@@ -202,6 +202,44 @@ describe('JwtStrategy', () => {
           storageQuotaBytes: 2000,
         });
       });
+
+      it('should preserve isSuperAdmin from the database path for /auth/me consumers', async () => {
+        mockDatabaseService.user.findUnique.mockResolvedValue({
+          ...mockUser,
+          isSuperAdmin: true,
+        } as any);
+
+        const result = await strategy.validate(userPayload);
+
+        expect(result.isSuperAdmin).toBe(true);
+        const cachedPayload = JSON.parse(mockRedisService.set.mock.calls[0][1] as string);
+        expect(cachedPayload.isSuperAdmin).toBe(true);
+      });
+
+      it('should preserve isSuperAdmin from the Redis cache path for /auth/me consumers', async () => {
+        mockRedisService.get.mockResolvedValue(JSON.stringify({
+          id: mockUser.id,
+          email: mockUser.email,
+          firstName: mockUser.firstName,
+          lastName: mockUser.lastName,
+          avatar: null,
+          organizationId: mockUser.organizationId,
+          role: mockUser.role,
+          isActive: true,
+          isSuperAdmin: true,
+          organization: {
+            id: 'org-123',
+            name: 'Test Organization',
+            storageUsedBytes: 0,
+            storageQuotaBytes: 1073741824,
+          },
+        }));
+
+        const result = await strategy.validate(userPayload);
+
+        expect(result.isSuperAdmin).toBe(true);
+        expect(mockDatabaseService.user.findUnique).not.toHaveBeenCalled();
+      });
     });
 
     describe('token revocation', () => {

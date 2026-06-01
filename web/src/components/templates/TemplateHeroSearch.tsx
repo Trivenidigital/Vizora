@@ -77,7 +77,7 @@ export default function TemplateHeroSearch({
             mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
           }`}
         >
-          Browse professionally designed templates or let AI create one for you
+          Browse professionally designed templates and clone one to customize for your screens
         </p>
 
         {/* Search bar */}
@@ -147,8 +147,8 @@ export default function TemplateHeroSearch({
             <path d="M19 2L19.5 3.5L21 4L19.5 4.5L19 6L18.5 4.5L17 4L18.5 3.5L19 2Z" fill="currentColor" opacity="0.6" />
             <path d="M5 18L5.5 19.5L7 20L5.5 20.5L5 22L4.5 20.5L3 20L4.5 19.5L5 18Z" fill="currentColor" opacity="0.6" />
           </svg>
-          Try AI Designer
-          <span className="text-[#00E5A0]/60 text-xs font-normal">New</span>
+          AI Designer coming soon
+          <span className="text-[#00E5A0]/60 text-xs font-normal">Soon</span>
         </button>
       </div>
     </div>

@@ -7,8 +7,11 @@ import { apiClient } from '@/lib/api';
 interface TemplateDetailModalProps {
   templateId: string;
   onClose: () => void;
-  onUseTemplate: (id: string) => void;
+  onUseTemplate?: (id: string) => void;
   onCustomize: (id: string) => void;
+  canManageLibraryTemplates?: boolean;
+  canEditOrgTemplates?: boolean;
+  canUseTemplates?: boolean;
 }
 
 interface TemplateData {
@@ -30,12 +33,20 @@ export default function TemplateDetailModal({
   onClose,
   onUseTemplate,
   onCustomize,
+  canManageLibraryTemplates = false,
+  canEditOrgTemplates = false,
+  canUseTemplates = false,
 }: TemplateDetailModalProps) {
   const router = useRouter();
   const [template, setTemplate] = useState<TemplateData | null>(null);
   const [previewHtml, setPreviewHtml] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [similar, setSimilar] = useState<TemplateData[]>([]);
+  const canEditTemplate =
+    canManageLibraryTemplates ||
+    (canEditOrgTemplates && template?.metadata?.isLibraryTemplate === false);
+  const canCloneTemplate =
+    canUseTemplates && template?.metadata?.isLibraryTemplate !== false;
 
   useEffect(() => {
     loadTemplate();
@@ -127,27 +138,33 @@ export default function TemplateDetailModal({
 
                 {/* Action buttons */}
                 <div className="flex gap-2 flex-shrink-0">
-                  <button
-                    onClick={() => {
-                      onClose();
-                      router.push(`/dashboard/templates/${template.id}/edit`);
-                    }}
-                    className="px-5 py-2.5 rounded-lg bg-[#00E5A0] text-[#061A21] font-semibold text-sm hover:bg-[#00CC8E] transition-all hover:shadow-[0_0_20px_rgba(0,229,160,0.3)]"
-                  >
-                    Edit Visually
-                  </button>
-                  <button
-                    onClick={() => onUseTemplate(template.id)}
-                    className="px-5 py-2.5 rounded-lg border border-[var(--border)] text-[var(--foreground-secondary)] font-medium text-sm hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)] transition-all"
-                  >
-                    Use This Template
-                  </button>
-                  <button
-                    onClick={() => onCustomize(template.id)}
-                    className="px-5 py-2.5 rounded-lg border border-[var(--border)] text-[var(--foreground-secondary)] font-medium text-sm hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)] transition-all"
-                  >
-                    Customize
-                  </button>
+                  {canEditTemplate && (
+                    <button
+                      onClick={() => {
+                        onClose();
+                        router.push(`/dashboard/templates/${template.id}/edit`);
+                      }}
+                      className="px-5 py-2.5 rounded-lg bg-[#00E5A0] text-[#061A21] font-semibold text-sm hover:bg-[#00CC8E] transition-all hover:shadow-[0_0_20px_rgba(0,229,160,0.3)]"
+                    >
+                      Edit Visually
+                    </button>
+                  )}
+                  {canCloneTemplate && onUseTemplate && (
+                    <button
+                      onClick={() => onUseTemplate(template.id)}
+                      className="px-5 py-2.5 rounded-lg border border-[var(--border)] text-[var(--foreground-secondary)] font-medium text-sm hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)] transition-all"
+                    >
+                      Use This Template
+                    </button>
+                  )}
+                  {canEditTemplate && (
+                    <button
+                      onClick={() => onCustomize(template.id)}
+                      className="px-5 py-2.5 rounded-lg border border-[var(--border)] text-[var(--foreground-secondary)] font-medium text-sm hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)] transition-all"
+                    >
+                      Customize
+                    </button>
+                  )}
                 </div>
               </div>
 

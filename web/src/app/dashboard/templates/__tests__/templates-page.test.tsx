@@ -1,16 +1,23 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import TemplateLibraryPage from '../page';
 
 const mockGetTemplateCategories = jest.fn();
 const mockGetFeaturedTemplates = jest.fn();
+const mockGetPopularTemplates = jest.fn();
 const mockSearchTemplates = jest.fn();
+const mockGetUserTemplates = jest.fn();
+const mockGetCurrentUser = jest.fn();
+const mockAiGenerateTemplate = jest.fn();
 
 jest.mock('@/lib/api', () => ({
   apiClient: {
     getTemplateCategories: (...args: any[]) => mockGetTemplateCategories(...args),
     getFeaturedTemplates: (...args: any[]) => mockGetFeaturedTemplates(...args),
+    getPopularTemplates: (...args: any[]) => mockGetPopularTemplates(...args),
     searchTemplates: (...args: any[]) => mockSearchTemplates(...args),
-    getCurrentUser: jest.fn().mockResolvedValue({ id: '1', email: 'test@test.com', firstName: 'Test', lastName: 'User', organizationId: 'org-1', role: 'admin' }),
+    getUserTemplates: (...args: any[]) => mockGetUserTemplates(...args),
+    getCurrentUser: (...args: any[]) => mockGetCurrentUser(...args),
+    aiGenerateTemplate: (...args: any[]) => mockAiGenerateTemplate(...args),
     setAuthenticated: jest.fn(),
     getQuotaUsage: jest.fn().mockResolvedValue({ storageUsedBytes: 0, storageQuotaBytes: 1073741824, screenCount: 0, screenQuota: 5 }),
   },
@@ -83,9 +90,21 @@ const sampleTemplates = [
 describe('TemplateLibraryPage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetCurrentUser.mockResolvedValue({
+      id: '1',
+      email: 'test@test.com',
+      firstName: 'Test',
+      lastName: 'User',
+      organizationId: 'org-1',
+      role: 'admin',
+      isSuperAdmin: false,
+    });
     mockGetTemplateCategories.mockResolvedValue(sampleCategories);
     mockGetFeaturedTemplates.mockResolvedValue({ data: sampleTemplates.filter(t => t.isFeatured) });
+    mockGetPopularTemplates.mockResolvedValue([]);
     mockSearchTemplates.mockResolvedValue({ data: sampleTemplates, meta: { total: 3 } });
+    mockGetUserTemplates.mockResolvedValue({ data: [], meta: { total: 0 } });
+    mockAiGenerateTemplate.mockResolvedValue({ available: false, message: 'AI Designer is launching soon.' });
   });
 
   it('renders loading spinner initially', () => {
@@ -165,5 +184,61 @@ describe('TemplateLibraryPage', () => {
     await waitFor(() => {
       expect(mockSearchTemplates).toHaveBeenCalled();
     });
+  });
+
+  it('does not expose platform template authoring actions to organization admins', async () => {
+    render(<TemplateLibraryPage />);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: /new design/i })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /ai designer coming soon/i }).length).toBeGreaterThan(0);
+  });
+
+  it('shows platform template authoring actions to super admins', async () => {
+    mockGetCurrentUser.mockResolvedValueOnce({
+      id: 'super-1',
+      email: 'super@test.com',
+      firstName: 'Super',
+      lastName: 'Admin',
+      organizationId: 'org-1',
+      role: 'admin',
+      isSuperAdmin: true,
+    });
+
+    render(<TemplateLibraryPage />);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('button', { name: /new design/i })).toBeInTheDocument();
+  });
+
+  it('does not expose clone/use actions on organization-owned templates', async () => {
+    mockGetUserTemplates.mockResolvedValueOnce({
+      data: [{
+        id: 'owned-1',
+        name: 'My Menu Clone',
+        description: 'Org-owned template',
+        category: 'Restaurant',
+        orientation: 'landscape',
+        difficulty: 'beginner',
+        metadata: { isLibraryTemplate: false },
+      }],
+      meta: { total: 1 },
+    });
+
+    render(<TemplateLibraryPage />);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
+    });
+    fireEvent.click(screen.getAllByRole('button', { name: /your templates/i })[0]);
+
+    expect(await screen.findByText('My Menu Clone')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^use template$/i })).not.toBeInTheDocument();
   });
 });

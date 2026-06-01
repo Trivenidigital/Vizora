@@ -53,7 +53,6 @@ export default function TemplateCard({
   renderedHtml,
   isFeatured,
   useCount,
-  tags,
   onClick,
   onUseTemplate,
   isAdmin,
@@ -117,18 +116,19 @@ export default function TemplateCard({
           </div>
         )}
 
-        {/* Hover overlay */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-300 flex items-center justify-center">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onUseTemplate?.(id);
-            }}
-            className="opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300 px-5 py-2 rounded-lg bg-[#00E5A0] text-[#061A21] font-semibold text-sm hover:bg-[#00CC8E] shadow-lg"
-          >
-            Use Template
-          </button>
-        </div>
+        {onUseTemplate && (
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-300 flex items-center justify-center">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onUseTemplate(id);
+              }}
+              className="opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300 px-5 py-2 rounded-lg bg-[#00E5A0] text-[#061A21] font-semibold text-sm hover:bg-[#00CC8E] shadow-lg"
+            >
+              Use Template
+            </button>
+          </div>
+        )}
 
         {/* Badges */}
         <div className="absolute top-2.5 left-2.5 flex gap-1.5">

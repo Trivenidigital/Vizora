@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/lib/hooks/useAuth';
 import TemplateHeroSearch from '@/components/templates/TemplateHeroSearch';
@@ -40,7 +39,8 @@ type ViewMode = 'home' | 'your-templates';
 export default function TemplateLibraryPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const canManageLibraryTemplates = user?.isSuperAdmin === true;
+  const canUseTemplates = user?.role === 'admin' || user?.role === 'manager';
 
   // Data
   const [templates, setTemplates] = useState<TemplateItem[]>([]);
@@ -215,8 +215,9 @@ export default function TemplateLibraryPage() {
   }, []);
 
   const handleUseTemplate = useCallback(async (id: string) => {
+    if (!canUseTemplates) return;
     setCloneModalId(id);
-  }, []);
+  }, [canUseTemplates]);
 
   const handleCloneConfirm = async () => {
     if (!cloneModalId) return;
@@ -295,6 +296,11 @@ export default function TemplateLibraryPage() {
     tags: t.libraryTags || t.tags,
   });
 
+  const canManageLibraryTemplate = (template: TemplateItem) =>
+    canManageLibraryTemplates && template.metadata?.isLibraryTemplate !== false;
+  const canCloneLibraryTemplate = (template: TemplateItem) =>
+    canUseTemplates && template.metadata?.isLibraryTemplate !== false;
+
   return (
     <div className="space-y-6 -mx-2 sm:-mx-4 lg:-mx-6">
       {/* Hero Search */}
@@ -321,7 +327,7 @@ export default function TemplateLibraryPage() {
           onViewModeChange={(m) => { setViewMode(m); setPage(1); setSearchQuery(''); }}
           onNewDesignClick={() => router.push('/dashboard/templates/new')}
           onAIDesignerClick={() => setShowAIDesigner(true)}
-          isAdmin={isAdmin}
+          isAdmin={canManageLibraryTemplates}
           totalCount={totalCount}
         />
 
@@ -350,7 +356,7 @@ export default function TemplateLibraryPage() {
                 onClick={() => setShowAIDesigner(true)}
                 className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-[#00E5A0] border border-[#00E5A0]/20 hover:bg-[#00E5A0]/5 transition-all"
               >
-                AI Designer
+                AI Designer coming soon
               </button>
               {viewMode === 'home' && (
                 <>
@@ -436,16 +442,18 @@ export default function TemplateLibraryPage() {
                   <div ref={featuredRef} className="flex gap-4 overflow-x-auto pb-2 scrollbar-thin" style={{ scrollbarWidth: 'thin' }}>
                     {featuredTemplates.map((t) => {
                       const mapped = mapForCard(t);
+                      const canManageThisTemplate = canManageLibraryTemplate(t);
+                      const canCloneThisTemplate = canCloneLibraryTemplate(t);
                       return (
                         <TemplateCard
                           key={t.id}
                           {...mapped}
                           variant="featured"
                           onClick={(id) => setDetailModalId(id)}
-                          onUseTemplate={handleUseTemplate}
-                          isAdmin={isAdmin}
-                          onEdit={isAdmin ? (id) => router.push(`/dashboard/templates/${id}?edit=true`) : undefined}
-                          onDelete={isAdmin ? (id) => setDeleteModalId(id) : undefined}
+                          onUseTemplate={canCloneThisTemplate ? handleUseTemplate : undefined}
+                          isAdmin={canManageThisTemplate}
+                          onEdit={canManageThisTemplate ? (id) => router.push(`/dashboard/templates/${id}?edit=true`) : undefined}
+                          onDelete={canManageThisTemplate ? (id) => setDeleteModalId(id) : undefined}
                         />
                       );
                     })}
@@ -465,15 +473,17 @@ export default function TemplateLibraryPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                     {popularTemplates.map((t) => {
                       const mapped = mapForCard(t);
+                      const canManageThisTemplate = canManageLibraryTemplate(t);
+                      const canCloneThisTemplate = canCloneLibraryTemplate(t);
                       return (
                         <TemplateCard
                           key={t.id}
                           {...mapped}
                           onClick={(id) => setDetailModalId(id)}
-                          onUseTemplate={handleUseTemplate}
-                          isAdmin={isAdmin}
-                          onEdit={isAdmin ? (id) => router.push(`/dashboard/templates/${id}?edit=true`) : undefined}
-                          onDelete={isAdmin ? (id) => setDeleteModalId(id) : undefined}
+                          onUseTemplate={canCloneThisTemplate ? handleUseTemplate : undefined}
+                          isAdmin={canManageThisTemplate}
+                          onEdit={canManageThisTemplate ? (id) => router.push(`/dashboard/templates/${id}?edit=true`) : undefined}
+                          onDelete={canManageThisTemplate ? (id) => setDeleteModalId(id) : undefined}
                         />
                       );
                     })}
@@ -543,7 +553,7 @@ export default function TemplateLibraryPage() {
                   <>
                     <h3 className="font-semibold text-[var(--foreground)] mb-1">No templates yet</h3>
                     <p className="text-sm text-[var(--foreground-secondary)] mb-4">
-                      Browse the library and clone templates to get started, or try the AI Designer.
+                      Browse the library and clone templates to get started. AI Designer is coming soon.
                     </p>
                     <div className="flex gap-2 justify-center">
                       <button
@@ -556,7 +566,7 @@ export default function TemplateLibraryPage() {
                         onClick={() => setShowAIDesigner(true)}
                         className="px-4 py-2 rounded-lg border border-[#00E5A0]/20 text-[#00E5A0] font-medium text-sm hover:bg-[#00E5A0]/5 transition-all"
                       >
-                        Try AI Designer
+                        AI Designer coming soon
                       </button>
                     </div>
                   </>
@@ -580,15 +590,17 @@ export default function TemplateLibraryPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                   {currentTemplates.map((t) => {
                     const mapped = mapForCard(t);
+                    const canManageThisTemplate = canManageLibraryTemplate(t);
+                    const canCloneThisTemplate = canCloneLibraryTemplate(t);
                     return (
                       <TemplateCard
                         key={t.id}
                         {...mapped}
                         onClick={(id) => setDetailModalId(id)}
-                        onUseTemplate={handleUseTemplate}
-                        isAdmin={isAdmin}
-                        onEdit={isAdmin ? (id) => router.push(`/dashboard/templates/${id}?edit=true`) : undefined}
-                        onDelete={isAdmin ? (id) => setDeleteModalId(id) : undefined}
+                        onUseTemplate={canCloneThisTemplate ? handleUseTemplate : undefined}
+                        isAdmin={canManageThisTemplate}
+                        onEdit={canManageThisTemplate ? (id) => router.push(`/dashboard/templates/${id}?edit=true`) : undefined}
+                        onDelete={canManageThisTemplate ? (id) => setDeleteModalId(id) : undefined}
                       />
                     );
                   })}
@@ -650,7 +662,10 @@ export default function TemplateLibraryPage() {
         <TemplateDetailModal
           templateId={detailModalId}
           onClose={() => setDetailModalId(null)}
-          onUseTemplate={handleUseTemplate}
+          onUseTemplate={canUseTemplates ? handleUseTemplate : undefined}
+          canManageLibraryTemplates={canManageLibraryTemplates}
+          canEditOrgTemplates={canUseTemplates}
+          canUseTemplates={canUseTemplates}
           onCustomize={(id) => {
             setDetailModalId(null);
             router.push(`/dashboard/templates/${id}?edit=true`);
@@ -662,11 +677,6 @@ export default function TemplateLibraryPage() {
       {showAIDesigner && (
         <AIDesignerModal
           onClose={() => setShowAIDesigner(false)}
-          onTemplateGenerated={(id) => {
-            setShowAIDesigner(false);
-            setViewMode('your-templates');
-            loadUserTemplates();
-          }}
         />
       )}
 

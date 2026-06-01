@@ -33,6 +33,7 @@ interface TemplateDetail {
   previewUrl?: string | null;
   createdAt?: string;
   updatedAt?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export default function TemplateDetailPage() {
@@ -42,7 +43,8 @@ export default function TemplateDetailPage() {
   const templateId = params.id as string;
 
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const canManageLibraryTemplates = user?.isSuperAdmin === true;
+  const canUseTemplates = user?.role === 'admin' || user?.role === 'manager';
   const startInEditMode = searchParams.get('edit') === 'true';
 
   const [template, setTemplate] = useState<TemplateDetail | null>(null);
@@ -74,6 +76,12 @@ export default function TemplateDetailPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const isOrgTemplate = template?.metadata?.isLibraryTemplate === false;
+  const canEditTemplate =
+    canManageLibraryTemplates ||
+    (isOrgTemplate && canUseTemplates);
+  const canDeleteTemplate = canManageLibraryTemplates && !isOrgTemplate;
+  const canCloneTemplate = canUseTemplates && template?.metadata?.isLibraryTemplate !== false;
 
   useEffect(() => {
     if (templateId) {
@@ -112,7 +120,7 @@ export default function TemplateDetailPage() {
   };
 
   const enterEditMode = () => {
-    if (!template) return;
+    if (!template || !canEditTemplate) return;
     setEditName(template.name || '');
     setEditDescription(template.description || '');
     setEditCategory(template.category || 'general');
@@ -127,16 +135,19 @@ export default function TemplateDetailPage() {
 
   // Auto-enter edit mode from URL param
   useEffect(() => {
-    if (startInEditMode && template && !editMode) {
+    if (startInEditMode && template && canEditTemplate && !editMode) {
       enterEditMode();
     }
-  }, [template, startInEditMode]);
+  }, [template, startInEditMode, canEditTemplate, editMode]);
 
   const handleSave = async () => {
     try {
       setSaving(true);
       setSaveError(null);
-      await apiClient.updateTemplate(templateId, {
+      const update = canManageLibraryTemplates && !isOrgTemplate
+        ? apiClient.updateLibraryTemplate
+        : apiClient.updateTemplate;
+      await update.call(apiClient, templateId, {
         name: editName.trim() || undefined,
         description: editDescription.trim() || undefined,
         templateHtml: editHtml || undefined,
@@ -186,6 +197,7 @@ export default function TemplateDetailPage() {
   };
 
   const handleClone = async () => {
+    if (!canCloneTemplate) return;
     try {
       setCloning(true);
       setCloneError(null);
@@ -316,7 +328,7 @@ export default function TemplateDetailPage() {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-3 flex-shrink-0">
-          {isAdmin && !editMode && (
+          {canEditTemplate && !editMode && (
             <button
               onClick={enterEditMode}
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition text-[var(--foreground)]"
@@ -328,12 +340,14 @@ export default function TemplateDetailPage() {
 
           {editMode ? (
             <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowDeleteModal(true)}
-                className="px-4 py-2 text-sm font-medium text-error-600 dark:text-error-400 bg-[var(--surface)] border border-error-500/20 rounded-lg hover:bg-error-500/10 transition"
-              >
-                Delete
-              </button>
+              {canDeleteTemplate && (
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="px-4 py-2 text-sm font-medium text-error-600 dark:text-error-400 bg-[var(--surface)] border border-error-500/20 rounded-lg hover:bg-error-500/10 transition"
+                >
+                  Delete
+                </button>
+              )}
               <button
                 onClick={() => setEditMode(false)}
                 className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition"
@@ -350,20 +364,24 @@ export default function TemplateDetailPage() {
             </div>
           ) : (
             <>
-              <Link
-                href={`/dashboard/templates/${templateId}/edit`}
-                className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 text-sm font-medium inline-flex items-center gap-2"
-              >
-                <Icon name="edit" size="sm" />
-                Edit Visually
-              </Link>
-              <button
-                onClick={() => setShowCloneModal(true)}
-                className="px-6 py-3 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
-              >
-                <Icon name="copy" size="md" />
-                Clone to My Content
-              </button>
+              {canEditTemplate && (
+                <Link
+                  href={`/dashboard/templates/${templateId}/edit`}
+                  className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 text-sm font-medium inline-flex items-center gap-2"
+                >
+                  <Icon name="edit" size="sm" />
+                  Edit Visually
+                </Link>
+              )}
+              {canCloneTemplate && (
+                <button
+                  onClick={() => setShowCloneModal(true)}
+                  className="px-6 py-3 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+                >
+                  <Icon name="copy" size="md" />
+                  Clone to My Content
+                </button>
+              )}
             </>
           )}
         </div>
@@ -596,28 +614,30 @@ export default function TemplateDetailPage() {
               )}
 
               {/* Clone CTA (repeated for visibility) */}
-              <div className="bg-gradient-to-br from-[#00E5A0]/10 to-[#00B4D8]/10 rounded-lg p-5 border border-[#00E5A0]/20">
-                <h3 className="text-sm font-semibold text-[var(--foreground)] mb-2">
-                  Use this template
-                </h3>
-                <p className="text-xs text-[var(--foreground-secondary)] mb-4">
-                  Clone this template to your content library and customize it with your own data.
-                </p>
-                <button
-                  onClick={() => setShowCloneModal(true)}
-                  className="w-full px-4 py-2.5 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition font-semibold text-sm flex items-center justify-center gap-2"
-                >
-                  <Icon name="copy" size="sm" />
-                  Clone Template
-                </button>
-              </div>
+              {canCloneTemplate && (
+                <div className="bg-gradient-to-br from-[#00E5A0]/10 to-[#00B4D8]/10 rounded-lg p-5 border border-[#00E5A0]/20">
+                  <h3 className="text-sm font-semibold text-[var(--foreground)] mb-2">
+                    Use this template
+                  </h3>
+                  <p className="text-xs text-[var(--foreground-secondary)] mb-4">
+                    Clone this template to your content library and customize it with your own data.
+                  </p>
+                  <button
+                    onClick={() => setShowCloneModal(true)}
+                    className="w-full px-4 py-2.5 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition font-semibold text-sm flex items-center justify-center gap-2"
+                  >
+                    <Icon name="copy" size="sm" />
+                    Clone Template
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
       </div>
 
       {/* Clone Modal */}
-      {showCloneModal && (
+      {showCloneModal && canCloneTemplate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           {/* Overlay */}
           <div

@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
-import { ExtractJwt, Strategy } from 'passport-jwt';
+import { Strategy } from 'passport-jwt';
 import { Request } from 'express';
 import { DatabaseService } from '../../database/database.service';
 import { RedisService } from '../../redis/redis.service';
@@ -137,6 +137,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           avatar: userData.avatar || null,
           organizationId: userData.organizationId,
           role: userData.role,
+          ...(userData.isSuperAdmin === true ? { isSuperAdmin: true } : {}),
           organization: userData.organization,
         };
       } catch (e) {
@@ -173,6 +174,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       organizationId: user.organizationId,
       role: user.role,
       isActive: user.isActive,
+      ...(user.isSuperAdmin === true ? { isSuperAdmin: true } : {}),
       organization: safeOrganization,
     };
     await this.redisService.set(cacheKey, JSON.stringify(userDataToCache), JwtStrategy.USER_CACHE_TTL);
@@ -185,6 +187,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       avatar: user.avatar,
       organizationId: user.organizationId,
       role: user.role,
+      ...(user.isSuperAdmin === true ? { isSuperAdmin: true } : {}),
       organization: safeOrganization,
     };
   }
