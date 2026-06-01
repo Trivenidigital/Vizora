@@ -5,6 +5,11 @@
  * to provide a consistent API for fetching, configuring, and previewing
  * widget data within the content system.
  */
+export interface WidgetFetchOptions {
+  /** Strict mode is used for persisted widgets; sample fallback data must not be returned. */
+  strict?: boolean;
+}
+
 export interface WidgetDataSource {
   /** Unique type identifier for this data source (e.g., 'weather', 'rss') */
   type: string;
@@ -14,7 +19,10 @@ export interface WidgetDataSource {
    * @param config - Widget-specific configuration (API keys, URLs, etc.)
    * @returns The fetched data shaped for template rendering
    */
-  fetchData(config: Record<string, unknown>): Promise<Record<string, unknown>>;
+  fetchData(
+    config: Record<string, unknown>,
+    options?: WidgetFetchOptions,
+  ): Promise<Record<string, unknown>>;
 
   /**
    * Return the JSON schema describing valid configuration options.

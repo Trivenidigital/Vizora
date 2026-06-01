@@ -1,7 +1,7 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, BadGatewayException, ServiceUnavailableException } from '@nestjs/common';
 import * as dns from 'dns/promises';
 import { GenericApiDataSource } from './generic-api.data-source';
-import { CircuitBreakerService } from '../../common/services/circuit-breaker.service';
+import { CircuitBreakerService, CircuitOpenError } from '../../common/services/circuit-breaker.service';
 
 jest.mock('dns/promises');
 
@@ -17,7 +17,7 @@ jest.mock('dns/promises');
  */
 describe('GenericApiDataSource', () => {
   let dataSource: GenericApiDataSource;
-  let circuitBreaker: jest.Mocked<Pick<CircuitBreakerService, 'executeWithFallback'>>;
+  let circuitBreaker: jest.Mocked<Pick<CircuitBreakerService, 'execute' | 'executeWithFallback'>>;
   const originalFetch = global.fetch;
   const mockLookup = dns.lookup as unknown as jest.Mock;
   const jsonResponse = (body: unknown, init?: ResponseInit) =>
@@ -33,6 +33,7 @@ describe('GenericApiDataSource', () => {
   beforeEach(() => {
     // Circuit breaker mock: execute the primary callback directly (skip fallback unless asked)
     circuitBreaker = {
+      execute: jest.fn((_name, primary, _config) => primary()),
       executeWithFallback: jest.fn((_name, primary, _fallback) => primary()),
     } as any;
     dataSource = new GenericApiDataSource(circuitBreaker as unknown as CircuitBreakerService);
@@ -340,6 +341,37 @@ describe('GenericApiDataSource', () => {
 
       const result = await dataSource.fetchData({ url: 'https://api.example.com/x' });
       expect(result.data).toBeInstanceOf(Array);
+    });
+  });
+
+  describe('strict mode', () => {
+    it('rejects missing url instead of returning sample data', async () => {
+      await expect(dataSource.fetchData({}, { strict: true })).rejects.toThrow(BadRequestException);
+      expect(circuitBreaker.execute).not.toHaveBeenCalled();
+      expect(circuitBreaker.executeWithFallback).not.toHaveBeenCalled();
+    });
+
+    it('does not use fallback sample data when the upstream endpoint fails', async () => {
+      global.fetch = jest.fn().mockResolvedValue(new Response('error', { status: 500 })) as any;
+
+      await expect(
+        dataSource.fetchData({ url: 'https://api.example.com/x' }, { strict: true }),
+      ).rejects.toThrow(BadGatewayException);
+
+      expect(circuitBreaker.execute).toHaveBeenCalled();
+      expect(circuitBreaker.executeWithFallback).not.toHaveBeenCalled();
+    });
+
+    it('maps an open circuit to ServiceUnavailableException', async () => {
+      circuitBreaker.execute.mockRejectedValue(
+        new CircuitOpenError('generic-api', Date.now() + 30_000),
+      );
+
+      await expect(
+        dataSource.fetchData({ url: 'https://api.example.com/x' }, { strict: true }),
+      ).rejects.toThrow(ServiceUnavailableException);
+
+      expect(circuitBreaker.executeWithFallback).not.toHaveBeenCalled();
     });
   });
 

@@ -6,7 +6,7 @@ jest.mock('isomorphic-dompurify', () => ({
   },
 }));
 
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { NotFoundException, BadRequestException, BadGatewayException } from '@nestjs/common';
 import { ContentService, TemplateMetadata } from './content.service';
 import { DatabaseService } from '../database/database.service';
 import { TemplateRenderingService } from './template-rendering.service';
@@ -1387,7 +1387,7 @@ describe('ContentService', () => {
         expiresAt,
       });
 
-      const result = await service.setExpiration('org-123', 'content-123', expiresAt);
+      await service.setExpiration('org-123', 'content-123', expiresAt);
 
       expect(mockDatabaseService.content.updateMany).toHaveBeenCalledWith({
         where: { id: 'content-123', organizationId: 'org-123' },
@@ -1411,7 +1411,7 @@ describe('ContentService', () => {
         replacementContentId: 'replacement-123',
       });
 
-      const result = await service.setExpiration(
+      await service.setExpiration(
         'org-123',
         'content-123',
         expiresAt,
@@ -1462,7 +1462,7 @@ describe('ContentService', () => {
         replacementContentId: null,
       });
 
-      const result = await service.clearExpiration('org-123', 'content-123');
+      await service.clearExpiration('org-123', 'content-123');
 
       expect(mockDatabaseService.content.updateMany).toHaveBeenCalledWith({
         where: { id: 'content-123', organizationId: 'org-123' },
@@ -2038,6 +2038,229 @@ describe('ContentService', () => {
           duration: 60,
         }),
       ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('widgets', () => {
+    const widgetDto = {
+      name: 'Lobby Weather',
+      widgetType: 'weather',
+      widgetConfig: { location: 'Austin', units: 'imperial' },
+      description: 'Live weather for the lobby',
+    };
+
+    const makeWidgetContent = (metadataOverrides: Record<string, unknown> = {}) => ({
+      ...mockContent,
+      id: 'widget-123',
+      type: 'template',
+      name: 'Lobby Weather',
+      url: '',
+      duration: 30,
+      metadata: {
+        isWidget: true,
+        widgetType: 'weather',
+        widgetConfig: { location: 'Austin', units: 'imperial' },
+        templateName: 'weather',
+        templateHtml: '<div>{{temperature}}</div>',
+        renderedHtml: '<div>old</div>',
+        renderedAt: '2026-06-01T00:00:00.000Z',
+        ...metadataOverrides,
+      },
+    });
+
+    const makeSource = (overrides: Record<string, unknown> = {}) => ({
+      type: 'weather',
+      fetchData: jest.fn().mockResolvedValue({ temperature: 72 }),
+      getConfigSchema: jest.fn().mockReturnValue({}),
+      getDefaultTemplate: jest.fn().mockReturnValue('weather'),
+      getSampleData: jest.fn().mockReturnValue({ temperature: 72 }),
+      ...overrides,
+    });
+
+    beforeEach(() => {
+      jest.spyOn(service as any, 'loadWidgetTemplate').mockReturnValue('<div>{{temperature}}</div>');
+      mockTemplateRendering.renderTemplate.mockReturnValue('<div>72</div>');
+    });
+
+    it('fails closed when initial live data fetch fails and does not create sample-backed widgets', async () => {
+      const source = makeSource({
+        fetchData: jest.fn().mockRejectedValue(new BadGatewayException('Weather provider failed')),
+      });
+      mockDataSourceRegistry.get.mockReturnValue(source as any);
+
+      await expect(service.createWidget('org-123', widgetDto)).rejects.toThrow(BadGatewayException);
+
+      expect(source.fetchData).toHaveBeenCalledWith(widgetDto.widgetConfig, { strict: true });
+      expect(source.getSampleData).not.toHaveBeenCalled();
+      expect(mockDatabaseService.content.create).not.toHaveBeenCalled();
+    });
+
+    it('fails closed when initial template render fails and does not create an empty widget', async () => {
+      const source = makeSource();
+      mockDataSourceRegistry.get.mockReturnValue(source as any);
+      mockTemplateRendering.renderTemplate.mockImplementation(() => {
+        throw new Error('template syntax error');
+      });
+
+      await expect(service.createWidget('org-123', widgetDto)).rejects.toThrow(BadGatewayException);
+
+      expect(source.fetchData).toHaveBeenCalledWith(widgetDto.widgetConfig, { strict: true });
+      expect(mockDatabaseService.content.create).not.toHaveBeenCalled();
+    });
+
+    it('does not persist widget configuration updates when live data fetch fails', async () => {
+      const source = makeSource({
+        fetchData: jest.fn().mockRejectedValue(new BadGatewayException('Feed provider failed')),
+      });
+      mockDataSourceRegistry.get.mockReturnValue(source as any);
+      mockDatabaseService.content.findFirst.mockResolvedValue(makeWidgetContent());
+
+      await expect(
+        service.updateWidget('org-123', 'widget-123', {
+          widgetConfig: { location: 'Broken' },
+        }),
+      ).rejects.toThrow(BadGatewayException);
+
+      expect(source.fetchData).toHaveBeenCalledWith({ location: 'Broken' }, { strict: true });
+      expect(mockDatabaseService.content.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('does not persist widget configuration updates when re-render fails', async () => {
+      const source = makeSource();
+      mockDataSourceRegistry.get.mockReturnValue(source as any);
+      mockDatabaseService.content.findFirst.mockResolvedValue(makeWidgetContent());
+      mockTemplateRendering.renderTemplate.mockImplementation(() => {
+        throw new Error('template syntax error');
+      });
+
+      await expect(
+        service.updateWidget('org-123', 'widget-123', {
+          widgetConfig: { location: 'Austin' },
+        }),
+      ).rejects.toThrow(BadGatewayException);
+
+      expect(source.fetchData).toHaveBeenCalledWith({ location: 'Austin' }, { strict: true });
+      expect(mockDatabaseService.content.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('refresh failure records lastError but preserves the previous rendered HTML', async () => {
+      const source = makeSource({
+        fetchData: jest.fn().mockRejectedValue(new BadGatewayException('Weather provider failed')),
+      });
+      mockDataSourceRegistry.get.mockReturnValue(source as any);
+      mockDatabaseService.content.findFirst.mockResolvedValue(makeWidgetContent());
+      mockDatabaseService.content.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.content.findFirst.mockResolvedValue(makeWidgetContent({
+        lastError: 'Weather provider failed',
+      }));
+
+      await expect(service.refreshWidget('org-123', 'widget-123')).rejects.toThrow(BadGatewayException);
+
+      expect(source.fetchData).toHaveBeenCalledWith(
+        { location: 'Austin', units: 'imperial' },
+        { strict: true },
+      );
+      expect(mockDatabaseService.content.updateMany).toHaveBeenCalledWith({
+        where: { id: 'widget-123', organizationId: 'org-123' },
+        data: {
+          metadata: expect.objectContaining({
+            renderedHtml: '<div>old</div>',
+            lastError: 'Weather provider failed',
+          }),
+        },
+      });
+    });
+
+    it('redacts generic API headers in widget responses while storing the real value', async () => {
+      const source = makeSource({
+        type: 'generic-api',
+        fetchData: jest.fn().mockResolvedValue({ data: [] }),
+        getDefaultTemplate: jest.fn().mockReturnValue('generic-api'),
+      });
+      mockDataSourceRegistry.get.mockReturnValue(source as any);
+      mockDatabaseService.content.create.mockImplementation(async ({ data }: any) => ({
+        ...mockContent,
+        id: 'generic-widget-123',
+        name: data.name,
+        type: data.type,
+        metadata: data.metadata,
+      }));
+
+      const result = await service.createWidget('org-123', {
+        ...widgetDto,
+        widgetType: 'generic-api',
+        widgetConfig: {
+          url: 'https://api.example.com/menu',
+          headers: { Authorization: 'Bearer live-secret' },
+        },
+      });
+
+      const createCall = mockDatabaseService.content.create.mock.calls[0][0];
+      expect(createCall.data.metadata.widgetConfig.headers.Authorization).toBe('Bearer live-secret');
+      expect((result as any).metadata.widgetConfig.headers.Authorization).toBe('********');
+    });
+
+    it('redacts generic API headers from widget list responses', async () => {
+      mockDatabaseService.content.findMany.mockResolvedValue([
+        makeWidgetContent({
+          widgetType: 'generic-api',
+          widgetConfig: {
+            url: 'https://api.example.com/menu',
+            headers: { Authorization: 'Bearer live-secret' },
+          },
+        }),
+      ]);
+      mockDatabaseService.content.count.mockResolvedValue(1);
+
+      const result = await service.findAllWidgets('org-123', { page: 1, limit: 10 });
+
+      expect(result.data[0].metadata.widgetConfig.headers.Authorization).toBe('********');
+    });
+
+    it('preserves stored generic API header secrets when a redacted value is saved back', async () => {
+      const existingGenericWidget = makeWidgetContent({
+        widgetType: 'generic-api',
+        widgetConfig: {
+          url: 'https://api.example.com/menu',
+          headers: { Authorization: 'Bearer stored-secret' },
+        },
+        templateName: 'generic-api',
+      });
+      const source = makeSource({
+        type: 'generic-api',
+        fetchData: jest.fn().mockResolvedValue({ data: [] }),
+        getDefaultTemplate: jest.fn().mockReturnValue('generic-api'),
+      });
+      mockDataSourceRegistry.get.mockReturnValue(source as any);
+      mockDatabaseService.content.findFirst
+        .mockResolvedValueOnce(existingGenericWidget)
+        .mockResolvedValueOnce(existingGenericWidget);
+      mockDatabaseService.content.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.updateWidget('org-123', 'widget-123', {
+        widgetConfig: {
+          url: 'https://api.example.com/menu',
+          headers: { Authorization: '********' },
+        },
+      });
+
+      expect(source.fetchData).toHaveBeenCalledWith(
+        {
+          url: 'https://api.example.com/menu',
+          headers: { Authorization: 'Bearer stored-secret' },
+        },
+        { strict: true },
+      );
+      expect(mockDatabaseService.content.updateMany).toHaveBeenCalledWith({
+        where: { id: 'widget-123', organizationId: 'org-123' },
+        data: expect.objectContaining({
+          metadata: expect.objectContaining({
+            widgetConfig: expect.objectContaining({
+              headers: { Authorization: 'Bearer stored-secret' },
+            }),
+          }),
+        }),
+      });
     });
   });
 });

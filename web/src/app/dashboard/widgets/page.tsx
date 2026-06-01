@@ -95,6 +95,8 @@ interface WidgetType {
   description: string;
   icon?: string;
   configSchema: Record<string, any>;
+  available?: boolean;
+  unavailableReason?: string;
 }
 
 interface Widget {
@@ -103,16 +105,90 @@ interface Widget {
   widgetType: string;
   widgetConfig: Record<string, any>;
   description?: string;
+  metadata?: Record<string, any>;
   createdAt?: string;
   updatedAt?: string;
 }
 
+const WIDGET_TYPES_UNAVAILABLE_MESSAGE = 'Widget types could not be loaded. Try again before creating widgets.';
+
+const humanizeFieldName = (key: string) =>
+  key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+
+const normalizeConfigSchema = (schema: Record<string, any> = {}) => {
+  const requiredFields = Array.isArray(schema.required) ? schema.required : [];
+  const properties =
+    schema.type === 'object' && schema.properties && typeof schema.properties === 'object'
+      ? schema.properties
+      : schema;
+
+  return Object.entries(properties).reduce<Record<string, any>>((acc, [key, rawField]) => {
+    if (!rawField || typeof rawField !== 'object') {
+      acc[key] = { type: 'string', label: humanizeFieldName(key) };
+      return acc;
+    }
+
+    const field = rawField as Record<string, any>;
+    const fieldType = field.options || field.enum ? 'select' : field.type || 'string';
+    acc[key] = {
+      ...field,
+      type: fieldType === 'integer' ? 'number' : fieldType,
+      label: field.label || humanizeFieldName(key),
+      placeholder: field.placeholder || field.description || '',
+      required: field.required ?? requiredFields.includes(key),
+      options: field.options || field.enum,
+      min: field.min ?? field.minimum,
+      max: field.max ?? field.maximum,
+    };
+    return acc;
+  }, {});
+};
+
+const normalizeWidget = (widget: any): Widget => {
+  const metadata = widget?.metadata || {};
+  return {
+    ...widget,
+    name: widget?.name || widget?.title || 'Untitled Widget',
+    widgetType: widget?.widgetType || metadata.widgetType || widget?.type || 'unknown',
+    widgetConfig: widget?.widgetConfig || metadata.widgetConfig || widget?.config || {},
+    metadata,
+  };
+};
+
+const normalizeWidgetTypes = (types: WidgetType[]) =>
+  types.map((type) => ({ ...type, configSchema: normalizeConfigSchema(type.configSchema) }));
+
+const getAvailableWidgetTypes = (types: WidgetType[]) => types.filter((type) => type.available !== false);
+
+const getMissingRequiredFields = (schema: Record<string, any> = {}, config: Record<string, any> = {}) =>
+  Object.entries(schema)
+    .filter(([, field]) => (field as any)?.required)
+    .map(([key, field]) => {
+      const value = config[key];
+      const isMissing =
+        value === undefined ||
+        value === null ||
+        (typeof value === 'string' && value.trim() === '') ||
+        (Array.isArray(value) && value.length === 0);
+      return isMissing ? ((field as any).label || humanizeFieldName(key)) : null;
+    })
+    .filter((label): label is string => Boolean(label));
+
+const unavailableFallbackWidgetTypes = () =>
+  normalizeWidgetTypes(DEFAULT_WIDGET_TYPES as WidgetType[]).map((type) => ({
+    ...type,
+    available: false,
+    unavailableReason: WIDGET_TYPES_UNAVAILABLE_MESSAGE,
+  }));
+
 export default function WidgetsPage() {
   const toast = useToast();
-  const [widgetTypes, setWidgetTypes] = useState<WidgetType[]>(DEFAULT_WIDGET_TYPES);
+  const [widgetTypes, setWidgetTypes] = useState<WidgetType[]>([]);
   const [myWidgets, setMyWidgets] = useState<Widget[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [refreshingWidgetIds, setRefreshingWidgetIds] = useState<Set<string>>(new Set());
+  const [widgetTypesLoadError, setWidgetTypesLoadError] = useState<string | null>(null);
 
   // Wizard state
   const [isWizardOpen, setIsWizardOpen] = useState(false);
@@ -126,10 +202,31 @@ export default function WidgetsPage() {
   const [editingWidget, setEditingWidget] = useState<Widget | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editConfig, setEditConfig] = useState<Record<string, any>>({});
+  const availableWidgetTypes = getAvailableWidgetTypes(widgetTypes);
+  const canOpenWizard = !loading && availableWidgetTypes.length > 0;
+  const createMissingFields = selectedType ? getMissingRequiredFields(selectedType.configSchema, widgetConfig) : [];
+  const editTypeInfo = editingWidget
+    ? widgetTypes.find((t) => t.type === editingWidget.widgetType)
+    : null;
+  const editMissingFields = editTypeInfo ? getMissingRequiredFields(editTypeInfo.configSchema, editConfig) : [];
 
   useEffect(() => {
     loadData();
   }, []);
+
+  const loadWidgets = async () => {
+    const response = await apiClient.get<any>('/content/widgets');
+    const widgets = response?.data || response || [];
+    return Array.isArray(widgets) ? widgets.map(normalizeWidget) : [];
+  };
+
+  const refreshWidgetListAfterMutation = async () => {
+    try {
+      setMyWidgets(await loadWidgets());
+    } catch {
+      toast.error('Widget list refresh failed. Showing the latest local change.');
+    }
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -143,19 +240,24 @@ export default function WidgetsPage() {
             ...t,
             name: t.name || fallback?.name || t.type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
             description: t.description || fallback?.description || '',
+            configSchema: normalizeConfigSchema(t.configSchema || fallback?.configSchema || {}),
+            available: true,
           };
         });
         setWidgetTypes(merged);
+        setWidgetTypesLoadError(null);
+      } else {
+        setWidgetTypes([]);
+        setWidgetTypesLoadError(null);
       }
     } catch {
       // Use default widget types as fallback — already set as initial state
-      setWidgetTypes(DEFAULT_WIDGET_TYPES);
+      setWidgetTypes(unavailableFallbackWidgetTypes());
+      setWidgetTypesLoadError(WIDGET_TYPES_UNAVAILABLE_MESSAGE);
     }
 
     try {
-      const response = await apiClient.get<any>('/content/widgets');
-      const widgets = response?.data || response || [];
-      setMyWidgets(Array.isArray(widgets) ? widgets : []);
+      setMyWidgets(await loadWidgets());
     } catch {
       // Widgets may not exist yet
       setMyWidgets([]);
@@ -190,13 +292,23 @@ export default function WidgetsPage() {
   };
 
   const openWizard = (type: WidgetType) => {
-    setSelectedType(type);
+    if (type.available === false) {
+      toast.error(type.unavailableReason || WIDGET_TYPES_UNAVAILABLE_MESSAGE);
+      return;
+    }
+
+    const normalizedType = {
+      ...type,
+      configSchema: normalizeConfigSchema(type.configSchema),
+    };
+
+    setSelectedType(normalizedType);
     setWidgetName('');
     setWidgetDescription('');
     // Initialize config with defaults from schema
     const defaults: Record<string, any> = {};
-    if (type.configSchema) {
-      Object.entries(type.configSchema).forEach(([key, schema]: [string, any]) => {
+    if (normalizedType.configSchema) {
+      Object.entries(normalizedType.configSchema).forEach(([key, schema]: [string, any]) => {
         if (schema.default !== undefined) {
           defaults[key] = schema.default;
         } else if (schema.type === 'boolean') {
@@ -218,20 +330,27 @@ export default function WidgetsPage() {
       toast.error('Widget name is required');
       return;
     }
+    if (createMissingFields.length > 0) {
+      toast.error(`Complete required fields: ${createMissingFields.join(', ')}`);
+      return;
+    }
 
     setActionLoading(true);
     try {
-      await apiClient.createWidget({
+      const created = normalizeWidget(await apiClient.createWidget({
         name: widgetName.trim(),
         widgetType: selectedType.type,
         widgetConfig: widgetConfig,
         description: widgetDescription.trim() || undefined,
-      });
+      }));
+      if (created.id) {
+        setMyWidgets((prev) => [created, ...prev.filter((widget) => widget.id !== created.id)]);
+      }
       toast.success('Widget created successfully');
       setIsWizardOpen(false);
       setSelectedType(null);
       setWizardStep('select');
-      loadData();
+      void refreshWidgetListAfterMutation();
     } catch (error: any) {
       toast.error(error.message || 'Failed to create widget');
     } finally {
@@ -240,11 +359,23 @@ export default function WidgetsPage() {
   };
 
   const handleRefreshWidget = async (id: string) => {
+    setRefreshingWidgetIds((prev) => new Set(prev).add(id));
     try {
-      await apiClient.refreshWidget(id);
+      const refreshed = normalizeWidget(await apiClient.refreshWidget(id));
+      if (refreshed.id) {
+        setMyWidgets((prev) =>
+          prev.map((widget) => (widget.id === refreshed.id ? { ...widget, ...refreshed } : widget)),
+        );
+      }
       toast.success('Widget data refreshed');
     } catch (error: any) {
       toast.error(error.message || 'Failed to refresh widget');
+    } finally {
+      setRefreshingWidgetIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     }
   };
 
@@ -256,16 +387,25 @@ export default function WidgetsPage() {
 
   const handleUpdateWidget = async () => {
     if (!editingWidget) return;
+    if (editMissingFields.length > 0) {
+      toast.error(`Complete required fields: ${editMissingFields.join(', ')}`);
+      return;
+    }
 
     setActionLoading(true);
     try {
-      await apiClient.updateWidget(editingWidget.id, {
+      const updated = normalizeWidget(await apiClient.updateWidget(editingWidget.id, {
         widgetConfig: editConfig,
-      });
+      }));
+      if (updated.id) {
+        setMyWidgets((prev) =>
+          prev.map((widget) => (widget.id === updated.id ? { ...widget, ...updated } : widget)),
+        );
+      }
       toast.success('Widget updated successfully');
       setIsEditModalOpen(false);
       setEditingWidget(null);
-      loadData();
+      void refreshWidgetListAfterMutation();
     } catch (error: any) {
       toast.error(error.message || 'Failed to update widget');
     } finally {
@@ -280,15 +420,42 @@ export default function WidgetsPage() {
     onChange: (key: string, val: any) => void
   ) => {
     const fieldType = schema.type || 'string';
+    const label = schema.label || humanizeFieldName(key);
+
+    if (fieldType === 'object') {
+      return (
+        <div key={key} className="space-y-1">
+          <label className="block text-sm font-medium text-[var(--foreground-secondary)]">
+            {label}
+            {schema.required && <span className="text-red-500 ml-1">*</span>}
+          </label>
+          <textarea
+            aria-label={label}
+            value={typeof value === 'string' ? value : JSON.stringify(value || {}, null, 2)}
+            placeholder={schema.placeholder || ''}
+            rows={4}
+            onChange={(e) => {
+              try {
+                onChange(key, JSON.parse(e.target.value));
+              } catch {
+                onChange(key, e.target.value);
+              }
+            }}
+            className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)] resize-y font-mono text-sm"
+          />
+        </div>
+      );
+    }
 
     if (fieldType === 'textarea') {
       return (
         <div key={key} className="space-y-1">
           <label className="block text-sm font-medium text-[var(--foreground-secondary)]">
-            {schema.label || key}
+            {label}
             {schema.required && <span className="text-red-500 ml-1">*</span>}
           </label>
           <textarea
+            aria-label={label}
             value={value || ''}
             placeholder={schema.placeholder || ''}
             rows={4}
@@ -308,7 +475,7 @@ export default function WidgetsPage() {
             onChange={(e) => onChange(key, e.target.checked)}
             className="w-4 h-4 rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]"
           />
-          <span className="text-sm font-medium text-[var(--foreground)]">{schema.label || key}</span>
+          <span className="text-sm font-medium text-[var(--foreground)]">{label}</span>
         </label>
       );
     }
@@ -317,10 +484,11 @@ export default function WidgetsPage() {
       return (
         <div key={key} className="space-y-1">
           <label className="block text-sm font-medium text-[var(--foreground-secondary)]">
-            {schema.label || key}
+            {label}
             {schema.required && <span className="text-red-500 ml-1">*</span>}
           </label>
           <select
+            aria-label={label}
             value={value || ''}
             onChange={(e) => onChange(key, e.target.value)}
             className="eh-select w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
@@ -340,9 +508,10 @@ export default function WidgetsPage() {
       return (
         <div key={key} className="space-y-1">
           <label className="block text-sm font-medium text-[var(--foreground-secondary)]">
-            {schema.label || key}
+            {label}
           </label>
           <input
+            aria-label={label}
             type="number"
             value={value ?? ''}
             min={schema.min}
@@ -358,10 +527,11 @@ export default function WidgetsPage() {
     return (
       <div key={key} className="space-y-1">
         <label className="block text-sm font-medium text-[var(--foreground-secondary)]">
-          {schema.label || key}
+          {label}
           {schema.required && <span className="text-red-500 ml-1">*</span>}
         </label>
         <input
+          aria-label={label}
           type="text"
           value={value || ''}
           placeholder={schema.placeholder || ''}
@@ -415,12 +585,13 @@ export default function WidgetsPage() {
           </p>
         </div>
         <button
+          disabled={!canOpenWizard}
           onClick={() => {
             setWizardStep('select');
             setSelectedType(null);
             setIsWizardOpen(true);
           }}
-          className="eh-btn-neon rounded-xl px-6 py-3 transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+          className="eh-btn-neon rounded-xl px-6 py-3 transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Icon name="add" size="lg" />
           <span>Create Widget</span>
@@ -474,10 +645,15 @@ export default function WidgetsPage() {
                         </button>
                         <button
                           onClick={() => handleRefreshWidget(widget.id)}
-                          className="flex-1 text-sm py-2 rounded-lg bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition font-medium flex items-center justify-center gap-1"
+                          disabled={refreshingWidgetIds.has(widget.id)}
+                          className="flex-1 text-sm py-2 rounded-lg bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition font-medium flex items-center justify-center gap-1 disabled:opacity-60 disabled:cursor-wait"
                         >
-                          <Icon name="refresh" size="sm" />
-                          Refresh
+                          {refreshingWidgetIds.has(widget.id) ? (
+                            <LoadingSpinner size="sm" />
+                          ) : (
+                            <Icon name="refresh" size="sm" />
+                          )}
+                          {refreshingWidgetIds.has(widget.id) ? 'Refreshing...' : 'Refresh'}
                         </button>
                       </div>
                     </div>
@@ -492,11 +668,16 @@ export default function WidgetsPage() {
             <h3 className="eh-dash-subtitle text-xl font-semibold text-[var(--foreground)] mb-4">
               {myWidgets.length > 0 ? 'Available Widget Types' : 'Widget Gallery'}
             </h3>
+            {widgetTypesLoadError && (
+              <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+                {widgetTypesLoadError}
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {widgetTypes.map((wType) => (
                 <div
                   key={wType.type}
-                  className="eh-dash-card rounded-lg shadow overflow-hidden hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 border border-[var(--border)] cursor-pointer group"
+                  className={`eh-dash-card rounded-lg shadow overflow-hidden transition-all duration-300 border border-[var(--border)] group ${wType.available === false ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md'}`}
                   onClick={() => openWizard(wType)}
                 >
                   <div className={`h-32 bg-gradient-to-br ${getColorForType(wType.type)} flex items-center justify-center relative`}>
@@ -506,12 +687,18 @@ export default function WidgetsPage() {
                   <div className="p-5">
                     <h4 className="text-lg font-semibold text-[var(--foreground)] mb-1">{wType.name}</h4>
                     <p className="text-sm text-[var(--foreground-secondary)] mb-4">{wType.description}</p>
+                    {wType.available === false && (
+                      <p className="text-xs text-amber-600 dark:text-amber-300 mb-3">
+                        Reload widget types before creating.
+                      </p>
+                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         openWizard(wType);
                       }}
-                      className="w-full py-2 text-sm font-medium rounded-lg border border-[#00E5A0] text-[#00E5A0] hover:bg-[#00E5A0] hover:text-[#061A21] transition flex items-center justify-center gap-2"
+                      disabled={wType.available === false}
+                      className="w-full py-2 text-sm font-medium rounded-lg border border-[#00E5A0] text-[#00E5A0] hover:bg-[#00E5A0] hover:text-[#061A21] transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#00E5A0]"
                     >
                       <Icon name="add" size="sm" />
                       Create {wType.name} Widget
@@ -552,12 +739,18 @@ export default function WidgetsPage() {
         {wizardStep === 'select' && (
           <div className="space-y-4">
             <p className="text-[var(--foreground-secondary)]">Choose a widget type to get started:</p>
+            {widgetTypesLoadError && (
+              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+                {widgetTypesLoadError}
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {widgetTypes.map((wType) => (
                 <button
                   key={wType.type}
                   onClick={() => openWizard(wType)}
-                  className="flex items-center gap-3 p-4 rounded-lg border border-[var(--border)] hover:border-[#00E5A0] hover:bg-[#00E5A0]/5 transition text-left"
+                  disabled={wType.available === false}
+                  className="flex items-center gap-3 p-4 rounded-lg border border-[var(--border)] hover:border-[#00E5A0] hover:bg-[#00E5A0]/5 transition text-left disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-[var(--border)] disabled:hover:bg-transparent"
                 >
                   <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${getColorForType(wType.type)} flex items-center justify-center flex-shrink-0`}>
                     <Icon name={getIconForType(wType.type)} size="lg" className="text-white" />
@@ -569,6 +762,13 @@ export default function WidgetsPage() {
                 </button>
               ))}
             </div>
+            {widgetTypes.length === 0 && (
+              <EmptyState
+                icon="content"
+                title="No widget types available"
+                description="Widget types will appear here once the backend is configured."
+              />
+            )}
           </div>
         )}
 
@@ -580,6 +780,7 @@ export default function WidgetsPage() {
                 Widget Name <span className="text-red-500">*</span>
               </label>
               <input
+                aria-label="Widget Name"
                 type="text"
                 value={widgetName}
                 onChange={(e) => setWidgetName(e.target.value)}
@@ -594,6 +795,7 @@ export default function WidgetsPage() {
                 Description (optional)
               </label>
               <input
+                aria-label="Description"
                 type="text"
                 value={widgetDescription}
                 onChange={(e) => setWidgetDescription(e.target.value)}
@@ -626,14 +828,14 @@ export default function WidgetsPage() {
               <div className="flex gap-2">
                 <button
                   onClick={() => setWizardStep('preview')}
-                  disabled={!widgetName.trim()}
+                  disabled={!widgetName.trim() || createMissingFields.length > 0}
                   className="px-4 py-2 text-sm font-medium text-[var(--foreground)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition disabled:opacity-50"
                 >
                   Preview
                 </button>
                 <button
                   onClick={handleCreateWidget}
-                  disabled={actionLoading || !widgetName.trim()}
+                  disabled={actionLoading || !widgetName.trim() || createMissingFields.length > 0}
                   className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium transition disabled:opacity-50 flex items-center gap-2"
                 >
                   {actionLoading && <LoadingSpinner size="sm" />}
@@ -772,7 +974,7 @@ export default function WidgetsPage() {
               </button>
               <button
                 onClick={handleCreateWidget}
-                disabled={actionLoading || !widgetName.trim()}
+                disabled={actionLoading || !widgetName.trim() || createMissingFields.length > 0}
                 className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium transition disabled:opacity-50 flex items-center gap-2"
               >
                 {actionLoading && <LoadingSpinner size="sm" />}
@@ -806,7 +1008,7 @@ export default function WidgetsPage() {
 
             {/* Config Fields based on widget type */}
             {(() => {
-              const typeInfo = widgetTypes.find((t) => t.type === editingWidget.widgetType);
+              const typeInfo = editTypeInfo;
               if (!typeInfo?.configSchema) return <p className="text-[var(--foreground-secondary)]">No configurable settings for this widget type.</p>;
 
               return (
@@ -832,7 +1034,7 @@ export default function WidgetsPage() {
               </button>
               <button
                 onClick={handleUpdateWidget}
-                disabled={actionLoading}
+                disabled={actionLoading || editMissingFields.length > 0}
                 className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium transition disabled:opacity-50 flex items-center gap-2"
               >
                 {actionLoading && <LoadingSpinner size="sm" />}

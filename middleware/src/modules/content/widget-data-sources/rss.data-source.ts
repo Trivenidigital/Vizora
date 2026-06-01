@@ -1,6 +1,10 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
-import { CircuitBreakerService } from '../../common/services/circuit-breaker.service';
-import { WidgetDataSource } from './widget-data-source.interface';
+import { Injectable, Logger, BadRequestException, BadGatewayException, ServiceUnavailableException } from '@nestjs/common';
+import { CircuitBreakerService, CircuitOpenError } from '../../common/services/circuit-breaker.service';
+import { fetchWithSsrfGuard, SsrfError } from '../../common/utils/ssrf-guard';
+import { WidgetDataSource, WidgetFetchOptions } from './widget-data-source.interface';
+import { readJsonResponseBodyWithLimit } from '../utils/bounded-json-response';
+
+const MAX_RSS_RESPONSE_BYTES = 2 * 1024 * 1024;
 
 const RSS_CIRCUIT_CONFIG = {
   failureThreshold: 3,
@@ -25,15 +29,24 @@ export class RssDataSource implements WidgetDataSource {
 
   constructor(private readonly circuitBreaker: CircuitBreakerService) {}
 
-  async fetchData(config: Record<string, unknown>): Promise<Record<string, unknown>> {
-    const feedUrl = config.feedUrl;
+  async fetchData(config: Record<string, unknown>, options: WidgetFetchOptions = {}): Promise<Record<string, unknown>> {
+    const strict = options.strict === true;
+    const feedUrl = typeof config.feedUrl === 'string' ? config.feedUrl.trim() : '';
     if (!feedUrl) {
+      if (strict) {
+        throw new BadRequestException('Feed URL is required');
+      }
       this.logger.warn('No feedUrl provided, returning sample data');
       return this.getSampleData();
     }
 
     // SSRF validation: block private/internal addresses
-    const url = new URL(feedUrl);
+    let url: URL;
+    try {
+      url = new URL(feedUrl);
+    } catch {
+      throw new BadRequestException('Invalid feed URL format');
+    }
     const hostname = url.hostname.toLowerCase();
     const blockedPatterns = [
       /^localhost$/i, /^127\./, /^10\./, /^172\.(1[6-9]|2\d|3[01])\./,
@@ -48,39 +61,70 @@ export class RssDataSource implements WidgetDataSource {
 
     const maxItems = config.maxItems ?? 10;
 
-    return this.circuitBreaker.executeWithFallback(
-      'rss-feed',
-      async () => {
+    const fetchLiveData = async () => {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.REQUEST_TIMEOUT);
 
         let xml: string;
         try {
-          const res = await fetch(feedUrl, {
-            headers: {
-              'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml',
-              'User-Agent': 'Vizora-Widget/1.0',
+          const res = await fetchWithSsrfGuard(
+            feedUrl,
+            {
+              headers: {
+                'Accept': 'application/rss+xml, application/atom+xml, application/xml, text/xml',
+                'User-Agent': 'Vizora-Widget/1.0',
+              },
+              signal: controller.signal,
             },
-            signal: controller.signal,
-          });
+            { allowHttp: true, maxRedirects: 3 },
+          );
 
           if (!res.ok) {
             throw new Error(`Feed returned HTTP ${res.status}`);
           }
 
-          xml = await res.text();
+          xml = await readJsonResponseBodyWithLimit(res, MAX_RSS_RESPONSE_BYTES);
+        } catch (error) {
+          if (error instanceof SsrfError) {
+            throw new BadRequestException(error.message);
+          }
+          throw error;
         } finally {
           clearTimeout(timeoutId);
         }
 
         return this.parseXml(xml, maxItems);
-      },
-      () => {
+    };
+
+    if (strict) {
+      try {
+        return await this.circuitBreaker.execute('rss-feed', fetchLiveData, RSS_CIRCUIT_CONFIG);
+      } catch (error) {
+        throw this.toStrictFetchException(error, 'RSS feed');
+      }
+    }
+
+    return this.circuitBreaker.executeWithFallback(
+      'rss-feed',
+      fetchLiveData,
+      (error) => {
+        if (error instanceof BadRequestException) {
+          throw error;
+        }
         this.logger.warn('RSS feed circuit open or failed, returning sample data');
         return this.getSampleData();
       },
       RSS_CIRCUIT_CONFIG,
     );
+  }
+
+  private toStrictFetchException(error: unknown, providerName: string): Error {
+    if (error instanceof BadRequestException) return error;
+    if (error instanceof CircuitOpenError) {
+      return new ServiceUnavailableException(`${providerName} provider is temporarily unavailable`);
+    }
+    const message = error instanceof Error ? error.message : 'Unknown provider error';
+    return new BadGatewayException(`${providerName} provider failed: ${message}`);
   }
 
   // -----------------------------------------------------------------------

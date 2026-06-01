@@ -1,5 +1,41 @@
 # Vizora - Task Tracker
 
+## Active: Widget Truthfulness Pass 29 (2026-06-01)
+
+**Branch:** `feat/widget-truthfulness-pass-29`
+
+**Why now:** Pass 28 is merged with green PR and post-merge `main` CI, but production deploy remains blocked by dirty/diverged prod-local state. The next highest customer-trust issue from the dashboard review is widgets saving sample or stale data while reporting success.
+
+**New primitives introduced:** one server-only optional strict-fetch mode on existing widget data sources, plus dashboard schema normalization for existing widget type metadata. No new database model, migration, process, queue, realtime path, MCP tool, Hermes skill, provider spend path, or deployment primitive.
+
+**Hermes-first analysis:** not applicable. This pass does not add or modify business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
+
+**Plan/design:** `docs/plans/2026-06-01-widget-truthfulness-pass-29.md`
+
+**Plan**
+- [x] Start fresh branch from `origin/main`.
+- [x] Drift-check widget create/update/runtime behavior.
+- [x] Run plan review before implementation.
+- [x] Add failing service/data-source tests for no sample/stale widget saves.
+- [x] Add failing dashboard tests for schema normalization, disabled fallback types, and error toasts without false success.
+- [x] Implement strict live-data fetch path for saved widgets.
+- [x] Fix dashboard schema handling, fallback type behavior, and refresh pending state.
+- [x] Run multi-subagent review before broader verification.
+- [x] Run focused and broader verification.
+- [ ] PR, CI, merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Local evidence so far:**
+- TDD red: focused middleware widget/data-source suite failed because strict mode did not exist, data sources returned sample data, create/update saved fallback or stale HTML, and refresh wrapped provider failure as `BadRequestException`.
+- TDD red: focused web widget page test failed because backend JSON schema rendered as raw `type/properties/required`, fallback catalog entries were creatable, refresh had no pending state, and create relied on a swallowed reload.
+- Focused green after implementation: middleware widget/data-source suite 158/158; web widgets page 14/14.
+- Review findings fixed: generic API widget headers are redacted from content responses while preserving stored secrets on redacted save-back; RSS strict mode now uses the shared SSRF guard with redirect and body-size checks; weather strict mode validates units; widget update/refresh writes are tenant-scoped; fallback widget types are disabled; refresh state is per-widget; required schema fields gate create/update.
+- Final review: backend and frontend subagents both returned CLEAN.
+- Final focused evidence: middleware widget/data-source suite passed 165/165; widgets page suite passed 16/16. Post-cleanup `content.service.spec.ts` passed 110/110.
+- Broader evidence: middleware full Jest passed 146 suites / 2920 tests; web full Jest passed 96 suites / 1041 tests. Middleware and web `tsc --noEmit` passed. `pnpm security:no-hardcoded-jwts` passed. `pnpm build:middleware` passed with existing webpack warnings. `pnpm build:web` passed with local required `NEXT_PUBLIC_SOCKET_URL`, `NEXT_PUBLIC_API_URL`, `BACKEND_URL`, and memory env; the first web build without `NEXT_PUBLIC_SOCKET_URL` correctly failed the production CSP guard. Changed-file ESLint exited 0 with non-blocking existing `any` warnings in the widgets page. `git diff --check` passed with CRLF warnings only.
+
+---
+
 ## Active: Content Tag Filter Trust Pass 28 (2026-06-01)
 
 **Branch:** `feat/customer-readiness-pass-28`

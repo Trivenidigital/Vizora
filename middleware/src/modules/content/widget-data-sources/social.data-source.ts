@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { WidgetDataSource } from './widget-data-source.interface';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import { WidgetDataSource, WidgetFetchOptions } from './widget-data-source.interface';
 
 // =============================================================================
 // Instagram Data Source (stub -- real API integration deferred)
@@ -11,7 +11,10 @@ export class InstagramDataSource implements WidgetDataSource {
 
   readonly type = 'social_instagram';
 
-  async fetchData(config: Record<string, unknown>): Promise<Record<string, unknown>> {
+  async fetchData(config: Record<string, unknown>, options: WidgetFetchOptions = {}): Promise<Record<string, unknown>> {
+    if (options.strict) {
+      throw new ServiceUnavailableException('Instagram live widget integration is not available');
+    }
     // Stub: real Instagram Graph API integration deferred
     this.logger.debug('Instagram fetchData called (stub), returning sample data');
     return this.getSampleData();
@@ -133,7 +136,10 @@ export class TwitterDataSource implements WidgetDataSource {
 
   readonly type = 'social_twitter';
 
-  async fetchData(config: Record<string, unknown>): Promise<Record<string, unknown>> {
+  async fetchData(config: Record<string, unknown>, options: WidgetFetchOptions = {}): Promise<Record<string, unknown>> {
+    if (options.strict) {
+      throw new ServiceUnavailableException('Twitter/X live widget integration is not available');
+    }
     this.logger.debug('Twitter fetchData called (stub), returning sample data');
     return this.getSampleData();
   }
@@ -240,7 +246,10 @@ export class FacebookDataSource implements WidgetDataSource {
 
   readonly type = 'social_facebook';
 
-  async fetchData(config: Record<string, unknown>): Promise<Record<string, unknown>> {
+  async fetchData(config: Record<string, unknown>, options: WidgetFetchOptions = {}): Promise<Record<string, unknown>> {
+    if (options.strict) {
+      throw new ServiceUnavailableException('Facebook live widget integration is not available');
+    }
     this.logger.debug('Facebook fetchData called (stub), returning sample data');
     return this.getSampleData();
   }

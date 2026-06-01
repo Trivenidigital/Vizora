@@ -1,4 +1,4 @@
-export { WidgetDataSource } from './widget-data-source.interface';
+export { WidgetDataSource, WidgetFetchOptions } from './widget-data-source.interface';
 export { WeatherDataSource } from './weather.data-source';
 export { RssDataSource } from './rss.data-source';
 export {
