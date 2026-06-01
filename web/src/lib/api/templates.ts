@@ -21,6 +21,7 @@ declare module './client' {
     // Template Admin
     createTemplate(data: { name: string; description?: string; templateHtml: string; category: string; difficulty?: string; orientation?: string; tags?: string[]; sampleData?: Record<string, any>; thumbnailUrl?: string; duration?: number }): Promise<any>;
     updateTemplate(id: string, data: { name?: string; description?: string; templateHtml?: string; category?: string; difficulty?: string; orientation?: string; tags?: string[]; sampleData?: Record<string, any>; thumbnailUrl?: string; duration?: number }): Promise<any>;
+    updateLibraryTemplate(id: string, data: { name?: string; description?: string; templateHtml?: string; category?: string; difficulty?: string; orientation?: string; tags?: string[]; sampleData?: Record<string, any>; thumbnailUrl?: string; duration?: number }): Promise<any>;
     deleteTemplate(id: string): Promise<void>;
     publishTemplate(templateId: string, data: { renderedHtml: string; displayIds: string[]; name: string; duration?: number }): Promise<{ contentId: string; displayCount: number }>;
   }
@@ -135,6 +136,24 @@ ApiClient.prototype.updateTemplate = async function (id: string, data: {
   duration?: number;
 }): Promise<any> {
   return this.request<any>(`/template-library/${id}/save`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+};
+
+ApiClient.prototype.updateLibraryTemplate = async function (id: string, data: {
+  name?: string;
+  description?: string;
+  templateHtml?: string;
+  category?: string;
+  difficulty?: string;
+  orientation?: string;
+  tags?: string[];
+  sampleData?: Record<string, any>;
+  thumbnailUrl?: string;
+  duration?: number;
+}): Promise<any> {
+  return this.request<any>(`/template-library/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
   });

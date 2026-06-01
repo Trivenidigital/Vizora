@@ -32,6 +32,7 @@ export interface AuthUser {
   firstName: string;
   lastName: string;
   role: string;
+  isSuperAdmin?: boolean;
   avatarUrl?: string | null;
   organizationId: string;
   organization?: {

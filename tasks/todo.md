@@ -1,6 +1,86 @@
 # Vizora - Task Tracker
 
-## Active: Bounded Playlist Fan-out Pass 35 (2026-06-01)
+## Active: Template Action Truthfulness Pass 36 (2026-06-01)
+
+**Branch:** `feat/customer-experience-pass-36`
+
+**Why now:** PR #166 is merged with green PR and post-merge main CI, but
+production deploy remains blocked by dirty/diverged prod-local state. The next
+customer trust issue from the dashboard audit is template authoring: the UI
+shows AI Designer and template editing affordances that ordinary customer admins
+cannot complete because the backend intentionally keeps AI generation disabled
+and template create/update/delete behind `SuperAdminGuard`.
+
+**New primitives introduced:** none. This pass only aligns existing frontend
+affordances with existing backend guards and unavailable AI response. No route,
+module, middleware, schema, response envelope, realtime path, notification path,
+MCP tool, Hermes skill, provider spend path, env var, or production process
+changes.
+
+**Hermes-first analysis:** not applicable. This pass does not add or modify
+business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
+
+**Plan/design:**
+`docs/plans/2026-06-01-template-action-truthfulness-pass-36.md`
+
+**Plan**
+- [x] Start fresh branch from updated `origin/main`.
+- [x] Drift-check template frontend actions against backend guards.
+- [x] Document pass 36 design and test plan.
+- [x] Add failing ordinary-admin template action tests.
+- [x] Gate super-admin-only actions and make AI Designer unavailable state honest.
+- [x] Run multi-subagent review before broader verification.
+- [x] Run focused and broader verification.
+- [ ] PR, CI, merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Evidence so far:**
+- PR #166 / pass 35 integration: merged at
+  `7728ea03dfa0a108f957d0225727f9613915f776`; PR CI and post-merge main CI run
+  `26779421101` completed with build, lint, test, security, and e2e all
+  successful.
+- Production gate after PR #166: blocked. `/opt/vizora/app` is still dirty and
+  diverged (`main...origin/main [ahead 17, behind 123]`, `HEAD bb76aa...`,
+  `origin/main 7728ea0...`) with many modified template/landing/Hermes files and
+  untracked production files. Core API health is OK, but most ops/agent PM2
+  entries remain stopped. No deploy attempted.
+- Open PR check after PR #166: no open pull requests.
+- Drift-check: `template-library.controller.ts` uses `SuperAdminGuard` on
+  create/update/delete, while `template-library.service.ts` returns
+  `available: false` for AI generation. The dashboard currently keys some
+  create/edit actions from `role === 'admin'` and simulates AI generation before
+  showing the unavailable state.
+- Implementation: `/auth/me` now preserves optional `isSuperAdmin`, global
+  template authoring is gated on `isSuperAdmin === true`, org-owned template
+  editing stays available to admin/manager roles through the existing
+  `/template-library/:id/save` route, and clone/use actions are hidden for
+  viewers and org-owned templates because backend clone accepts global templates
+  only.
+- Implementation: AI Designer entry points now show an honest coming-soon modal
+  and no longer simulate or call disabled generation.
+- Multi-vector review: authorization/architecture reviewer CLEAN; customer-flow
+  and backend-contract reviewer CLEAN after follow-up tests hid clone/use actions
+  on org-owned templates.
+- Focused verification:
+  `pnpm --filter @vizora/web test -- --runInBand --runTestsByPath src/app/dashboard/templates/__tests__/templates-page.test.tsx src/components/templates/__tests__/AIDesignerModal.test.tsx src/components/templates/__tests__/TemplateDetailModal.test.tsx src/lib/api/__tests__/templates.test.ts 'src/app/dashboard/templates/[id]/__tests__/template-detail-page.test.tsx' 'src/app/dashboard/templates/[id]/edit/__tests__/page-client.test.tsx'`
+  passed 6 suites / 26 tests. `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/auth/strategies/jwt.strategy.spec.ts`
+  passed 34 tests.
+- Broader verification: `pnpm --filter @vizora/web test -- --runInBand` passed
+  101 suites / 1065 tests; `pnpm --filter @vizora/middleware test -- --runInBand`
+  passed 146 suites / 2942 tests. Existing warning noise remains from React
+  `act(...)`, jsdom navigation, MinIO/storage logs, and expected health/circuit
+  breaker logs.
+- Type/build/security: web and middleware `tsc --noEmit --pretty false` passed;
+  changed-file ESLint passed with warnings only from existing `any` debt;
+  `npx nx build @vizora/web --skip-nx-cache`, `npx nx build @vizora/middleware --skip-nx-cache`,
+  and `npx nx build @vizora/realtime --skip-nx-cache` passed. The first
+  concurrent middleware build hit a Windows Prisma generated-client copy lock;
+  serial retry passed. `git diff --check` and `pnpm security:no-hardcoded-jwts`
+  passed.
+
+---
+
+## Completed: Bounded Playlist Fan-out Pass 35 (2026-06-01)
 
 **Branch:** `feat/customer-experience-pass-35`
 
@@ -32,8 +112,12 @@ business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
 - [x] Implement bounded notification dispatch with existing circuit breaker path.
 - [x] Run multi-subagent review before broader verification.
 - [x] Run focused and broader verification.
-- [ ] PR, CI, merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge if green. PR #166 merged to `origin/main` at
+  `7728ea03dfa0a108f957d0225727f9613915f776`; PR CI and post-merge main CI
+  green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe. Rechecked
+  after PR #166: blocked because `/opt/vizora/app` is dirty and diverged
+  (`main...origin/main [ahead 17, behind 123]`) despite healthy core API.
 
 **Evidence so far:**
 - Drift-check: `middleware/src/modules/playlists/playlists.service.ts`

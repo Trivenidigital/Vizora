@@ -66,7 +66,7 @@ export default function CreateTemplatePage() {
   }
 
   // Auth gate: access denied
-  if (user?.role !== 'admin') {
+  if (user?.isSuperAdmin !== true) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
         <Icon name="shield" size="3xl" className="text-red-500 mb-4" />
@@ -74,7 +74,7 @@ export default function CreateTemplatePage() {
           Access Denied
         </h2>
         <p className="text-[var(--foreground-secondary)] mb-6">
-          You do not have permission to create templates. Admin access is required.
+          Platform super-admin access is required to create global library templates.
         </p>
         <Link
           href="/dashboard/templates"

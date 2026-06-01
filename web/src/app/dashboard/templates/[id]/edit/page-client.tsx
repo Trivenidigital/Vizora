@@ -12,6 +12,7 @@ import { useEditorHistory } from '@/components/template-editor/useEditorHistory'
 import { useCanvasZoom } from '@/components/template-editor/useCanvasZoom';
 import type { ZoomPreset } from '@/components/template-editor/useCanvasZoom';
 import { apiClient } from '@/lib/api';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { useToast } from '@/lib/hooks/useToast';
 
 interface EditPageClientProps {
@@ -21,9 +22,15 @@ interface EditPageClientProps {
 export default function EditPageClient({ templateId }: EditPageClientProps) {
   const router = useRouter();
   const toast = useToast();
+  const { user, loading: authLoading } = useAuth();
+  const canManageLibraryTemplates = user?.isSuperAdmin === true;
+  const canUseTemplates = user?.role === 'admin' || user?.role === 'manager';
+  const routerRef = useRef(router);
+  const toastRef = useRef(toast);
 
   // ── State ────────────────────────────────────────────────────────────
   const [templateName, setTemplateName] = useState('');
+  const [isOrgTemplate, setIsOrgTemplate] = useState(false);
   const [previewHtml, setPreviewHtml] = useState('');
   const [loading, setLoading] = useState(true);
   const [editorReady, setEditorReady] = useState(false);
@@ -31,6 +38,9 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
   const [showDisplayPicker, setShowDisplayPicker] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const canEditTemplate =
+    canManageLibraryTemplates ||
+    (isOrgTemplate && canUseTemplates);
 
   // ── Refs ──────────────────────────────────────────────────────────────
   const canvasRef = useRef<CanvasHandle>(null);
@@ -41,6 +51,11 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
 
   // ── Editor History (undo/redo) ────────────────────────────────────────
   const history = useEditorHistory(iframeRef);
+
+  useEffect(() => {
+    routerRef.current = router;
+    toastRef.current = toast;
+  }, [router, toast]);
 
   // Populate iframeRef by finding the iframe inside the canvas container
   // after the editor is ready.
@@ -68,11 +83,12 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
         if (cancelled) return;
 
         setTemplateName(detail.name || 'Untitled Template');
+        setIsOrgTemplate(detail.metadata?.isLibraryTemplate === false);
         setPreviewHtml(preview.html || '');
       } catch (err: any) {
         if (cancelled) return;
-        toast.error(err.message || 'Failed to load template');
-        router.push('/dashboard/templates');
+        toastRef.current.error(err.message || 'Failed to load template');
+        routerRef.current.push('/dashboard/templates');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -82,7 +98,7 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
     return () => {
       cancelled = true;
     };
-  }, [templateId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [templateId]);
 
   // ── Handlers ─────────────────────────────────────────────────────────
 
@@ -113,14 +129,16 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
   }, []);
 
   const handleSaveDraft = useCallback(async () => {
-    if (!canvasRef.current) return;
+    if (!canvasRef.current || !canEditTemplate) return;
 
     setSaving(true);
     try {
       const renderedHtml = await canvasRef.current.serialize();
+      const update = canManageLibraryTemplates && !isOrgTemplate
+        ? apiClient.updateLibraryTemplate
+        : apiClient.updateTemplate;
 
-      // Save the edited HTML back to the template
-      await apiClient.updateTemplate(templateId, {
+      await update.call(apiClient, templateId, {
         templateHtml: renderedHtml,
       });
 
@@ -130,11 +148,11 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
     } finally {
       setSaving(false);
     }
-  }, [templateId, toast]);
+  }, [canEditTemplate, canManageLibraryTemplates, isOrgTemplate, templateId, toast]);
 
   const handlePublish = useCallback(
     async (displayIds: string[]) => {
-      if (!canvasRef.current) return;
+      if (!canvasRef.current || !canEditTemplate) return;
 
       setPublishing(true);
       try {
@@ -163,12 +181,12 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
         setPublishing(false);
       }
     },
-    [templateId, templateName, toast, router],
+    [canEditTemplate, templateId, templateName, toast, router],
   );
 
   // ── Loading state ────────────────────────────────────────────────────
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-950">
         <div className="flex flex-col items-center gap-3">
@@ -193,6 +211,25 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
             />
           </svg>
           <span className="text-sm text-gray-400">Loading template...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!canEditTemplate) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-950">
+        <div className="max-w-sm text-center">
+          <p className="text-sm font-semibold text-gray-200">Template editing is not available</p>
+          <p className="mt-2 text-sm text-gray-400">
+            Clone this template into your organization before editing it, or use a platform super-admin account for global library templates.
+          </p>
+          <button
+            onClick={() => router.push('/dashboard/templates')}
+            className="mt-5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500"
+          >
+            Back to Templates
+          </button>
         </div>
       </div>
     );

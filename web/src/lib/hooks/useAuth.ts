@@ -9,6 +9,7 @@ interface User {
   avatarUrl?: string | null;
   organizationId: string;
   role: string;
+  isSuperAdmin?: boolean;
   organization?: {
     name: string;
     subscriptionTier: string;
