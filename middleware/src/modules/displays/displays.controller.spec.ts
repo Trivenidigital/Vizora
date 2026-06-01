@@ -34,6 +34,8 @@ describe('DisplaysController', () => {
       getLastScreenshot: jest.fn(),
       disableDevice: jest.fn(),
       enableDevice: jest.fn(),
+      updateQrOverlay: jest.fn(),
+      removeQrOverlay: jest.fn(),
     } as any;
 
     // Mock DatabaseService for QuotaGuard
@@ -372,6 +374,46 @@ describe('DisplaysController', () => {
       await expect(
         controller.getScreenshot('display-123', organizationId)
       ).rejects.toThrow('Display not found');
+    });
+  });
+
+  describe('QR overlay', () => {
+    it('should return the saved QR overlay config', async () => {
+      const config = {
+        enabled: true,
+        url: 'https://example.com/menu',
+        position: 'bottom-right' as const,
+        size: 120,
+        opacity: 1,
+        margin: 16,
+        backgroundColor: '#ffffff',
+      };
+      mockDisplaysService.updateQrOverlay.mockResolvedValue(config as any);
+
+      const result = await controller.updateQrOverlay(
+        organizationId,
+        'display-123',
+        config as any,
+      );
+
+      expect(result).toEqual(config);
+      expect(mockDisplaysService.updateQrOverlay).toHaveBeenCalledWith(
+        organizationId,
+        'display-123',
+        config,
+      );
+    });
+
+    it('should remove QR overlay without returning a display row', async () => {
+      mockDisplaysService.removeQrOverlay.mockResolvedValue(undefined as any);
+
+      await expect(
+        controller.removeQrOverlay(organizationId, 'display-123'),
+      ).resolves.toBeUndefined();
+      expect(mockDisplaysService.removeQrOverlay).toHaveBeenCalledWith(
+        organizationId,
+        'display-123',
+      );
     });
   });
 });

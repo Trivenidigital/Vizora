@@ -4,6 +4,7 @@ import { CreateDisplayGroupDto } from './dto/create-display-group.dto';
 import { UpdateDisplayGroupDto } from './dto/update-display-group.dto';
 import { ManageDisplaysDto } from './dto/manage-displays.dto';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
+import { DISPLAY_GROUP_MEMBER_WITH_DISPLAY_SELECT } from '../displays/display-response.select';
 
 @Injectable()
 export class DisplayGroupsService {
@@ -17,9 +18,7 @@ export class DisplayGroupsService {
       },
       include: {
         displays: {
-          include: {
-            display: true,
-          },
+          select: DISPLAY_GROUP_MEMBER_WITH_DISPLAY_SELECT,
         },
       },
     });
@@ -59,9 +58,7 @@ export class DisplayGroupsService {
       where: { id, organizationId },
       include: {
         displays: {
-          include: {
-            display: true,
-          },
+          select: DISPLAY_GROUP_MEMBER_WITH_DISPLAY_SELECT,
         },
       },
     });

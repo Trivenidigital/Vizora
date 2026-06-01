@@ -1,6 +1,114 @@
 # Vizora - Task Tracker
 
-## In Progress: Dashboard Customer Improvements Pass 20 (2026-06-01)
+## In Progress: Display Response Projection Pass 21 (2026-06-01)
+
+**Branch:** `feat/customer-dashboard-improvements-pass-21`
+
+**Why now:** PR #143 merged the shared dashboard socket pass and post-merge
+`main` CI is green, but deployment remains blocked by dirty/diverged prod-local
+state. A fresh customer/performance/release review found several valid next
+targets; local drift-check also found the authenticated display API still
+returns full Prisma `Display` rows, which can include hashed device JWTs,
+pairing-code fields, and transient socket IDs. This pass closes that sensitive
+response surface and reduces display list/detail payloads.
+
+**New primitives introduced:** one shared Prisma display response projection
+module. No new runtime service, route, database model, migration, agent, or
+infrastructure primitive.
+
+**Hermes-first analysis:** not applicable. This pass does not add business
+agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
+
+**Plan**
+- [x] Merge PR #143 after PR CI green and confirm post-merge `main` CI.
+- [x] Re-check production deploy gate after merge.
+- [x] Start fresh branch from `origin/main`.
+- [x] Dispatch read-only customer UX, backend/performance, and test/release
+  readiness reviewers.
+- [x] Drift-check display response shape against current code.
+- [x] Select highest-value bounded target.
+- [x] Write scoped plan/design before code.
+- [x] Add focused failing display response projection tests.
+- [x] Implement safe display list/detail/update projections.
+- [x] Run multi-subagent code review before broader tests.
+- [x] Run focused and broader affected verification.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Current merge/deploy state**
+- [x] PR #143 merged at
+  `384b584054446547ec3d64a37f7f6839dc10ac39`; PR checks green for audit,
+  build, e2e, lint, security, and test.
+- [x] Post-merge `main` CI for `384b584054446547ec3d64a37f7f6839dc10ac39`
+  completed successfully: build, test, lint, security, and e2e all green.
+- [x] Prod deploy remains blocked: `/opt/vizora/app` is at
+  `bb76aa1838740bff5b58623dfef7a906d44f46a6`, while its stale local
+  `origin/main` is `1618f31f9e151ca394f4e0471e457267805415a9`; prod is
+  `ahead 17, behind 77` with many tracked edits and untracked files. No
+  production pull, reset, stash, env edit, service restart, DB mutation, or
+  deploy performed.
+
+**Plan/design:**
+`docs/plans/2026-06-01-display-response-projection-pass-21.md`
+
+**Implementation notes**
+- [x] Added `middleware/src/modules/displays/display-response.select.ts` with
+  shared safe list/detail/embedded/member projections.
+- [x] Updated display create/list/detail/update response paths to use explicit
+  safe Prisma `select`s.
+- [x] Updated display-group nested display responses to reuse the safe embedded
+  projection.
+- [x] Changed QR overlay update/delete service contracts to return the saved
+  overlay config / `void` instead of re-reading and returning the display row.
+- [x] Tightened pairing-service internal queries to select only the fields each
+  path needs: token-only paired check, id/org status lookup, existing id/location
+  read, and safe result fields on create/update.
+
+**Review gate**
+- [x] Security/API reviewer CLEAN after pairing follow-up. Confirmed response
+  paths omit `jwtToken`, `pairingCode`, `pairingCodeExpiresAt`, and `socketId`;
+  tenant/API conventions remain intact; QR overlay return shape matches web/API.
+- [x] Regression/dashboard reviewer CLEAN except for expected low staging note:
+  new selector file must be staged before commit. This will be closed at commit
+  staging.
+
+**Verification so far**
+- [x] Red focused projection tests reproduced missing explicit safe selectors
+  before implementation.
+- [x] Focused display/pairing run passed:
+  `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/displays/pairing.service.spec.ts src/modules/displays/displays.service.spec.ts src/modules/displays/displays.controller.spec.ts src/modules/display-groups/display-groups.service.spec.ts src/modules/displays/displays.service.bulk.spec.ts`
+  - 5 suites / 137 tests.
+- [x] Broader display/display-group unit run passed:
+  `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/displays/pairing.service.spec.ts src/modules/displays/pairing.controller.spec.ts src/modules/displays/displays.controller.spec.ts src/modules/displays/displays.service.spec.ts src/modules/displays/displays.service.bulk.spec.ts src/modules/displays/displays.service.tag-events.spec.ts src/modules/display-groups/display-groups.service.spec.ts src/modules/display-groups/display-groups.controller.spec.ts`
+  - 8 suites / 166 tests.
+- [x] Middleware typecheck passed:
+  `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false`.
+- [x] Changed-file ESLint passed with only the existing ESLintRC deprecation
+  notice:
+  `ESLINT_USE_FLAT_CONFIG=false npx eslint ...`.
+- [x] Middleware build passed:
+  `npx nx build @vizora/middleware`; existing webpack warnings remain.
+- [x] Full middleware unit suite passed:
+  `pnpm --filter @vizora/middleware test -- --runInBand` - 143 suites /
+  2,884 tests.
+- [x] `git diff --check` passed with Windows CRLF warnings only.
+
+**Reviewer target synthesis**
+- [x] Customer UX reviewer found valid current dashboard issues: inactive
+  schedules shown as active, dead schedule conflict warning UI, hardcoded
+  content tag filters, and synthetic analytics labels.
+- [x] Backend/performance reviewer found a valid next performance target:
+  dashboard-only org broadcasts still iterate device sockets and can trigger
+  per-device DB checks.
+- [x] Test/release reviewer found a larger release-gate target: middleware E2E
+  currently gates only the agents suite and older specs still use `/api`.
+- [x] Selected first bounded target for this pass: safe display response
+  projections, because it is a small high-severity security/payload fix in a
+  customer-facing API and does not require operator action.
+
+---
+
+## Completed: Dashboard Customer Improvements Pass 20 (2026-06-01)
 
 **Branch:** `feat/dashboard-customer-improvements-pass-20`
 
@@ -30,14 +138,19 @@ agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
 - [x] Implement dashboard shared Socket.IO provider.
 - [x] Run multi-subagent code review before broader tests.
 - [x] Run focused and broader affected verification.
-- [ ] PR, CI, merge.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge. PR #143 merged at
+  `384b584054446547ec3d64a37f7f6839dc10ac39`.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Current merge/deploy state**
 - [x] PR #142 merged at
   `80463b2aaad1c041d14e4cfe55ffcdae627b7b09`; PR checks green for audit,
   build, e2e, lint, security, and test.
 - [x] Post-merge `main` CI for `80463b2aaad1c041d14e4cfe55ffcdae627b7b09`
+  completed successfully.
+- [x] PR #143 merged at
+  `384b584054446547ec3d64a37f7f6839dc10ac39`; PR CI green for audit, build,
+  e2e, lint, security, and test. Post-merge `main` CI for `384b584054` also
   completed successfully.
 - [x] Prod deploy remains blocked: `/opt/vizora/app` is at
   `bb76aa1838740bff5b58623dfef7a906d44f46a6`, while `origin/main` is

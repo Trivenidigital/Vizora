@@ -13,6 +13,7 @@ import { RedisService } from '../redis/redis.service';
 import { ProvisioningTemplatesService } from '../provisioning-templates/provisioning-templates.service';
 import { RequestPairingDto } from './dto/request-pairing.dto';
 import { CompletePairingDto } from './dto/complete-pairing.dto';
+import type { Prisma } from '@vizora/database';
 import * as crypto from 'crypto';
 import * as QRCode from 'qrcode';
 
@@ -39,6 +40,27 @@ interface PairingRequestRecord {
   code: string;
   request: PairingRequest;
 }
+
+const PAIRING_TOKEN_CHECK_SELECT = {
+  jwtToken: true,
+} as const satisfies Prisma.DisplaySelect;
+
+const PAIRING_STATUS_SELECT = {
+  id: true,
+  organizationId: true,
+} as const satisfies Prisma.DisplaySelect;
+
+const PAIRING_EXISTING_DISPLAY_SELECT = {
+  id: true,
+  location: true,
+} as const satisfies Prisma.DisplaySelect;
+
+const PAIRING_RESULT_SELECT = {
+  id: true,
+  nickname: true,
+  deviceIdentifier: true,
+  status: true,
+} as const satisfies Prisma.DisplaySelect;
 
 @Injectable()
 export class PairingService implements OnModuleDestroy {
@@ -129,6 +151,7 @@ export class PairingService implements OnModuleDestroy {
     // Check if device already exists and is paired
     const existingDisplay = await this.db.display.findUnique({
       where: { deviceIdentifier },
+      select: PAIRING_TOKEN_CHECK_SELECT,
     });
 
     if (existingDisplay && existingDisplay.jwtToken) {
@@ -218,6 +241,7 @@ export class PairingService implements OnModuleDestroy {
     if (request.plaintextToken) {
       const display = await this.db.display.findUnique({
         where: { deviceIdentifier: request.deviceIdentifier },
+        select: PAIRING_STATUS_SELECT,
       });
 
       // Pairing complete! Clean up request and return plaintext token
@@ -268,13 +292,14 @@ export class PairingService implements OnModuleDestroy {
       : undefined;
 
     // Check if device already exists
-    let display = await this.db.display.findUnique({
+    const existingDisplay = await this.db.display.findUnique({
       where: { deviceIdentifier: request.deviceIdentifier },
+      select: PAIRING_EXISTING_DISPLAY_SELECT,
     });
 
     // Generate device JWT token
     const devicePayload = {
-      sub: display?.id || crypto.randomUUID(),
+      sub: existingDisplay?.id || crypto.randomUUID(),
       deviceIdentifier: request.deviceIdentifier,
       organizationId,
       type: 'device',
@@ -299,12 +324,13 @@ export class PairingService implements OnModuleDestroy {
     // Hash the token before storing in database for security
     // If database is compromised, attacker cannot use the hashed tokens
     const hashedToken = this.hashToken(jwtToken);
+    let display: Prisma.DisplayGetPayload<{ select: typeof PAIRING_RESULT_SELECT }>;
 
-    if (display) {
+    if (existingDisplay) {
       // Update existing display
       // Set status to 'pairing' - the WebSocket gateway will update to 'online' when device connects
       display = await this.db.display.update({
-        where: { id: display.id },
+        where: { id: existingDisplay.id },
         data: {
           nickname: nickname || request.nickname,
           organizationId,
@@ -312,11 +338,12 @@ export class PairingService implements OnModuleDestroy {
           pairedAt: new Date(),
           lastHeartbeat: new Date(),
           status: 'pairing',
-          location: completeDto.location || display.location,
+          location: completeDto.location || existingDisplay.location,
           // O6 — apply provisioning-template defaults. Spread last so they
           // override the Vizora-level defaults but NOT explicit fields above.
           ...(provisioningDefaults ?? {}),
         },
+        select: PAIRING_RESULT_SELECT,
       });
     } else {
       // Create new display
@@ -338,6 +365,7 @@ export class PairingService implements OnModuleDestroy {
           // 'landscape', timezone='UTC') with the operator's preference.
           ...(provisioningDefaults ?? {}),
         },
+        select: PAIRING_RESULT_SELECT,
       });
     }
 

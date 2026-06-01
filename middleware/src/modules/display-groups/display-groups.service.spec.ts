@@ -16,12 +16,26 @@ describe('DisplayGroupsService', () => {
     displays: [],
   };
 
-  const mockDisplayGroupMember = {
-    id: 'member-123',
-    displayGroupId: 'group-123',
-    displayId: 'display-123',
-    createdAt: new Date(),
-  };
+  const secretDisplayFields = [
+    'jwtToken',
+    'pairingCode',
+    'pairingCodeExpiresAt',
+    'socketId',
+  ];
+
+  function expectNestedDisplaySelectOmitsSecrets(query: any) {
+    const displaySelect = query.include.displays.select.display.select;
+    expect(displaySelect).toEqual(expect.objectContaining({
+      id: true,
+      organizationId: true,
+      deviceIdentifier: true,
+      nickname: true,
+      status: true,
+    }));
+    for (const field of secretDisplayFields) {
+      expect(displaySelect).not.toHaveProperty(field);
+    }
+  }
 
   beforeEach(() => {
     mockDatabaseService = {
@@ -75,11 +89,14 @@ describe('DisplayGroupsService', () => {
           }),
           include: expect.objectContaining({
             displays: expect.objectContaining({
-              include: { display: true },
+              select: expect.objectContaining({
+                display: { select: expect.any(Object) },
+              }),
             }),
           }),
         }),
       );
+      expectNestedDisplaySelectOmitsSecrets(mockDatabaseService.displayGroup.create.mock.calls[0][0]);
     });
 
     it('should create a display group without description', async () => {
@@ -202,7 +219,13 @@ describe('DisplayGroupsService', () => {
           {
             id: 'member-1',
             displayId: 'display-1',
-            display: { id: 'display-1', name: 'Lobby Screen' },
+            display: {
+              id: 'display-1',
+              nickname: 'Lobby Screen',
+              location: 'Lobby',
+              status: 'online',
+              currentPlaylistId: 'playlist-1',
+            },
           },
         ],
       };
@@ -211,7 +234,13 @@ describe('DisplayGroupsService', () => {
       const result = await service.findOne('org-123', 'group-123');
 
       expect(result.displays).toHaveLength(1);
-      expect(result.displays[0].display.name).toBe('Lobby Screen');
+      expect(result.displays[0].display).toEqual(expect.objectContaining({
+        nickname: 'Lobby Screen',
+        location: 'Lobby',
+        status: 'online',
+        currentPlaylistId: 'playlist-1',
+      }));
+      expectNestedDisplaySelectOmitsSecrets(mockDatabaseService.displayGroup.findFirst.mock.calls[0][0]);
     });
 
     it('should enforce organization isolation in findOne', async () => {
