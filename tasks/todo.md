@@ -36,8 +36,11 @@ business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
 - [x] Run multiple subagent diff reviews before broader verification.
 - [x] Run focused middleware and web tests.
 - [x] Run broader verification.
-- [ ] PR, CI, merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge if green. PR #161 merged to `origin/main` at
+  `4a8403c000590d45771f54da51c00274c665e753`; post-merge main CI passed
+  lint, security, build, test, and e2e.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe. Gate
+  checked and deployment remains blocked by dirty/diverged prod-local checkout.
 
 **Evidence so far:**
 - Drift evidence: `AnalyticsService.getDeviceMetrics` simulates category
@@ -78,6 +81,19 @@ business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
   - `npx nx build @vizora/middleware --skip-nx-cache` passed with existing webpack dependency warnings.
   - `NODE_OPTIONS=--max-old-space-size=4096 NEXT_PUBLIC_SOCKET_URL=http://localhost:3002 NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1 BACKEND_URL=http://localhost:3000 npx nx build @vizora/web --skip-nx-cache` passed with existing Next middleware/proxy and TS project-reference warnings.
   - `git diff --check` passed with CRLF warnings only.
+- PR/CI/deploy evidence:
+  - PR #161 passed branch CI: audit, lint, security, build, test, and e2e.
+  - PR #161 was merged remotely via GitHub API after `gh pr merge` hit the
+    local multi-worktree `main` checkout guard.
+  - Post-merge `main` CI run `26769194160` passed: lint, security, build,
+    test, and e2e.
+  - Production deploy was not run. Read-only prod probe showed
+    `/opt/vizora/app` on `main` at `bb76aa1838740bff5b58623dfef7a906d44f46a6`
+    with `git status` reporting `[ahead 17, behind 109]` against its local
+    `origin/main`, many modified template/Hermes/landing files, and untracked
+    production files. Health endpoint was OK and middleware/web/realtime were
+    online, but updating the checkout would risk overwriting unreconciled
+    prod-local work.
 
 ---
 
