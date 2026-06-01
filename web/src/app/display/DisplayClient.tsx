@@ -46,7 +46,7 @@ export function DisplayClient() {
   const impressionRef = useRef<((...args: any[]) => void) | null>(null);
 
   const { isFullscreen, toggleFullscreen } = useFullscreen();
-  const { preloadItems, clearCache } = useBrowserCache();
+  const { getCachedUrl, preloadItems, clearCache } = useBrowserCache();
 
   const {
     pairingCode,
@@ -98,7 +98,7 @@ export function DisplayClient() {
         window.location.reload();
         break;
       default:
-        console.log('[Vizora Display] Unknown command:', command.type);
+        console.warn('[Vizora Display] Unknown command:', command.type);
     }
   }, [clearCache]);
 
@@ -228,6 +228,7 @@ export function DisplayClient() {
         onVideoEnded={player.handleVideoEnded}
         onContentError={handleContentError}
         deviceToken={credentials.deviceToken}
+        getCachedUrl={getCachedUrl}
       />
       <StatusBar status={connection.status} />
       <FullscreenButton isFullscreen={isFullscreen} onToggle={toggleFullscreen} />

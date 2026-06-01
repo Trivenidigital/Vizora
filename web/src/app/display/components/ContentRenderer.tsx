@@ -12,64 +12,185 @@ interface ContentRendererProps {
   name?: string;
   metadata?: LayoutMetadata;
   authenticateUrl?: (url: string) => string;
+  getCachedUrl?: (url: string) => Promise<string | null>;
   onEnded?: () => void;
   onError?: (errorType: string, errorMessage: string) => void;
 }
 
 /**
- * Fetch an image URL via JavaScript and return a blob URL.
- * This bypasses browser caching/header issues with <img src>.
+ * Resolve protected media to an object URL. The browser display cache is
+ * checked first; protected images keep the old network blob fallback.
  */
-function useBlobUrl(url: string, enabled: boolean) {
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+function useMediaObjectUrl(
+  url: string,
+  enabled: boolean,
+  fetchOnCacheMiss: boolean,
+  getCachedUrl?: (url: string) => Promise<string | null>,
+) {
+  const [state, setState] = useState<{
+    url: string;
+    objectUrl: string | null;
+    error: string | null;
+    cacheDone: boolean;
+    fetchPending: boolean;
+  }>({
+    url: '',
+    objectUrl: null,
+    error: null,
+    cacheDone: false,
+    fetchPending: false,
+  });
 
   useEffect(() => {
-    if (!enabled || !url) return;
+    if (!enabled || !url) {
+      setState({
+        url,
+        objectUrl: null,
+        error: null,
+        cacheDone: true,
+        fetchPending: false,
+      });
+      return;
+    }
 
     let revoked = false;
+    let currentObjectUrl: string | null = null;
     const controller = new AbortController();
 
-    fetch(url, { signal: controller.signal })
-      .then((res) => {
+    setState({
+      url,
+      objectUrl: null,
+      error: null,
+      cacheDone: !getCachedUrl,
+      fetchPending: !getCachedUrl && fetchOnCacheMiss,
+    });
+
+    const loadObjectUrl = async () => {
+      const cachedUrl = getCachedUrl
+        ? await Promise.resolve(getCachedUrl(url)).catch(() => null)
+        : null;
+      if (revoked) {
+        if (cachedUrl && typeof URL.revokeObjectURL === 'function') {
+          URL.revokeObjectURL(cachedUrl);
+        }
+        return;
+      }
+      if (cachedUrl) {
+        currentObjectUrl = cachedUrl;
+        setState({
+          url,
+          objectUrl: cachedUrl,
+          error: null,
+          cacheDone: true,
+          fetchPending: false,
+        });
+        return;
+      }
+      if (!fetchOnCacheMiss) {
+        setState({
+          url,
+          objectUrl: null,
+          error: null,
+          cacheDone: true,
+          fetchPending: false,
+        });
+        return;
+      }
+
+      setState({
+        url,
+        objectUrl: null,
+        error: null,
+        cacheDone: true,
+        fetchPending: true,
+      });
+
+      try {
+        const res = await fetch(url, { signal: controller.signal });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.blob();
-      })
-      .then((blob) => {
+        const blob = await res.blob();
         if (revoked) return;
         const objectUrl = URL.createObjectURL(blob);
-        setBlobUrl(objectUrl);
-        setError(null);
-      })
-      .catch((err) => {
+        currentObjectUrl = objectUrl;
+        setState({
+          url,
+          objectUrl,
+          error: null,
+          cacheDone: true,
+          fetchPending: false,
+        });
+      } catch (err) {
         if (revoked) return;
-        setError(err.message || 'fetch failed');
-      });
+        const error = err instanceof Error ? err.message : 'fetch failed';
+        setState({
+          url,
+          objectUrl: null,
+          error,
+          cacheDone: true,
+          fetchPending: false,
+        });
+      }
+    };
+
+    void loadObjectUrl();
 
     return () => {
       revoked = true;
       controller.abort();
-      setBlobUrl((prev) => {
-        if (prev) URL.revokeObjectURL(prev);
-        return null;
-      });
+      if (currentObjectUrl && typeof URL.revokeObjectURL === 'function') {
+        URL.revokeObjectURL(currentObjectUrl);
+      }
     };
-  }, [url, enabled]);
+  }, [url, enabled, fetchOnCacheMiss, getCachedUrl]);
 
-  return { blobUrl, error };
+  const stateMatchesUrl = state.url === url;
+  const cachePending = enabled && Boolean(getCachedUrl) && (!stateMatchesUrl || !state.cacheDone);
+  const fetchPending = enabled && fetchOnCacheMiss && (!stateMatchesUrl || state.fetchPending);
+
+  return {
+    objectUrl: stateMatchesUrl ? state.objectUrl : null,
+    error: stateMatchesUrl ? state.error : null,
+    pending: cachePending || fetchPending,
+  };
 }
 
-function shouldFetchImageAsBlob(url: string): boolean {
-  return url.includes('/device-content/') && url.includes('/file');
+function shouldUseDeviceContentObjectUrl(url: string): boolean {
+  try {
+    const baseOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+    const parsed = new URL(url, baseOrigin);
+    const apiOrigin = process.env.NEXT_PUBLIC_API_URL
+      ? new URL(process.env.NEXT_PUBLIC_API_URL).origin
+      : baseOrigin;
+    const isDeviceContentPath =
+      /^\/(?:api\/v1\/)?device-content\/[^/]+\/file$/.test(parsed.pathname);
+
+    return new Set([baseOrigin, apiOrigin]).has(parsed.origin) && isDeviceContentPath;
+  } catch {
+    return false;
+  }
 }
 
-export function ContentRenderer({ type, url, name, metadata, authenticateUrl, onEnded, onError }: ContentRendererProps) {
+export function ContentRenderer({
+  type,
+  url,
+  name,
+  metadata,
+  authenticateUrl,
+  getCachedUrl,
+  onEnded,
+  onError,
+}: ContentRendererProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const renderedUrl = authenticateUrl ? authenticateUrl(url) : url;
   const safeRenderedUrl = redactSensitiveUrl(renderedUrl);
   const isImage = type === 'image';
-  const shouldFetchBlob = isImage && shouldFetchImageAsBlob(renderedUrl);
-  const { blobUrl, error: fetchError } = useBlobUrl(renderedUrl, shouldFetchBlob);
+  const isVideo = type === 'video';
+  const shouldUseObjectUrl = (isImage || isVideo) && shouldUseDeviceContentObjectUrl(renderedUrl);
+  const {
+    objectUrl: mediaObjectUrl,
+    error: fetchError,
+    pending: mediaPending,
+  } = useMediaObjectUrl(renderedUrl, shouldUseObjectUrl, isImage, getCachedUrl);
 
   // Attempt autoplay when video mounts
   useEffect(() => {
@@ -82,7 +203,7 @@ export function ContentRenderer({ type, url, name, metadata, authenticateUrl, on
         }
       });
     }
-  }, [type, renderedUrl]);
+  }, [type, renderedUrl, mediaObjectUrl]);
 
   // Report fetch errors for images
   useEffect(() => {
@@ -93,7 +214,7 @@ export function ContentRenderer({ type, url, name, metadata, authenticateUrl, on
 
   switch (type) {
     case 'image':
-      if (!shouldFetchBlob) {
+      if (!shouldUseObjectUrl) {
         return (
           <img
             src={renderedUrl}
@@ -113,7 +234,7 @@ export function ContentRenderer({ type, url, name, metadata, authenticateUrl, on
           </div>
         );
       }
-      if (!blobUrl) {
+      if (!mediaObjectUrl || mediaPending) {
         return (
           <div style={{ ...styles.image, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ width: '40px', height: '40px', border: '3px solid rgba(0,229,160,0.2)', borderTopColor: '#00E5A0', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
@@ -122,7 +243,7 @@ export function ContentRenderer({ type, url, name, metadata, authenticateUrl, on
       }
       return (
         <img
-          src={blobUrl}
+          src={mediaObjectUrl}
           alt={name || 'Display content'}
           style={styles.image}
           onError={() => {
@@ -133,10 +254,17 @@ export function ContentRenderer({ type, url, name, metadata, authenticateUrl, on
       );
 
     case 'video':
+      if (shouldUseObjectUrl && getCachedUrl && mediaPending && !mediaObjectUrl) {
+        return (
+          <div style={{ ...styles.video, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: '40px', height: '40px', border: '3px solid rgba(0,229,160,0.2)', borderTopColor: '#00E5A0', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+          </div>
+        );
+      }
       return (
         <video
           ref={videoRef}
-          src={renderedUrl}
+          src={mediaObjectUrl || renderedUrl}
           autoPlay
           muted
           playsInline
@@ -177,7 +305,14 @@ export function ContentRenderer({ type, url, name, metadata, authenticateUrl, on
 
     case 'layout':
       if (metadata) {
-        return <LayoutRenderer metadata={metadata} authenticateUrl={authenticateUrl} onError={onError} />;
+        return (
+          <LayoutRenderer
+            metadata={metadata}
+            authenticateUrl={authenticateUrl}
+            getCachedUrl={getCachedUrl}
+            onError={onError}
+          />
+        );
       }
       return null;
 

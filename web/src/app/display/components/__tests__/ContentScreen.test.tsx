@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { ContentScreen } from '../ContentScreen';
 
 jest.mock('../ContentRenderer', () => ({
-  ContentRenderer: ({ url, name, type, metadata, authenticateUrl }: any) => {
+  ContentRenderer: ({ url, name, type, metadata, authenticateUrl, getCachedUrl }: any) => {
     const zoneUrl = metadata?.zones?.[0]?.resolvedContent?.url;
     return (
       <div
@@ -10,6 +10,7 @@ jest.mock('../ContentRenderer', () => ({
         data-url={url}
         data-zone-url={zoneUrl && authenticateUrl ? authenticateUrl(zoneUrl) : zoneUrl}
         data-type={type}
+        data-has-cache-resolver={typeof getCachedUrl === 'function' ? 'true' : 'false'}
       >
         {name}
       </div>
@@ -73,6 +74,7 @@ describe('ContentScreen', () => {
   });
 
   it('passes token authentication through to protected layout zone URLs', () => {
+    const getCachedUrl = jest.fn();
     render(
       <ContentScreen
         currentItem={{
@@ -103,12 +105,17 @@ describe('ContentScreen', () => {
         temporaryContent={null}
         onVideoEnded={jest.fn()}
         deviceToken="device-token"
+        getCachedUrl={getCachedUrl}
       />,
     );
 
     expect(screen.getByTestId('renderer')).toHaveAttribute(
       'data-zone-url',
       '/api/v1/device-content/content-2/file?token=device-token',
+    );
+    expect(screen.getByTestId('renderer')).toHaveAttribute(
+      'data-has-cache-resolver',
+      'true',
     );
   });
 });
