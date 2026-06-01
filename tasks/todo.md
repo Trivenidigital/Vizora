@@ -1,6 +1,6 @@
 # Vizora - Task Tracker
 
-## Active: Template Action Truthfulness Pass 36 (2026-06-01)
+## Completed: Template Action Truthfulness Pass 36 (2026-06-01)
 
 **Branch:** `feat/customer-experience-pass-36`
 
@@ -31,8 +31,13 @@ business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
 - [x] Gate super-admin-only actions and make AI Designer unavailable state honest.
 - [x] Run multi-subagent review before broader verification.
 - [x] Run focused and broader verification.
-- [ ] PR, CI, merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge if green. PR #167 merged to `origin/main` at
+  `923c6ddd097151d89637916aa021f582eddfa466`; PR CI and post-merge main CI
+  green.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe. Rechecked
+  after PR #167: blocked because `/opt/vizora/app` remains dirty and diverged
+  (`main...origin/main [ahead 17, behind 123]`, prod `HEAD bb76aa...`,
+  `origin/main 923c6dd...`). No deploy attempted.
 
 **Evidence so far:**
 - PR #166 / pass 35 integration: merged at
@@ -77,6 +82,17 @@ business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
   concurrent middleware build hit a Windows Prisma generated-client copy lock;
   serial retry passed. `git diff --check` and `pnpm security:no-hardcoded-jwts`
   passed.
+- PR #167 / pass 36 integration: merged at
+  `923c6ddd097151d89637916aa021f582eddfa466`; PR checks passed (`audit`,
+  `build`, `lint`, `security`, `test`, `e2e`). Post-merge main CI run
+  `26782351951` completed successfully with `test`, `build`, `security`,
+  `lint`, and `e2e` all green.
+- Production gate after PR #167: blocked. `/opt/vizora/app` is dirty and
+  diverged (`main...origin/main [ahead 17, behind 123]`, prod `HEAD bb76aa...`,
+  remote main `923c6dd...`) with many modified template/landing/Hermes files and
+  untracked production files. Middleware and web local health probes returned
+  OK; realtime `/health` returned 404 while the `vizora-realtime` PM2 process was
+  online. Most ops/agent PM2 entries remain stopped. No deploy attempted.
 
 ---
 
