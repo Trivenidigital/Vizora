@@ -1,8 +1,14 @@
 # Vizora - Task Tracker
 
-## Active: Dashboard Safety and Truth Pass 38 (2026-06-01)
+## Completed: Dashboard Safety and Truth Pass 38 (2026-06-01)
 
 **Branch:** `feat/customer-dashboard-pass-38`
+
+**PR:** #171
+
+**Commit:** `7920db8`
+
+**Merge SHA:** `d09bfc514aa37cb03bfb308193894b9065211fa0`
 
 **Why now:** After PR #169/#170, CI now gates the customer-critical API path.
 The next buildable customer-facing gap is dashboard trust: destructive bulk
@@ -29,8 +35,8 @@ Hermes, AI/provider, or spend-path change.
 - [x] Implement minimal UI state/copy fixes.
 - [x] Run multi-vector subagent review before broader verification.
 - [x] Run focused and broader verification.
-- [ ] PR, CI, merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge if green.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Evidence so far:**
 - Drift-check: `web/src/lib/server-api.ts` already uses `vizora_auth_token`, so
@@ -72,6 +78,15 @@ Hermes, AI/provider, or spend-path change.
   tests; `npx nx build @vizora/web --skip-nx-cache` passed with production env
   placeholders; `git diff --check` passed with Windows CRLF warnings only;
   `pnpm security:no-hardcoded-jwts` passed.
+- CI: PR #171 passed GitHub `audit`, `lint`, `test`, `build`, `security`, and
+  `e2e`, then merged.
+- Deploy gate: deploy NOT attempted. Prod `/opt/vizora/app` remains unsafe for
+  automated deploy: `main...origin/main [ahead 17, behind 123]`, dirty tracked
+  and untracked template/Hermes/public-doc files present, prod HEAD
+  `bb76aa1838740bff5b58623dfef7a906d44f46a6`, remote main
+  `d09bfc514aa37cb03bfb308193894b9065211fa0`. Core prod probe showed
+  middleware 200, web 200, realtime `/health` 404; ops/Hermes PM2 jobs remain
+  stopped.
 
 ---
 
