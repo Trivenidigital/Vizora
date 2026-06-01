@@ -1,5 +1,59 @@
 # Vizora - Task Tracker
 
+## Active: Template Publish Tenant Guardrail Pass 33 (2026-06-01)
+
+**Branch:** `feat/customer-experience-pass-33`
+
+**Why now:** The pass 32 security review fixed pairing and display-tag tenant
+guardrails, but it also left one bounded residual in template publishing:
+`publishTemplate()` still resolves a source template by id/type only and updates
+usage metadata by id. That can let a tenant publish another organization's
+private non-global template if they guess the id, and it mutates that private
+template's metadata. Nearby template read/edit paths already use the intended
+global-or-own boundary, so this pass closes the isolated publish gap.
+
+**New primitives introduced:** none. This pass only tightens existing
+`TemplateLibraryService` query predicates and focused tests. No route, module,
+middleware, schema, response envelope, realtime path, notification path, MCP
+tool, Hermes skill, provider spend path, or production process changes.
+
+**Hermes-first analysis:** not applicable. This pass does not add or modify
+business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
+
+**Plan/design:**
+`docs/plans/2026-06-01-template-publish-tenant-pass-33.md`
+
+**Plan**
+- [x] Start fresh branch from updated `origin/main`.
+- [x] Drift-check existing template read/edit tenant boundaries.
+- [x] Document pass 33 design and test plan.
+- [x] Add failing publish-template tenant-boundary tests.
+- [x] Implement global-or-own source-template scope and scoped use-count write.
+- [x] Run multi-subagent review before broader verification.
+- [x] Run focused and broader verification.
+- [ ] PR, CI, merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Evidence so far:**
+- Red TDD: `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/template-library/template-library.service.spec.ts`
+  failed on the new publish-template tests because source lookup used only
+  `{ id, type }` and use-count writes did not use the scoped predicate.
+- Focused green: the same command passed 52/52 after moving source-template
+  lookup into the transaction with the global-or-own predicate and updating
+  use-count through `updateMany` with that same predicate.
+- Multi-vector review: tenant/security reviewer CLEAN; Prisma/transaction/API
+  compatibility reviewer CLEAN. Both independently reran the focused
+  template-library service suite and saw 52/52 pass.
+- Verification: focused template-library service suite passed 52/52; middleware
+  `tsc --noEmit` passed; changed-file ESLint passed with 0 errors and 2
+  pre-existing warnings in `template-library.service.ts`; hardcoded JWT scan
+  passed; `git diff --check` passed with CRLF warnings only; full middleware
+  Jest passed 146/146 suites and 2938/2938 tests; `npx nx build
+  @vizora/middleware --skip-nx-cache` passed with existing webpack warnings and
+  the existing Nx flaky-task note for `@vizora/database:build`.
+
+---
+
 ## Active: Middleware Guardrail + Sanitize Fast Path Pass 32 (2026-06-01)
 
 **Branch:** `feat/customer-experience-pass-32`
@@ -40,7 +94,8 @@ business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
   rows.
 - [x] Run multi-subagent review before broader verification.
 - [x] Run focused and broader verification.
-- [ ] PR, CI, merge if green.
+- [x] PR, CI, merge if green. PR #163 merged to `origin/main` at
+  `3249ee22495371d9b3d41f6fd3ba457dcfa6e004`; post-merge main CI green.
 - [ ] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Evidence so far:**

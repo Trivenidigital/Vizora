@@ -50,7 +50,21 @@ describe('TemplateLibraryService', () => {
         count: jest.fn().mockResolvedValue(0),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
       },
+      display: {
+        findFirst: jest.fn(),
+        update: jest.fn(),
+      },
+      playlist: {
+        findFirst: jest.fn(),
+        create: jest.fn(),
+      },
+      playlistItem: {
+        findFirst: jest.fn(),
+        create: jest.fn(),
+      },
+      $transaction: jest.fn(async (callback) => callback(mockDb)),
     };
 
     mockTemplateRendering = {
@@ -770,6 +784,98 @@ describe('TemplateLibraryService', () => {
       await expect(
         service.saveUserTemplate('nonexistent', { name: 'Foo' }, 'org-1'),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('publishTemplate', () => {
+    const publishDto = {
+      renderedHtml: '<section>Menu</section>',
+      displayIds: [],
+      name: 'Published Menu',
+      duration: 45,
+    };
+
+    it('rejects a private template from another org without creating content or mutating metadata', async () => {
+      mockDb.content.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.publishTemplate('tmpl-other', publishDto, 'org-1', 'user-1'),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(mockDb.content.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'tmpl-other',
+          type: 'template',
+          OR: [{ isGlobal: true }, { organizationId: 'org-1' }],
+        },
+      });
+      expect(mockDb.content.create).not.toHaveBeenCalled();
+      expect(mockDb.content.update).not.toHaveBeenCalled();
+      expect(mockDb.content.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('publishes a global template and increments usage through the scoped template predicate', async () => {
+      mockDb.content.findFirst.mockResolvedValue(
+        makeTemplate({ id: 'tmpl-global', isGlobal: true, organizationId: null, metadata: { useCount: 2 } }),
+      );
+      mockDb.content.create.mockResolvedValue({ id: 'content-1' });
+      mockDb.content.updateMany.mockResolvedValue({ count: 1 });
+
+      const result = await service.publishTemplate('tmpl-global', publishDto, 'org-1', 'user-1');
+
+      expect(result).toEqual({ contentId: 'content-1', displayCount: 0 });
+      expect(mockDb.content.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          name: 'Published Menu',
+          type: 'html',
+          organizationId: 'org-1',
+          isGlobal: false,
+          metadata: expect.objectContaining({
+            htmlContent: '<section>Menu</section>',
+            sourceTemplateId: 'tmpl-global',
+            publishedBy: 'user-1',
+            publishedAt: expect.any(String),
+          }),
+        }),
+      });
+      expect(mockDb.content.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'tmpl-global',
+          type: 'template',
+          OR: [{ isGlobal: true }, { organizationId: 'org-1' }],
+        },
+        data: {
+          metadata: expect.objectContaining({ useCount: 3 }),
+        },
+      });
+    });
+
+    it('publishes an org-owned private template through the same global-or-own predicate', async () => {
+      mockDb.content.findFirst.mockResolvedValue(
+        makeTemplate({ id: 'tmpl-owned', isGlobal: false, organizationId: 'org-1', metadata: { useCount: 4 } }),
+      );
+      mockDb.content.create.mockResolvedValue({ id: 'content-2' });
+      mockDb.content.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.publishTemplate('tmpl-owned', publishDto, 'org-1', 'user-1');
+
+      expect(mockDb.content.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'tmpl-owned',
+          type: 'template',
+          OR: [{ isGlobal: true }, { organizationId: 'org-1' }],
+        },
+      });
+      expect(mockDb.content.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: 'tmpl-owned',
+          type: 'template',
+          OR: [{ isGlobal: true }, { organizationId: 'org-1' }],
+        },
+        data: {
+          metadata: expect.objectContaining({ useCount: 5 }),
+        },
+      });
     });
   });
 

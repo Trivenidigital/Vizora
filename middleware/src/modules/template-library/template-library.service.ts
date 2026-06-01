@@ -45,6 +45,14 @@ export class TemplateLibraryService {
     private readonly templateRendering: TemplateRenderingService,
   ) {}
 
+  private accessibleTemplateWhere(templateId: string, organizationId: string): Prisma.ContentWhereInput {
+    return {
+      id: templateId,
+      type: 'template',
+      OR: [{ isGlobal: true }, { organizationId }],
+    };
+  }
+
   /**
    * Search/browse template library with filters
    */
@@ -247,17 +255,16 @@ export class TemplateLibraryService {
     organizationId: string,
     userId: string,
   ) {
-    // 1. Verify the source template exists
-    const template = await this.db.content.findFirst({
-      where: { id: templateId, type: 'template' },
-    });
+    const templateWhere = this.accessibleTemplateWhere(templateId, organizationId);
 
-    if (!template) {
-      throw new NotFoundException('Template not found');
-    }
-
-    // 2. Execute all writes in a transaction for atomicity
+    // Execute all writes in a transaction for atomicity.
     return this.db.$transaction(async (tx) => {
+      const template = await tx.content.findFirst({ where: templateWhere });
+
+      if (!template) {
+        throw new NotFoundException('Template not found');
+      }
+
       // Create the published content record (draft if displayIds is empty)
       const content = await tx.content.create({
         data: {
@@ -340,8 +347,8 @@ export class TemplateLibraryService {
       // 4. Increment useCount on the source template
       const templateMetadata = (template.metadata as Record<string, unknown>) || {};
       const currentUseCount = ((templateMetadata.useCount as number) || 0) + 1;
-      await tx.content.update({
-        where: { id: templateId },
+      const updateResult = await tx.content.updateMany({
+        where: templateWhere,
         data: {
           metadata: {
             ...templateMetadata,
@@ -349,6 +356,10 @@ export class TemplateLibraryService {
           } as Prisma.InputJsonValue,
         },
       });
+
+      if (updateResult.count !== 1) {
+        throw new NotFoundException('Template not found');
+      }
 
       return { contentId: content.id, displayCount };
     });
