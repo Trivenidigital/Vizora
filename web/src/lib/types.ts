@@ -26,7 +26,7 @@ export interface Content {
   status: 'ready' | 'processing' | 'error' | 'active' | 'archived' | 'flagged' | 'rejected';
   duration?: number;
   fileSize?: number | null;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   folderId?: string;
   createdAt: Date | string;
   updatedAt: Date | string;
@@ -297,7 +297,7 @@ export interface PlatformStats {
 export interface SystemConfig {
   id: string;
   key: string;
-  value: any;
+  value: unknown;
   dataType: string;
   category: string;
   description: string | null;
@@ -310,7 +310,7 @@ export interface AdminAuditLog {
   action: string;
   targetType: string | null;
   targetId: string | null;
-  details: any;
+  details: unknown;
   ipAddress: string | null;
   createdAt: string;
 }
@@ -345,54 +345,91 @@ export interface AnalyticsSummary {
   totalImpressions: number;
   totalContentSize: number;
   uptimePercent: number;
+  onlineNowPercent?: number;
+  uptimePercentSource?: 'current_online_ratio';
+  uptimePercentIsHistorical?: boolean;
   avgUptimePercent?: number;
 }
 
 export interface DeviceMetric {
   date: string;
-  onlineCount: number;
-  offlineCount: number;
-  avgUptime: number;
+  mobile: number;
+  tablet: number;
+  desktop: number;
+  isEstimated?: boolean;
+  metricSource?: 'display_inventory_estimate';
+  unit?: 'percent';
 }
 
 export interface ContentPerformance {
-  contentId: string;
-  name: string;
-  type: string;
+  title: string;
   impressions: number;
-  avgDuration: number;
+  averageCompletion: number;
+  /** @deprecated Legacy alias for impressions. */
+  views?: number;
+  /** @deprecated Legacy alias for averageCompletion. */
+  engagement?: number;
+  /** @deprecated Shares are not tracked; kept as zero for response compatibility. */
+  shares?: number;
+  impressionsSource?: 'content_impressions';
+  engagementSource?: 'content_impressions';
+  sharesTracked?: boolean;
 }
 
 export interface UsageTrend {
   date: string;
-  impressions: number;
-  activeDevices: number;
-  contentUploads: number;
+  video: number;
+  image: number;
+  text: number;
+  interactive: number;
+  other: number;
 }
 
 export interface DeviceDistribution {
-  status: string;
-  count: number;
-  percentage: number;
+  name: string;
+  value: number;
+  color: string;
 }
 
 export interface BandwidthUsage {
-  date: string;
-  bytesTransferred: number;
-  requestCount: number;
+  time: string;
+  current: number;
+  average: number;
+  peak: number;
+  isEstimated?: boolean;
+  metricSource?: 'content_size_device_count_estimate';
+  unit?: 'MB/day';
 }
 
 export interface PlaylistPerformance {
-  playlistId: string;
   name: string;
-  impressions: number;
-  deviceCount: number;
+  proofOfPlayImpressions: number;
+  averageCompletion: number;
+  assignedScreens: number;
+  /** @deprecated Legacy alias for proofOfPlayImpressions. */
+  plays?: number;
+  /** @deprecated Legacy alias for averageCompletion. */
+  engagement?: number;
+  /** @deprecated Assigned screen count, not unique playback devices. */
+  uniqueDevices?: number;
+  /** @deprecated Legacy alias for proofOfPlayImpressions. */
+  views?: number;
+  /** @deprecated Legacy alias for averageCompletion. */
+  completion?: number;
+  playsSource?: 'content_impressions';
+  completionSource?: 'content_impressions';
+  uniqueDevicesSource?: 'assigned_displays';
+  uniquePlaybackDevicesTracked?: boolean;
 }
 
 export interface AnalyticsExport {
-  data: Record<string, unknown>;
-  exportedAt: string;
-  format: string;
+  summary?: Partial<AnalyticsSummary>;
+  deviceMetrics?: DeviceMetric[];
+  contentPerformance?: ContentPerformance[];
+  playlistPerformance?: PlaylistPerformance[];
+  bandwidthUsage?: BandwidthUsage[];
+  usageTrends?: UsageTrend[];
+  deviceDistribution?: DeviceDistribution[];
 }
 
 // Team / User types

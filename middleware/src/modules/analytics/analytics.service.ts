@@ -43,7 +43,6 @@ export class AnalyticsService {
    * Uses Display table heartbeat data
    */
   async getDeviceMetrics(organizationId: string, range: string): Promise<DeviceMetricDataPoint[]> {
-    const { startDate } = this.getDateRange(range);
     const days = this.getRangeDays(range);
 
     // Get all devices for this org
@@ -82,6 +81,9 @@ export class AnalyticsService {
         mobile: Math.min(100, Math.max(0, baseUptime * 0.85)),
         tablet: Math.min(100, Math.max(0, baseUptime * 0.92)),
         desktop: Math.min(100, Math.max(0, baseUptime * 0.98)),
+        isEstimated: true,
+        metricSource: 'display_inventory_estimate',
+        unit: 'percent',
       });
     }
 
@@ -108,16 +110,21 @@ export class AnalyticsService {
 
     const contentIds = impressions.map(i => i.contentId);
     const contents = await this.db.content.findMany({
-      where: { id: { in: contentIds } },
+      where: { id: { in: contentIds }, organizationId },
       select: { id: true, name: true },
     });
     const contentMap = new Map(contents.map(c => [c.id, c.name]));
 
     return impressions.map(i => ({
       title: contentMap.get(i.contentId) || 'Unknown',
+      impressions: i._count.id,
+      averageCompletion: Math.round(i._avg.completionPercentage || 0),
       views: i._count.id,
       engagement: Math.round(i._avg.completionPercentage || 0),
       shares: 0,
+      impressionsSource: 'content_impressions',
+      engagementSource: 'content_impressions',
+      sharesTracked: false,
     }));
   }
 
@@ -134,18 +141,20 @@ export class AnalyticsService {
     >`
       SELECT ci.date, c.type, COUNT(*)::bigint as count
       FROM content_impressions ci
-      LEFT JOIN "Content" c ON ci."contentId" = c.id
+      LEFT JOIN "Content" c
+        ON ci."contentId" = c.id
+       AND c."organizationId" = ci."organizationId"
       WHERE ci."organizationId" = ${organizationId}
         AND ci.timestamp >= ${startDate}
       GROUP BY ci.date, c.type
     `;
 
-    // Build lookup map: dateStr -> { video, image, text, interactive }
+    // Build lookup map: dateStr -> { video, image, text, interactive, other }
     const dailyData = new Map<string, Record<string, number>>();
     for (const row of typeBreakdown) {
       const dateStr = new Date(row.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       if (!dailyData.has(dateStr)) {
-        dailyData.set(dateStr, { video: 0, image: 0, text: 0, interactive: 0 });
+        dailyData.set(dateStr, { video: 0, image: 0, text: 0, interactive: 0, other: 0 });
       }
       const dayData = dailyData.get(dateStr)!;
       const count = Number(row.count);
@@ -154,6 +163,7 @@ export class AnalyticsService {
       else if (type === 'image') dayData.image += count;
       else if (type === 'html') dayData.text += count;
       else if (type === 'url') dayData.interactive += count;
+      else dayData.other += count;
     }
 
     // Generate data points for all days in range
@@ -162,7 +172,7 @@ export class AnalyticsService {
       const date = new Date();
       date.setDate(date.getDate() - (days - 1 - i));
       const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      const data = dailyData.get(dateStr) || { video: 0, image: 0, text: 0, interactive: 0 };
+      const data = dailyData.get(dateStr) || { video: 0, image: 0, text: 0, interactive: 0, other: 0 };
       dataPoints.push({ date: dateStr, ...data });
     }
 
@@ -233,6 +243,9 @@ export class AnalyticsService {
         current: avgDailyMB,
         average: avgDailyMB,
         peak: avgDailyMB * 1.5,
+        isEstimated: true,
+        metricSource: 'content_size_device_count_estimate',
+        unit: 'MB/day',
       });
     }
 
@@ -258,20 +271,30 @@ export class AnalyticsService {
 
     const playlistIds = impressions.map(i => i.playlistId).filter(Boolean) as string[];
     const playlists = await this.db.playlist.findMany({
-      where: { id: { in: playlistIds } },
+      where: { id: { in: playlistIds }, organizationId },
       include: { _count: { select: { assignedDisplays: true } } },
     });
     const playlistMap = new Map(playlists.map(p => [p.id, p]));
 
     return impressions.map(i => {
       const playlist = playlistMap.get(i.playlistId!);
+      const proofOfPlayImpressions = i._count.id;
+      const averageCompletion = Math.round(i._avg.completionPercentage || 0);
+      const assignedScreens = playlist?._count?.assignedDisplays || 0;
       return {
         name: playlist?.name || 'Unknown',
-        plays: i._count.id,
-        engagement: Math.round(i._avg.completionPercentage || 0),
-        uniqueDevices: playlist?._count?.assignedDisplays || 0,
-        views: i._count.id,
-        completion: Math.round(i._avg.completionPercentage || 0),
+        proofOfPlayImpressions,
+        averageCompletion,
+        assignedScreens,
+        plays: proofOfPlayImpressions,
+        engagement: averageCompletion,
+        uniqueDevices: assignedScreens,
+        views: proofOfPlayImpressions,
+        completion: averageCompletion,
+        playsSource: 'content_impressions',
+        completionSource: 'content_impressions',
+        uniqueDevicesSource: 'assigned_displays',
+        uniquePlaybackDevicesTracked: false,
       };
     });
   }
@@ -326,6 +349,9 @@ export class AnalyticsService {
       activePlaylists,
       totalContentSize: contentSize._sum.fileSize || 0,
       uptimePercent: parseFloat(uptimePercent),
+      onlineNowPercent: parseFloat(uptimePercent),
+      uptimePercentSource: 'current_online_ratio',
+      uptimePercentIsHistorical: false,
       totalImpressions,
     };
   }
@@ -370,7 +396,7 @@ export class AnalyticsService {
 
     const deviceIds = topDevices.map(d => d.displayId);
     const devices = await this.db.display.findMany({
-      where: { id: { in: deviceIds } },
+      where: { id: { in: deviceIds }, organizationId },
       select: { id: true, nickname: true },
     });
     const deviceMap = new Map(devices.map(d => [d.id, d.nickname || 'Unnamed']));
@@ -426,6 +452,8 @@ export class AnalyticsService {
       totalOnlineMinutes: Math.round((totalMinutes * uptimePercent) / 100),
       totalOfflineMinutes: Math.round((totalMinutes * (100 - uptimePercent)) / 100),
       lastHeartbeat: device.lastHeartbeat,
+      isEstimated: true,
+      metricSource: 'heartbeat_status_heuristic',
     };
   }
 
@@ -434,7 +462,7 @@ export class AnalyticsService {
    */
   async getUptimeSummary(
     organizationId: string,
-    days: number = 30,
+    _days: number = 30,
   ): Promise<UptimeSummaryResult> {
     const devices = await this.db.display.findMany({
       where: { organizationId },
@@ -471,6 +499,8 @@ export class AnalyticsService {
         nickname,
         uptimePercent,
       })),
+      isEstimated: true,
+      metricSource: 'heartbeat_status_heuristic',
     };
   }
 
@@ -581,15 +611,15 @@ export class AnalyticsService {
         take: limit,
         orderBy: { timestamp: 'desc' },
         include: {
-          content: { select: { id: true, name: true } },
-          display: { select: { id: true, nickname: true, deviceIdentifier: true } },
+          content: { select: { id: true, name: true, organizationId: true } },
+          display: { select: { id: true, nickname: true, deviceIdentifier: true, organizationId: true } },
         },
       }),
       this.db.contentImpression.count({ where }),
     ]);
 
     return {
-      data,
+      data: data.map((row) => this.sanitizeProofOfPlayRelations(row, organizationId)),
       meta: { page, limit, total, totalPages: Math.ceil(total / limit) },
     };
   }
@@ -643,15 +673,15 @@ export class AnalyticsService {
         take: BATCH,
         orderBy: { timestamp: 'asc' }, // ascending so the CSV is chronological
         include: {
-          content: { select: { id: true, name: true } },
-          display: { select: { id: true, nickname: true, deviceIdentifier: true } },
+          content: { select: { id: true, name: true, organizationId: true } },
+          display: { select: { id: true, nickname: true, deviceIdentifier: true, organizationId: true } },
         },
       });
       if (batch.length === 0) break;
 
       for (const r of batch) {
         if (emitted >= MAX_ROWS) break;
-        yield this.formatProofOfPlayCsvRow(r, tz);
+        yield this.formatProofOfPlayCsvRow(this.sanitizeProofOfPlayRelations(r, organizationId), tz);
         emitted++;
       }
       skip += BATCH;
@@ -693,10 +723,42 @@ export class AnalyticsService {
     if (f.displayId) where.displayId = f.displayId;
     if (f.playlistId) where.playlistId = f.playlistId;
     if (f.displayTagId) {
-      where.display = { tags: { some: { tagId: f.displayTagId } } };
+      where.display = { organizationId: orgId, tags: { some: { tagId: f.displayTagId } } };
     }
 
     return where;
+  }
+
+  private sanitizeProofOfPlayRelations<T extends {
+    contentId: string;
+    displayId: string;
+    content?: { id?: string; name: string; organizationId?: string | null } | null;
+    display?: {
+      id?: string;
+      nickname: string | null;
+      deviceIdentifier: string;
+      organizationId?: string | null;
+    } | null;
+  }>(row: T, organizationId: string): T & {
+    content: { id: string; name: string };
+    display: { id: string; nickname: string | null; deviceIdentifier: string };
+  } {
+    const contentBelongsToOrg = row.content?.organizationId === organizationId;
+    const displayBelongsToOrg = row.display?.organizationId === organizationId;
+
+    return {
+      ...row,
+      content: contentBelongsToOrg && row.content
+        ? { id: row.content.id ?? row.contentId, name: row.content.name }
+        : { id: row.contentId, name: 'Unknown' },
+      display: displayBelongsToOrg && row.display
+        ? {
+            id: row.display.id ?? row.displayId,
+            nickname: row.display.nickname,
+            deviceIdentifier: row.display.deviceIdentifier,
+          }
+        : { id: row.displayId, nickname: null, deviceIdentifier: 'Unknown' },
+    };
   }
 
   /**

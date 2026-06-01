@@ -1,5 +1,86 @@
 # Vizora - Task Tracker
 
+## Active: Analytics Truthfulness Pass 31 (2026-06-01)
+
+**Branch:** `feat/analytics-truthfulness-pass-31`
+
+**Why now:** Pass 30 is merged with green PR and post-merge `main` CI, but
+production deploy remains blocked by dirty/diverged prod-local state. The next
+highest customer-trust issue from dashboard review is the analytics page
+presenting current-state or estimated metrics as real-time measured uptime and
+bandwidth. Plan review also found a P1 analytics data-isolation gap: malformed
+impression rows can carry the caller's `organizationId` while pointing at
+another tenant's content, playlist, or display IDs, and current analytics
+relation lookups resolve those related names by ID only.
+
+**New primitives introduced:** none. This pass only adds optional provenance
+metadata to existing analytics response shapes, tenant predicates to existing
+relation lookups, and updates existing dashboard copy/labels. No migration,
+route, module, queue, realtime path, notification path, MCP tool, Hermes skill,
+provider spend path, or production process.
+
+**Hermes-first analysis:** not applicable. This pass does not add or modify
+business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
+
+**Plan/design:**
+`docs/plans/2026-06-01-analytics-truthfulness-pass-31.md`
+
+**Plan**
+- [x] Start fresh branch from `origin/main`.
+- [x] Dispatch customer-copy/UX and API-contract/backcompat reviewers.
+- [x] Capture plan-review findings before test edits.
+- [x] Add failing middleware tests for analytics provenance.
+- [x] Add failing middleware tests for analytics tenant-isolated relation lookups.
+- [x] Add failing web tests for customer-facing truthfulness.
+- [x] Implement analytics DTO provenance and dashboard copy/label updates.
+- [x] Run multiple subagent diff reviews before broader verification.
+- [x] Run focused middleware and web tests.
+- [x] Run broader verification.
+- [ ] PR, CI, merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Evidence so far:**
+- Drift evidence: `AnalyticsService.getDeviceMetrics` simulates category
+  uptime from device inventory, `getBandwidthUsage` estimates transfer from
+  content sizes and device count, while the dashboard labels the page as
+  real-time performance metrics, shows a `System Uptime` KPI, and charts
+  bandwidth as `MB/s`.
+- Plan-review evidence: two read-only reviewers found misleading real-time,
+  uptime, bandwidth, views/shares/unique-device/top-engagement copy; stale web
+  analytics types; and analytics relation lookups that need organization
+  predicates before returning related names.
+- TDD red evidence: focused middleware analytics tests failed on missing
+  provenance fields and cross-tenant content/playlist/proof-of-play name
+  redaction; focused web analytics tests failed on `System Uptime`, `Device
+  Uptime Timeline`, real-time analytics copy, `MB/s`, views/shares/unique-device
+  CSV labels, and old chart titles.
+- Focused green evidence: middleware analytics service/proof-of-play suites
+  passed 55/55; web analytics page suite passed 12/12.
+- Diff review findings fixed: usage-trends raw SQL now joins `Content` by both
+  content ID and organization ID; proof-of-play relation sanitization fails
+  closed when relation `organizationId` is absent; realtime device-status events
+  no longer render a stale analytics `Updated Ns ago` freshness claim; frontend
+  analytics types now expose honest required aliases with legacy fields optional
+  for response compatibility; usage trends include an `other` bucket and clearer
+  reported-content-type copy.
+- Post-review focused green evidence: middleware analytics service/proof-of-play
+  suites passed 57/57; web analytics page suite passed 13/13.
+- Follow-up backend and frontend diff reviewers both returned CLEAN.
+- Broader local verification:
+  - `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/analytics/analytics.controller.spec.ts src/modules/analytics/analytics.service.spec.ts src/modules/analytics/proof-of-play.service.spec.ts` passed 70/70.
+  - `pnpm --filter @vizora/web test -- --runInBand --runTestsByPath src/app/dashboard/analytics/__tests__/analytics-page.test.tsx src/lib/hooks/__tests__/useAnalyticsData.test.ts` passed 28/28.
+  - `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false` passed.
+  - `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` passed.
+  - `pnpm --filter @vizora/middleware test -- --runInBand` passed 146 suites / 2930 tests.
+  - `pnpm --filter @vizora/web test -- --runInBand` passed 96 suites / 1045 tests with unrelated existing React `act()` warnings.
+  - `ESLINT_USE_FLAT_CONFIG=false npx eslint ...changed analytics files...` passed with 0 errors / 0 warnings; only the ESLint config deprecation notice remains.
+  - `pnpm security:no-hardcoded-jwts` passed.
+  - `npx nx build @vizora/middleware --skip-nx-cache` passed with existing webpack dependency warnings.
+  - `NODE_OPTIONS=--max-old-space-size=4096 NEXT_PUBLIC_SOCKET_URL=http://localhost:3002 NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1 BACKEND_URL=http://localhost:3000 npx nx build @vizora/web --skip-nx-cache` passed with existing Next middleware/proxy and TS project-reference warnings.
+  - `git diff --check` passed with CRLF warnings only.
+
+---
+
 ## Completed: Realtime Widget Secret Boundary Pass 30 (2026-06-01)
 
 **Branch:** `feat/customer-readiness-pass-30`

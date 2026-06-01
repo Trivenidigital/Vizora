@@ -51,8 +51,24 @@ interface KPICardProps {
 interface AnalyticsCsvExport {
  summary?: Partial<AnalyticsSummary>;
  deviceMetrics?: Array<{ date: string; mobile?: number; tablet?: number; desktop?: number }>;
- contentPerformance?: Array<{ title?: string; name?: string; views?: number; engagement?: number; shares?: number }>;
- playlistPerformance?: Array<{ name: string; plays?: number; engagement?: number; uniqueDevices?: number; completion?: number }>;
+ contentPerformance?: Array<{
+  title?: string;
+  name?: string;
+  impressions?: number;
+  averageCompletion?: number;
+  views?: number;
+  engagement?: number;
+ }>;
+ playlistPerformance?: Array<{
+  name: string;
+  proofOfPlayImpressions?: number;
+  averageCompletion?: number;
+  assignedScreens?: number;
+  plays?: number;
+  engagement?: number;
+  uniqueDevices?: number;
+  completion?: number;
+ }>;
 }
 
 const KPICard: React.FC<KPICardProps> = ({
@@ -110,13 +126,17 @@ const formatBytes = (bytes: number) => {
 
 const csvCell = (value: unknown): string => `"${String(value ?? '').replace(/"/g, '""')}"`;
 const fixedCell = (value: number | undefined): string => typeof value === 'number' ? value.toFixed(1) : '';
+const rangeBadgeLabel = (range: 'week' | 'month' | 'year') => {
+ if (range === 'week') return 'Last 7 Days';
+ if (range === 'year') return '30 sampled days';
+ return 'Last 30 Days';
+};
 
 export default function AnalyticsClient() {
  const toast = useToast();
  const [dateRange, setDateRange] = useState<'week' | 'month' | 'year'>('month');
  const [exporting, setExporting] = useState(false);
  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline'>('offline');
- const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
  const [summaryError, setSummaryError] = useState<string | null>(null);
 
@@ -150,12 +170,12 @@ export default function AnalyticsClient() {
 
  const analyticsErrorSections = [
  { label: 'Analytics summary', error: summaryError },
- { label: 'Device uptime timeline', error: deviceMetrics.error },
- { label: 'Content performance', error: contentPerformance.error },
+ { label: 'Estimated availability trend', error: deviceMetrics.error },
+ { label: 'Content proof-of-play', error: contentPerformance.error },
  { label: 'Device distribution', error: deviceDistribution.error },
  { label: 'Usage trends', error: usageTrends.error },
- { label: 'Bandwidth usage', error: bandwidthUsage.error },
- { label: 'Playlist performance', error: playlistPerformance.error },
+ { label: 'Estimated transfer volume', error: bandwidthUsage.error },
+ { label: 'Playlist playback summary', error: playlistPerformance.error },
  ].filter((section) => Boolean(section.error));
 
  const hasAnalyticsErrors = analyticsErrorSections.length > 0;
@@ -168,10 +188,6 @@ export default function AnalyticsClient() {
  // Real-time analytics updates
  useRealtimeEvents({
  enabled: true,
- onDeviceStatusChange: () => {
- // Device status changes may affect uptime metrics
- setLastUpdate(new Date());
- },
  onConnectionChange: (connected) => {
  setRealtimeStatus(connected ? 'connected' : 'offline');
  },
@@ -193,14 +209,14 @@ export default function AnalyticsClient() {
  sections.push(`"Online Devices","${data.summary.onlineDevices}"`);
  sections.push(`"Total Content","${data.summary.totalContent}"`);
  sections.push(`"Total Playlists","${data.summary.totalPlaylists}"`);
- sections.push(`"Uptime %","${data.summary.uptimePercent}"`);
+ sections.push(`"Online Now %","${data.summary.onlineNowPercent ?? data.summary.uptimePercent}"`);
  sections.push('');
  }
 
  // Device Metrics section
  if (data.deviceMetrics?.length) {
- sections.push('DEVICE METRICS');
- sections.push(['Date', 'Mobile', 'Tablet', 'Desktop'].join(','));
+ sections.push('ESTIMATED AVAILABILITY');
+ sections.push(['Date', 'Lower Estimate %', 'Mid Estimate %', 'Upper Estimate %'].join(','));
  data.deviceMetrics.forEach((d) => {
  sections.push([csvCell(d.date), fixedCell(d.mobile), fixedCell(d.tablet), fixedCell(d.desktop)].join(','));
  });
@@ -209,20 +225,29 @@ export default function AnalyticsClient() {
 
  // Content Performance section
  if (data.contentPerformance?.length) {
- sections.push('CONTENT PERFORMANCE');
- sections.push(['Title', 'Views', 'Engagement', 'Shares'].join(','));
+ sections.push('CONTENT PROOF-OF-PLAY');
+ sections.push(['Title', 'Proof-of-Play Impressions', 'Average Completion'].join(','));
  data.contentPerformance.forEach((c) => {
- sections.push([csvCell(c.title ?? c.name), c.views ?? '', c.engagement ?? '', c.shares ?? ''].join(','));
+ sections.push([
+  csvCell(c.title ?? c.name),
+  c.impressions ?? c.views ?? '',
+  c.averageCompletion ?? c.engagement ?? '',
+ ].join(','));
  });
  sections.push('');
  }
 
  // Playlist Performance section
  if (data.playlistPerformance?.length) {
- sections.push('PLAYLIST PERFORMANCE');
- sections.push(['Name', 'Plays', 'Engagement', 'Unique Devices', 'Completion'].join(','));
+ sections.push('PLAYLIST PLAYBACK SUMMARY');
+ sections.push(['Name', 'Proof-of-Play Impressions', 'Average Completion', 'Assigned Screens'].join(','));
  data.playlistPerformance.forEach((p) => {
- sections.push([csvCell(p.name), p.plays ?? '', p.engagement ?? '', p.uniqueDevices ?? '', p.completion ?? ''].join(','));
+ sections.push([
+  csvCell(p.name),
+  p.proofOfPlayImpressions ?? p.plays ?? '',
+  p.averageCompletion ?? p.completion ?? p.engagement ?? '',
+  p.assignedScreens ?? p.uniqueDevices ?? '',
+ ].join(','));
  });
  sections.push('');
  }
@@ -252,16 +277,11 @@ export default function AnalyticsClient() {
  Analytics
  </h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
- Real-time performance metrics and insights
+ Current device status and proof-of-play reporting
  {realtimeStatus === 'connected' && (
  <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
  <span className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full animate-pulse"></span>
- Real-time active
- </span>
- )}
- {lastUpdate && (
- <span className="ml-2 text-xs text-[var(--foreground-tertiary)]">
- Updated {Math.round((Date.now() - lastUpdate.getTime()) / 1000)}s ago
+ Realtime connection active
  </span>
  )}
  </p>
@@ -316,13 +336,19 @@ export default function AnalyticsClient() {
  icon="analytics"
  />
  <KPICard
- label="System Uptime"
- value={summary ? `${summary.uptimePercent}%` : '---'}
- change={summary ? (summary.uptimePercent >= 95 ? 'Above target' : 'Below target') : summaryError ? 'Unavailable' : ''}
- changeType={summary ? (summary.uptimePercent >= 95 ? 'positive' : 'negative') : 'neutral'}
+ label="Online Now"
+ value={summary ? `${summary.onlineNowPercent ?? summary.uptimePercent}%` : '---'}
+ change={summary ? `${summary.onlineDevices}/${summary.totalDevices} devices online` : summaryError ? 'Unavailable' : ''}
+ changeType="neutral"
  icon="overview"
  />
  </div>
+
+ {summary && (
+ <p className="text-xs text-[var(--foreground-tertiary)]">
+ Current online ratio from display status. Historical uptime is not tracked by this KPI.
+ </p>
+ )}
 
  {hasAnalyticsErrors && (
  <div
@@ -357,17 +383,20 @@ export default function AnalyticsClient() {
 
  {/* Charts Grid */}
  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
- {/* Device Uptime Timeline */}
+ {/* Estimated Availability Trend */}
  <Card className="eh-dash-card lg:col-span-2">
  <Card.Header>
  <div className="flex items-center justify-between">
  <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)]">
- Device Uptime Timeline
+ Estimated Availability Trend
  </h3>
  <Badge variant="info" size="sm" className="eh-badge">
- Last 30 Days
+ {rangeBadgeLabel(dateRange)}
  </Badge>
  </div>
+ <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
+ Estimated from display inventory and creation dates. This is not measured historical uptime.
+ </p>
  </Card.Header>
  <Card.Body>
  {deviceMetrics.loading ? (
@@ -377,31 +406,34 @@ export default function AnalyticsClient() {
  </div>
  </div>
  ) : deviceMetrics.error ? (
- <ChartErrorState message="Unable to load device uptime data." detail={deviceMetrics.error} />
+ <ChartErrorState message="Unable to load estimated availability data." detail={deviceMetrics.error} />
  ) : deviceMetrics.data.length === 0 ? (
- <EmptyChartState message="No device uptime data available yet." />
+ <EmptyChartState message="No availability estimate available yet." />
  ) : (
  <LineChart
  data={deviceMetrics.data}
  dataKeys={[
- { key: 'mobile', name: 'Mobile Displays' },
- { key: 'tablet', name: 'Tablets' },
- { key: 'desktop', name: 'Desktop Screens' },
+ { key: 'mobile', name: 'Lower availability estimate' },
+ { key: 'tablet', name: 'Mid availability estimate' },
+ { key: 'desktop', name: 'Upper availability estimate' },
  ]}
  xAxisKey="date"
- yAxisLabel="Uptime %"
+ yAxisLabel="Estimated availability %"
  height={300}
  />
  )}
  </Card.Body>
  </Card>
 
- {/* Content Performance */}
+ {/* Content Proof-of-Play */}
  <Card className="eh-dash-card">
  <Card.Header>
  <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)]">
- Content Performance
+ Content Proof-of-Play
  </h3>
+ <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
+ Impressions and completion are measured from display playback reports. Shares are not tracked.
+ </p>
  </Card.Header>
  <Card.Body>
  {contentPerformance.loading ? (
@@ -411,13 +443,13 @@ export default function AnalyticsClient() {
  </div>
  </div>
  ) : contentPerformance.error ? (
- <ChartErrorState message="Unable to load content performance data." detail={contentPerformance.error} />
+ <ChartErrorState message="Unable to load content proof-of-play data." detail={contentPerformance.error} />
  ) : contentPerformance.data.length === 0 ? (
- <EmptyChartState message="No content performance data yet. Upload content to track views." />
+ <EmptyChartState message="No content proof-of-play data yet. Playback impressions appear as displays report content playback." />
  ) : (
  <BarChart
  data={contentPerformance.data}
- dataKeys={[{ key: 'views', name: 'Views' }]}
+ dataKeys={[{ key: 'impressions', name: 'Impressions' }]}
  xAxisKey="title"
  height={300}
  layout="vertical"
@@ -460,8 +492,11 @@ export default function AnalyticsClient() {
  <Card className="eh-dash-card lg:col-span-2">
  <Card.Header>
  <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)]">
- Usage Trends by Content Type
+ Usage Trends by Reported Content Type
  </h3>
+ <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
+ Proof-of-play impressions grouped into video, image, HTML, URL, and other content types.
+ </p>
  </Card.Header>
  <Card.Body>
  {usageTrends.loading ? (
@@ -478,13 +513,14 @@ export default function AnalyticsClient() {
  <AreaChart
  data={usageTrends.data}
  dataKeys={[
- { key: 'video', name: 'Video' },
- { key: 'image', name: 'Images' },
- { key: 'text', name: 'Text' },
- { key: 'interactive', name: 'Interactive' },
+ { key: 'video', name: 'Video impressions' },
+ { key: 'image', name: 'Image impressions' },
+ { key: 'text', name: 'HTML impressions' },
+ { key: 'interactive', name: 'URL impressions' },
+ { key: 'other', name: 'Other impressions' },
  ]}
  xAxisKey="date"
- yAxisLabel="Views"
+ yAxisLabel="Impressions"
  height={300}
  stacked={true}
  />
@@ -492,12 +528,15 @@ export default function AnalyticsClient() {
  </Card.Body>
  </Card>
 
- {/* Bandwidth Usage */}
+ {/* Estimated Transfer Volume */}
  <Card className="eh-dash-card lg:col-span-2">
  <Card.Header>
  <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)]">
- Bandwidth Usage (24h)
+ Estimated Transfer Volume
  </h3>
+ <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
+ Estimated from stored content size and assigned screens. This is not measured network throughput.
+ </p>
  </Card.Header>
  <Card.Body>
  {bandwidthUsage.loading ? (
@@ -507,31 +546,34 @@ export default function AnalyticsClient() {
  </div>
  </div>
  ) : bandwidthUsage.error ? (
- <ChartErrorState message="Unable to load bandwidth usage." detail={bandwidthUsage.error} />
+ <ChartErrorState message="Unable to load estimated transfer volume." detail={bandwidthUsage.error} />
  ) : bandwidthUsage.data.length === 0 ? (
- <EmptyChartState message="No bandwidth data yet. Usage will be tracked as devices stream content." />
+ <EmptyChartState message="No transfer estimate yet. Upload content and pair screens to estimate daily transfer volume." />
  ) : (
  <ComposedChart
  data={bandwidthUsage.data}
  series={[
- { type: 'line', key: 'current', name: 'Current Usage' },
- { type: 'line', key: 'average', name: 'Average' },
- { type: 'bar', key: 'peak', name: 'Peak' },
+ { type: 'line', key: 'current', name: 'Estimated current volume' },
+ { type: 'line', key: 'average', name: 'Estimated average volume' },
+ { type: 'bar', key: 'peak', name: 'Estimated peak volume' },
  ]}
  xAxisKey="time"
- yAxisLabel="MB/s"
+ yAxisLabel="MB/day"
  height={300}
  />
  )}
  </Card.Body>
  </Card>
 
- {/* Playlist Performance */}
+ {/* Playlist Playback Summary */}
  <Card className="eh-dash-card lg:col-span-2">
  <Card.Header>
  <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)]">
- Top Playlists by Engagement
+ Playlist Playback Summary
  </h3>
+ <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
+ Plays and completion come from proof-of-play reports. Assigned screens are not unique playback devices.
+ </p>
  </Card.Header>
  <Card.Body>
  {playlistPerformance.loading ? (
@@ -541,15 +583,15 @@ export default function AnalyticsClient() {
  </div>
  </div>
  ) : playlistPerformance.error ? (
- <ChartErrorState message="Unable to load playlist performance data." detail={playlistPerformance.error} />
+ <ChartErrorState message="Unable to load playlist playback data." detail={playlistPerformance.error} />
  ) : playlistPerformance.data.length === 0 ? (
- <EmptyChartState message="No playlist data yet. Create playlists and assign them to devices." />
+ <EmptyChartState message="No playlist playback data yet. Assign playlists and wait for proof-of-play reports." />
  ) : (
  <BarChart
  data={playlistPerformance.data}
  dataKeys={[
- { key: 'views', name: 'Views' },
- { key: 'completion', name: 'Completion %' },
+ { key: 'proofOfPlayImpressions', name: 'Impressions' },
+ { key: 'averageCompletion', name: 'Average Completion' },
  ]}
  xAxisKey="name"
  height={300}
