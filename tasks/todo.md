@@ -1,6 +1,6 @@
 # Vizora - Task Tracker
 
-## In Progress: Realtime Status Catch-Up Performance Pass 25 (2026-06-01)
+## Completed: Realtime Status Catch-Up Performance Pass 25 (2026-06-01)
 
 **Branch:** `feat/performance-readiness-pass-25`
 
@@ -24,8 +24,8 @@ business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
 - [x] Implement batched dashboard status catch-up.
 - [x] Run multi-vector review before broader verification.
 - [x] Run focused and broader verification.
-- [ ] PR, CI, merge.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Local evidence:**
 - TDD red: realtime catch-up tests failed because large/small fleets still
@@ -52,6 +52,15 @@ business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
   Next middleware deprecation warnings. The first realtime build attempt failed
   with a Windows file-lock in `@vizora/database:build` while tests were running
   in parallel; sequential rerun passed.
+- PR #150 merged as `327a642b426e02045d6e02d60439efa89d6f4755`. PR CI passed
+  audit, build, lint, security, test, and e2e. Post-merge `main` CI run
+  `26745939486` passed build, lint, security, test, and e2e.
+- Deployment was not performed. Read-only prod gate still blocks deploy:
+  `/opt/vizora/app` is on `bb76aa1838740bff5b58623dfef7a906d44f46a6`,
+  `origin/main` is `327a642b426e02045d6e02d60439efa89d6f4755`, the checkout is
+  17 commits ahead / 93 behind with many tracked and untracked local changes.
+  Core prod probes remain up: middleware 200, web 200; realtime `/health`
+  returns the known 404. PM2 shows middleware, realtime, and web online.
 
 **Plan/design:**
 `docs/plans/2026-06-01-realtime-status-catchup-performance-pass-25.md`
