@@ -1,6 +1,6 @@
 # Vizora - Task Tracker
 
-## Active: Widget Truthfulness Pass 29 (2026-06-01)
+## Completed: Widget Truthfulness Pass 29 (2026-06-01)
 
 **Branch:** `feat/widget-truthfulness-pass-29`
 
@@ -22,8 +22,8 @@
 - [x] Fix dashboard schema handling, fallback type behavior, and refresh pending state.
 - [x] Run multi-subagent review before broader verification.
 - [x] Run focused and broader verification.
-- [ ] PR, CI, merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge if green.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Local evidence so far:**
 - TDD red: focused middleware widget/data-source suite failed because strict mode did not exist, data sources returned sample data, create/update saved fallback or stale HTML, and refresh wrapped provider failure as `BadRequestException`.
@@ -33,10 +33,12 @@
 - Final review: backend and frontend subagents both returned CLEAN.
 - Final focused evidence: middleware widget/data-source suite passed 165/165; widgets page suite passed 16/16. Post-cleanup `content.service.spec.ts` passed 110/110.
 - Broader evidence: middleware full Jest passed 146 suites / 2920 tests; web full Jest passed 96 suites / 1041 tests. Middleware and web `tsc --noEmit` passed. `pnpm security:no-hardcoded-jwts` passed. `pnpm build:middleware` passed with existing webpack warnings. `pnpm build:web` passed with local required `NEXT_PUBLIC_SOCKET_URL`, `NEXT_PUBLIC_API_URL`, `BACKEND_URL`, and memory env; the first web build without `NEXT_PUBLIC_SOCKET_URL` correctly failed the production CSP guard. Changed-file ESLint exited 0 with non-blocking existing `any` warnings in the widgets page. `git diff --check` passed with CRLF warnings only.
+- PR #157 merged as `a52d3f4daa59c386cd85e58fee2c0351941fb707`. PR CI passed audit, build, lint, security, test, and e2e. Post-merge `main` CI run `26760099592` also passed lint, build, security, test, and e2e.
+- Deployment was not performed. Read-only prod gate still blocks deploy: `/opt/vizora/app` is on `bb76aa1838740bff5b58623dfef7a906d44f46a6`, `origin/main` is `a52d3f4daa59c386cd85e58fee2c0351941fb707`, the checkout is 105 commits behind / 17 ahead with 72 dirty/untracked entries, and many ops/Hermes PM2 jobs are stopped. Core probes: middleware 200, web 200, realtime `/health` 404.
 
 ---
 
-## Active: Content Tag Filter Trust Pass 28 (2026-06-01)
+## Completed: Content Tag Filter Trust Pass 28 (2026-06-01)
 
 **Branch:** `feat/customer-readiness-pass-28`
 
@@ -68,8 +70,8 @@ business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
 - [x] Replace hardcoded dashboard tag filters with fetched real tags.
 - [x] Run multi-subagent review before broader verification.
 - [x] Run focused and broader verification.
-- [ ] PR, CI, merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge if green.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Local evidence so far:**
 - TDD red: middleware content tests failed on missing
@@ -103,6 +105,9 @@ business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
   webpack warnings; `npx nx build @vizora/web --skip-nx-cache` passed with the
   existing Next middleware/proxy warning. `git diff --check` and
   `pnpm security:no-hardcoded-jwts` passed.
+- PR #156 merged as `ef12326737cbbe8133148af97468607cc34528c4`. Post-merge
+  `main` CI passed. Deployment was not performed because the same dirty/diverged
+  prod checkout gate remained blocked.
 
 ---
 
