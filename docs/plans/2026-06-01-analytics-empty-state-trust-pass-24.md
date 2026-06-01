@@ -87,10 +87,29 @@ Hermes skills, AI/provider calls, or spend paths.
   errors.
 - `pnpm security:no-hardcoded-jwts`: pass.
 - `git diff --check`: pass with CRLF warnings only.
+- PR #148 CI: audit, build, lint, security, test, and e2e pass.
+- Post-merge `main` CI run `26742702487` at
+  `56ba589a2babc1cad4b5d4ce4518bb58266ef673`: build, lint, security, test, and
+  e2e pass.
+
+## Merge / Deploy
+
+- PR #148 was squash-merged as
+  `56ba589a2babc1cad4b5d4ce4518bb58266ef673`.
+- The remote feature branch was deleted after merge.
+- Production deploy was not performed. The read-only deploy-gate probe found
+  `/opt/vizora/app` on `bb76aa1838740bff5b58623dfef7a906d44f46a6` while
+  `origin/main` is `56ba589a2babc1cad4b5d4ce4518bb58266ef673`; the checkout is
+  17 commits ahead / 91 behind and dirty with tracked and untracked production
+  edits. Deploying over that state would require operator classification or a
+  reviewed production-state plan.
+- Prod health probes at gate time: middleware `/api/v1/health` 200, web `/`
+  200, realtime `/health` known 404.
 
 ## Residual Risk
 
 - Package-level lint scripts remain stale for Next 16 and Windows POSIX env var
   syntax, so equivalent direct ESLint commands were used for this pass.
-- Production deploy remains blocked unless the prod checkout is no longer dirty
-  or diverged at deploy-gate time.
+- Production deploy remains blocked until the prod checkout is no longer dirty
+  and diverged, or those prod-local changes are explicitly classified and a safe
+  deployment path is approved.
