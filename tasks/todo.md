@@ -1,6 +1,6 @@
 # Vizora - Task Tracker
 
-## In Progress: Schedule Trust Polish Pass 23 (2026-06-01)
+## Completed: Schedule Trust Polish Pass 23 (2026-06-01)
 
 **Branch:** `feat/customer-dashboard-improvements-pass-23`
 
@@ -32,8 +32,8 @@ business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
   semantics for dynamic conflict states.
 - [x] Run final multi-subagent code review before broader tests.
 - [x] Run focused and broader verification.
-- [ ] PR, CI, merge.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Plan/design:**
 `docs/plans/2026-06-01-schedule-trust-polish-pass-23.md`
@@ -100,6 +100,11 @@ business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
   - Exit 0; Windows CRLF conversion warnings only.
 
 **Current merge/deploy state**
+- [x] PR #146 merged at
+  `b373760f373e31e0f0c3fb76f9b0ddef7c396e74`; PR checks green for audit,
+  build, e2e, lint, security, and test.
+- [x] Post-merge `main` CI run `26739722438` completed successfully: security,
+  lint, build, test, and e2e all green.
 - [x] PR #145 merged at
   `89a33b99d15abe82d99d1f767e6d5475f320c155`; PR checks green for audit,
   build, e2e, lint, security, and test.
@@ -107,8 +112,10 @@ business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
   lint, build, test, and e2e all green.
 - [x] Prod deploy remains blocked: `/opt/vizora/app` is at
   `bb76aa1838740bff5b58623dfef7a906d44f46a6`, remote `main` is
-  `89a33b99d15abe82d99d1f767e6d5475f320c155`, and prod is
-  `ahead 17, behind 77` with many tracked edits and untracked files. No
+  `b373760f373e31e0f0c3fb76f9b0ddef7c396e74`, and prod is
+  `ahead 17, behind 89` with many tracked edits and untracked files. Core PM2
+  services are online; middleware `/api/v1/health` and web `/` returned 200,
+  while realtime `/health` remains 404. No
   production pull, reset, stash, env edit, service restart, DB mutation, or
   deploy performed.
 
