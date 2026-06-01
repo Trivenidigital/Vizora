@@ -20,8 +20,7 @@ import { CreateDisplayDto } from './dto/create-display.dto';
 import { UpdateDisplayDto } from './dto/update-display.dto';
 import { UpdateQrOverlayDto } from './dto/update-qr-overlay.dto';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
-
-const MINIO_URL_PREFIX = 'minio://';
+import { DISPLAY_DETAIL_SELECT, DISPLAY_LIST_SELECT } from './display-response.select';
 
 /**
  * Hash a token using SHA-256 for secure storage
@@ -77,6 +76,7 @@ export class DisplaysService {
           nickname: name,
           organizationId,
         },
+        select: DISPLAY_DETAIL_SELECT,
       });
       this.emitDisplayEvent('created', display.id, organizationId);
       return display;
@@ -117,13 +117,7 @@ export class DisplaysService {
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
-        include: {
-          tags: {
-            include: {
-              tag: true,
-            },
-          },
-        },
+        select: DISPLAY_LIST_SELECT,
       }),
       this.db.display.count({ where }),
     ]);
@@ -134,24 +128,7 @@ export class DisplaysService {
   async findOne(organizationId: string, id: string) {
     const display = await this.db.display.findFirst({
       where: { id, organizationId },
-      include: {
-        tags: {
-          include: {
-            tag: true,
-          },
-        },
-        groups: {
-          include: {
-            displayGroup: true,
-          },
-        },
-        schedules: {
-          where: { isActive: true },
-          include: {
-            playlist: true,
-          },
-        },
-      },
+      select: DISPLAY_DETAIL_SELECT,
     });
 
     if (!display) {
@@ -217,7 +194,10 @@ export class DisplaysService {
     if (updateResult.count === 0) {
       throw new NotFoundException('Display not found');
     }
-    const updatedDisplay = await this.db.display.findUnique({ where: { id } });
+    const updatedDisplay = await this.db.display.findUnique({
+      where: { id },
+      select: DISPLAY_DETAIL_SELECT,
+    });
 
     // If playlist was updated, notify the realtime service to push update to device
     // Fire-and-forget - don't block the response if realtime service is down
@@ -874,10 +854,17 @@ export class DisplaysService {
     );
   }
 
-  async updateQrOverlay(organizationId: string, id: string, dto: UpdateQrOverlayDto) {
-    const display = await this.findOne(organizationId, id);
-    const metadata = (display.metadata as Record<string, unknown>) || {};
-    metadata.qrOverlay = {
+  async updateQrOverlay(
+    organizationId: string,
+    id: string,
+    dto: UpdateQrOverlayDto,
+  ): Promise<UpdateQrOverlayDto>;
+  async updateQrOverlay(
+    organizationId: string,
+    id: string,
+    dto: UpdateQrOverlayDto,
+  ): Promise<UpdateQrOverlayDto> {
+    const qrOverlay = {
       enabled: dto.enabled,
       url: dto.url,
       position: dto.position || 'bottom-right',
@@ -885,24 +872,29 @@ export class DisplaysService {
       opacity: dto.opacity ?? 1,
       margin: dto.margin || 16,
       backgroundColor: dto.backgroundColor || '#ffffff',
-      label: dto.label,
+      ...(dto.label !== undefined ? { label: dto.label } : {}),
     };
 
-    // Defense-in-depth: include organizationId to prevent TOCTOU races
-    const result = await this.db.display.updateMany({
-      where: { id, organizationId },
-      data: { metadata: metadata as Prisma.InputJsonValue },
-    });
-    if (result.count === 0) {
-      throw new NotFoundException('Display not found');
-    }
-    return this.db.display.findUnique({ where: { id } });
+    await this.writeQrOverlay(organizationId, id, qrOverlay);
+    return qrOverlay;
   }
 
-  async removeQrOverlay(organizationId: string, id: string) {
+  async removeQrOverlay(organizationId: string, id: string): Promise<void> {
+    await this.writeQrOverlay(organizationId, id);
+  }
+
+  private async writeQrOverlay(
+    organizationId: string,
+    id: string,
+    qrOverlay?: UpdateQrOverlayDto,
+  ): Promise<void> {
     const display = await this.findOne(organizationId, id);
     const metadata = (display.metadata as Record<string, unknown>) || {};
-    delete metadata.qrOverlay;
+    if (qrOverlay) {
+      metadata.qrOverlay = qrOverlay;
+    } else {
+      delete metadata.qrOverlay;
+    }
 
     // Defense-in-depth: include organizationId to prevent TOCTOU races
     const result = await this.db.display.updateMany({
@@ -912,6 +904,5 @@ export class DisplaysService {
     if (result.count === 0) {
       throw new NotFoundException('Display not found');
     }
-    return this.db.display.findUnique({ where: { id } });
   }
 }

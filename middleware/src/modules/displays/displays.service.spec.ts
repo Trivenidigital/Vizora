@@ -39,6 +39,28 @@ describe('DisplaysService', () => {
     updatedAt: new Date('2026-01-27T12:00:00Z'),
   };
 
+  const secretDisplayFields = [
+    'jwtToken',
+    'pairingCode',
+    'pairingCodeExpiresAt',
+    'socketId',
+  ];
+
+  function expectSafeDisplaySelect(select: Record<string, unknown> | undefined) {
+    expect(select).toBeDefined();
+    expect(select).toEqual(expect.objectContaining({
+      id: true,
+      organizationId: true,
+      deviceIdentifier: true,
+      nickname: true,
+      status: true,
+      currentPlaylistId: true,
+    }));
+    for (const field of secretDisplayFields) {
+      expect(select).not.toHaveProperty(field);
+    }
+  }
+
   beforeEach(async () => {
     process.env.INTERNAL_API_SECRET = 'test-internal-secret';
 
@@ -143,7 +165,10 @@ describe('DisplaysService', () => {
           timezone: 'America/New_York',
           organizationId: mockOrganizationId,
         },
+        select: expect.any(Object),
       });
+      const query = databaseService.display.create.mock.calls[0][0] as any;
+      expectSafeDisplaySelect(query.select);
       expect(result).toEqual(mockDisplay);
     });
 
@@ -175,14 +200,11 @@ describe('DisplaysService', () => {
         skip: 0,
         take: 10,
         orderBy: { createdAt: 'desc' },
-        include: {
-          tags: {
-            include: {
-              tag: true,
-            },
-          },
-        },
+        select: expect.any(Object),
       });
+      const query = databaseService.display.findMany.mock.calls[0][0] as any;
+      expect(query).not.toHaveProperty('include');
+      expectSafeDisplaySelect(query.select);
       expect(databaseService.display.count).toHaveBeenCalledWith({
         where: { organizationId: mockOrganizationId },
       });
@@ -204,13 +226,7 @@ describe('DisplaysService', () => {
         skip: 10,
         take: 10,
         orderBy: { createdAt: 'desc' },
-        include: {
-          tags: {
-            include: {
-              tag: true,
-            },
-          },
-        },
+        select: expect.any(Object),
       });
       expect(result.meta.page).toBe(2);
       expect(result.meta.totalPages).toBe(2);
@@ -242,25 +258,19 @@ describe('DisplaysService', () => {
 
       expect(databaseService.display.findFirst).toHaveBeenCalledWith({
         where: { id: mockDisplayId, organizationId: mockOrganizationId },
-        include: {
-          tags: {
-            include: {
-              tag: true,
-            },
-          },
-          groups: {
-            include: {
-              displayGroup: true,
-            },
-          },
-          schedules: {
-            where: { isActive: true },
-            include: {
-              playlist: true,
-            },
-          },
-        },
+        select: expect.any(Object),
       });
+      const query = databaseService.display.findFirst.mock.calls[0][0] as any;
+      expect(query).not.toHaveProperty('include');
+      expectSafeDisplaySelect(query.select);
+      expect(query.select).toEqual(expect.objectContaining({
+        metadata: true,
+        lastScreenshot: true,
+        lastScreenshotAt: true,
+        tags: expect.any(Object),
+        groups: expect.any(Object),
+        schedules: expect.any(Object),
+      }));
       expect(result).toEqual(mockDisplayWithRelations);
     });
 
@@ -315,6 +325,12 @@ describe('DisplaysService', () => {
           nickname: 'Updated Display',
         },
       });
+      const findUniqueQuery = databaseService.display.findUnique.mock.calls[0][0] as any;
+      expect(findUniqueQuery).toEqual({
+        where: { id: mockDisplayId },
+        select: expect.any(Object),
+      });
+      expectSafeDisplaySelect(findUniqueQuery.select);
       expect(result.nickname).toBe('Updated Display');
     });
 
@@ -716,6 +732,73 @@ describe('DisplaysService', () => {
           lastScreenshotAt: expect.any(Date),
         },
       });
+    });
+  });
+
+  describe('QR overlay', () => {
+    const mockDisplayWithMetadata = {
+      ...mockDisplay,
+      tags: [],
+      groups: [],
+      schedules: [],
+      metadata: {
+        brightness: 80,
+        qrOverlay: {
+          enabled: true,
+          url: 'https://old.example.com',
+          position: 'top-left',
+        },
+      },
+    };
+
+    it('updates QR overlay metadata and returns the saved overlay config', async () => {
+      databaseService.display.findFirst.mockResolvedValue(mockDisplayWithMetadata as any);
+      databaseService.display.updateMany.mockResolvedValue({ count: 1 });
+
+      const result = await service.updateQrOverlay(mockOrganizationId, mockDisplayId, {
+        enabled: true,
+        url: 'https://example.com/menu',
+        position: 'bottom-right',
+      });
+
+      expect(result).toEqual({
+        enabled: true,
+        url: 'https://example.com/menu',
+        position: 'bottom-right',
+        size: 120,
+        opacity: 1,
+        margin: 16,
+        backgroundColor: '#ffffff',
+      });
+      expect(databaseService.display.updateMany).toHaveBeenCalledWith({
+        where: { id: mockDisplayId, organizationId: mockOrganizationId },
+        data: {
+          metadata: {
+            brightness: 80,
+            qrOverlay: result,
+          },
+        },
+      });
+      expect(databaseService.display.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('removes QR overlay metadata without returning the full display row', async () => {
+      databaseService.display.findFirst.mockResolvedValue(mockDisplayWithMetadata as any);
+      databaseService.display.updateMany.mockResolvedValue({ count: 1 });
+
+      await expect(
+        service.removeQrOverlay(mockOrganizationId, mockDisplayId),
+      ).resolves.toBeUndefined();
+
+      expect(databaseService.display.updateMany).toHaveBeenCalledWith({
+        where: { id: mockDisplayId, organizationId: mockOrganizationId },
+        data: {
+          metadata: {
+            brightness: 80,
+          },
+        },
+      });
+      expect(databaseService.display.findUnique).not.toHaveBeenCalled();
     });
   });
 

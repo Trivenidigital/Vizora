@@ -16,6 +16,19 @@ describe('PairingService', () => {
   let mockRedisService: jest.Mocked<RedisService>;
   let redisClient: { scan: jest.Mock; mget: jest.Mock };
 
+  const sensitiveDisplayFields = ['jwtToken', 'pairingCode', 'pairingCodeExpiresAt', 'socketId'];
+  const pairingResultSelect = {
+    id: true,
+    nickname: true,
+    deviceIdentifier: true,
+    status: true,
+  };
+  const expectSelectToExcludeSensitiveDisplayFields = (select: Record<string, unknown>) => {
+    for (const field of sensitiveDisplayFields) {
+      expect(select).not.toHaveProperty(field);
+    }
+  };
+
   // In-memory store to simulate Redis behavior
   let redisStore: Map<string, { value: string; ttl: number; expiresAt: number }>;
 
@@ -134,6 +147,17 @@ describe('PairingService', () => {
       expect(result).toHaveProperty('pairingUrl');
     });
 
+    it('should check existing pairing state with token-only display select', async () => {
+      mockDatabaseService.display.findUnique.mockResolvedValue(null);
+
+      await service.requestPairingCode(mockRequestDto);
+
+      expect(mockDatabaseService.display.findUnique).toHaveBeenCalledWith({
+        where: { deviceIdentifier: 'device-123' },
+        select: { jwtToken: true },
+      });
+    });
+
     it('should store pairing request in Redis with TTL', async () => {
       mockDatabaseService.display.findUnique.mockResolvedValue(null);
 
@@ -247,8 +271,6 @@ describe('PairingService', () => {
   });
 
   describe('checkPairingStatus', () => {
-    const mockCode = 'ABC123';
-
     beforeEach(async () => {
       mockDatabaseService.display.findUnique.mockResolvedValue(null);
       // Create a pairing request first
@@ -319,6 +341,7 @@ describe('PairingService', () => {
       await service.completePairing('org-123', 'user-123', { code: pairingResult.code });
 
       // Now checkPairingStatus reads the plaintext token from Redis
+      mockDatabaseService.display.findUnique.mockClear();
       mockDatabaseService.display.findUnique.mockResolvedValue({
         id: 'display-id',
         organizationId: 'org-123',
@@ -326,6 +349,10 @@ describe('PairingService', () => {
 
       const status = await service.checkPairingStatus(pairingResult.code);
 
+      expect(mockDatabaseService.display.findUnique).toHaveBeenCalledWith({
+        where: { deviceIdentifier: 'device-paired' },
+        select: { id: true, organizationId: true },
+      });
       expect(status.status).toBe('paired');
       expect(status.deviceToken).toBe('mock-jwt-token'); // plaintext token from jwtService.sign mock
       expect(status.deviceId).toBe('display-id');
@@ -395,7 +422,21 @@ describe('PairingService', () => {
 
       expect(result.success).toBe(true);
       expect(result.display).toHaveProperty('id');
-      expect(mockDatabaseService.display.create).toHaveBeenCalled();
+      expect(mockDatabaseService.display.findUnique).toHaveBeenNthCalledWith(1, {
+        where: { deviceIdentifier: 'new-device' },
+        select: { jwtToken: true },
+      });
+      expect(mockDatabaseService.display.findUnique).toHaveBeenNthCalledWith(2, {
+        where: { deviceIdentifier: 'new-device' },
+        select: { id: true, location: true },
+      });
+      expect(mockDatabaseService.display.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: pairingResultSelect,
+        }),
+      );
+      const createArgs = mockDatabaseService.display.create.mock.calls[0][0] as any;
+      expectSelectToExcludeSensitiveDisplayFields(createArgs.select);
     });
 
     it('should update existing unpaired device', async () => {
@@ -403,7 +444,7 @@ describe('PairingService', () => {
         .mockResolvedValueOnce(null) // requestPairingCode check
         .mockResolvedValueOnce({
           id: 'existing-display-id',
-          jwtToken: null,
+          location: 'Lobby',
         } as any); // completePairing check
 
       const pairingResult = await service.requestPairingCode({
@@ -425,7 +466,17 @@ describe('PairingService', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(mockDatabaseService.display.update).toHaveBeenCalled();
+      expect(mockDatabaseService.display.findUnique).toHaveBeenNthCalledWith(2, {
+        where: { deviceIdentifier: 'existing-device' },
+        select: { id: true, location: true },
+      });
+      expect(mockDatabaseService.display.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: pairingResultSelect,
+        }),
+      );
+      const updateArgs = mockDatabaseService.display.update.mock.calls[0][0] as any;
+      expectSelectToExcludeSensitiveDisplayFields(updateArgs.select);
     });
 
     it('should throw NotFoundException for non-existent code', async () => {
