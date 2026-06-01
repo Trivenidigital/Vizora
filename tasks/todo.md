@@ -1,6 +1,6 @@
 # Vizora - Task Tracker
 
-## Active: Customer Critical Path E2E Gate Pass 37 (2026-06-01)
+## Completed: Customer Critical Path E2E Gate Pass 37 (2026-06-01)
 
 **Branch:** `feat/customer-experience-pass-37`
 
@@ -33,10 +33,15 @@ Hermes, or AI/provider workflow.
   alongside the existing agents suite.
 - [x] Run multi-vector subagent review before broader verification.
 - [x] Run focused and broader verification.
-- [ ] PR, CI, merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge if green. PR #169 merged to `origin/main` at
+  `cc708d539cddeb686c64d11bd8f6abf351d9f524`; PR CI green.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe. Rechecked
+  after PR #169: blocked because `/opt/vizora/app` remains dirty and diverged
+  (`main...origin/main [ahead 17, behind 123]`, prod `HEAD bb76aa...`,
+  prod local `origin/main 7728ea0...`, remote `origin/main cc708d5...`).
+  No deploy attempted.
 
-**Evidence so far:**
+**Evidence:**
 - Drift-check: `scripts/smoke/api-critical-path.sh` already covers full pairing
   completion, URL content, multipart PDF upload, authenticated device-content
   range streaming, playlist creation, schedule creation, and device
@@ -78,6 +83,14 @@ Hermes, or AI/provider workflow.
   repo check because the spec tsconfig has a pre-existing
   `moduleResolution: NodeNext` / `module` mismatch; Jest/ts-jest is the E2E
   compile path and passed.
+- PR/CI/merge: PR #169 passed `audit`, `build`, `lint`, `security`, `test`,
+  and `e2e`; merged 2026-06-01T22:46:28Z as
+  `cc708d539cddeb686c64d11bd8f6abf351d9f524`.
+- Production gate: blocked. `/opt/vizora/app` remains dirty and diverged with
+  many modified template/landing/Hermes files plus untracked production files.
+  Core health at probe time: middleware HTTP 200, web HTTP 200, realtime
+  `/health` HTTP 404. Most ops/Hermes PM2 jobs remain stopped; `vizora-web`,
+  `vizora-realtime`, and two `vizora-middleware` cluster workers are online.
 
 ---
 
