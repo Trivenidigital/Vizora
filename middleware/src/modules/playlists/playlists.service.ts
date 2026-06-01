@@ -15,6 +15,7 @@ const REALTIME_CIRCUIT_CONFIG = {
   successThreshold: 2,
   failureWindow: 60000, // 1 minute
 };
+const PLAYLIST_UPDATE_NOTIFY_CONCURRENCY = 20;
 
 @Injectable()
 export class PlaylistsService {
@@ -538,8 +539,10 @@ export class PlaylistsService {
 
     const url = `${this.realtimeUrl}/api/push/playlist`;
 
-    await Promise.allSettled(
-      displays.map(async (display) => {
+    await this.runBounded(
+      displays,
+      PLAYLIST_UPDATE_NOTIFY_CONCURRENCY,
+      async (display) => {
         await this.circuitBreaker.executeWithFallback(
           'realtime-service',
           async () => {
@@ -564,6 +567,31 @@ export class PlaylistsService {
           },
           REALTIME_CIRCUIT_CONFIG,
         );
+      },
+    );
+  }
+
+  private async runBounded<T>(
+    items: readonly T[],
+    concurrency: number,
+    task: (item: T) => Promise<void>,
+  ): Promise<void> {
+    if (items.length === 0) return;
+
+    const workerCount = Math.min(Math.max(1, concurrency), items.length);
+    let nextIndex = 0;
+
+    await Promise.all(
+      Array.from({ length: workerCount }, async () => {
+        while (nextIndex < items.length) {
+          const item = items[nextIndex];
+          nextIndex += 1;
+          try {
+            await task(item);
+          } catch {
+            // Preserve the previous Promise.allSettled behavior: attempt every display.
+          }
+        }
       }),
     );
   }
