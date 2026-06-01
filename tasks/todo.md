@@ -1565,7 +1565,7 @@ Plan: `docs/plans/2026-05-31-customer-dashboard-trust-pass-13.md`
   - `npx nx build @vizora/web` — pass.
   - `pnpm --filter @vizora/web test -- --runInBand` — 95 suites / 977 tests pass; unrelated existing act warnings remain in non-dashboard suites.
   - Playwright browser smoke against `next start` on `localhost:3001`: desktop and mobile dashboard render with no page errors after the layout hydration fix; screenshots in `logs/dashboard-pass13-{desktop,mobile}.png`.
-- [ ] Open PR, wait for CI, merge if green.
+- [x] Open PR, wait for CI, merge if green. PR #139 opened; CI passed audit, lint, security, build, test, and e2e.
 - [ ] Deploy status: blocked unless production dirty/diverged state is resolved or explicitly approved with a reviewed runbook.
 
 ## Next Up (Not Started)
@@ -1573,3 +1573,36 @@ Plan: `docs/plans/2026-05-31-customer-dashboard-trust-pass-13.md`
 Continue the ranked customer/performance findings after pass 13: shared dashboard
 Socket.IO provider, server-side content-library search, playlist summary payloads,
 org broadcast scaling, and template refresh scheduling.
+
+---
+
+## Active Workstream: Pairing Active List Performance Pass 16 (2026-05-31)
+
+Branch: `feat/device-content-streaming-pass-16`
+Plan: `docs/plans/2026-05-31-pairing-active-list-performance-pass-16.md`
+
+- [x] Drift-check old device streaming bottleneck against current code.
+- [x] Identify residual pairing-dashboard serial Redis/DB work.
+- [x] Document pass 16 design and test plan.
+- [x] Add failing unit tests for batched active-pairing Redis reads and display ownership lookup.
+- [x] Implement batched Redis `MGET` parsing and one-query display ownership lookup in existing `PairingService`.
+- [x] Run multiple subagent reviews before broader tests.
+- [x] Run focused pairing/display middleware tests.
+- [x] Run broader middleware verification and build.
+- [ ] Open PR, wait for CI, merge if green.
+- [ ] Deploy status: blocked unless production dirty/diverged state is resolved or explicitly approved with a reviewed runbook.
+
+**Pass 16 verification**
+- Red/green TDD:
+  - Initial `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern=pairing.service` failed on the new batching assertions before implementation.
+  - Post-fix focused run passed: 1 suite / 32 tests.
+- Reviewer gate:
+  - Security/tenant/architecture reviewer: CLEAN; focused pairing suite passed.
+  - Redis/performance/test-safety reviewer: CLEAN; focused pairing suite, middleware build, and `git diff --check` passed.
+- Local verification:
+  - `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/displays/pairing.service.spec.ts src/modules/displays/pairing.controller.spec.ts src/modules/displays/displays.service.spec.ts src/modules/displays/displays.controller.spec.ts` — 4 suites / 103 tests passed.
+  - `pnpm --filter @vizora/middleware test -- --runInBand` — 143 suites / 2876 tests passed.
+  - `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false` — passed.
+  - `ESLINT_USE_FLAT_CONFIG=false npx eslint middleware/src/modules/displays/pairing.service.ts middleware/src/modules/displays/pairing.service.spec.ts` — 0 errors, 1 pre-existing warning in `pairing.service.spec.ts`.
+  - `npx nx build @vizora/middleware` — passed with existing webpack warnings.
+  - `git diff --check` — passed with CRLF warnings only.
