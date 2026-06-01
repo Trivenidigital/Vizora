@@ -1,8 +1,8 @@
 # Vizora - Task Tracker
 
-## In Progress: Playlist Publish Trust Pass 27 (2026-06-01)
+## Completed: Playlist Publish Trust Pass 27 (2026-06-01)
 
-**Branch:** `feat/playlist-publish-trust-pass-27`
+**Branch:** `feat/playlist-publish-trust-pass-27` -> PR #154 -> `main`
 
 **Why now:** Pass 26 is merged with green post-merge `main` CI, but production
 deploy remains blocked by dirty/diverged prod-local state. The next
@@ -25,8 +25,8 @@ business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
 - [x] Run focused playlist tests.
 - [x] Run multi-vector review before broader verification.
 - [x] Run broader verification.
-- [ ] PR, CI, merge.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Plan/design:**
 `docs/plans/2026-06-01-playlist-publish-trust-pass-27.md`
@@ -65,6 +65,17 @@ business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
   assignment modal and non-online copy, submitted `{ displayIds: ['display-2'],
   playlistId: 'playlist-1' }`, displayed the non-online assignment toast, and
   recorded zero page errors. Scratch screenshots were not committed.
+- PR #154 merged as `cd1e7681d86f29ce89f0c7fe4d8828d477d81268`. PR CI passed
+  audit, build, lint, security, test, and e2e. Remote feature branch was deleted
+  manually because `gh pr merge` merged remotely but could not check out local
+  `main` while `C:/projects/vizora` had `main` checked out.
+- Deployment was not performed. Read-only prod gate still blocks deploy:
+  `/opt/vizora/app` is on `bb76aa1838740bff5b58623dfef7a906d44f46a6`,
+  its local `origin/main` is stale at `84e572f2ee0c86230ef42b0817266a1a8a1f2e43`,
+  and the checkout remains 17 commits ahead / 96 behind that stale ref with many
+  tracked and untracked local changes. Core prod probes remain up: middleware
+  200, web 200; realtime `/health` returns the known 404. Many ops/agent PM2
+  jobs remain stopped; no services were restarted.
 
 ---
 
