@@ -4,7 +4,7 @@
 import { useEffect, useCallback, useRef, useState } from 'react';
 import { useSocket } from './useSocket';
 import { devLog, devWarn } from '@/lib/logger';
-import type { Display, Content, Playlist, Schedule } from '../types';
+import type { Playlist } from '../types';
 
 // Event types
 export type DeviceStatusUpdate = {
@@ -71,7 +71,6 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
   });
 
   // Offline sync queue
-  const syncQueueRef = useRef<SyncQueueItem[]>([]);
   const offlineQueueRef = useRef<SyncQueueItem[]>([]);
 
   // Emit event with optimistic update support
@@ -205,6 +204,13 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
     [onDeviceStatusChange]
   );
 
+  const handleDeviceStatusBatch = useCallback(
+    (updates: DeviceStatusUpdate[]) => {
+      updates.forEach(handleDeviceStatusUpdate);
+    },
+    [handleDeviceStatusUpdate]
+  );
+
   // Playlist update handler with conflict resolution
   const handlePlaylistUpdate = useCallback(
     (update: PlaylistUpdate) => {
@@ -220,7 +226,7 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
         );
 
         if (conflicted.length > 0) {
-          const resolved = resolveConflict(conflicted[0][1], update.payload);
+          resolveConflict(conflicted[0][1], update.payload);
           return {
             ...prev,
             pendingChanges: new Map(
@@ -239,8 +245,9 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
   useEffect(() => {
     if (!enabled || !socket) return;
 
-    // Device status updates (gateway emits 'device:status')
+    // Device status updates (gateway emits singles for live updates and batches for catch-up)
     const unsubDeviceStatus = on('device:status', handleDeviceStatusUpdate);
+    const unsubDeviceStatusBatch = on('device:status:batch', handleDeviceStatusBatch);
 
     // Playlist changes
     const unsubPlaylist = on('playlist:updated', handlePlaylistUpdate);
@@ -271,6 +278,7 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
 
     return () => {
       unsubDeviceStatus?.();
+      unsubDeviceStatusBatch?.();
       unsubPlaylist?.();
       unsubConnect?.();
       unsubDisconnect?.();
@@ -280,6 +288,7 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
     socket,
     on,
     handleDeviceStatusUpdate,
+    handleDeviceStatusBatch,
     handlePlaylistUpdate,
     onConnectionChange,
     onSyncStateChange,

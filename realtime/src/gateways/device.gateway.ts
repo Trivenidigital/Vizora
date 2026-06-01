@@ -1113,16 +1113,20 @@ export class DeviceGateway
       const toSend = truncated ? devices.slice(0, cap) : devices;
 
       const now = new Date().toISOString();
-      for (const device of toSend) {
+      const statusBatch = toSend.map((device) => {
         // Check in-memory cache first (most accurate for connected devices)
         const cachedStatus = this.deviceStatusCache.get(device.id);
         const status = cachedStatus || device.status || 'offline';
-        client.emit('device:status', {
+        return {
           deviceId: device.id,
           status,
           lastSeen: device.lastHeartbeat?.toISOString() || now,
           timestamp: now,
-        });
+        };
+      });
+
+      if (statusBatch.length > 0) {
+        client.emit('device:status:batch', statusBatch);
       }
 
       if (truncated) {

@@ -1,5 +1,63 @@
 # Vizora - Task Tracker
 
+## In Progress: Realtime Status Catch-Up Performance Pass 25 (2026-06-01)
+
+**Branch:** `feat/performance-readiness-pass-25`
+
+**Why now:** Pass 24 is merged with green post-merge `main` CI, but production
+deploy remains blocked by dirty/diverged prod-local state. The next
+repo-side performance review found dashboard reconnect catch-up emits one socket
+event per display even though the dashboard already handles batch status events.
+
+**New primitives introduced:** none. This reuses the existing realtime gateway,
+Socket.IO room model, and `device:status:batch` client event path.
+
+**Hermes-first analysis:** not applicable. This pass does not add or modify
+business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
+
+**Plan**
+- [x] Start fresh branch from `origin/main`.
+- [x] Dispatch performance reviewers for upload, pairing/status,
+  streaming/realtime, and dashboard bottlenecks.
+- [x] Drift-check realtime catch-up code and dashboard batch handler.
+- [x] Write focused failing realtime tests proving catch-up emits one batch.
+- [x] Implement batched dashboard status catch-up.
+- [x] Run multi-vector review before broader verification.
+- [x] Run focused and broader verification.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Local evidence:**
+- TDD red: realtime catch-up tests failed because large/small fleets still
+  emitted one `device:status` socket event per display; web hook test failed
+  because `useRealtimeEvents` ignored `device:status:batch`.
+- Implementation: realtime dashboard catch-up now emits one capped
+  `device:status:batch` payload with the same per-device fields; the dashboard
+  hook subscribes to batch updates and fans them through the existing
+  single-update handler so Devices page row state remains current.
+- Review: realtime correctness/security reviewer CLEAN; dashboard
+  compatibility reviewer initially found the missing `useRealtimeEvents` batch
+  listener, then re-reviewed the fixed diff as CLEAN. Local Claude Code review
+  was CLEAN before the web compatibility fix but the post-fix Claude rerun
+  exited without usable output, so it is not counted as evidence.
+- Verification: focused realtime catch-up test 4/4 pass; full gateway spec
+  98/98 pass; full realtime suite 277/277 pass; focused web realtime hook suite
+  18/18 pass; full web suite 1017/1017 pass; realtime production build pass;
+  web production build pass with explicit local `NEXT_PUBLIC_SOCKET_URL`,
+  `NEXT_PUBLIC_API_URL`, and `BACKEND_URL`; changed-file ESLint exits 0 with
+  pre-existing warnings only; repo security JWT guard pass; `git diff --check`
+  pass with CRLF warnings only.
+- Known unrelated verification noise: existing React `act(...)` warnings in
+  broader web suites; realtime/web builds show known package/source-map and
+  Next middleware deprecation warnings. The first realtime build attempt failed
+  with a Windows file-lock in `@vizora/database:build` while tests were running
+  in parallel; sequential rerun passed.
+
+**Plan/design:**
+`docs/plans/2026-06-01-realtime-status-catchup-performance-pass-25.md`
+
+---
+
 ## Completed: Analytics Empty-State Trust Pass 24 (2026-06-01)
 
 **Branch:** `feat/analytics-empty-state-trust-pass-24`

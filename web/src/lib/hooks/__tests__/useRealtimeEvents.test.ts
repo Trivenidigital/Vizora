@@ -137,6 +137,40 @@ describe('useRealtimeEvents', () => {
         expect(onDeviceStatusChange).toHaveBeenCalledTimes(2);
       });
     });
+
+    it('should fan out device:status:batch updates to the device status callback', async () => {
+      const onDeviceStatusChange = jest.fn();
+
+      renderHook(() =>
+        useRealtimeEvents({
+          enabled: true,
+          onDeviceStatusChange,
+        })
+      );
+
+      const updates = [
+        {
+          deviceId: 'device-1',
+          status: 'online' as const,
+          lastSeen: new Date().toISOString(),
+        },
+        {
+          deviceId: 'device-2',
+          status: 'offline' as const,
+          lastSeen: new Date().toISOString(),
+        },
+      ];
+
+      act(() => {
+        mockSocket?.simulateEvent('device:status:batch', updates);
+      });
+
+      await waitFor(() => {
+        expect(onDeviceStatusChange).toHaveBeenCalledTimes(2);
+        expect(onDeviceStatusChange).toHaveBeenNthCalledWith(1, updates[0]);
+        expect(onDeviceStatusChange).toHaveBeenNthCalledWith(2, updates[1]);
+      });
+    });
   });
 
   describe('Playlist Updates', () => {

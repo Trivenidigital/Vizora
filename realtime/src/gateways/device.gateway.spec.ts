@@ -1660,9 +1660,9 @@ describe('DeviceGateway', () => {
   describe('sendDeviceStatusCatchUp (catch-up cap)', () => {
     it('should cap a large fleet at 500 devices and warn about truncation', async () => {
       const client = createMockSocket();
-      // Simulate 501 devices for one org — the cap is 500, so the
+      // Simulate 501 devices for one org - the cap is 500, so the
       // query should request take=501 (cap + 1 peek) and the function
-      // should emit only the first 500 + a warning.
+      // should emit only the first 500 in one batch + a warning.
       const fleet = Array.from({ length: 501 }, (_, i) => ({
         id: `dev-${i}`,
         status: 'offline',
@@ -1680,7 +1680,26 @@ describe('DeviceGateway', () => {
           take: 501,
         }),
       );
-      expect(client.emit).toHaveBeenCalledTimes(500);
+      expect(client.emit).toHaveBeenCalledTimes(1);
+      expect(client.emit).toHaveBeenCalledWith(
+        'device:status:batch',
+        expect.arrayContaining([
+          expect.objectContaining({
+            deviceId: 'dev-0',
+            status: 'offline',
+            lastSeen: expect.any(String),
+            timestamp: expect.any(String),
+          }),
+          expect.objectContaining({
+            deviceId: 'dev-499',
+            status: 'offline',
+            lastSeen: expect.any(String),
+            timestamp: expect.any(String),
+          }),
+        ]),
+      );
+      const batch = (client.emit as jest.Mock).mock.calls[0][1];
+      expect(batch).toHaveLength(500);
       expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('truncated at 500'));
     });
 
@@ -1695,7 +1714,58 @@ describe('DeviceGateway', () => {
 
       await (gateway as any).sendDeviceStatusCatchUp(client, 'org-small');
 
-      expect(client.emit).toHaveBeenCalledTimes(7);
+      expect(client.emit).toHaveBeenCalledTimes(1);
+      expect(client.emit).toHaveBeenCalledWith(
+        'device:status:batch',
+        expect.arrayContaining([
+          expect.objectContaining({
+            deviceId: 'dev-0',
+            status: 'offline',
+            lastSeen: expect.any(String),
+            timestamp: expect.any(String),
+          }),
+          expect.objectContaining({
+            deviceId: 'dev-6',
+            status: 'offline',
+            lastSeen: expect.any(String),
+            timestamp: expect.any(String),
+          }),
+        ]),
+      );
+      const batch = (client.emit as jest.Mock).mock.calls[0][1];
+      expect(batch).toHaveLength(7);
+    });
+
+    it('should prefer cached status values in the catch-up batch', async () => {
+      const client = createMockSocket();
+      databaseService.display.findMany.mockResolvedValue([
+        {
+          id: 'dev-1',
+          status: 'offline',
+          lastHeartbeat: new Date(),
+        },
+      ] as any);
+      (gateway as any).deviceStatusCache.set('dev-1', 'online');
+
+      await (gateway as any).sendDeviceStatusCatchUp(client, 'org-small');
+
+      expect(client.emit).toHaveBeenCalledWith('device:status:batch', [
+        expect.objectContaining({
+          deviceId: 'dev-1',
+          status: 'online',
+          lastSeen: expect.any(String),
+          timestamp: expect.any(String),
+        }),
+      ]);
+    });
+
+    it('should not emit a batch when no devices exist for the organization', async () => {
+      const client = createMockSocket();
+      databaseService.display.findMany.mockResolvedValue([]);
+
+      await (gateway as any).sendDeviceStatusCatchUp(client, 'org-empty');
+
+      expect(client.emit).not.toHaveBeenCalled();
     });
   });
 
