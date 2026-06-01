@@ -213,6 +213,8 @@ describe('DashboardClient', () => {
   it('shows getting started guide when no devices', async () => {
     await renderDashboardClient();
     expect(screen.getByText('Getting Started')).toBeInTheDocument();
+    expect(screen.getByText('Assign & Schedule')).toBeInTheDocument();
+    expect(screen.queryByText('Publish & Schedule')).not.toBeInTheDocument();
   });
 
   it('does not refetch content and playlists on mount when server summary is present', async () => {
@@ -286,7 +288,9 @@ describe('DashboardClient', () => {
     expect(screen.getByText('7 processing')).toBeInTheDocument();
     expect(screen.getByText('31 ready')).toBeInTheDocument();
     expect(screen.getByText('Fresh Menu')).toBeInTheDocument();
+    expect(screen.getByText('image - ready')).toBeInTheDocument();
     expect(screen.getByText('Lunch Loop')).toBeInTheDocument();
+    expect(screen.queryByText(/â/)).not.toBeInTheDocument();
   });
 
   it('preserves initial overview counts when summary refresh fails', async () => {
@@ -460,7 +464,7 @@ describe('DashboardClient', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Lobby Display')).toBeInTheDocument();
-      expect(screen.getByText(/online.*Front Desk/)).toBeInTheDocument();
+      expect(screen.getByText('online - Front Desk')).toBeInTheDocument();
     });
   });
 });

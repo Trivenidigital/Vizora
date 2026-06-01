@@ -129,11 +129,20 @@ jest.mock('@/components/PreviewModal', () => {
 });
 
 jest.mock('@/components/ConfirmDialog', () => {
-  return function MockConfirm({ isOpen, onConfirm, title }: any) {
+  return function MockConfirm({ isOpen, onClose, onConfirm, title }: any) {
+    const handleConfirm = async () => {
+      try {
+        await onConfirm();
+        onClose?.();
+      } catch {
+        // Match the real dialog: failed confirmations stay open for retry.
+      }
+    };
+
     return isOpen ? (
       <div data-testid="confirm-dialog">
         <span>{title}</span>
-        <button onClick={onConfirm}>Confirm</button>
+        <button onClick={handleConfirm}>Confirm</button>
       </div>
     ) : null;
   };
@@ -353,6 +362,70 @@ describe('ContentClient', () => {
     await waitForAuxiliaryRequestsToSettle();
     expect(screen.getByText('Promo Video')).toBeInTheDocument();
     expect(screen.getByText('Menu PDF')).toBeInTheDocument();
+  });
+
+  it('requires confirmation before bulk deleting selected content', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    render(<ContentClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    const itemCheckboxes = screen.getAllByRole('checkbox');
+    await act(async () => {
+      fireEvent.click(itemCheckboxes[0]);
+      fireEvent.click(itemCheckboxes[1]);
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /delete selected/i }));
+    });
+
+    expect(mockDeleteContent).not.toHaveBeenCalled();
+    expect(screen.getByTestId('confirm-dialog')).toHaveTextContent('Delete Selected Content');
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+    });
+
+    await waitFor(() => {
+      expect(mockDeleteContent).toHaveBeenCalledWith('c1');
+      expect(mockDeleteContent).toHaveBeenCalledWith('c2');
+    });
+    expect(mockToast.success).toHaveBeenCalledWith('2 items deleted');
+  });
+
+  it('keeps bulk delete confirmation open when deletion fails', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    mockDeleteContent.mockRejectedValueOnce(new Error('Delete failed'));
+    render(<ContentClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    const itemCheckboxes = screen.getAllByRole('checkbox');
+    await act(async () => {
+      fireEvent.click(itemCheckboxes[0]);
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /delete selected/i }));
+    });
+
+    expect(screen.getByTestId('confirm-dialog')).toHaveTextContent('Delete Selected Content');
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+    });
+
+    await waitFor(() => {
+      expect(mockToast.error).toHaveBeenCalledWith('Delete failed');
+    });
+    expect(screen.getByTestId('confirm-dialog')).toHaveTextContent('Delete Selected Content');
   });
 
   it('renders content list cards from summary payloads without url or metadata', async () => {

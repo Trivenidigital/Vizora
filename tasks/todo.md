@@ -1,5 +1,80 @@
 # Vizora - Task Tracker
 
+## Active: Dashboard Safety and Truth Pass 38 (2026-06-01)
+
+**Branch:** `feat/customer-dashboard-pass-38`
+
+**Why now:** After PR #169/#170, CI now gates the customer-critical API path.
+The next buildable customer-facing gap is dashboard trust: destructive bulk
+content deletion can execute from the toolbar without a confirmation step, and
+dashboard copy includes Unicode separators plus stale "Publish" wording.
+
+**New primitives introduced:** none. This pass changes existing web UI state,
+copy, and tests only. No route, backend module, schema, env var, realtime
+substrate, notification path, MCP tool, Hermes skill, provider spend path, or
+runtime process changes.
+
+**Hermes-first analysis:** not applicable. This is not a business-agent, MCP,
+Hermes, AI/provider, or spend-path change.
+
+**Plan/design:**
+`docs/plans/2026-06-01-dashboard-safety-truth-pass-38.md`
+
+**Plan**
+- [x] Start fresh isolated branch from updated `origin/main`.
+- [x] Drift-check prior customer UX findings against current repo truth.
+- [x] Document pass 38 design and customer-improvement list.
+- [x] Add failing web tests for content bulk-delete confirmation and dashboard
+  copy cleanup.
+- [x] Implement minimal UI state/copy fixes.
+- [x] Run multi-vector subagent review before broader verification.
+- [x] Run focused and broader verification.
+- [ ] PR, CI, merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Evidence so far:**
+- Drift-check: `web/src/lib/server-api.ts` already uses `vizora_auth_token`, so
+  the prior server cookie mismatch concern is stale.
+- Drift-check: `web/src/app/dashboard/devices/page-client.tsx` already wraps
+  device bulk delete in `ConfirmDialog`.
+- Backend/security reviewer findings verified stale in this worktree:
+  `PairingService.getActivePairings` already hides brand-new unclaimed codes
+  from org dashboards and has a test for it; `DisplaysService.bulkAssignGroup`
+  already counts display IDs by `organizationId` before membership inserts and
+  has a mixed-org rejection test; `ApiClient.updateContent` already maps
+  dashboard `title` to backend `name` with a unit test.
+- Residual gap: `web/src/app/dashboard/content/page-client.tsx` calls
+  `apiClient.deleteContent` immediately in `handleBulkDelete` from the selected
+  items toolbar.
+- Residual gap: `web/src/app/dashboard/page-client.tsx` renders Unicode bullet
+  separators in recent activity and says "Publish & Schedule" in the first-run
+  guide.
+- Queued high-value follow-ups from customer UX/security/performance review:
+  frontend role/action matrix, persistent list-load error panels, schedule
+  multi-device/group truthfulness, schedule precedence copy vs backend ordering,
+  offline-device immediate push gating, health dashboard mock metrics, help-copy
+  drift, device-content streaming, thumbnail storm prevention, stream/disk-backed
+  uploads, compact list selects/indexes, active-schedule caching, and pairing
+  active-list scaling.
+- Implementation: content bulk deletion now opens `ConfirmDialog` and defers
+  `apiClient.deleteContent` until confirmation; dashboard recent-activity
+  separators now use ASCII ` - ` and the first-run guide says "Assign &
+  Schedule".
+- Review: replacement frontend reviewer found a real failure-path issue where
+  the bulk-delete confirmation could close after a rejected delete; fixed by
+  rethrowing after the toast and adding a regression test. Release-safety
+  reviewer found a low-risk docs wording issue; fixed before verification.
+- Focused verification:
+  `pnpm --filter @vizora/web test -- --runInBand web/src/app/dashboard/content/__tests__/content-page.test.tsx web/src/app/dashboard/__tests__/dashboard-page.test.tsx`
+  passed 2 suites / 62 tests.
+- Broader verification:
+  `pnpm --filter @vizora/web test -- --runInBand` passed 101 suites / 1067
+  tests; `npx nx build @vizora/web --skip-nx-cache` passed with production env
+  placeholders; `git diff --check` passed with Windows CRLF warnings only;
+  `pnpm security:no-hardcoded-jwts` passed.
+
+---
+
 ## Completed: Customer Critical Path E2E Gate Pass 37 (2026-06-01)
 
 **Branch:** `feat/customer-experience-pass-37`
