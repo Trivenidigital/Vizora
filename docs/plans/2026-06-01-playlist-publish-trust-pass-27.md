@@ -32,5 +32,12 @@ The playlist card currently exposes `Publish`, but the handler only calls `updat
 - [x] Run focused playlist tests.
 - [x] Request two review vectors before broader tests: customer trust/UX and runtime/API safety.
 - [x] Run broader web verification.
-- [ ] PR, CI, merge if clean.
-- [ ] Re-check production deploy gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge if clean.
+- [x] Re-check production deploy gate; deploy only if prod checkout is safe.
+
+## Result
+
+PR #154 merged as `cd1e7681d86f29ce89f0c7fe4d8828d477d81268` with audit,
+build, lint, security, test, and e2e checks green. Deployment was not performed:
+the production checkout is dirty/diverged and must be reconciled before any
+deploy.
