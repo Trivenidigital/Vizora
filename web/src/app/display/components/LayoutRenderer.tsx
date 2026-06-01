@@ -1,16 +1,17 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { LayoutMetadata, LayoutZone, PlaylistItem } from '../lib/types';
+import type { LayoutMetadata, LayoutZone } from '../lib/types';
 import { ContentRenderer } from './ContentRenderer';
 
 interface LayoutRendererProps {
   metadata: LayoutMetadata;
   authenticateUrl?: (url: string) => string;
+  getCachedUrl?: (url: string) => Promise<string | null>;
   onError?: (errorType: string, errorMessage: string) => void;
 }
 
-export function LayoutRenderer({ metadata, authenticateUrl, onError }: LayoutRendererProps) {
+export function LayoutRenderer({ metadata, authenticateUrl, getCachedUrl, onError }: LayoutRendererProps) {
   const gridStyle: React.CSSProperties = {
     width: '100%',
     height: '100%',
@@ -28,7 +29,13 @@ export function LayoutRenderer({ metadata, authenticateUrl, onError }: LayoutRen
   return (
     <div style={gridStyle}>
       {metadata.zones.map((zone) => (
-        <ZonePlayer key={zone.id} zone={zone} authenticateUrl={authenticateUrl} onError={onError} />
+        <ZonePlayer
+          key={zone.id}
+          zone={zone}
+          authenticateUrl={authenticateUrl}
+          getCachedUrl={getCachedUrl}
+          onError={onError}
+        />
       ))}
     </div>
   );
@@ -37,10 +44,12 @@ export function LayoutRenderer({ metadata, authenticateUrl, onError }: LayoutRen
 function ZonePlayer({
   zone,
   authenticateUrl,
+  getCachedUrl,
   onError,
 }: {
   zone: LayoutZone;
   authenticateUrl?: (url: string) => string;
+  getCachedUrl?: (url: string) => Promise<string | null>;
   onError?: (t: string, m: string) => void;
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -80,6 +89,7 @@ function ZonePlayer({
           type={zone.resolvedContent.type}
           url={authenticateUrl ? authenticateUrl(zone.resolvedContent.url) : zone.resolvedContent.url}
           name={zone.resolvedContent.name}
+          getCachedUrl={getCachedUrl}
           onError={onError}
         />
       </div>
@@ -98,6 +108,7 @@ function ZonePlayer({
         type={item.content.type}
         url={authenticateUrl ? authenticateUrl(item.content.url) : item.content.url}
         name={item.content.name}
+        getCachedUrl={getCachedUrl}
         onEnded={advance}
         onError={onError}
       />

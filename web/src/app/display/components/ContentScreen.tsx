@@ -9,6 +9,7 @@ interface ContentScreenProps {
   onVideoEnded: () => void;
   onContentError?: (contentId: string, errorType: string, errorMessage: string) => void;
   deviceToken?: string;
+  getCachedUrl?: (url: string) => Promise<string | null>;
 }
 
 /**
@@ -47,6 +48,7 @@ export function ContentScreen({
   onVideoEnded,
   onContentError,
   deviceToken,
+  getCachedUrl,
 }: ContentScreenProps) {
   // Temporary pushed content takes priority
   if (temporaryContent) {
@@ -57,6 +59,7 @@ export function ContentScreen({
           url={authenticateUrl(temporaryContent.url, deviceToken)}
           name={temporaryContent.name}
           authenticateUrl={(url) => authenticateUrl(url, deviceToken)}
+          getCachedUrl={getCachedUrl}
           onEnded={onVideoEnded}
           onError={(errType, errMsg) => onContentError?.(temporaryContent.id, errType, errMsg)}
         />
@@ -74,6 +77,7 @@ export function ContentScreen({
           name={currentItem.content.name}
           metadata={currentItem.content.metadata}
           authenticateUrl={(url) => authenticateUrl(url, deviceToken)}
+          getCachedUrl={getCachedUrl}
           onEnded={onVideoEnded}
           onError={(errType, errMsg) => onContentError?.(currentItem.content!.id, errType, errMsg)}
         />

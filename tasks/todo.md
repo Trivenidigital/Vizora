@@ -1,5 +1,66 @@
 # Vizora - Task Tracker
 
+## Active: Display Cache Streaming Pass 34 (2026-06-01)
+
+**Branch:** `feat/customer-experience-pass-34`
+
+**Why now:** PR #164 is merged with green PR and post-merge main CI, but
+production deploy remains blocked by dirty/diverged prod-local state. The next
+highest device/customer performance issue is display media playback: the display
+client preloads protected image/video URLs into the browser Cache API, yet
+`ContentRenderer` does not read from that cache during playback. That makes
+screen transitions pay repeat network fetch cost and weakens offline/poor-link
+behavior.
+
+**New primitives introduced:** none. This pass only wires existing display
+cache helpers into existing display rendering components and tests. No route,
+module, middleware, schema, response envelope, realtime path, notification path,
+MCP tool, Hermes skill, provider spend path, env var, or production process
+changes.
+
+**Hermes-first analysis:** not applicable. This pass does not add or modify
+business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
+
+**Plan/design:**
+`docs/plans/2026-06-01-display-cache-streaming-pass-34.md`
+
+**Plan**
+- [x] Start fresh branch from updated `origin/main`.
+- [x] Drift-check display preloading/cache/rendering path.
+- [x] Document pass 34 design and test plan.
+- [x] Add failing display renderer cache-first tests.
+- [x] Wire existing `getCachedUrl()` through playback components.
+- [x] Run multi-subagent review before broader verification.
+- [x] Run focused and broader verification.
+- [ ] PR, CI, merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Evidence so far:**
+- Red TDD: `pnpm --filter @vizora/web test -- --runInBand --runTestsByPath src/app/display/components/__tests__/ContentRenderer.test.tsx`
+  failed on the new cache-first media tests because protected images still used
+  the old network blob path and videos ignored the browser cache.
+- Focused green: `pnpm --filter @vizora/web test -- --runInBand --runTestsByPath src/app/display/components/__tests__/ContentRenderer.test.tsx src/app/display/components/__tests__/ContentScreen.test.tsx src/app/display/__tests__/DisplayClient.test.tsx`
+  passed 3/3 suites and 11/11 tests after threading `getCachedUrl()` through
+  display playback. Web `tsc --noEmit` passed; changed-file ESLint passed with
+  0 errors and only the repo's existing ESLintRC deprecation warning.
+- Review finding fixed: protected videos now wait for cache lookup before
+  mounting a network `src`, and external lookalike `/device-content/.../file`
+  URLs are treated as ordinary external media rather than protected display
+  media. Focused display suite now passes 3/3 suites and 12/12 tests; web
+  `tsc --noEmit` and changed-file ESLint pass.
+- Multi-vector review: first playback/performance reviewer found the video
+  pre-cache network mount and external lookalike URL issues above; follow-up
+  playback reviewer CLEAN after fixes. React lifecycle/browser/security
+  reviewer CLEAN. Reviewers independently ran focused display suites.
+- Verification: full web Jest passed 96/96 suites and 1049/1049 tests, with
+  existing unrelated React `act()`/jsdom navigation console warnings; web
+  `tsc --noEmit` passed; changed-file ESLint passed with 0 errors; hardcoded
+  JWT scan passed; `git diff --check` passed with CRLF warnings only; production
+  `pnpm --filter @vizora/web build` passed with existing Next middleware/proxy
+  and TypeScript project-reference warnings.
+
+---
+
 ## Active: Template Publish Tenant Guardrail Pass 33 (2026-06-01)
 
 **Branch:** `feat/customer-experience-pass-33`
@@ -31,8 +92,12 @@ business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
 - [x] Implement global-or-own source-template scope and scoped use-count write.
 - [x] Run multi-subagent review before broader verification.
 - [x] Run focused and broader verification.
-- [ ] PR, CI, merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge if green. PR #164 merged to `origin/main` at
+  `a0e1d915d7034c2c5c9b05f7f8ed0e5187dc8dec`; PR CI and post-merge main CI
+  green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe. Rechecked
+  after PR #164: blocked because `/opt/vizora/app` is dirty and diverged
+  (`main...origin/main [ahead 17, behind 119]`) despite healthy core services.
 
 **Evidence so far:**
 - Red TDD: `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/template-library/template-library.service.spec.ts`

@@ -2,9 +2,9 @@ import { render, waitFor } from '@testing-library/react';
 import { DisplayClient } from '../DisplayClient';
 import type { Playlist } from '../lib/types';
 
-var mockPreloadItems = jest.fn();
-var mockClearCache = jest.fn().mockResolvedValue(undefined);
-var mockClearCredentials = jest.fn();
+const mockPreloadItems = jest.fn();
+const mockClearCache = jest.fn().mockResolvedValue(undefined);
+const mockClearCredentials = jest.fn();
 const updatePlaylist = jest.fn();
 let capturedPlaylistUpdate: ((playlist: Playlist) => void) | undefined;
 let capturedCommand: ((command: { type: string }) => void) | undefined;
