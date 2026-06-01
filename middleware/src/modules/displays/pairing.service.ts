@@ -28,12 +28,25 @@ interface PairingRequest {
   plaintextToken?: string;
 }
 
+interface ActivePairingResponse {
+  code: string;
+  nickname: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
+interface PairingRequestRecord {
+  code: string;
+  request: PairingRequest;
+}
+
 @Injectable()
 export class PairingService implements OnModuleDestroy {
   private readonly logger = new Logger(PairingService.name);
   private readonly PAIRING_CODE_LENGTH = 6;
   private readonly PAIRING_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
   private readonly PAIRING_TTL_SECONDS = 300; // 5 minutes
+  private readonly PAIRING_READ_BATCH_SIZE = 100;
   private readonly REDIS_KEY_PREFIX = 'pairing:';
   private cleanupIntervalId: NodeJS.Timeout | null = null;
 
@@ -66,9 +79,18 @@ export class PairingService implements OnModuleDestroy {
     try {
       const data = await this.redisService.get(this.redisKey(code));
       if (!data) return null;
-      return JSON.parse(data) as PairingRequest;
+      return this.parsePairingRequest(data, code);
     } catch (error) {
       this.logger.error(`Failed to get pairing request for code ${code}: ${error}`);
+      return null;
+    }
+  }
+
+  private parsePairingRequest(data: string, code: string): PairingRequest | null {
+    try {
+      return JSON.parse(data) as PairingRequest;
+    } catch (error) {
+      this.logger.error(`Failed to parse pairing request for code ${code}: ${error}`);
       return null;
     }
   }
@@ -344,23 +366,21 @@ export class PairingService implements OnModuleDestroy {
     };
   }
 
-  async getActivePairings(organizationId: string) {
+  async getActivePairings(organizationId: string): Promise<ActivePairingResponse[]> {
     // Return active pairing requests filtered by organization
     // Only show requests that have been completed for this org,
     // or where the device already belongs to this org
-    const activePairings: PairingRequest[] = [];
+    const activePairings: ActivePairingResponse[] = [];
 
     // Use SCAN to find all pairing keys in Redis
     const keys = await this.scanPairingKeys();
+    const records = await this.getPairingRequestRecords(keys);
+    const now = new Date();
+    const unclaimedRequests: PairingRequest[] = [];
 
-    for (const key of keys) {
-      const code = key.replace(this.REDIS_KEY_PREFIX, '');
-      const request = await this.getPairingRequest(code);
-
-      if (!request) continue;
-
+    for (const { code, request } of records) {
       // Check if expired (safety check)
-      if (new Date() >= new Date(request.expiresAt)) {
+      if (now >= new Date(request.expiresAt)) {
         continue;
       }
 
@@ -375,26 +395,98 @@ export class PairingService implements OnModuleDestroy {
         continue;
       }
 
-      // If not yet paired to any org, check if device exists in this org
       if (!request.organizationId) {
-        const display = await this.db.display.findUnique({
-          where: { deviceIdentifier: request.deviceIdentifier },
-          select: { organizationId: true },
-        });
+        unclaimedRequests.push(request);
+      }
+    }
 
-        // Show if device belongs to this org, or is brand new (no org yet)
-        if (!display || display.organizationId === organizationId) {
-          activePairings.push({
-            code,
-            nickname: request.nickname,
-            createdAt: request.createdAt,
-            expiresAt: request.expiresAt,
-          });
-        }
+    const displayOrganizationsByDevice = await this.getDisplayOrganizationsByDevice(unclaimedRequests);
+
+    for (const request of unclaimedRequests) {
+      const displayOrganizationId = displayOrganizationsByDevice.get(request.deviceIdentifier);
+
+      // Show if device belongs to this org, or is brand new (no org yet)
+      if (!displayOrganizationId || displayOrganizationId === organizationId) {
+        activePairings.push({
+          code: request.code,
+          nickname: request.nickname,
+          createdAt: request.createdAt,
+          expiresAt: request.expiresAt,
+        });
       }
     }
 
     return activePairings;
+  }
+
+  private async getPairingRequestRecords(keys: string[]): Promise<PairingRequestRecord[]> {
+    if (keys.length === 0) return [];
+
+    const client = this.redisService.getClient();
+
+    if (client) {
+      try {
+        const records: PairingRequestRecord[] = [];
+
+        for (let index = 0; index < keys.length; index += this.PAIRING_READ_BATCH_SIZE) {
+          const batchKeys = keys.slice(index, index + this.PAIRING_READ_BATCH_SIZE);
+          const values = await client.mget(...batchKeys);
+
+          values.forEach((data, valueIndex) => {
+            if (!data) return;
+
+            const key = batchKeys[valueIndex];
+            const code = key.replace(this.REDIS_KEY_PREFIX, '');
+            const request = this.parsePairingRequest(data, code);
+
+            if (request) {
+              records.push({ code, request });
+            }
+          });
+        }
+
+        return records;
+      } catch (error) {
+        this.logger.error(`Failed to batch get pairing requests: ${error}`);
+      }
+    }
+
+    const records: PairingRequestRecord[] = [];
+    for (const key of keys) {
+      const code = key.replace(this.REDIS_KEY_PREFIX, '');
+      const request = await this.getPairingRequest(code);
+
+      if (request) {
+        records.push({ code, request });
+      }
+    }
+
+    return records;
+  }
+
+  private async getDisplayOrganizationsByDevice(
+    requests: PairingRequest[],
+  ): Promise<Map<string, string>> {
+    const deviceIdentifiers = Array.from(new Set(
+      requests.map(request => request.deviceIdentifier).filter(Boolean),
+    ));
+
+    if (deviceIdentifiers.length === 0) {
+      return new Map();
+    }
+
+    const displays = await this.db.display.findMany({
+      where: {
+        deviceIdentifier: {
+          in: deviceIdentifiers,
+        },
+      },
+      select: { deviceIdentifier: true, organizationId: true },
+    });
+
+    return new Map(
+      displays.map(display => [display.deviceIdentifier, display.organizationId]),
+    );
   }
 
   /**
