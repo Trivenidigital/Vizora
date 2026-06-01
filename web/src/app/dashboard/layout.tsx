@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { SocketProvider } from '@/lib/hooks/useSocket';
 import Breadcrumbs from '@/components/Breadcrumbs';
 import ThemeToggle from '@/components/ThemeToggle';
 import NotificationBell from '@/components/NotificationBell';
@@ -98,23 +99,26 @@ export default function DashboardLayout({
   if (isEditorRoute) {
     return (
       <SupportChatProvider>
-        <QueryProvider>
-          <DeviceStatusProvider user={user}>
-            {authLoading ? (
-              <div className="flex h-screen items-center justify-center">
-                <LoadingSpinner size="lg" />
-              </div>
-            ) : (
-              children
-            )}
-          </DeviceStatusProvider>
-        </QueryProvider>
+        <SocketProvider user={user}>
+          <QueryProvider>
+            <DeviceStatusProvider user={user}>
+              {authLoading ? (
+                <div className="flex h-screen items-center justify-center">
+                  <LoadingSpinner size="lg" />
+                </div>
+              ) : (
+                children
+              )}
+            </DeviceStatusProvider>
+          </QueryProvider>
+        </SocketProvider>
       </SupportChatProvider>
     );
   }
 
   return (
     <SupportChatProvider>
+    <SocketProvider user={user}>
     <div className="min-h-screen bg-[var(--background)]">
       {/* Header */}
       <header className="bg-[var(--surface)]/80 backdrop-blur-xl border-b border-[var(--border)] fixed top-0 left-0 right-0 z-30 transition-colors duration-200">
@@ -311,6 +315,7 @@ export default function DashboardLayout({
       {/* Support Chat Widget */}
       <SupportChat />
     </div>
+    </SocketProvider>
     </SupportChatProvider>
   );
 }

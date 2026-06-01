@@ -1,6 +1,89 @@
 # Vizora - Task Tracker
 
-## In Progress: Content List Payload Performance Pass 19 (2026-06-01)
+## In Progress: Dashboard Customer Improvements Pass 20 (2026-06-01)
+
+**Branch:** `feat/dashboard-customer-improvements-pass-20`
+
+**Why now:** PR #142 merged the content-list payload pass with green PR checks,
+but production deployment remains blocked by a dirty/diverged production
+checkout. The next autonomous step is to review the dashboard as a customer,
+pick the highest-value repo-side improvement that is small enough to build,
+test, review, merge, and keep deployment gated until prod state is safe.
+
+**New primitives introduced:** one dashboard-scoped `SocketProvider` in the
+existing web `useSocket` module. No new transport, gateway, event type,
+process, backend route, agent, or deployment primitive.
+
+**Hermes-first analysis:** not applicable. This pass does not add business
+agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
+
+**Plan**
+- [x] Merge PR #142 after full PR CI green.
+- [x] Re-check production deploy gate after merge.
+- [x] Start fresh branch from `origin/main`.
+- [x] Dispatch read-only customer UX, backend/performance, and test/release
+  readiness reviewers.
+- [x] Reconcile tracker/backlog stale state after recent merges.
+- [x] Select the highest-value buildable repo-side target.
+- [x] Write scoped plan/design before code.
+- [x] Add focused failing shared-socket tests.
+- [x] Implement dashboard shared Socket.IO provider.
+- [x] Run multi-subagent code review before broader tests.
+- [x] Run focused and broader affected verification.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Current merge/deploy state**
+- [x] PR #142 merged at
+  `80463b2aaad1c041d14e4cfe55ffcdae627b7b09`; PR checks green for audit,
+  build, e2e, lint, security, and test.
+- [x] Post-merge `main` CI for `80463b2aaad1c041d14e4cfe55ffcdae627b7b09`
+  completed successfully.
+- [x] Prod deploy remains blocked: `/opt/vizora/app` is at
+  `bb76aa1838740bff5b58623dfef7a906d44f46a6`, while `origin/main` is
+  `80463b2aaad1c041d14e4cfe55ffcdae627b7b09`; prod is `ahead 17, behind 77`
+  with many tracked edits and untracked files. No production pull, reset,
+  stash, env edit, service restart, DB mutation, or deploy performed.
+
+**Plan/design:**
+`docs/plans/2026-06-01-dashboard-shared-socket-pass-20.md`
+
+**Selected target**
+- [x] Current-branch drift check confirmed several stale UX findings are
+  already fixed on `origin/main` (multi-file upload queue, filtered content
+  empty state, health page mock telemetry, and multi-device schedule creation).
+- [x] Remaining buildable customer/performance target: share one dashboard
+  Socket.IO connection across notification bell, device status context,
+  page-level realtime hooks, and device preview instead of creating one client
+  per hook instance.
+
+**Focused verification**
+- [x] Red/green shared-socket hook test added. Initial focused run failed
+  because `SocketProvider` did not exist.
+- [x] Multi-vector code review CLEAN after two reviewer passes:
+  architecture/tenant/listener-isolation review and UX/release/regression
+  review. Initial findings added missing listener-isolation, layout
+  integration, tenant fallback, and custom-option fallback coverage; all were
+  fixed before broader tests.
+- [x] Focused web tests passed:
+  `pnpm --filter @vizora/web test -- --runInBand --runTestsByPath src/lib/hooks/__tests__/useSocket.test.ts src/lib/hooks/__tests__/useRealtimeEvents.test.ts src/app/dashboard/__tests__/dashboard-page.test.tsx src/app/dashboard/__tests__/dashboard-layout.test.tsx`
+  (4 suites / 47 tests).
+- [x] Web TypeScript passed:
+  `pnpm --filter @vizora/web exec tsc --noEmit --pretty false`.
+- [x] Changed-file ESLint passed with warnings only:
+  `ESLINT_USE_FLAT_CONFIG=false npx eslint web/src/lib/hooks/useSocket.ts web/src/lib/hooks/__tests__/useSocket.test.ts web/src/app/dashboard/layout.tsx web/src/app/dashboard/__tests__/dashboard-layout.test.tsx`
+  (legacy explicit-`any` / test `require()` warnings only).
+- [x] Full web Jest passed:
+  `pnpm --filter @vizora/web test -- --runInBand`
+  (96 suites / 1001 tests). Existing unrelated React `act(...)` warnings
+  remain in older suites.
+- [x] Web build passed:
+  `$env:NODE_OPTIONS='--max-old-space-size=4096'; $env:NEXT_PUBLIC_SOCKET_URL='http://localhost:3002'; $env:NEXT_PUBLIC_API_URL='http://localhost:3000/api/v1'; $env:BACKEND_URL='http://localhost:3000'; npx nx build @vizora/web`.
+- [x] `git diff --check` passed with CRLF normalization warnings only.
+
+---
+
+## Completed: Content List Payload Performance Pass 19 (2026-06-01)
 
 **Branch:** `feat/content-list-payload-pass-19`
 
@@ -26,13 +109,17 @@ agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
 - [x] Implement backend list projection and frontend detail hydration.
 - [x] Run multi-subagent code review before broader tests.
 - [x] Run focused and broader affected verification.
-- [ ] PR, CI, merge.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge. PR #142 merged at
+  `80463b2aaad1c041d14e4cfe55ffcdae627b7b09`.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Current merge/deploy state**
 - [x] PR #141 merged at
   `6fcc39deb60634037be37758843aa638dcf1cb3d`; CI green for audit, build, e2e,
   lint, security, and test.
+- [x] PR #142 merged at
+  `80463b2aaad1c041d14e4cfe55ffcdae627b7b09`; PR CI green for audit, build,
+  e2e, lint, security, and test.
 - [x] Prod deploy remains blocked: `/opt/vizora/app` is dirty and
   ahead/behind stale prod `origin/main`; no production pull, reset, stash, env
   edit, service restart, DB mutation, or deploy performed.
