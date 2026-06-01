@@ -8,6 +8,9 @@ const mockGetDisplayGroups = jest.fn();
 const mockDeleteDisplay = jest.fn();
 const mockUpdateDisplay = jest.fn();
 const mockGeneratePairingToken = jest.fn();
+const mockBulkDeleteDisplays = jest.fn();
+const mockBulkAssignPlaylist = jest.fn();
+const mockBulkAssignGroup = jest.fn();
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -29,6 +32,9 @@ jest.mock('@/lib/api', () => ({
     deleteDisplay: (...args: any[]) => mockDeleteDisplay(...args),
     updateDisplay: (...args: any[]) => mockUpdateDisplay(...args),
     generatePairingToken: (...args: any[]) => mockGeneratePairingToken(...args),
+    bulkDeleteDisplays: (...args: any[]) => mockBulkDeleteDisplays(...args),
+    bulkAssignPlaylist: (...args: any[]) => mockBulkAssignPlaylist(...args),
+    bulkAssignGroup: (...args: any[]) => mockBulkAssignGroup(...args),
     getCurrentUser: jest.fn().mockRejectedValue(new Error('401')),
     setAuthenticated: jest.fn(),
     getActiveOverrides: jest.fn().mockResolvedValue([]),
@@ -213,6 +219,9 @@ describe('DevicesClient', () => {
     mockGetDisplayGroups.mockResolvedValue({ data: [] });
     mockDeleteDisplay.mockResolvedValue({});
     mockUpdateDisplay.mockResolvedValue({});
+    mockBulkDeleteDisplays.mockResolvedValue({ deleted: 0 });
+    mockBulkAssignPlaylist.mockResolvedValue({ updated: 0 });
+    mockBulkAssignGroup.mockResolvedValue({ added: 0 });
     mockGeneratePairingToken.mockResolvedValue({
       pairingToken: 'eyJ.mock.pairing-token',
       expiresIn: '30d',
@@ -390,6 +399,106 @@ describe('DevicesClient', () => {
       expect(screen.getByText('eyJ.mock.pairing-token')).toBeInTheDocument();
     });
     expect(screen.queryByText('N/A')).not.toBeInTheDocument();
+  });
+
+  it('requires confirmation before bulk deleting selected devices and reports the backend count', async () => {
+    mockBulkDeleteDisplays.mockResolvedValue({ deleted: 1 });
+
+    render(
+      <DevicesClient
+        initialDevices={sampleDevices as any}
+        initialPlaylists={samplePlaylists as any}
+        initialDevicesComplete
+        initialPlaylistsComplete
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Lobby Display')).toBeInTheDocument();
+    });
+
+    const checkboxes = screen.getAllByRole('checkbox');
+    fireEvent.click(checkboxes[1]);
+    fireEvent.click(checkboxes[2]);
+
+    fireEvent.click(screen.getByText('Delete Selected'));
+
+    expect(mockBulkDeleteDisplays).not.toHaveBeenCalled();
+    expect(screen.getByTestId('confirm-dialog')).toHaveTextContent('Delete Selected Devices');
+
+    fireEvent.click(screen.getByText('Confirm'));
+
+    await waitFor(() => {
+      expect(mockBulkDeleteDisplays).toHaveBeenCalledWith(['d1', 'd2']);
+    });
+    expect(mockToast.success).toHaveBeenCalledWith('Deleted 1 device(s)');
+  });
+
+  it('reports backend updated count after bulk playlist assignment', async () => {
+    mockBulkAssignPlaylist.mockResolvedValue({ updated: 1 });
+
+    render(
+      <DevicesClient
+        initialDevices={sampleDevices as any}
+        initialPlaylists={samplePlaylists as any}
+        initialDevicesComplete
+        initialPlaylistsComplete
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Lobby Display')).toBeInTheDocument();
+    });
+
+    const checkboxes = screen.getAllByRole('checkbox');
+    fireEvent.click(checkboxes[1]);
+    fireEvent.click(checkboxes[2]);
+    fireEvent.click(screen.getByText('Assign Playlist'));
+    fireEvent.change(screen.getAllByRole('combobox').at(-1)!, { target: { value: 'p1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Assign' }));
+
+    await waitFor(() => {
+      expect(mockBulkAssignPlaylist).toHaveBeenCalledWith(['d1', 'd2'], 'p1');
+    });
+    expect(mockToast.success).toHaveBeenCalledWith('Playlist assigned to 1 device(s)');
+  });
+
+  it('reports backend added count after bulk group assignment', async () => {
+    mockGetDisplayGroups.mockResolvedValue({
+      data: [{ id: 'g1', name: 'Lobby Group', description: '', displays: [] }],
+      meta: { total: 1 },
+    });
+    mockBulkAssignGroup.mockResolvedValue({ added: 1 });
+
+    render(
+      <DevicesClient
+        initialDevices={sampleDevices as any}
+        initialPlaylists={samplePlaylists as any}
+        initialDevicesComplete
+        initialPlaylistsComplete
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Lobby Display')).toBeInTheDocument();
+    });
+
+    const checkboxes = screen.getAllByRole('checkbox');
+    fireEvent.click(checkboxes[1]);
+    fireEvent.click(checkboxes[2]);
+    fireEvent.click(screen.getByText('Add to Group'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Lobby Group')).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getAllByRole('combobox').at(-1)!, { target: { value: 'g1' } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Add to Group' }).at(-1)!);
+
+    await waitFor(() => {
+      expect(mockBulkAssignGroup).toHaveBeenCalledWith(['d1', 'd2'], 'g1');
+    });
+    expect(mockToast.success).toHaveBeenCalledWith('Added 1 device(s) to group');
   });
 
   it('handles empty device list gracefully', async () => {

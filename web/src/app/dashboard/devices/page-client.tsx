@@ -46,6 +46,7 @@ export default function DevicesClient({
  const [selectedDevice, setSelectedDevice] = useState<Display | null>(null);
  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+ const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
  const [isPairingModalOpen, setIsPairingModalOpen] = useState(false);
  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
  const [pairingCode, setPairingCode] = useState('');
@@ -314,12 +315,14 @@ export default function DevicesClient({
 
  const handleBulkDelete = async () => {
  if (selectedDeviceIds.size === 0) return;
+ const displayIds = Array.from(selectedDeviceIds);
  try {
  setActionLoading(true);
- await apiClient.bulkDeleteDisplays(Array.from(selectedDeviceIds));
- toast.success(`Deleted ${selectedDeviceIds.size} device(s)`);
+ const result = await apiClient.bulkDeleteDisplays(displayIds);
+ toast.success(`Deleted ${result.deleted} device(s)`);
  setSelectedDeviceIds(new Set());
- loadDevices();
+ setIsBulkDeleteModalOpen(false);
+ await loadDevices(false);
  } catch (error: any) {
  toast.error(error.message || 'Bulk delete failed');
  } finally {
@@ -329,14 +332,15 @@ export default function DevicesClient({
 
  const handleBulkAssignPlaylist = async () => {
  if (!bulkPlaylistId || selectedDeviceIds.size === 0) return;
+ const displayIds = Array.from(selectedDeviceIds);
  try {
  setActionLoading(true);
- await apiClient.bulkAssignPlaylist(Array.from(selectedDeviceIds), bulkPlaylistId);
- toast.success(`Playlist assigned to ${selectedDeviceIds.size} device(s)`);
+ const result = await apiClient.bulkAssignPlaylist(displayIds, bulkPlaylistId);
+ toast.success(`Playlist assigned to ${result.updated} device(s)`);
  setSelectedDeviceIds(new Set());
  setIsBulkPlaylistModalOpen(false);
  setBulkPlaylistId('');
- loadDevices();
+ await loadDevices(false);
  } catch (error: any) {
  toast.error(error.message || 'Bulk assign failed');
  } finally {
@@ -346,15 +350,16 @@ export default function DevicesClient({
 
  const handleBulkAssignGroup = async () => {
  if (!bulkGroupId || selectedDeviceIds.size === 0) return;
+ const displayIds = Array.from(selectedDeviceIds);
  try {
  setActionLoading(true);
- await apiClient.bulkAssignGroup(Array.from(selectedDeviceIds), bulkGroupId);
- toast.success(`Added ${selectedDeviceIds.size} device(s) to group`);
+ const result = await apiClient.bulkAssignGroup(displayIds, bulkGroupId);
+ toast.success(`Added ${result.added} device(s) to group`);
  setSelectedDeviceIds(new Set());
  setIsBulkGroupModalOpen(false);
  setBulkGroupId('');
- loadDevices();
- loadGroups();
+ await loadDevices(false);
+ await loadGroups();
  } catch (error: any) {
  toast.error(error.message || 'Bulk group assign failed');
  } finally {
@@ -541,7 +546,7 @@ export default function DevicesClient({
  <div className="flex gap-4 items-center">
  <button onClick={() => setIsBulkPlaylistModalOpen(true)} className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium">Assign Playlist</button>
  <button onClick={() => setIsBulkGroupModalOpen(true)} className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium">Add to Group</button>
- <button onClick={handleBulkDelete} disabled={actionLoading} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50">Delete Selected</button>
+ <button onClick={() => setIsBulkDeleteModalOpen(true)} disabled={actionLoading} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50">Delete Selected</button>
  <button onClick={() => setSelectedDeviceIds(new Set())} className="px-4 py-2 text-sm text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition">Clear</button>
  </div>
  </div>
@@ -661,6 +666,16 @@ export default function DevicesClient({
  </Modal>
 
  <ConfirmDialog isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={confirmDelete} title="Delete Device" message={`Are you sure you want to delete "${selectedDevice?.nickname}"? This action cannot be undone.`} confirmText="Delete" type="danger" />
+
+ <ConfirmDialog
+ isOpen={isBulkDeleteModalOpen}
+ onClose={() => setIsBulkDeleteModalOpen(false)}
+ onConfirm={handleBulkDelete}
+ title="Delete Selected Devices"
+ message={`Delete ${selectedDeviceIds.size} selected device${selectedDeviceIds.size !== 1 ? 's' : ''}? This action cannot be undone.`}
+ confirmText="Delete Selected"
+ type="danger"
+ />
 
  <Modal isOpen={isBulkPlaylistModalOpen} onClose={() => { setIsBulkPlaylistModalOpen(false); setBulkPlaylistId(''); }} title="Assign Playlist to Selected Devices">
  <div className="space-y-5">

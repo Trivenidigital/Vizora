@@ -1,5 +1,63 @@
 # Vizora - Task Tracker
 
+## In Progress: Dashboard Bulk-Action Safety Pass 26 (2026-06-01)
+
+**Branch:** `feat/customer-dashboard-pass-26`
+
+**Why now:** After Pass 25 merged with green CI, the next customer-dashboard
+analysis found multiple customer trust and performance gaps. The safest bounded
+first build target is destructive device bulk-action safety: currently device
+bulk delete fires immediately, bulk action toasts use selected row counts rather
+than backend result counts, and the shared confirmation dialog closes before
+async destructive actions finish.
+
+**New primitives introduced:** none. This pass reuses existing dashboard client
+pages, `ConfirmDialog`, display bulk endpoints, and API client methods.
+
+**Hermes-first analysis:** not applicable. This pass does not add or modify
+business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
+
+**Plan**
+- [x] Start fresh branch from `origin/main`.
+- [x] Dispatch customer UX, frontend performance, and action-safety reviewers.
+- [x] Record Pass 26 findings and choose a bounded first build target.
+- [x] Write failing tests for async confirmation and device bulk-action safety.
+- [x] Implement shared confirmation pending state.
+- [x] Implement device bulk-delete confirmation and backend count toasts.
+- [x] Run focused tests.
+- [x] Run multi-vector review before broader verification.
+- [x] Run broader verification.
+- [ ] PR, CI, merge.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Plan/design:**
+`docs/plans/2026-06-01-dashboard-bulk-action-safety-pass-26.md`
+
+**Local evidence:**
+- TDD red: shared confirmation test failed because `onClose` fired before an
+  async confirm resolved; device tests failed because bulk delete called the API
+  before confirmation and bulk action toasts used selected row counts instead of
+  backend result counts.
+- Implementation: `ConfirmDialog` now awaits async confirm handlers, disables
+  actions while pending, keeps the dialog open until success, resets pending
+  state before close so reopen is usable, and exposes `role="dialog"` with
+  modal label/description semantics. Device bulk delete now opens a confirmation
+  dialog, and device bulk delete/playlist/group toasts use `{ deleted }`,
+  `{ updated }`, and `{ added }` counts returned by the backend.
+- Review: initial destructive-action and runtime reviewers both found a real
+  high issue where the shared dialog could reopen with buttons permanently
+  disabled; fixed with a reopen regression test. Re-review from both vectors was
+  CLEAN, with residual risk limited to no full browser/aXe focus-trap pass and
+  existing fire-and-forget ConfirmDialog consumers outside this scope.
+- Verification: focused `ConfirmDialog` suite 11/11 pass; focused devices page
+  suite 17/17 pass; full web Jest suite 96 suites / 1023 tests pass; web
+  `tsc --noEmit` pass; changed-file ESLint exits 0 with existing warnings only;
+  web production build pass with explicit local `NEXT_PUBLIC_SOCKET_URL`,
+  `NEXT_PUBLIC_API_URL`, `BACKEND_URL`, and memory env; repo JWT secret guard
+  pass; `git diff --check` pass with CRLF warnings only.
+
+---
+
 ## Completed: Realtime Status Catch-Up Performance Pass 25 (2026-06-01)
 
 **Branch:** `feat/performance-readiness-pass-25`
