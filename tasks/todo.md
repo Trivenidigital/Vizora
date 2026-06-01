@@ -1,6 +1,78 @@
 # Vizora - Task Tracker
 
-## Active: Display Cache Streaming Pass 34 (2026-06-01)
+## Active: Bounded Playlist Fan-out Pass 35 (2026-06-01)
+
+**Branch:** `feat/customer-experience-pass-35`
+
+**Why now:** PR #165 is merged with green PR and post-merge main CI, but
+production deploy remains blocked by dirty/diverged prod-local state. The next
+highest performance issue from the audit is playlist update fan-out:
+`notifyDisplaysOfPlaylistUpdate()` currently sends one realtime HTTP request per
+assigned display through `Promise.allSettled(displays.map(...))`. For larger
+fleets this can create an avoidable burst against middleware, realtime, and the
+internal command path.
+
+**New primitives introduced:** none. This pass only adds a small private
+bounded-concurrency helper in the existing playlist service notification path.
+No route, module, middleware, schema, response envelope, realtime gateway
+contract, notification substrate, MCP tool, Hermes skill, provider spend path,
+env var, or production process changes.
+
+**Hermes-first analysis:** not applicable. This pass does not add or modify
+business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
+
+**Plan/design:**
+`docs/plans/2026-06-01-playlist-fanout-performance-pass-35.md`
+
+**Plan**
+- [x] Start fresh branch from updated `origin/main`.
+- [x] Drift-check playlist update notification path and tests.
+- [x] Document pass 35 design and test plan.
+- [x] Add failing bounded fan-out tests.
+- [x] Implement bounded notification dispatch with existing circuit breaker path.
+- [x] Run multi-subagent review before broader verification.
+- [x] Run focused and broader verification.
+- [ ] PR, CI, merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Evidence so far:**
+- Drift-check: `middleware/src/modules/playlists/playlists.service.ts`
+  `notifyDisplaysOfPlaylistUpdate()` loads displays by `currentPlaylistId` and
+  currently uses unbounded `Promise.allSettled(displays.map(...))` around the
+  existing `this.circuitBreaker.executeWithFallback('realtime-service', ...)`
+  realtime POST. Existing focused tests cover dispatch count, no-display skip,
+  missing-secret skip, and fallback behavior, but not concurrency.
+- PR #165 / pass 34 integration: merged at
+  `4827344cab9c538461e8b7a6bd368a084e33b694`; post-merge main CI run
+  `26777703887` completed with build, lint, test, security, and e2e all
+  successful.
+- Production gate after PR #165: blocked. `/opt/vizora/app` is still dirty and
+  diverged (`main...origin/main [ahead 17, behind 121]`, `HEAD bb76aa...`,
+  `origin/main 4827344...`) with many modified template/landing/Hermes files and
+  untracked production files. Core services are healthy, but most ops/agent PM2
+  entries remain stopped. No deploy attempted.
+- Red TDD: focused playlist service suite failed on the new fan-out test because
+  the existing `Promise.allSettled(displays.map(...))` path reached 45 active
+  realtime notifications with 45 displays, exceeding the 20-request cap.
+- Focused green: after adding the bounded runner, the focused playlist service
+  suite passed 31/31. Review follow-up hardened the test set with a final
+  post-drain peak assertion and an explicit "earlier rejects do not stop later
+  displays" regression; the focused suite then passed 32/32.
+- Multi-vector review: performance/correctness reviewer CLEAN with low notes to
+  add explicit reject-continuation coverage and update docs; architecture,
+  security, and runtime/deploy-safety reviewer CLEAN with a low note to reassert
+  peak concurrency after all batches drain. Both low notes were addressed.
+- Verification: focused playlist service suite passed 32/32; middleware
+  `tsc --noEmit` passed; changed-file ESLint passed with 0 errors and only the
+  existing ESLintRC deprecation warning; hardcoded JWT scan passed; `git diff
+  --check` passed with CRLF warnings only; full middleware Jest passed 146/146
+  suites and 2940/2940 tests; `npx nx build @vizora/middleware
+  --skip-nx-cache` passed with existing webpack dependency warnings and the
+  existing Nx flaky-task note for `@vizora/database:build`.
+
+---
+
+## Completed: Display Cache Streaming Pass 34 (2026-06-01)
 
 **Branch:** `feat/customer-experience-pass-34`
 
@@ -32,8 +104,12 @@ business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
 - [x] Wire existing `getCachedUrl()` through playback components.
 - [x] Run multi-subagent review before broader verification.
 - [x] Run focused and broader verification.
-- [ ] PR, CI, merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge if green. PR #165 merged to `origin/main` at
+  `4827344cab9c538461e8b7a6bd368a084e33b694`; PR CI and post-merge main CI
+  green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe. Rechecked
+  after PR #165: blocked because `/opt/vizora/app` is dirty and diverged
+  (`main...origin/main [ahead 17, behind 121]`) despite healthy core services.
 
 **Evidence so far:**
 - Red TDD: `pnpm --filter @vizora/web test -- --runInBand --runTestsByPath src/app/display/components/__tests__/ContentRenderer.test.tsx`
@@ -58,6 +134,8 @@ business agents, MCP tools, Hermes skills, AI/provider calls, or spend paths.
   JWT scan passed; `git diff --check` passed with CRLF warnings only; production
   `pnpm --filter @vizora/web build` passed with existing Next middleware/proxy
   and TypeScript project-reference warnings.
+- PR/CI: PR #165 merged; post-merge main CI run `26777703887` succeeded for
+  build, lint, test, security, and e2e.
 
 ---
 

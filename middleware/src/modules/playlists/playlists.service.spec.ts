@@ -680,5 +680,79 @@ describe('PlaylistsService', () => {
       expect(result).toEqual(updatedPlaylist);
       expect(mockCircuitBreaker.executeWithFallback).toHaveBeenCalledTimes(1);
     });
+
+    it('should limit concurrent realtime notifications for large display fan-out', async () => {
+      const displays = Array.from({ length: 45 }, (_, index) => ({ id: `display-${index + 1}` }));
+      const concurrencyLimit = 20;
+      const releases: Array<() => void> = [];
+      let activeCalls = 0;
+      let maxActiveCalls = 0;
+      let completed = false;
+
+      mockDatabaseService.display.findMany.mockResolvedValue(displays);
+      mockCircuitBreaker.executeWithFallback.mockImplementation(async () => {
+        activeCalls += 1;
+        maxActiveCalls = Math.max(maxActiveCalls, activeCalls);
+        await new Promise<void>((resolve) => releases.push(resolve));
+        activeCalls -= 1;
+      });
+
+      const waitFor = async (predicate: () => boolean) => {
+        const startedAt = Date.now();
+        while (!predicate()) {
+          if (Date.now() - startedAt > 1000) {
+            throw new Error('Timed out waiting for playlist notification fan-out');
+          }
+          await new Promise((resolve) => setTimeout(resolve, 5));
+        }
+      };
+
+      const notifyPromise = (service as any)
+        .notifyDisplaysOfPlaylistUpdate('playlist-123', updatedPlaylist)
+        .finally(() => {
+          completed = true;
+        });
+
+      await waitFor(() => mockCircuitBreaker.executeWithFallback.mock.calls.length >= concurrencyLimit);
+
+      let concurrencyError: unknown;
+      try {
+        expect(maxActiveCalls).toBeLessThanOrEqual(concurrencyLimit);
+      } catch (error) {
+        concurrencyError = error;
+      }
+
+      while (!completed) {
+        await waitFor(() => releases.length > 0 || completed);
+        while (releases.length > 0) {
+          releases.shift()?.();
+        }
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+      await notifyPromise;
+
+      expect(maxActiveCalls).toBeLessThanOrEqual(concurrencyLimit);
+      expect(mockCircuitBreaker.executeWithFallback).toHaveBeenCalledTimes(displays.length);
+      expect(activeCalls).toBe(0);
+
+      if (concurrencyError) {
+        throw concurrencyError;
+      }
+    });
+
+    it('should continue notifying later displays when earlier notifications reject', async () => {
+      const displays = Array.from({ length: 45 }, (_, index) => ({ id: `display-${index + 1}` }));
+      mockDatabaseService.display.findMany.mockResolvedValue(displays);
+      mockCircuitBreaker.executeWithFallback.mockImplementation(async () => {
+        const currentCallNumber = mockCircuitBreaker.executeWithFallback.mock.calls.length;
+        if (currentCallNumber <= 20) {
+          throw new Error('realtime unavailable');
+        }
+      });
+
+      await (service as any).notifyDisplaysOfPlaylistUpdate('playlist-123', updatedPlaylist);
+
+      expect(mockCircuitBreaker.executeWithFallback).toHaveBeenCalledTimes(displays.length);
+    });
   });
 });
