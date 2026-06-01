@@ -45,6 +45,12 @@ describe('DeviceStatusIndicator', () => {
     expect(screen.getByText('Online')).toBeInTheDocument();
   });
 
+  it('shows pairing status from context', () => {
+    mockGetDeviceStatus.mockReturnValue({ status: 'pairing', timestamp: Date.now() });
+    render(<DeviceStatusIndicator deviceId="device-1" />);
+    expect(screen.getByText('Pairing')).toBeInTheDocument();
+  });
+
   it('hides label when showLabel is false', () => {
     render(<DeviceStatusIndicator deviceId="device-1" showLabel={false} />);
     expect(screen.queryByText('Offline')).not.toBeInTheDocument();

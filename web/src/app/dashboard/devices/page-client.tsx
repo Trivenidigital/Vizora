@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { fetchAllPaginated } from '@/lib/api/pagination';
-import { Display, PlaylistSummary, DisplayGroup } from '@/lib/types';
+import { Display, PlaylistSummary, DisplayGroup, DisplayStatus } from '@/lib/types';
 import Modal from '@/components/Modal';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -70,7 +70,7 @@ export default function DevicesClient({
  const hasCompleteInitialPlaylists = initialPlaylistsComplete ?? initialPlaylists.length > 0;
 
  // Memoized callback for device status changes
- const handleDeviceStatusChange = useCallback((update: { deviceId: string; status: 'online' | 'offline'; lastSeen?: string; currentPlaylistId?: string }) => {
+ const handleDeviceStatusChange = useCallback((update: { deviceId: string; status: DisplayStatus; lastSeen?: string; currentPlaylistId?: string }) => {
  setDevices((prev) =>
  prev.map((d) =>
  d.id === update.deviceId

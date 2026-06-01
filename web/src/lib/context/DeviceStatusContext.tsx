@@ -4,8 +4,9 @@ import React, { createContext, useContext, useEffect, useRef, useState, useCallb
 import { useSocket } from '@/lib/hooks/useSocket';
 import { apiClient } from '@/lib/api';
 import { fetchAllPaginated } from '@/lib/api/pagination';
+import type { DisplayStatus } from '@/lib/types';
 
-export type DeviceStatus = 'online' | 'offline' | 'idle' | 'error';
+export type DeviceStatus = DisplayStatus | 'idle';
 
 export interface DeviceStatusUpdate {
   deviceId: string;

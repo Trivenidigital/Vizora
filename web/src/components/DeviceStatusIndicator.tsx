@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useDeviceStatus, DeviceStatus } from '@/lib/context/DeviceStatusContext';
-import { Icon } from '@/theme/icons';
 
 interface DeviceStatusIndicatorProps {
   deviceId: string;
@@ -32,6 +31,13 @@ const statusConfig = {
     dotColor: 'bg-yellow-500',
     label: 'Idle',
     icon: 'pause',
+  },
+  pairing: {
+    color: 'text-blue-600 dark:text-blue-400',
+    bgColor: 'bg-blue-100 dark:bg-blue-900',
+    dotColor: 'bg-blue-500',
+    label: 'Pairing',
+    icon: 'clock',
   },
   error: {
     color: 'text-orange-600 dark:text-orange-400',
@@ -72,8 +78,6 @@ export default function DeviceStatusIndicator({
     }
 
     return unsubscribe;
-    // Only depend on deviceId - subscribeToDevice and getDeviceStatus are stable from context
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deviceId]);
 
   const config = statusConfig[status] || statusConfig.offline;

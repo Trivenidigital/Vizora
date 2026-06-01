@@ -110,6 +110,8 @@ export default function PlaylistsClient() {
  const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
  const [content, setContent] = useState<Content[]>([]);
  const [devices, setDevices] = useState<Display[]>([]);
+ const [devicesLoading, setDevicesLoading] = useState(true);
+ const [devicesLoadFailed, setDevicesLoadFailed] = useState(false);
  const [loading, setLoading] = useState(true);
  const [selectedPlaylist, setSelectedPlaylist] = useState<PlaylistSummary | null>(null);
  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -117,6 +119,8 @@ export default function PlaylistsClient() {
  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
  const [playlistThumbnails, setPlaylistThumbnails] = useState<Record<string, string[]>>({});
  const [isBuilderModalOpen, setIsBuilderModalOpen] = useState(false);
+ const [publishPlaylist, setPublishPlaylist] = useState<PlaylistSummary | null>(null);
+ const [selectedPublishDeviceIds, setSelectedPublishDeviceIds] = useState<Set<string>>(new Set());
  const [createForm, setCreateForm] = useState({ name: '', description: '' });
  const [actionLoading, setActionLoading] = useState(false);
  const [searchQuery, setSearchQuery] = useState('');
@@ -217,10 +221,16 @@ export default function PlaylistsClient() {
 
  const loadDevices = async () => {
  try {
+ setDevicesLoading(true);
+ setDevicesLoadFailed(false);
  const devicesList = await fetchAllPaginated((params) => apiClient.getDisplays(params));
  setDevices(devicesList);
  } catch (error) {
+ setDevices([]);
+ setDevicesLoadFailed(true);
  toast.error('Failed to load devices');
+ } finally {
+ setDevicesLoading(false);
  }
  };
 
@@ -295,13 +305,76 @@ export default function PlaylistsClient() {
  }
  };
 
- const handlePublish = async (playlist: PlaylistSummary) => {
+ const handlePublish = (playlist: PlaylistSummary) => {
+ if (!playlist.items || playlist.items.length === 0) {
+ toast.warning('Add content to this playlist before assigning it');
+ return;
+ }
+
+ if (devicesLoading) {
+ toast.info('Devices are still loading. Try again in a moment.');
+ return;
+ }
+
+ if (devicesLoadFailed) {
+ toast.error('Device list failed to load. Refresh the page before assigning playlists.');
+ return;
+ }
+
+ if (devices.length === 0) {
+ toast.warning('Pair a device before assigning playlists to screens');
+ return;
+ }
+
+ setPublishPlaylist(playlist);
+ setSelectedPublishDeviceIds(new Set());
+ };
+
+ const closePublishModal = () => {
+ setPublishPlaylist(null);
+ setSelectedPublishDeviceIds(new Set());
+ };
+
+ const requestClosePublishModal = () => {
+ if (actionLoading) return;
+ closePublishModal();
+ };
+
+ const togglePublishDevice = (deviceId: string) => {
+ if (actionLoading) return;
+
+ setSelectedPublishDeviceIds((current) => {
+ const next = new Set(current);
+ if (next.has(deviceId)) {
+ next.delete(deviceId);
+ } else {
+ next.add(deviceId);
+ }
+ return next;
+ });
+ };
+
+ const confirmPublish = async () => {
+ if (!publishPlaylist || selectedPublishDeviceIds.size === 0) return;
+
  try {
- await apiClient.updatePlaylist(playlist.id, { name: playlist.name });
- toast.success('Playlist published successfully');
- loadPlaylists();
+ setActionLoading(true);
+ const selectedDeviceIds = Array.from(selectedPublishDeviceIds);
+ const selectedDelayedCount = devices.filter(
+ (device) => selectedPublishDeviceIds.has(device.id) && device.status !== 'online',
+ ).length;
+ const result = await apiClient.bulkAssignPlaylist(selectedDeviceIds, publishPlaylist.id);
+ const delayedSuffix = selectedDelayedCount > 0
+ ? '. Non-online devices will update when they come online.'
+ : '';
+ toast.success(`Playlist assigned to ${formatDeviceCount(result.updated)}${delayedSuffix}`);
+ closePublishModal();
+ await loadDevices();
+ await loadPlaylists();
  } catch (error: any) {
- toast.error(error.message || 'Failed to publish playlist');
+ toast.error(error.message || 'Failed to assign playlist to devices');
+ } finally {
+ setActionLoading(false);
  }
  };
 
@@ -322,6 +395,8 @@ export default function PlaylistsClient() {
  const seconds = total % 60;
  return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
  };
+
+ const formatDeviceCount = (count: number) => `${count} ${count === 1 ? 'device' : 'devices'}`;
 
  const handleDragEnd = async (event: DragEndEvent) => {
  const { active, over } = event;
@@ -521,7 +596,7 @@ export default function PlaylistsClient() {
  className="flex-1 px-4 py-2 text-sm bg-green-500/10 text-green-600 dark:text-green-400 rounded-lg hover:bg-green-500/20 transition font-medium flex items-center justify-center gap-1"
  >
  <Icon name="power" size="sm" className="text-green-600 dark:text-green-400" />
- Publish
+ Assign
  </button>
  <button
  onClick={async () => {
@@ -725,6 +800,133 @@ export default function PlaylistsClient() {
  className="eh-btn-neon rounded-xl px-6 py-2 text-sm font-medium transition"
  >
  Done
+ </button>
+ </div>
+ </div>
+ </Modal>
+
+ {/* Assign Modal */}
+ <Modal
+ isOpen={!!publishPlaylist}
+ onClose={requestClosePublishModal}
+ title={`Assign ${publishPlaylist?.name || 'Playlist'} to Devices`}
+ size="lg"
+ >
+ <div className="space-y-5" aria-busy={actionLoading}>
+ <div>
+ <p className="text-sm text-[var(--foreground-secondary)]">
+ Select paired devices to assign this playlist to now.
+ </p>
+ <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
+ {formatDeviceCount(selectedPublishDeviceIds.size)} selected
+ </p>
+ </div>
+
+ <div className="space-y-2 max-h-80 overflow-y-auto">
+ {devices.map((device) => {
+ const deviceLabel = device.nickname || device.deviceId || 'Unnamed device';
+ const isCurrentlyAssigned = publishPlaylist?.id === device.currentPlaylistId;
+ const isSelected = selectedPublishDeviceIds.has(device.id);
+ const isChecked = isCurrentlyAssigned || isSelected;
+ const isNonOnline = device.status !== 'online';
+
+ if (isCurrentlyAssigned) {
+ return (
+ <div
+ key={device.id}
+ className="flex items-start gap-3 rounded-lg border border-[#00E5A0] bg-[#00E5A0]/10 p-4"
+ >
+ <Icon name="check" size="sm" className="mt-1 text-[#00E5A0]" />
+ <span className="flex-1 min-w-0">
+ <span className="flex flex-wrap items-center gap-2">
+ <span className="font-medium text-[var(--foreground)]">{deviceLabel}</span>
+ <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+ device.status === 'online'
+ ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+ : 'bg-[var(--surface)] text-[var(--foreground-tertiary)]'
+ }`}>
+ {device.status}
+ </span>
+ <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-[#00E5A0]/10 text-[#00E5A0]">
+ Already assigned
+ </span>
+ {isNonOnline && (
+ <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300">
+ Updates when online
+ </span>
+ )}
+ </span>
+ {device.location && (
+ <span className="mt-1 block text-xs text-[var(--foreground-tertiary)] truncate">
+ {device.location}
+ </span>
+ )}
+ </span>
+ </div>
+ );
+ }
+
+ return (
+ <label
+ key={device.id}
+ className={`flex items-start gap-3 rounded-lg border p-4 transition ${
+ actionLoading ? 'cursor-not-allowed opacity-75' : 'cursor-pointer'
+ } ${
+ isChecked
+ ? 'border-[#00E5A0] bg-[#00E5A0]/10'
+ : 'border-[var(--border)] bg-[var(--background)] hover:bg-[var(--surface-hover)]'
+ }`}
+ >
+ <input
+ type="checkbox"
+ aria-label={deviceLabel}
+ checked={isChecked}
+ disabled={actionLoading}
+ onChange={() => togglePublishDevice(device.id)}
+ className="mt-1 h-4 w-4 rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]"
+ />
+ <span className="flex-1 min-w-0">
+ <span className="flex flex-wrap items-center gap-2">
+ <span className="font-medium text-[var(--foreground)]">{deviceLabel}</span>
+ <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+ device.status === 'online'
+ ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+ : 'bg-[var(--surface)] text-[var(--foreground-tertiary)]'
+ }`}>
+ {device.status}
+ </span>
+ {isNonOnline && (
+ <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300">
+ Updates when online
+ </span>
+ )}
+ </span>
+ {device.location && (
+ <span className="mt-1 block text-xs text-[var(--foreground-tertiary)] truncate">
+ {device.location}
+ </span>
+ )}
+ </span>
+ </label>
+ );
+ })}
+ </div>
+
+ <div className="flex justify-end gap-3 pt-4 border-t border-[var(--border)]">
+ <button
+ onClick={requestClosePublishModal}
+ className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition"
+ disabled={actionLoading}
+ >
+ Cancel
+ </button>
+ <button
+ onClick={confirmPublish}
+ className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium transition disabled:opacity-50 flex items-center gap-2"
+ disabled={actionLoading || selectedPublishDeviceIds.size === 0}
+ >
+ {actionLoading && <LoadingSpinner size="sm" />}
+ Assign to {formatDeviceCount(selectedPublishDeviceIds.size)}
  </button>
  </div>
  </div>
