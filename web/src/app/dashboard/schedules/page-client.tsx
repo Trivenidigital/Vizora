@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient } from '@/lib/api';
 import { fetchAllPaginated } from '@/lib/api/pagination';
 import { Display, PlaylistSummary } from '@/lib/types';
@@ -93,6 +93,22 @@ const getLoadFailureMessage = (reason: unknown): string => {
  return 'Request failed';
 };
 
+const getScheduleActiveState = (schedule: Schedule): boolean => {
+ return schedule.isActive ?? schedule.active ?? false;
+};
+
+const dateToIso = (date?: Date | string | null): string | undefined => {
+ if (!date) return undefined;
+ return typeof date === 'string' ? new Date(date).toISOString() : date.toISOString();
+};
+
+const formatConflictTimeRange = (conflict: { startTime?: number | string | null; endTime?: number | string | null }) => {
+ if (conflict.startTime == null || conflict.endTime == null) {
+ return 'all day';
+ }
+ return `${minutesToHHMM(conflict.startTime)} - ${minutesToHHMM(conflict.endTime)}`;
+};
+
 export default function SchedulesClient() {
  const toast = useToast();
  const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -105,6 +121,11 @@ export default function SchedulesClient() {
  const [targetType, setTargetType] = useState<'device' | 'group'>('device');
  const [displayGroups, setDisplayGroups] = useState<any[]>([]);
  const [conflictWarnings, setConflictWarnings] = useState<any[]>([]);
+ const conflictWarningsRef = useRef<any[]>([]);
+ const [conflictCheckFailed, setConflictCheckFailed] = useState(false);
+ const conflictCheckFailedRef = useRef(false);
+ const conflictResultCacheRef = useRef<Map<string, any[]>>(new Map());
+ const conflictRequestCacheRef = useRef<Map<string, Promise<any[]>>>(new Map());
  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
  const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -126,6 +147,30 @@ export default function SchedulesClient() {
  });
 
  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+ const selectedTargetKey = formData.deviceIds.join('|');
+ const selectedDaysKey = formData.days.join('|');
+
+ const updateConflictWarnings = useCallback((nextWarnings: any[]) => {
+ const currentWarnings = conflictWarningsRef.current;
+ if (currentWarnings.length === nextWarnings.length && currentWarnings.every((warning, index) => warning === nextWarnings[index])) {
+ return;
+ }
+ conflictWarningsRef.current = nextWarnings;
+ setConflictWarnings(nextWarnings);
+ }, []);
+
+ const updateConflictCheckFailed = useCallback((failed: boolean) => {
+ if (conflictCheckFailedRef.current === failed) {
+ return;
+ }
+ conflictCheckFailedRef.current = failed;
+ setConflictCheckFailed(failed);
+ }, []);
+
+ const clearConflictCheckCache = useCallback(() => {
+ conflictResultCacheRef.current.clear();
+ conflictRequestCacheRef.current.clear();
+ }, []);
 
  // Real-time event handling for schedule status
  const { isConnected } = useRealtimeEvents({
@@ -138,6 +183,110 @@ export default function SchedulesClient() {
  useEffect(() => {
  loadData();
  }, []);
+
+ useEffect(() => {
+ const modalOpen = isCreateModalOpen || isEditModalOpen;
+ const daysOfWeek = dayNamesToNumbers(formData.days);
+ const targetIds = targetType === 'device' ? formData.deviceIds : formData.deviceIds.slice(0, 1);
+
+ if (!modalOpen || daysOfWeek.length === 0 || targetIds.length === 0) {
+ updateConflictWarnings([]);
+ updateConflictCheckFailed(false);
+ return;
+ }
+
+ const candidateStartDate = selectedSchedule?.startDate ? dateToIso(selectedSchedule.startDate) : new Date().toISOString().slice(0, 10);
+ const candidateEndDate = dateToIso(selectedSchedule?.endDate);
+
+ const requests = targetIds
+ .filter(Boolean)
+ .map((targetId) => ({
+ ...(targetType === 'device' ? { displayId: targetId } : { displayGroupId: targetId }),
+ daysOfWeek,
+ startTime: hhmmToMinutes(formData.startTime),
+ endTime: calculateEndTimeMinutes(formData.startTime, formData.duration),
+ startDate: candidateStartDate,
+ ...(candidateEndDate ? { endDate: candidateEndDate } : {}),
+ ...(selectedSchedule?.id ? { excludeScheduleId: selectedSchedule.id } : {}),
+ }));
+
+ if (requests.length === 0) {
+ updateConflictWarnings([]);
+ updateConflictCheckFailed(false);
+ return;
+ }
+
+ let cancelled = false;
+
+ const checkConflicts = async () => {
+ try {
+ const getConflictsForRequest = (request: typeof requests[number]) => {
+ const requestKey = JSON.stringify(request);
+ const cachedResult = conflictResultCacheRef.current.get(requestKey);
+ if (cachedResult) {
+ return Promise.resolve(cachedResult);
+ }
+
+ const cachedRequest = conflictRequestCacheRef.current.get(requestKey);
+ if (cachedRequest) {
+ return cachedRequest;
+ }
+
+ const requestPromise = apiClient.checkScheduleConflicts(request)
+ .then((result) => {
+ const conflicts = result.conflicts || [];
+ conflictResultCacheRef.current.set(requestKey, conflicts);
+ conflictRequestCacheRef.current.delete(requestKey);
+ return conflicts;
+ })
+ .catch((error) => {
+ conflictRequestCacheRef.current.delete(requestKey);
+ throw error;
+ });
+
+ conflictRequestCacheRef.current.set(requestKey, requestPromise);
+ return requestPromise;
+ };
+
+ const results = await Promise.all(
+ requests.map((request) => getConflictsForRequest(request)),
+ );
+ if (cancelled) return;
+
+ const conflictsById = new Map<string, any>();
+ results.flat().forEach((conflict: any, index) => {
+ const key = conflict.id || `${conflict.name || 'conflict'}-${conflict.startTime}-${conflict.endTime}-${index}`;
+ conflictsById.set(key, conflict);
+ });
+ updateConflictCheckFailed(false);
+ updateConflictWarnings(Array.from(conflictsById.values()));
+ } catch {
+ if (!cancelled) {
+ updateConflictWarnings([]);
+ updateConflictCheckFailed(true);
+ }
+ }
+ };
+
+ void checkConflicts();
+
+ return () => {
+ cancelled = true;
+ };
+ }, [
+ isCreateModalOpen,
+ isEditModalOpen,
+ targetType,
+ selectedTargetKey,
+ selectedDaysKey,
+ formData.startTime,
+ formData.duration,
+ selectedSchedule?.id,
+ selectedSchedule?.startDate,
+ selectedSchedule?.endDate,
+ updateConflictWarnings,
+ updateConflictCheckFailed,
+ ]);
 
  const loadData = async () => {
  try {
@@ -360,6 +509,7 @@ export default function SchedulesClient() {
  };
 
  const openEditModal = (schedule: Schedule) => {
+ clearConflictCheckCache();
  setSelectedSchedule(schedule);
  setFormData({
  name: schedule.name,
@@ -381,6 +531,7 @@ export default function SchedulesClient() {
  };
 
  const resetForm = () => {
+ clearConflictCheckCache();
  setFormData({
  name: '',
  startTime: '09:00',
@@ -393,7 +544,8 @@ export default function SchedulesClient() {
  setFormErrors({});
  setSelectedSchedule(null);
  setTargetType('device');
- setConflictWarnings([]);
+ updateConflictWarnings([]);
+ updateConflictCheckFailed(false);
  };
 
  const getPlaylistName = (playlistId: string) => {
@@ -548,21 +700,31 @@ export default function SchedulesClient() {
  ) : (
  /* Schedules List */
  <div className="space-y-4">
- {schedules.map(schedule => (
+ {schedules.map(schedule => {
+ const scheduleActive = getScheduleActiveState(schedule);
+ return (
  <div
  key={schedule.id}
- className="eh-dash-card border-l-4 border-l-[#00E5A0] p-6"
+ className={`eh-dash-card border-l-4 p-6 ${scheduleActive ? 'border-l-[#00E5A0]' : 'border-l-[var(--border)]'}`}
  >
  <div className="flex items-start justify-between">
  <div className="flex items-start gap-4 flex-1">
- <Icon name="schedules" size="2xl" className="text-[#00E5A0] dark:text-[#00E5A0]" />
+ <Icon
+ name="schedules"
+ size="2xl"
+ className={scheduleActive ? 'text-[#00E5A0] dark:text-[#00E5A0]' : 'text-[var(--foreground-tertiary)]'}
+ />
  <div className="flex-1 min-w-0">
  <div className="flex items-center gap-3 mb-3">
  <h3 className="text-xl font-semibold text-[var(--foreground)] truncate">
  {schedule.name}
  </h3>
- <span className="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200">
- Active
+ <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
+ scheduleActive
+ ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
+ : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)]'
+ }`}>
+ {scheduleActive ? 'Active' : 'Inactive'}
  </span>
  </div>
 
@@ -624,7 +786,8 @@ export default function SchedulesClient() {
  </button>
  </div>
  </div>
- ))}
+ );
+ })}
  </div>
  )}
 
@@ -715,19 +878,14 @@ export default function SchedulesClient() {
  {/* Timezone */}
  <div>
  <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
- Timezone <span className="text-red-500">*</span>
+ Timezone
  </label>
- <select
- value={formData.timezone}
- onChange={e => setFormData({ ...formData, timezone: e.target.value })}
- className="eh-select w-full px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] transition"
- >
- <option value="America/New_York">Eastern (America/New_York)</option>
- <option value="America/Chicago">Central (America/Chicago)</option>
- <option value="America/Denver">Mountain (America/Denver)</option>
- <option value="America/Los_Angeles">Pacific (America/Los_Angeles)</option>
- <option value="UTC">UTC</option>
- </select>
+ <div className="rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] px-4 py-3">
+ <p className="text-sm font-medium text-[var(--foreground)]">Target display timezone</p>
+ <p className="mt-1 text-xs text-[var(--foreground-secondary)]">
+ Each target display applies its own configured timezone at playback time.
+ </p>
+ </div>
  </div>
 
  {/* Days */}
@@ -872,14 +1030,25 @@ export default function SchedulesClient() {
  )}
 
  {/* Conflict Warnings */}
+ {conflictCheckFailed && (
+ <div role="alert" className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+ <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-1 flex items-center gap-2">
+ <Icon name="error" size="sm" className="text-red-600 dark:text-red-400" />
+ Unable to verify schedule conflicts
+ </p>
+ <p className="text-xs text-red-700 dark:text-red-300">
+ Check the schedule after saving or retry when the network is available.
+ </p>
+ </div>
+ )}
  {conflictWarnings.length > 0 && (
- <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-lg p-3">
+ <div role="status" aria-live="polite" className="bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-lg p-3">
  <p className="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-1 flex items-center gap-2">
  <span className="text-amber-500">&#9888;</span> Schedule Conflicts Detected
  </p>
  {conflictWarnings.map((c: any, i: number) => (
  <p key={i} className="text-xs text-amber-700 dark:text-amber-300">
- Overlaps with &quot;{c.name}&quot; ({c.startTime} - {c.endTime})
+ Overlaps with &quot;{c.name}&quot; ({formatConflictTimeRange(c)})
  </p>
  ))}
  </div>

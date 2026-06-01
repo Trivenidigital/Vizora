@@ -332,6 +332,7 @@ describe('SchedulesService', () => {
 
   describe('findActiveSchedules', () => {
     it('should return active schedules for a display', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-06-01T10:00:00Z')); // Monday 10:00 UTC
       const mockActiveSchedules = [
         {
           ...mockSchedule,
@@ -345,10 +346,14 @@ describe('SchedulesService', () => {
       databaseService.display.findFirst.mockResolvedValue({ timezone: 'UTC', isDisabled: false } as any);
       databaseService.schedule.findMany.mockResolvedValue(mockActiveSchedules);
 
-      const result = await service.findActiveSchedules(mockDisplayId, mockOrganizationId);
+      try {
+        const result = await service.findActiveSchedules(mockDisplayId, mockOrganizationId);
 
-      expect(databaseService.schedule.findMany).toHaveBeenCalled();
-      expect(result).toEqual(mockActiveSchedules);
+        expect(databaseService.schedule.findMany).toHaveBeenCalled();
+        expect(result).toEqual(mockActiveSchedules);
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('should filter by current date, time, day of week, and organizationId', async () => {
@@ -361,8 +366,44 @@ describe('SchedulesService', () => {
       expect(callArgs.where.organizationId).toBe(mockOrganizationId);
       expect(callArgs.where.isActive).toBe(true);
       expect(callArgs.where.startDate).toHaveProperty('lte');
-      expect(callArgs.where.daysOfWeek).toHaveProperty('has');
+      expect(callArgs.where.daysOfWeek).toHaveProperty('hasSome');
       expect(callArgs.orderBy).toEqual({ priority: 'desc' });
+    });
+
+    it('should keep overnight schedules active after midnight on the next local day', async () => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-06-02T00:30:00Z')); // Tuesday 00:30 UTC
+      databaseService.display.findFirst.mockResolvedValue({ timezone: 'UTC', isDisabled: false } as any);
+      databaseService.schedule.findMany.mockResolvedValue([
+        {
+          ...mockSchedule,
+          id: 'overnight-monday',
+          name: 'Monday Overnight',
+          daysOfWeek: [1],
+          startTime: 1380, // 23:00
+          endTime: 120,    // 02:00 next day
+          playlist: { id: mockPlaylistId, items: [] },
+        },
+        {
+          ...mockSchedule,
+          id: 'future-tuesday',
+          name: 'Future Tuesday',
+          daysOfWeek: [2],
+          startTime: 60,  // 01:00
+          endTime: 120,   // 02:00
+          playlist: { id: mockPlaylistId, items: [] },
+        },
+      ] as any);
+
+      try {
+        const result = await service.findActiveSchedules(mockDisplayId, mockOrganizationId);
+
+        const callArgs = databaseService.schedule.findMany.mock.calls[0][0];
+        expect(callArgs.where.daysOfWeek).toEqual({ hasSome: [2, 1] });
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe('overnight-monday');
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('should reject missing displays before querying schedules', async () => {
@@ -735,7 +776,7 @@ describe('SchedulesService', () => {
       expect(result.conflicts).toHaveLength(2);
     });
 
-    it('should filter by displayGroupId when provided', async () => {
+    it('should check group schedules against direct display and overlapping group targets', async () => {
       databaseService.schedule.findMany.mockResolvedValue([]);
 
       await service.checkConflicts('org-123', {
@@ -748,10 +789,76 @@ describe('SchedulesService', () => {
       expect(databaseService.schedule.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            displayGroupId: 'group-1',
+            OR: expect.arrayContaining([
+              { displayGroupId: 'group-1' },
+              { display: { groups: { some: { displayGroupId: 'group-1' } } } },
+              {
+                displayGroup: {
+                  displays: {
+                    some: {
+                      display: {
+                        groups: { some: { displayGroupId: 'group-1' } },
+                      },
+                    },
+                  },
+                },
+              },
+            ]),
           }),
         }),
       );
+    });
+
+    it('should detect conflicts when a candidate schedule crosses midnight', async () => {
+      databaseService.schedule.findMany.mockResolvedValue([
+        {
+          id: 'tuesday-early',
+          name: 'Tuesday Early',
+          startTime: 60,   // 01:00
+          endTime: 180,    // 03:00
+          daysOfWeek: [2],
+          playlist: { id: 'p-1', name: 'Playlist 1' },
+          display: { id: 'display-1', nickname: 'Display 1' },
+          displayGroup: null,
+        },
+      ]);
+
+      const result = await service.checkConflicts('org-123', {
+        displayId: 'display-1',
+        daysOfWeek: [1],
+        startTime: 1380, // Monday 23:00
+        endTime: 120,    // Tuesday 02:00
+      });
+
+      const callArgs = databaseService.schedule.findMany.mock.calls[0][0];
+      expect(callArgs.where.daysOfWeek).toEqual({ hasSome: [1, 0, 2] });
+      expect(result.hasConflicts).toBe(true);
+      expect(result.conflicts[0].id).toBe('tuesday-early');
+    });
+
+    it('should not flag adjacent-day all-day schedules as conflicts after broad day prefiltering', async () => {
+      databaseService.schedule.findMany.mockResolvedValue([
+        {
+          id: 'sunday-all-day',
+          name: 'Sunday All Day',
+          startTime: null,
+          endTime: null,
+          daysOfWeek: [0],
+          playlist: { id: 'p-1', name: 'Playlist 1' },
+          display: { id: 'display-1', nickname: 'Display 1' },
+          displayGroup: null,
+        },
+      ]);
+
+      const result = await service.checkConflicts('org-123', {
+        displayId: 'display-1',
+        daysOfWeek: [1],
+        startTime: 540,
+        endTime: 600,
+      });
+
+      expect(result.hasConflicts).toBe(false);
+      expect(result.conflicts).toHaveLength(0);
     });
 
     it('should treat requests without times as always conflicting', async () => {

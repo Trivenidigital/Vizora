@@ -7,6 +7,64 @@ import { UpdateScheduleDto } from './dto/update-schedule.dto';
 import { CheckConflictsDto } from './dto/check-conflicts.dto';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 
+const MINUTES_PER_DAY = 24 * 60;
+const DAYS_PER_WEEK = 7;
+const MINUTES_PER_WEEK = DAYS_PER_WEEK * MINUTES_PER_DAY;
+
+type ScheduleWindow = {
+  daysOfWeek: number[];
+  startTime?: number | null;
+  endTime?: number | null;
+};
+
+const previousDay = (day: number) => (day + DAYS_PER_WEEK - 1) % DAYS_PER_WEEK;
+const nextDay = (day: number) => (day + 1) % DAYS_PER_WEEK;
+
+const expandAdjacentDays = (days: number[]): number[] => Array.from(new Set(
+  days.flatMap((day) => [day, previousDay(day), nextDay(day)]),
+));
+
+const expandWeeklyIntervals = (window: ScheduleWindow): Array<{ start: number; end: number }> => {
+  return window.daysOfWeek.flatMap((day) => {
+    if (window.startTime == null || window.endTime == null || window.startTime === window.endTime) {
+      return [{ start: day * MINUTES_PER_DAY, end: (day + 1) * MINUTES_PER_DAY }];
+    }
+
+    const start = day * MINUTES_PER_DAY + window.startTime;
+    const end = window.startTime < window.endTime
+      ? day * MINUTES_PER_DAY + window.endTime
+      : (day + 1) * MINUTES_PER_DAY + window.endTime;
+    return [{ start, end }];
+  });
+};
+
+const intervalsOverlap = (
+  left: { start: number; end: number },
+  right: { start: number; end: number },
+): boolean => {
+  return [-MINUTES_PER_WEEK, 0, MINUTES_PER_WEEK].some((shift) => {
+    const shiftedRight = { start: right.start + shift, end: right.end + shift };
+    return left.start < shiftedRight.end && shiftedRight.start < left.end;
+  });
+};
+
+const schedulesOverlapInTime = (candidate: ScheduleWindow, existing: ScheduleWindow): boolean => {
+  const candidateIntervals = expandWeeklyIntervals(candidate);
+  const existingIntervals = expandWeeklyIntervals(existing);
+  return candidateIntervals.some((candidateInterval) => (
+    existingIntervals.some((existingInterval) => intervalsOverlap(candidateInterval, existingInterval))
+  ));
+};
+
+const isScheduleActiveAt = (schedule: ScheduleWindow, dayOfWeek: number, currentTime: number): boolean => {
+  const point = dayOfWeek * MINUTES_PER_DAY + currentTime;
+  return expandWeeklyIntervals(schedule).some((interval) => (
+    [point - MINUTES_PER_WEEK, point, point + MINUTES_PER_WEEK].some((shiftedPoint) => (
+      interval.start <= shiftedPoint && shiftedPoint < interval.end
+    ))
+  ));
+};
+
 @Injectable()
 export class SchedulesService {
   constructor(
@@ -159,26 +217,16 @@ export class SchedulesService {
     const dayOfWeek = localNow.getDay();
     const currentTime = localNow.getHours() * 60 + localNow.getMinutes();
 
-    return this.db.schedule.findMany({
+    const candidateDays = [dayOfWeek, previousDay(dayOfWeek)];
+    const activeCandidates = await this.db.schedule.findMany({
       where: {
         organizationId,
         isActive: true,
         startDate: { lte: now },
-        daysOfWeek: { has: dayOfWeek },
+        daysOfWeek: { hasSome: candidateDays },
         AND: [
           {
             OR: [{ endDate: null }, { endDate: { gte: now } }],
-          },
-          {
-            OR: [
-              { startTime: null, endTime: null },
-              {
-                AND: [
-                  { startTime: { lte: currentTime } },
-                  { endTime: { gte: currentTime } },
-                ],
-              },
-            ],
           },
           {
             OR: [{ displayId }, { displayGroup: { displays: { some: { displayId } } } }],
@@ -201,6 +249,18 @@ export class SchedulesService {
         },
       },
     });
+
+    return activeCandidates.filter((schedule) => (
+      isScheduleActiveAt(
+        {
+          daysOfWeek: schedule.daysOfWeek,
+          startTime: schedule.startTime,
+          endTime: schedule.endTime,
+        },
+        dayOfWeek,
+        currentTime,
+      )
+    ));
   }
 
   async update(organizationId: string, id: string, updateScheduleDto: UpdateScheduleDto) {
@@ -303,12 +363,26 @@ export class SchedulesService {
         { displayGroup: { displays: { some: { displayId: dto.displayId } } } },
       ];
     } else if (dto.displayGroupId) {
-      where.displayGroupId = dto.displayGroupId;
+      where.OR = [
+        { displayGroupId: dto.displayGroupId },
+        { display: { groups: { some: { displayGroupId: dto.displayGroupId } } } },
+        {
+          displayGroup: {
+            displays: {
+              some: {
+                display: {
+                  groups: { some: { displayGroupId: dto.displayGroupId } },
+                },
+              },
+            },
+          },
+        },
+      ];
     }
 
     // Filter by overlapping days
     if (dto.daysOfWeek && dto.daysOfWeek.length > 0) {
-      where.daysOfWeek = { hasSome: dto.daysOfWeek };
+      where.daysOfWeek = { hasSome: expandAdjacentDays(dto.daysOfWeek) };
     }
 
     // Date-range overlap filter — without this, schedules in non-
@@ -358,11 +432,18 @@ export class SchedulesService {
 
     // Check time overlap
     const conflicts = potentialConflicts.filter(schedule => {
-      if (!dto.startTime || !dto.endTime || !schedule.startTime || !schedule.endTime) {
-        return true; // All-day schedules always conflict
-      }
-      // Time overlap check: NOT (newEnd <= existingStart OR newStart >= existingEnd)
-      return !(dto.endTime <= schedule.startTime || dto.startTime >= schedule.endTime);
+      return schedulesOverlapInTime(
+        {
+          daysOfWeek: dto.daysOfWeek,
+          startTime: dto.startTime,
+          endTime: dto.endTime,
+        },
+        {
+          daysOfWeek: schedule.daysOfWeek,
+          startTime: schedule.startTime,
+          endTime: schedule.endTime,
+        },
+      );
     });
 
     return {
