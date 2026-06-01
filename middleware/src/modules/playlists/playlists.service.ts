@@ -120,8 +120,23 @@ export class PlaylistsService {
         orderBy: { createdAt: 'desc' },
         include: {
           items: {
-            include: {
-              content: true,
+            select: {
+              id: true,
+              playlistId: true,
+              contentId: true,
+              order: true,
+              duration: true,
+              content: {
+                select: {
+                  id: true,
+                  name: true,
+                  type: true,
+                  thumbnail: true,
+                  duration: true,
+                  fileSize: true,
+                  status: true,
+                },
+              },
             },
             orderBy: {
               order: 'asc',

@@ -1,11 +1,11 @@
 // Playlist API methods
 
-import type { Playlist, PlaylistItem, PaginatedResponse } from '../types';
+import type { Playlist, PlaylistItem, PlaylistSummary, PaginatedResponse } from '../types';
 import { ApiClient } from './client';
 
 declare module './client' {
   interface ApiClient {
-    getPlaylists(params?: { page?: number; limit?: number }): Promise<PaginatedResponse<Playlist>>;
+    getPlaylists(params?: { page?: number; limit?: number }): Promise<PaginatedResponse<PlaylistSummary>>;
     getPlaylist(id: string): Promise<Playlist>;
     createPlaylist(data: { name: string; description?: string; loop?: boolean; items?: Array<{ contentId: string; duration?: number }> }): Promise<Playlist>;
     updatePlaylist(id: string, data: Partial<{ name: string; description?: string; loop?: boolean }>): Promise<Playlist>;
@@ -18,9 +18,9 @@ declare module './client' {
   }
 }
 
-ApiClient.prototype.getPlaylists = async function (params?: { page?: number; limit?: number }): Promise<PaginatedResponse<Playlist>> {
+ApiClient.prototype.getPlaylists = async function (params?: { page?: number; limit?: number }): Promise<PaginatedResponse<PlaylistSummary>> {
   const query = params ? new URLSearchParams(params as Record<string, string>).toString() : '';
-  return this.request<PaginatedResponse<Playlist>>(`/playlists${query ? `?${query}` : ''}`);
+  return this.request<PaginatedResponse<PlaylistSummary>>(`/playlists${query ? `?${query}` : ''}`);
 };
 
 ApiClient.prototype.getPlaylist = async function (id: string): Promise<Playlist> {

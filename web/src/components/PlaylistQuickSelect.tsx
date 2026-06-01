@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { apiClient } from '@/lib/api';
-import { Display, Playlist } from '@/lib/types';
+import { Display, PlaylistSummary } from '@/lib/types';
 import LoadingSpinner from './LoadingSpinner';
 
 interface PlaylistQuickSelectProps {
   device: Display;
-  playlists: Playlist[];
+  playlists: PlaylistSummary[];
   onUpdate?: () => void;
   onError?: (error: Error) => void;
   onSuccess?: () => void;

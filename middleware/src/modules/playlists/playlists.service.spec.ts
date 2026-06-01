@@ -1,5 +1,4 @@
 import { NotFoundException } from '@nestjs/common';
-import { of, throwError } from 'rxjs';
 import { PlaylistsService } from './playlists.service';
 import { DatabaseService } from '../database/database.service';
 
@@ -189,6 +188,59 @@ describe('PlaylistsService', () => {
           where: { organizationId: 'org-123' },
         }),
       );
+    });
+
+    it('should project only summary content fields for list payloads', async () => {
+      mockDatabaseService.playlist.findMany.mockResolvedValue([
+        {
+          ...mockPlaylist,
+          items: [
+            {
+              ...mockPlaylistItem,
+              duration: undefined,
+              content: {
+                id: 'content-123',
+                name: 'Menu Board',
+                type: 'image',
+                thumbnail: '/thumb.png',
+                duration: 12,
+                fileSize: 2048,
+                status: 'active',
+              },
+            },
+          ],
+        },
+      ]);
+      mockDatabaseService.playlist.count.mockResolvedValue(1);
+
+      const result = await service.findAll('org-123', { page: 1, limit: 10 });
+      const query = mockDatabaseService.playlist.findMany.mock.calls[0][0];
+
+      expect(query.include.items.include).toBeUndefined();
+      expect(query.include.items.select.content).toEqual({
+        select: {
+          id: true,
+          name: true,
+          type: true,
+          thumbnail: true,
+          duration: true,
+          fileSize: true,
+          status: true,
+        },
+      });
+      expect(result.data[0].items[0].content).toEqual(
+        expect.objectContaining({
+          id: 'content-123',
+          title: 'Menu Board',
+          thumbnailUrl: '/thumb.png',
+          type: 'image',
+          duration: 12,
+          status: 'active',
+        }),
+      );
+      expect(result.data[0].itemCount).toBe(1);
+      expect(result.data[0].totalDuration).toBe(12);
+      expect(result.data[0].totalSize).toBe(2048);
     });
   });
 

@@ -1589,7 +1589,7 @@ Plan: `docs/plans/2026-05-31-pairing-active-list-performance-pass-16.md`
 - [x] Run multiple subagent reviews before broader tests.
 - [x] Run focused pairing/display middleware tests.
 - [x] Run broader middleware verification and build.
-- [ ] Open PR, wait for CI, merge if green.
+- [x] Open PR, wait for CI, merge if green. PR #139 merged to `origin/main` at `f9a3df8ad802caaa4a9a7e737e4fd6ff2b4dce60`.
 - [ ] Deploy status: blocked unless production dirty/diverged state is resolved or explicitly approved with a reviewed runbook.
 
 **Pass 16 verification**
@@ -1606,3 +1606,43 @@ Plan: `docs/plans/2026-05-31-pairing-active-list-performance-pass-16.md`
   - `ESLINT_USE_FLAT_CONFIG=false npx eslint middleware/src/modules/displays/pairing.service.ts middleware/src/modules/displays/pairing.service.spec.ts` — 0 errors, 1 pre-existing warning in `pairing.service.spec.ts`.
   - `npx nx build @vizora/middleware` — passed with existing webpack warnings.
   - `git diff --check` — passed with CRLF warnings only.
+- CI verification:
+  - PR #139 passed audit, lint, security, build, test, and e2e before merge.
+
+## Active Workstream: Playlist List Payload Performance Pass 17 (2026-06-01)
+
+Branch: `feat/playlist-list-payload-pass-17`
+Plan: `docs/plans/2026-06-01-playlist-list-payload-performance-pass-17.md`
+
+- [x] Drift-check playlist list/detail split and dashboard consumers.
+- [x] Document pass 17 design and test plan.
+- [x] Add failing unit test for nested content projection on playlist lists.
+- [x] Implement minimal content projection in existing `PlaylistsService.findAll`.
+- [x] Run multiple subagent reviews before broader tests.
+- [x] Run focused playlist middleware tests.
+- [x] Run broader middleware verification and build.
+- [ ] Open PR, wait for CI, merge if green.
+- [ ] Deploy status: blocked unless production dirty/diverged state is resolved or explicitly approved with a reviewed runbook.
+
+**Pass 17 verification**
+- Red/green TDD:
+  - Initial `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern=playlists.service` failed on the new projection assertion while `findAll` still used `content: true`.
+  - Post-fix focused run passed: playlist service suite 30 tests.
+- Reviewer gate:
+  - Backend correctness/Prisma/tenant reviewer: CLEAN.
+  - API/frontend contract reviewer first found a medium summary-type contract gap; fixed with `PlaylistSummary` typing and consumer updates.
+  - Follow-up backend reviewer: CLEAN.
+  - Follow-up API/frontend contract reviewer: CLEAN.
+- Local verification:
+  - `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/playlists/playlists.service.spec.ts src/modules/playlists/playlists.controller.spec.ts` — 2 suites / 42 tests passed.
+  - `pnpm --filter @vizora/web test -- --runInBand --testPathPattern="playlists-page|content-page|devices-page|schedules-page|PlaylistPreview|DeviceQuickChange"` — 6 suites / 100 tests passed, with pre-existing React `act()` warnings.
+  - `pnpm --filter @vizora/middleware test -- --runInBand` — 143 suites / 2877 tests passed.
+  - `pnpm --filter @vizora/web test -- --runInBand` — 95 suites / 982 tests passed, with pre-existing React `act()`/jsdom navigation warnings.
+  - `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false` — passed.
+  - `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` — passed.
+  - `ESLINT_USE_FLAT_CONFIG=false npx eslint ...changed files...` — 0 errors, existing warnings remain in touched web files.
+  - `npx nx build @vizora/middleware` — passed after killing abandoned local e2e Jest processes that held the generated Prisma directory; existing webpack warnings remain.
+  - `NEXT_PUBLIC_SOCKET_URL=http://localhost:3002 NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1 BACKEND_URL=http://localhost:3000 npx nx build @vizora/web` — passed.
+  - `git diff --check` — passed with CRLF warnings only.
+- Local e2e status:
+  - `pnpm --filter @vizora/middleware test:e2e -- --runInBand --testPathPattern=playlists` timed out locally because Docker Desktop is unavailable and test DB/Redis ports `5433`/`6380` are closed. CI e2e must verify the added playlist list contract test.

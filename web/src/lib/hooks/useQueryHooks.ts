@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
-import type { PaginatedResponse, Content, Display, Playlist, Schedule } from '@/lib/types';
+import type { PaginatedResponse, Content, Display, PlaylistSummary, Schedule } from '@/lib/types';
 
 export function useContent(params?: {
   page?: number;
@@ -24,7 +24,7 @@ export function useDisplays(params?: { page?: number; limit?: number }) {
 }
 
 export function usePlaylists(params?: { page?: number; limit?: number }) {
-  return useQuery<PaginatedResponse<Playlist>>({
+  return useQuery<PaginatedResponse<PlaylistSummary>>({
     queryKey: ['playlists', params],
     queryFn: () => apiClient.getPlaylists(params),
   });
