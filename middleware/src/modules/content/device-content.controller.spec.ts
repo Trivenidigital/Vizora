@@ -138,13 +138,16 @@ describe('DeviceContentController', () => {
 
     const createMockResponse = () => {
       const chunks: Buffer[] = [];
-      const res: any = new Writable({
+      let res: any;
+      res = new Writable({
         write(chunk, _encoding, callback) {
+          res.headersSent = true;
           chunks.push(Buffer.from(chunk));
           callback();
         },
       });
       res.statusCode = 200;
+      res.headersSent = false;
       res.set = jest.fn().mockReturnValue(res);
       res.status = jest.fn((statusCode: number) => {
         res.statusCode = statusCode;
@@ -1184,19 +1187,14 @@ describe('DeviceContentController', () => {
       const req = createMockRequest('valid-device-token') as any;
       req.requestId = 'req-stream-123';
       const res = createMockResponse();
-      Object.defineProperty(res, 'headersSent', {
-        configurable: true,
-        get: () => true,
-      });
       const loggerErrorSpy = jest
         .spyOn((controller as any).logger, 'error')
         .mockImplementation();
 
-      const failingStream = new Readable({
-        read() {
-          this.destroy(new Error('post-header stream failed'));
-        },
-      });
+      const failingStream = Readable.from((async function* () {
+        yield Buffer.from('partial');
+        throw new Error('post-header stream failed');
+      })());
 
       mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
       mockJwtService.verify.mockReturnValue(validDevicePayload);
@@ -1209,9 +1207,11 @@ describe('DeviceContentController', () => {
 
       await controller.serveFile(contentId, req, res);
 
+      expect(res.getBody().toString()).toBe('partial');
+      expect(res.headersSent).toBe(true);
       expect(loggerErrorSpy).toHaveBeenCalledWith(
         expect.stringContaining(
-          '[req-stream-123] Failed to stream device content content-789 at /api/v1/device-content/content-789/file: post-header stream failed',
+          '[req-stream-123] Failed to stream device content content-789 at /api/v1/device-content/content-789/file: post-header stream failed (status=200)',
         ),
       );
       expect(res.destroy).toHaveBeenCalledWith(expect.any(Error));

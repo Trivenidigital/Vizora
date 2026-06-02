@@ -72,6 +72,12 @@ error logging; proceed with Vizora-native code.
     passed 2 suites / 8 tests.
   - `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/common/interceptors/logging.interceptor.spec.ts middleware/src/modules/content/device-content.controller.spec.ts middleware/src/modules/health/health.controller.spec.ts middleware/src/modules/health/health.service.spec.ts middleware/src/modules/playlists/playlists.service.spec.ts`
     passed 5 suites / 128 tests.
+  - Reviewer-fix rerun:
+    `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/content/device-content.controller.spec.ts`
+    passed 1 suite / 41 tests, and
+    `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/common/interceptors/logging.interceptor.spec.ts`
+    passed 1 suite / 22 tests after the post-write stream-failure test was
+    tightened.
 - Broader local verification:
   - `pnpm --filter @vizora/display test -- --runInBand` passed 7 suites / 131
     tests, with existing console noise from older Electron tests.
@@ -90,6 +96,11 @@ error logging; proceed with Vizora-native code.
   - Final media reviewer then found playback cache-miss still background
     downloaded videos; fixed with separate read-vs-download cache policy.
   - Final narrow media re-review CLEAN after the second Electron cache fix.
+  - Stream-logging reviewer found the post-header stream failure regression
+    test was artificially forcing `headersSent=true`; fixed by making the mock
+    response mark headers sent on an actual write, writing a partial chunk
+    before stream failure, and asserting the `(status=200)` log suffix. Final
+    re-review CLEAN.
 
 ## Completed: Customer Readiness Hot-Path Pass 41 (2026-06-02)
 
