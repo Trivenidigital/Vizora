@@ -1,8 +1,23 @@
 # Vizora - Task Tracker
 
-## Active: CSRF + Pairing Authorization Pass 44 (2026-06-02)
+## Completed: CSRF + Pairing Authorization Pass 44 (2026-06-02)
 
-**Branch:** `feat/customer-dashboard-improvement-pass-44`
+**Branches:** `feat/customer-dashboard-improvement-pass-44`,
+`fix/pass44-cleanup-evidence`
+
+**PRs:** #182, #183
+
+**Commits:** `04e2ee3`, `0f00862`, `6573eb9`
+
+**Merge SHAs:** `14936c4fd37a1439871a246dd60e0f4e3c8d364b`,
+`c1fe047411ee8f41d2ef484cacfe119cfbda735a`
+
+**CI:** Green on both PRs - audit, build, e2e, lint, security, and test.
+
+**Deploy:** Not deployed. Production checkout is dirty/diverged
+(`ahead 17, behind 157`) and unsafe for automated pull/reload. Middleware and
+web are reachable; realtime `/health` still returns 404, and middleware
+detailed health is degraded by high memory usage.
 
 **Why now:** Pass 44 customer/security/performance review found two high-value
 repo-side gaps that are buildable and testable without operator actions:
@@ -43,9 +58,9 @@ with Vizora-native code.
 - [x] Run focused tests.
 - [x] Run multi-vector code review.
 - [x] Run broader local verification.
-- [ ] PR, CI, merge, and deployment gate.
+- [x] PR, CI, merge, and deployment gate.
 
-**Evidence so far**
+**Evidence**
 - Red verification:
   `pnpm --filter @vizora/middleware test -- --runInBand src/app/app.module.spec.ts src/modules/displays/pairing.controller.spec.ts`
   failed as expected because `AppModule.configure()` did not exist and
