@@ -57,6 +57,10 @@ interface CachedDeviceAuth {
   tokenHash: string;
 }
 
+interface DeviceContentRequest extends Request {
+  requestId?: string;
+}
+
 interface CachedLookup<T> {
   value: T;
   cacheHit: boolean;
@@ -518,8 +522,10 @@ export class DeviceContentController {
   }
 
   private async writeResolvedContent(
+    contentId: string,
     resolved: ResolvedDeviceContent,
     stream: NodeJS.ReadableStream | null,
+    req: DeviceContentRequest,
     res: Response,
   ): Promise<void> {
     if (resolved.kind === 'redirect') {
@@ -557,7 +563,11 @@ export class DeviceContentController {
         'Last-Modified': validators.lastModified,
         'Cross-Origin-Resource-Policy': 'cross-origin',
       });
-      await this.streamToResponse(stream, res);
+      await this.streamToResponse(stream, res, {
+        contentId,
+        path: this.getRequestPath(req),
+        requestId: req.requestId,
+      });
       return;
     }
 
@@ -571,7 +581,11 @@ export class DeviceContentController {
       'Last-Modified': validators.lastModified,
       'Cross-Origin-Resource-Policy': 'cross-origin',
     });
-    await this.streamToResponse(stream, res);
+    await this.streamToResponse(stream, res, {
+      contentId,
+      path: this.getRequestPath(req),
+      requestId: req.requestId,
+    });
   }
 
   private getMediaValidators(resolved: ResolvedMinioContent): {
@@ -733,12 +747,24 @@ export class DeviceContentController {
     res.end();
   }
 
-  private async streamToResponse(stream: NodeJS.ReadableStream, res: Response): Promise<void> {
+  private getRequestPath(req: Request): string {
+    const url = req.originalUrl || req.url || '';
+    return url.split('?')[0] || 'unknown-path';
+  }
+
+  private async streamToResponse(
+    stream: NodeJS.ReadableStream,
+    res: Response,
+    context: { contentId: string; path: string; requestId?: string },
+  ): Promise<void> {
     try {
       await pipeline(stream, res);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'unknown stream error';
-      this.logger.error(`Failed to stream device content: ${message}`);
+      const requestId = context.requestId ?? 'no-request-id';
+      this.logger.error(
+        `[${requestId}] Failed to stream device content ${context.contentId} at ${context.path}: ${message} (status=${res.statusCode})`,
+      );
 
       if (!res.headersSent) {
         res.removeHeader('Content-Type');
@@ -767,7 +793,7 @@ export class DeviceContentController {
   @SkipOutputSanitize()
   async serveFile(
     @Param('id', ParseIdPipe) id: string,
-    @Req() req: Request,
+    @Req() req: DeviceContentRequest,
     @Res() res: Response,
   ): Promise<void> {
     // Device JWT is mandatory — throws UnauthorizedException if missing/invalid.
@@ -806,6 +832,6 @@ export class DeviceContentController {
       stream = opened.stream;
     }
 
-    await this.writeResolvedContent(resolved, stream, res);
+    await this.writeResolvedContent(id, resolved, stream, req, res);
   }
 }

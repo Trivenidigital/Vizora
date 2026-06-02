@@ -117,9 +117,12 @@ describe('HealthController', () => {
 
       const result = await controller.ready();
 
-      expect(result).toMatchObject(mockHealthyResponse);
       expect(result.status).toBe('ok');
       expect(result).toHaveProperty('self_test', 'pending');
+      expect(result).toHaveProperty('timestamp', mockHealthyResponse.timestamp);
+      expect(result).toHaveProperty('uptime', mockHealthyResponse.uptime);
+      expect(result).toHaveProperty('version', mockHealthyResponse.version);
+      expect(result).not.toHaveProperty('checks');
     });
 
     it('should return health response when degraded', async () => {
@@ -127,8 +130,8 @@ describe('HealthController', () => {
 
       const result = await controller.ready();
 
-      expect(result).toMatchObject(mockDegradedResponse);
       expect(result.status).toBe('degraded');
+      expect(result).not.toHaveProperty('checks');
     });
 
     it('should throw SERVICE_UNAVAILABLE when unhealthy', async () => {
@@ -141,19 +144,25 @@ describe('HealthController', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(HttpException);
         expect((error as HttpException).getStatus()).toBe(HttpStatus.SERVICE_UNAVAILABLE);
-        expect((error as HttpException).getResponse()).toMatchObject(mockUnhealthyResponse);
+        expect((error as HttpException).getResponse()).toEqual({
+          status: 'unhealthy',
+          timestamp: mockUnhealthyResponse.timestamp,
+          uptime: mockUnhealthyResponse.uptime,
+          version: mockUnhealthyResponse.version,
+          self_test: 'pending',
+        });
       }
     });
 
-    it('should include all checks in response', async () => {
+    it('should not expose dependency details on the public readiness endpoint', async () => {
       healthService.check.mockResolvedValue(mockHealthyResponse);
 
       const result = await controller.ready();
 
-      expect(result.checks).toBeDefined();
-      expect(result.checks.database).toBeDefined();
-      expect(result.checks.redis).toBeDefined();
-      expect(result.checks.memory).toBeDefined();
+      expect(result).not.toHaveProperty('checks');
+      expect(JSON.stringify(result)).not.toContain('heapUsedMB');
+      expect(JSON.stringify(result)).not.toContain('bucket');
+      expect(JSON.stringify(result)).not.toContain('Connection refused');
     });
 
     it('should include uptime and version', async () => {

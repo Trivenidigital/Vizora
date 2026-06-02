@@ -116,6 +116,7 @@ describe('DeviceContentController', () => {
       const req: any = {
         headers: {},
         query: {},
+        originalUrl: `/api/v1/device-content/${contentId}/file`,
       };
       if (token) {
         req.headers.authorization = `Bearer ${token}`;
@@ -137,16 +138,25 @@ describe('DeviceContentController', () => {
 
     const createMockResponse = () => {
       const chunks: Buffer[] = [];
-      const res: any = new Writable({
+      let res: any;
+      res = new Writable({
         write(chunk, _encoding, callback) {
+          res.headersSent = true;
           chunks.push(Buffer.from(chunk));
           callback();
         },
       });
+      res.statusCode = 200;
+      res.headersSent = false;
       res.set = jest.fn().mockReturnValue(res);
-      res.status = jest.fn().mockReturnValue(res);
+      res.status = jest.fn((statusCode: number) => {
+        res.statusCode = statusCode;
+        return res;
+      });
       res.redirect = jest.fn();
       res.removeHeader = jest.fn();
+      const destroy = res.destroy.bind(res);
+      res.destroy = jest.fn((error?: Error) => destroy(error));
       res.getBody = () => Buffer.concat(chunks);
       return res;
     };
@@ -1171,6 +1181,40 @@ describe('DeviceContentController', () => {
       expect(res.removeHeader).toHaveBeenCalledWith('ETag');
       expect(res.removeHeader).toHaveBeenCalledWith('Last-Modified');
       expect(res.removeHeader).toHaveBeenCalledWith('Cross-Origin-Resource-Policy');
+    });
+
+    it('should log request context when streaming fails after media headers are sent', async () => {
+      const req = createMockRequest('valid-device-token') as any;
+      req.requestId = 'req-stream-123';
+      const res = createMockResponse();
+      const loggerErrorSpy = jest
+        .spyOn((controller as any).logger, 'error')
+        .mockImplementation();
+
+      const failingStream = Readable.from((async function* () {
+        yield Buffer.from('partial');
+        throw new Error('post-header stream failed');
+      })());
+
+      mockContentService.findByIdForDevice.mockResolvedValue(mockContent as any);
+      mockJwtService.verify.mockReturnValue(validDevicePayload);
+      mockStorageService.getFileMetadata.mockResolvedValue({
+        size: 12,
+        lastModified: new Date('2026-05-31T00:00:00.000Z'),
+        contentType: 'image/jpeg',
+      });
+      mockStorageService.getObject.mockResolvedValue(failingStream);
+
+      await controller.serveFile(contentId, req, res);
+
+      expect(res.getBody().toString()).toBe('partial');
+      expect(res.headersSent).toBe(true);
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          '[req-stream-123] Failed to stream device content content-789 at /api/v1/device-content/content-789/file: post-header stream failed (status=200)',
+        ),
+      );
+      expect(res.destroy).toHaveBeenCalledWith(expect.any(Error));
     });
 
     it('should not set media headers when full-object stream acquisition fails', async () => {

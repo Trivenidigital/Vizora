@@ -178,6 +178,30 @@ describe('HealthService', () => {
       });
     });
 
+    describe('when storage service is not available', () => {
+      beforeEach(() => {
+        mockDatabaseService.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
+        mockRedisService.healthCheck.mockResolvedValue({
+          healthy: true,
+          responseTime: 5,
+        });
+        service = new HealthService(
+          mockDatabaseService as DatabaseService,
+          undefined,
+          mockRedisService as RedisService,
+          undefined,
+        );
+      });
+
+      it('should return unhealthy status because object storage is required for readiness', async () => {
+        const result = await service.check();
+
+        expect(result.status).toBe('unhealthy');
+        expect(result.checks.minio.status).toBe('unhealthy');
+        expect(result.checks.minio.error).toContain('not configured');
+      });
+    });
+
     describe('when redis service throws an error', () => {
       beforeEach(() => {
         mockDatabaseService.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
@@ -196,7 +220,12 @@ describe('HealthService', () => {
       beforeEach(() => {
         mockDatabaseService.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
         // Create service without redis
-        service = new HealthService(mockDatabaseService as DatabaseService, undefined);
+        service = new HealthService(
+          mockDatabaseService as DatabaseService,
+          undefined,
+          undefined,
+          mockStorageService as StorageService,
+        );
       });
 
       it('should return degraded status for redis', async () => {
