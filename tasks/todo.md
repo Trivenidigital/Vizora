@@ -1,6 +1,75 @@
 # Vizora - Task Tracker
 
-## Active Workstream: Dashboard Overview Accessibility Pass 53 (2026-06-02)
+## Active Workstream: Schedule Target Names Pass 54 (2026-06-02)
+
+**Branch:** `fix/schedule-target-names-pass-54`
+
+**Why now:** PR #193 merged with green CI, but production deployment remains
+blocked by dirty/diverged prod state. The next customer-visible dashboard gap is
+small and testable: schedule list rows already load display metadata, but
+individual display targets render only as `1 device`, making it hard to tell
+which screen a schedule affects.
+
+**New primitives introduced:** none. This pass reuses the existing Schedules
+page, existing loaded display data, existing group-target display-name pattern,
+and existing Jest/RTL schedule coverage. No new route, model, migration,
+module, env var, process, response shape, realtime event, MCP tool, Hermes
+skill, or AI/provider spend path.
+
+**Hermes-first analysis:** checked per project convention. This is local
+dashboard schedule-list rendering, not a business-agent, MCP, Hermes runtime, or
+provider-spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Schedule target display names | none applicable | resolve labels from already-loaded displays |
+| Schedule list UX | none applicable | keep fix in existing schedules page/test |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+React schedule target label rendering.
+
+**Plan**
+- [x] Add a focused red test proving individual schedule targets render display names.
+- [x] Resolve schedule display targets against loaded display metadata.
+- [x] Run focused schedules page tests.
+- [x] Run multi-vector diff review.
+- [x] Run broader web verification.
+- [ ] PR, CI, and merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Evidence so far**
+- Current `origin/main`: `3bbfd6e53b6646d5aa07f092c2643a85aecdaeb8`.
+- Red focused run:
+  - `pnpm --filter @vizora/web test -- --runInBand src/app/dashboard/schedules/__tests__/schedules-page.test.tsx`
+    failed because `Morning Announcements` rendered target `1 device` instead
+    of `Lobby Display`.
+- Fix:
+  - `getScheduleTargetDescription` now resolves individual display targets
+    against the `devices` list already loaded by the schedules page.
+  - If display metadata is unavailable, it preserves the previous count-based
+    fallback instead of exposing raw IDs.
+- Green focused run:
+  - Same command => 1 suite / 29 tests passing.
+- Review:
+  - UX/API-truth reviewer found that fallback labels could expose raw device
+    identifiers and that truncated target text had no full-text recovery. Fixed
+    by using only trimmed nickname/location for display labels, preserving the
+    count fallback when labels are unavailable, and adding `title` to the
+    rendered target label. Final re-review returned CLEAN.
+  - Test/release reviewer returned CLEAN after independently running the
+    focused schedules test, web type-check, full web suite, and diff check.
+- Broader verification:
+  - `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` => passing
+    (run independently by reviewer).
+  - `pnpm --filter @vizora/web test -- --runInBand` => 105 suites / 1109 tests
+    passing, with existing React `act(...)` and jsdom navigation warnings (run
+    independently by reviewer).
+  - Production-like web build with public URLs set to `https://vizora.cloud`:
+    `npx nx build @vizora/web` => passing, with existing Next/Nx warnings.
+  - `pnpm security:no-hardcoded-jwts` => passing.
+  - `git diff --check` => exit 0, with only LF/CRLF normalization warnings.
+
+## Completed Workstream: Dashboard Overview Accessibility Pass 53 (2026-06-02)
 
 **Branch:** `fix/customer-dashboard-next-pass-53`
 
@@ -32,8 +101,8 @@ React card semantics in Vizora's dashboard.
 - [x] Run focused dashboard page tests.
 - [x] Run multi-vector diff review.
 - [x] Run broader web verification.
-- [ ] PR, CI, and merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, and merge if green.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Evidence so far**
 - Current `origin/main`: `680b7a6f161248f26ee2aae123dcbdc0f6b36ce2`.
@@ -71,6 +140,18 @@ React card semantics in Vizora's dashboard.
   - Playwright checked desktop 1366x900 and mobile 390x844. The Devices,
     Content, and Playlists overview links were present, nonzero-sized, and had
     expected hrefs; no page errors were reported.
+- PR / CI / merge:
+  - PR #193: `https://github.com/Trivenidigital/Vizora/pull/193`.
+  - Squash merge commit: `3bbfd6e53b6646d5aa07f092c2643a85aecdaeb8`.
+  - CI green: audit 29s, lint 36s, security 26s, build 1m29s, test 4m12s,
+    e2e 8m43s.
+- Deploy gate:
+  - Not deployed. Read-only production check showed prod at
+    `bb76aa1838740bff5b58623dfef7a906d44f46a6`, remote main at
+    `3bbfd6e53b6646d5aa07f092c2643a85aecdaeb8`, 72 dirty/untracked paths, and
+    branch state `ahead 17, behind 164`.
+  - Core PM2 services were online, but `/api/v1/health/ready` was degraded with
+    the memory check marked unhealthy. No pull/restart/deploy was performed.
 
 ## Completed Workstream: Realtime Command Timeout Pass 52 (2026-06-02)
 
