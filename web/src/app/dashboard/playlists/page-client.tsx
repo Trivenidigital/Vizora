@@ -10,9 +10,12 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import EmptyState from '@/components/EmptyState';
 import SearchFilter from '@/components/SearchFilter';
+import DashboardSectionError from '@/components/DashboardSectionError';
 import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { useRealtimeEvents } from '@/lib/hooks';
+import { getDashboardPermissions } from '@/lib/permissions';
 import {
  DndContext,
  closestCenter,
@@ -34,11 +37,12 @@ import { Icon } from '@/theme/icons';
 import PlaylistPreview from '@/components/PlaylistPreview';
 
 // Sortable playlist item component
-function SortablePlaylistItem({ item, idx, onRemove, onDurationChange }: {
+function SortablePlaylistItem({ item, idx, onRemove, onDurationChange, canRemove }: {
  item: any;
  idx: number;
  onRemove: () => void;
  onDurationChange: (newDuration: number) => void;
+ canRemove: boolean;
 }) {
  const {
  attributes,
@@ -94,12 +98,14 @@ function SortablePlaylistItem({ item, idx, onRemove, onDurationChange }: {
  </div>
  </div>
  </div>
+ {canRemove && (
  <button
  onClick={onRemove}
  className="text-red-600 hover:text-red-800 text-sm"
  >
  <Icon name="delete" size="md" className="text-red-600 dark:text-red-400" />
  </button>
+ )}
  </div>
  );
 }
@@ -107,12 +113,15 @@ function SortablePlaylistItem({ item, idx, onRemove, onDurationChange }: {
 export default function PlaylistsClient() {
  const router = useRouter();
  const toast = useToast();
+ const { user } = useAuth();
+ const permissions = getDashboardPermissions(user);
  const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
  const [content, setContent] = useState<Content[]>([]);
  const [devices, setDevices] = useState<Display[]>([]);
  const [devicesLoading, setDevicesLoading] = useState(true);
  const [devicesLoadFailed, setDevicesLoadFailed] = useState(false);
  const [loading, setLoading] = useState(true);
+ const [playlistsLoadError, setPlaylistsLoadError] = useState<Error | null>(null);
  const [selectedPlaylist, setSelectedPlaylist] = useState<PlaylistSummary | null>(null);
  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -201,10 +210,14 @@ export default function PlaylistsClient() {
  const loadPlaylists = async () => {
  try {
  setLoading(true);
+ setPlaylistsLoadError(null);
  const playlistList = await fetchAllPaginated((params) => apiClient.getPlaylists(params));
  setPlaylists(playlistList);
+ setPlaylistsLoadError(null);
  } catch (error: any) {
- toast.error(error.message || 'Failed to load playlists');
+ const message = error.message || 'Failed to load playlists';
+ setPlaylistsLoadError(error instanceof Error ? error : new Error(message));
+ toast.error(message);
  } finally {
  setLoading(false);
  }
@@ -433,6 +446,7 @@ export default function PlaylistsClient() {
  Create and manage content playlists ({playlists.length} total)
  </p>
  </div>
+ {permissions.canManagePlaylists && (
  <button
  onClick={() => setIsCreateModalOpen(true)}
  className="eh-btn-neon rounded-xl px-6 py-3 transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
@@ -440,6 +454,7 @@ export default function PlaylistsClient() {
  <span className="text-xl">+</span>
  <span>Create Playlist</span>
  </button>
+ )}
  </div>
 
  {/* Search Filter */}
@@ -454,15 +469,23 @@ export default function PlaylistsClient() {
  <div className="bg-[var(--surface)] rounded-lg shadow p-12">
  <LoadingSpinner size="lg" />
  </div>
+ ) : playlistsLoadError ? (
+ <DashboardSectionError
+ section="Playlists"
+ error={playlistsLoadError}
+ reset={() => {
+ void loadPlaylists();
+ }}
+ />
  ) : playlists.length === 0 ? (
  <EmptyState
  icon="playlists"
  title="No playlists yet"
  description="Create your first playlist to organize content"
- action={{
+ action={permissions.canManagePlaylists ? {
  label: 'Create Playlist',
  onClick: () => setIsCreateModalOpen(true),
- }}
+ } : undefined}
  />
  ) : (
  <>
@@ -584,6 +607,7 @@ export default function PlaylistsClient() {
  <Icon name="preview" size="sm" className="text-[var(--foreground-secondary)]" />
  Preview
  </button>
+ {permissions.canManagePlaylists && (
  <button
  onClick={() => handleEdit(playlist)}
  className="flex-1 px-4 py-2 text-sm bg-[#00E5A0]/5 text-[#00E5A0] rounded-lg hover:bg-[#00E5A0]/10 transition font-medium flex items-center justify-center gap-1"
@@ -591,6 +615,8 @@ export default function PlaylistsClient() {
  <Icon name="edit" size="sm" className="text-[#00E5A0]" />
  Edit
  </button>
+ )}
+ {permissions.canManagePlaylists && (
  <button
  onClick={() => handlePublish(playlist)}
  className="flex-1 px-4 py-2 text-sm bg-green-500/10 text-green-600 dark:text-green-400 rounded-lg hover:bg-green-500/20 transition font-medium flex items-center justify-center gap-1"
@@ -598,6 +624,8 @@ export default function PlaylistsClient() {
  <Icon name="power" size="sm" className="text-green-600 dark:text-green-400" />
  Assign
  </button>
+ )}
+ {permissions.canManagePlaylists && (
  <button
  onClick={async () => {
  try {
@@ -613,6 +641,8 @@ export default function PlaylistsClient() {
  <Icon name="playlists" size="sm" className="text-purple-600 dark:text-purple-400" />
  Duplicate
  </button>
+ )}
+ {permissions.canDeletePlaylists && (
  <button
  onClick={() => handleDelete(playlist)}
  className="flex-1 px-4 py-2 text-sm bg-red-500/10 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-500/20 transition font-medium flex items-center justify-center gap-1"
@@ -620,6 +650,7 @@ export default function PlaylistsClient() {
  <Icon name="delete" size="sm" className="text-red-600 dark:text-red-400" />
  Delete
  </button>
+ )}
  </div>
  </div>
  ))}
@@ -629,7 +660,7 @@ export default function PlaylistsClient() {
 
  {/* Create Modal */}
  <Modal
- isOpen={isCreateModalOpen}
+ isOpen={isCreateModalOpen && permissions.canManagePlaylists}
  onClose={() => setIsCreateModalOpen(false)}
  title="Create New Playlist"
  >
@@ -679,7 +710,7 @@ export default function PlaylistsClient() {
 
  {/* Playlist Builder Modal */}
  <Modal
- isOpen={isBuilderModalOpen}
+ isOpen={isBuilderModalOpen && permissions.canManagePlaylists}
  onClose={() => setIsBuilderModalOpen(false)}
  title={`Edit: ${selectedPlaylist?.name}`}
  size="xl"
@@ -758,6 +789,7 @@ export default function PlaylistsClient() {
  key={item.id}
  item={item}
  idx={idx}
+ canRemove={permissions.canRemovePlaylistItems}
  onRemove={async () => {
  try {
  await apiClient.removePlaylistItem(selectedPlaylist.id, item.id);
@@ -807,7 +839,7 @@ export default function PlaylistsClient() {
 
  {/* Assign Modal */}
  <Modal
- isOpen={!!publishPlaylist}
+ isOpen={!!publishPlaylist && permissions.canManagePlaylists}
  onClose={requestClosePublishModal}
  title={`Assign ${publishPlaylist?.name || 'Playlist'} to Devices`}
  size="lg"
@@ -934,7 +966,7 @@ export default function PlaylistsClient() {
 
  {/* Delete Confirmation */}
  <ConfirmDialog
- isOpen={isDeleteModalOpen}
+ isOpen={isDeleteModalOpen && permissions.canDeletePlaylists}
  onClose={() => setIsDeleteModalOpen(false)}
  onConfirm={confirmDelete}
  title="Delete Playlist"

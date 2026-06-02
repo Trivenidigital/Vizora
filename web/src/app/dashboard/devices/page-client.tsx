@@ -14,12 +14,14 @@ import DeviceStatusIndicator from '@/components/DeviceStatusIndicator';
 import DeviceGroupSelector from '@/components/DeviceGroupSelector';
 import DevicePreviewModal from '@/components/DevicePreviewModal';
 import PlaylistQuickSelect from '@/components/PlaylistQuickSelect';
+import DashboardSectionError from '@/components/DashboardSectionError';
 import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useRealtimeEvents, useOptimisticState, useErrorRecovery } from '@/lib/hooks';
 import { Icon } from '@/theme/icons';
 import { FleetCommandDropdown, EmergencyOverrideModal, ActiveOverrideBanner } from '@/components/fleet';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { getDashboardPermissions } from '@/lib/permissions';
 
 interface DevicesClientProps {
  initialDevices: Display[];
@@ -37,12 +39,15 @@ export default function DevicesClient({
  const router = useRouter();
  const toast = useToast();
  const { user } = useAuth();
+ const permissions = getDashboardPermissions(user);
+ const canSelectDevices = permissions.canManageDevices || permissions.canDeleteDevices;
  const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
  const [devices, setDevices] = useState<Display[]>(initialDevices);
  const [playlists, setPlaylists] = useState<PlaylistSummary[]>(initialPlaylists);
  const [deviceGroups, setDeviceGroups] = useState<any[]>([]);
  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
  const [loading, setLoading] = useState(!initialDevices.length && initialDevices.length === 0 ? false : false);
+ const [devicesLoadError, setDevicesLoadError] = useState<Error | null>(null);
  const [selectedDevice, setSelectedDevice] = useState<Display | null>(null);
  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -138,11 +143,13 @@ export default function DevicesClient({
  const loadDevices = async (showLoading = true) => {
  try {
  if (showLoading) setLoading(true);
+ setDevicesLoadError(null);
  await retry(
  'loadDevices',
  async () => {
  const devicesList = await fetchAllPaginated((params) => apiClient.getDisplays(params));
  setDevices(devicesList);
+ setDevicesLoadError(null);
  clearError('loadDevices');
  return devicesList;
  },
@@ -153,6 +160,8 @@ export default function DevicesClient({
  );
  } catch (error: any) {
  recordError('loadDevices', error, 'warning');
+ const message = error?.message || 'Failed to load devices';
+ setDevicesLoadError(error instanceof Error ? error : new Error(message));
  } finally {
  if (showLoading) setLoading(false);
  }
@@ -455,9 +464,10 @@ export default function DevicesClient({
  </p>
  </div>
  <div className="flex items-center gap-3">
- {user?.organizationId && (
+ {permissions.canUseFleetCommands && user?.organizationId && (
  <FleetCommandDropdown organizationId={user.organizationId} />
  )}
+ {permissions.canUseEmergencyOverride && (
  <button
  onClick={() => setIsOverrideModalOpen(true)}
  className="eh-btn-danger rounded-xl px-4 py-3 flex items-center gap-2 text-sm font-medium"
@@ -465,6 +475,7 @@ export default function DevicesClient({
  <Icon name="warning" size="lg" className="text-white" />
  <span>Emergency Override</span>
  </button>
+ )}
  <button
  onClick={() => router.push('/dashboard/devices/pair')}
  className="eh-btn-neon rounded-xl px-6 py-3 flex items-center gap-2"
@@ -475,7 +486,9 @@ export default function DevicesClient({
  </div>
  </div>
 
- <ActiveOverrideBanner />
+ {permissions.canUseFleetCommands && (
+ <ActiveOverrideBanner canClearOverride={permissions.canUseEmergencyOverride} />
+ )}
 
  <SearchFilter
  value={searchQuery}
@@ -499,7 +512,7 @@ export default function DevicesClient({
  groups={deviceGroups}
  selectedGroupIds={selectedGroups}
  onChange={setSelectedGroups}
- showCreate={true}
+ showCreate={permissions.canManageDevices}
  onCreateGroup={async (name, description) => {
  try {
  await apiClient.createDisplayGroup({ name, description });
@@ -518,6 +531,14 @@ export default function DevicesClient({
  <div className="eh-dash-card p-12">
  <LoadingSpinner size="lg" />
  </div>
+ ) : devicesLoadError ? (
+ <DashboardSectionError
+ section="Devices"
+ error={devicesLoadError}
+ reset={() => {
+ void loadDevices(true);
+ }}
+ />
  ) : devices.length === 0 ? (
  <EmptyState
  icon="devices"
@@ -538,15 +559,15 @@ export default function DevicesClient({
  </p>
  </div>
  )}
- {selectedDeviceIds.size > 0 && (
+ {selectedDeviceIds.size > 0 && canSelectDevices && (
  <div className="eh-bulk-bar flex items-center justify-between">
  <span className="text-sm font-medium text-[#00E5A0] dark:text-[#00E5A0]">
  {selectedDeviceIds.size} device{selectedDeviceIds.size !== 1 ? 's' : ''} selected
  </span>
  <div className="flex gap-4 items-center">
- <button onClick={() => setIsBulkPlaylistModalOpen(true)} className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium">Assign Playlist</button>
- <button onClick={() => setIsBulkGroupModalOpen(true)} className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium">Add to Group</button>
- <button onClick={() => setIsBulkDeleteModalOpen(true)} disabled={actionLoading} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50">Delete Selected</button>
+ {permissions.canManageDevices && <button onClick={() => setIsBulkPlaylistModalOpen(true)} className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium">Assign Playlist</button>}
+ {permissions.canManageDevices && <button onClick={() => setIsBulkGroupModalOpen(true)} className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium">Add to Group</button>}
+ {permissions.canDeleteDevices && <button onClick={() => setIsBulkDeleteModalOpen(true)} disabled={actionLoading} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50">Delete Selected</button>}
  <button onClick={() => setSelectedDeviceIds(new Set())} className="px-4 py-2 text-sm text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition">Clear</button>
  </div>
  </div>
@@ -555,9 +576,11 @@ export default function DevicesClient({
  <table className="min-w-full divide-y divide-[var(--border)]">
  <thead className="bg-[var(--background)]">
  <tr>
+ {canSelectDevices && (
  <th className="px-4 py-3 text-left">
  <input type="checkbox" checked={selectedDeviceIds.size === displayDevices.length && displayDevices.length > 0} onChange={toggleSelectAll} className="rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]" />
  </th>
+ )}
  <th className="eh-th cursor-pointer hover:bg-[var(--surface-hover)] select-none" onClick={() => handleSort('nickname')}>Device{getSortIcon('nickname')}</th>
  <th className="eh-th cursor-pointer hover:bg-[var(--surface-hover)] select-none" onClick={() => handleSort('status')}>Status{getSortIcon('status')}</th>
  <th className="eh-th cursor-pointer hover:bg-[var(--surface-hover)] select-none" onClick={() => handleSort('location')}>Location{getSortIcon('location')}</th>
@@ -569,7 +592,7 @@ export default function DevicesClient({
  <tbody className="bg-[var(--surface)] divide-y divide-[var(--border)]">
  {displayDevices.map((device) => (
  <tr key={device.id} className="eh-tr-hover">
- <td className="eh-td"><input type="checkbox" checked={selectedDeviceIds.has(device.id)} onChange={() => toggleDeviceSelection(device.id)} className="rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]" /></td>
+ {canSelectDevices && <td className="eh-td"><input type="checkbox" checked={selectedDeviceIds.has(device.id)} onChange={() => toggleDeviceSelection(device.id)} className="rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]" /></td>}
  <td className="eh-td">
  <div className="flex items-center">
  <Icon name="devices" size="xl" className="mr-3 text-[var(--foreground-secondary)]" />
@@ -582,15 +605,28 @@ export default function DevicesClient({
  <td className="eh-td"><DeviceStatusIndicator deviceId={device.id} showLabel showTime /></td>
  <td className="eh-td text-sm text-[var(--foreground-secondary)]">{device.location || '\u2014'}</td>
  <td className="eh-td text-sm">
- <PlaylistQuickSelect device={device} playlists={playlists} onSuccess={() => toast.success('Playlist updated')} onError={(err) => toast.error(err.message || 'Failed to update playlist')} onUpdate={() => { loadDevices(); }} />
+ <PlaylistQuickSelect
+ device={device}
+ playlists={playlists}
+ disabled={!permissions.canManageDevices}
+ onSuccess={() => toast.success('Playlist updated')}
+ onError={(err) => toast.error(err.message || 'Failed to update playlist')}
+ onUpdate={() => { loadDevices(); }}
+ />
  </td>
  <td className="eh-td text-sm text-[var(--foreground-tertiary)]">{(device.lastSeen || device.lastHeartbeat) ? new Date(String(device.lastSeen || device.lastHeartbeat)).toLocaleString() : 'Never'}</td>
  <td className="eh-td text-right text-sm font-medium">
  <div className="flex justify-end gap-2">
  <button onClick={() => handlePreview(device)} className="eh-icon-btn" title="Preview device screen">Preview</button>
+ {permissions.canManageDevices && (
  <button onClick={() => handleEdit(device)} className="eh-icon-btn">Edit</button>
+ )}
+ {permissions.canManageDevices && (
  <button onClick={() => handleGeneratePairingCode(device)} className="eh-icon-btn">Pair</button>
+ )}
+ {permissions.canDeleteDevices && (
  <button onClick={() => handleDelete(device)} className="eh-icon-btn eh-icon-btn-danger">Delete</button>
+ )}
  </div>
  </td>
  </tr>
@@ -637,7 +673,7 @@ export default function DevicesClient({
  </>
  )}
 
- <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} title="Edit Device">
+ <Modal isOpen={isEditModalOpen && permissions.canManageDevices} onClose={() => setIsEditModalOpen(false)} title="Edit Device">
  <div className="space-y-5">
  <div>
  <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">Device Nickname</label>
@@ -654,7 +690,7 @@ export default function DevicesClient({
  </div>
  </Modal>
 
- <Modal isOpen={isPairingModalOpen} onClose={() => setIsPairingModalOpen(false)} title="Pairing Token">
+ <Modal isOpen={isPairingModalOpen && permissions.canManageDevices} onClose={() => setIsPairingModalOpen(false)} title="Pairing Token">
  <div className="text-center space-y-5">
  <p className="text-[var(--foreground-secondary)]">Use this token on your display device to pair it:</p>
  <div className="bg-[var(--background-secondary)] rounded-lg p-6">
@@ -665,10 +701,10 @@ export default function DevicesClient({
  </div>
  </Modal>
 
- <ConfirmDialog isOpen={isDeleteModalOpen} onClose={() => setIsDeleteModalOpen(false)} onConfirm={confirmDelete} title="Delete Device" message={`Are you sure you want to delete "${selectedDevice?.nickname}"? This action cannot be undone.`} confirmText="Delete" type="danger" />
+ <ConfirmDialog isOpen={isDeleteModalOpen && permissions.canDeleteDevices} onClose={() => setIsDeleteModalOpen(false)} onConfirm={confirmDelete} title="Delete Device" message={`Are you sure you want to delete "${selectedDevice?.nickname}"? This action cannot be undone.`} confirmText="Delete" type="danger" />
 
  <ConfirmDialog
- isOpen={isBulkDeleteModalOpen}
+ isOpen={isBulkDeleteModalOpen && permissions.canDeleteDevices}
  onClose={() => setIsBulkDeleteModalOpen(false)}
  onConfirm={handleBulkDelete}
  title="Delete Selected Devices"
@@ -677,7 +713,7 @@ export default function DevicesClient({
  type="danger"
  />
 
- <Modal isOpen={isBulkPlaylistModalOpen} onClose={() => { setIsBulkPlaylistModalOpen(false); setBulkPlaylistId(''); }} title="Assign Playlist to Selected Devices">
+ <Modal isOpen={isBulkPlaylistModalOpen && permissions.canManageDevices} onClose={() => { setIsBulkPlaylistModalOpen(false); setBulkPlaylistId(''); }} title="Assign Playlist to Selected Devices">
  <div className="space-y-5">
  <p className="text-sm text-[var(--foreground-secondary)]">Assign a playlist to {selectedDeviceIds.size} selected device{selectedDeviceIds.size !== 1 ? 's' : ''}.</p>
  <select value={bulkPlaylistId} onChange={(e) => setBulkPlaylistId(e.target.value)} className="w-full px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)]">
@@ -691,7 +727,7 @@ export default function DevicesClient({
  </div>
  </Modal>
 
- <Modal isOpen={isBulkGroupModalOpen} onClose={() => { setIsBulkGroupModalOpen(false); setBulkGroupId(''); }} title="Add Selected Devices to Group">
+ <Modal isOpen={isBulkGroupModalOpen && permissions.canManageDevices} onClose={() => { setIsBulkGroupModalOpen(false); setBulkGroupId(''); }} title="Add Selected Devices to Group">
  <div className="space-y-5">
  <p className="text-sm text-[var(--foreground-secondary)]">Add {selectedDeviceIds.size} selected device{selectedDeviceIds.size !== 1 ? 's' : ''} to a group.</p>
  <select value={bulkGroupId} onChange={(e) => setBulkGroupId(e.target.value)} className="w-full px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)]">
@@ -706,12 +742,17 @@ export default function DevicesClient({
  </Modal>
 
  {selectedDevice && (
- <DevicePreviewModal device={selectedDevice} isOpen={isPreviewModalOpen} onClose={() => setIsPreviewModalOpen(false)} />
+ <DevicePreviewModal
+ device={selectedDevice}
+ isOpen={isPreviewModalOpen}
+ onClose={() => setIsPreviewModalOpen(false)}
+ canRequestScreenshot={permissions.canManageDevices}
+ />
  )}
 
- {user?.organizationId && (
+ {permissions.canUseEmergencyOverride && user?.organizationId && (
  <EmergencyOverrideModal
- isOpen={isOverrideModalOpen}
+ isOpen={isOverrideModalOpen && permissions.canUseEmergencyOverride}
  onClose={() => setIsOverrideModalOpen(false)}
  organizationId={user.organizationId}
  />

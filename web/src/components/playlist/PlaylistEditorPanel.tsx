@@ -16,6 +16,9 @@ interface PlaylistEditorPanelProps {
   onRemoveItem: (itemId: string) => void;
   onUpdateDuration: (itemId: string, duration: number) => void;
   onReorder: (itemIds: string[]) => void;
+  canReorder?: boolean;
+  canUpdateDuration?: boolean;
+  canRemoveItems?: boolean;
 }
 
 // Sortable playlist item
@@ -24,11 +27,17 @@ function SortablePlaylistItem({
   index,
   onRemove,
   onDurationChange,
+  canReorder,
+  canUpdateDuration,
+  canRemove,
 }: {
   item: PlaylistItem;
   index: number;
   onRemove: () => void;
   onDurationChange: (duration: number) => void;
+  canReorder: boolean;
+  canUpdateDuration: boolean;
+  canRemove: boolean;
 }) {
   const {
     attributes,
@@ -68,9 +77,13 @@ function SortablePlaylistItem({
     >
       {/* Drag Handle */}
       <button
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing text-[var(--foreground-tertiary)] hover:text-[var(--foreground-secondary)]"
+        {...(canReorder ? attributes : {})}
+        {...(canReorder ? listeners : {})}
+        disabled={!canReorder}
+        className={`text-[var(--foreground-tertiary)] hover:text-[var(--foreground-secondary)] ${
+          canReorder ? 'cursor-grab active:cursor-grabbing' : 'cursor-default opacity-50'
+        }`}
+        aria-label="Reorder playlist item"
       >
         <Icon name="list" size="sm" className="text-[var(--foreground-tertiary)]" />
       </button>
@@ -112,24 +125,29 @@ function SortablePlaylistItem({
           max="300"
           value={item.duration || 30}
           onChange={(e) => {
+            if (!canUpdateDuration) return;
             const val = parseInt(e.target.value);
             if (val > 0 && val <= 300) {
               onDurationChange(val);
             }
           }}
+          disabled={!canUpdateDuration}
           onClick={(e) => e.stopPropagation()}
-          className="w-16 px-2 py-1 text-sm border border-[var(--border)] rounded focus:ring-1 focus:ring-[#00E5A0] focus:border-[#00E5A0]"
+          className="w-16 px-2 py-1 text-sm border border-[var(--border)] rounded focus:ring-1 focus:ring-[#00E5A0] focus:border-[#00E5A0] disabled:opacity-70 disabled:cursor-not-allowed"
         />
         <span className="text-sm text-[var(--foreground-tertiary)]">s</span>
       </div>
 
       {/* Remove Button */}
-      <button
-        onClick={onRemove}
-        className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded transition"
-      >
-        <Icon name="delete" size="sm" className="text-red-600" />
-      </button>
+      {canRemove && (
+        <button
+          onClick={onRemove}
+          className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded transition"
+          aria-label="Remove playlist item"
+        >
+          <Icon name="delete" size="sm" className="text-red-600" />
+        </button>
+      )}
     </div>
   );
 }
@@ -139,6 +157,9 @@ export default function PlaylistEditorPanel({
   onRemoveItem,
   onUpdateDuration,
   onReorder,
+  canReorder = true,
+  canUpdateDuration = true,
+  canRemoveItems = true,
 }: PlaylistEditorPanelProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: 'playlist-drop-zone',
@@ -169,7 +190,7 @@ export default function PlaylistEditorPanel({
         ref={setNodeRef}
         className={`
           flex-1 overflow-y-auto p-4 space-y-2
-          ${isOver ? 'bg-[#00E5A0]/5 border-2 border-[#00E5A0] border-dashed' : ''}
+          ${canReorder && isOver ? 'bg-[#00E5A0]/5 border-2 border-[#00E5A0] border-dashed' : ''}
         `}
       >
         {items.length === 0 ? (
@@ -193,6 +214,9 @@ export default function PlaylistEditorPanel({
                 index={index}
                 onRemove={() => onRemoveItem(item.id)}
                 onDurationChange={(duration) => onUpdateDuration(item.id, duration)}
+                canReorder={canReorder}
+                canUpdateDuration={canUpdateDuration}
+                canRemove={canRemoveItems}
               />
             ))}
           </SortableContext>

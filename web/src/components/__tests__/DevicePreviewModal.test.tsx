@@ -197,6 +197,25 @@ describe('DevicePreviewModal', () => {
     expect(mockToast.info).toHaveBeenCalledWith('Screenshot request sent to device...');
   });
 
+  it('hides screenshot capture controls when request access is not allowed', async () => {
+    (apiClient.getDeviceScreenshot as jest.Mock).mockResolvedValue(null);
+
+    render(
+      <DevicePreviewModal
+        device={mockDevice}
+        isOpen={true}
+        onClose={jest.fn()}
+        canRequestScreenshot={false}
+      />
+    );
+
+    await waitForInitialScreenshotLoad();
+
+    expect(screen.queryByRole('button', { name: /refresh screenshot/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /capture screenshot/i })).not.toBeInTheDocument();
+    expect(apiClient.requestDeviceScreenshot).not.toHaveBeenCalled();
+  });
+
   it('shows a timeout error if screenshot capture never returns', async () => {
     jest.useFakeTimers();
 

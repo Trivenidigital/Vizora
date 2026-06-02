@@ -11,6 +11,14 @@ import { Content, Playlist, PlaylistItem } from '@/lib/types';
 // Mock dependencies
 const mockPush = jest.fn();
 const mockBack = jest.fn();
+let mockUser: any = {
+  id: 'u1',
+  email: 'admin@test.com',
+  firstName: 'Admin',
+  lastName: 'User',
+  organizationId: 'org-1',
+  role: 'admin',
+};
 
 jest.mock('next/navigation', () => {
   const actual = jest.requireActual('next/navigation');
@@ -34,8 +42,20 @@ jest.mock('@/lib/api', () => ({
     addPlaylistItem: jest.fn(),
     removePlaylistItem: jest.fn(),
     updatePlaylistItem: jest.fn(),
+    updatePlaylist: jest.fn(),
     reorderPlaylistItems: jest.fn(),
   },
+}));
+
+jest.mock('@/lib/hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: mockUser,
+    loading: false,
+    error: null,
+    isAuthenticated: !!mockUser,
+    logout: jest.fn(),
+    reload: jest.fn(),
+  }),
 }));
 
 jest.mock('@/lib/hooks/useToast', () => ({
@@ -149,6 +169,14 @@ function createDeferred<T>() {
 describe('PlaylistBuilder Components', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUser = {
+      id: 'u1',
+      email: 'admin@test.com',
+      firstName: 'Admin',
+      lastName: 'User',
+      organizationId: 'org-1',
+      role: 'admin',
+    };
   });
 
   describe('DraggableContentItem', () => {
@@ -628,6 +656,36 @@ describe('PlaylistBuilder Components', () => {
       await waitFor(() => {
         expect(screen.getByText('Save')).toBeInTheDocument();
       });
+    });
+
+    it('renders direct playlist route as read-only for viewers', async () => {
+      mockUser = { ...mockUser, role: 'viewer' };
+
+      render(<PlaylistBuilderPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Playlist')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText('Save')).not.toBeInTheDocument();
+      expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+      expect(screen.getByRole('spinbutton')).toBeDisabled();
+      expect(screen.queryByLabelText('Remove playlist item')).not.toBeInTheDocument();
+    });
+
+    it('lets managers edit playlist items without exposing admin-only item removal', async () => {
+      mockUser = { ...mockUser, role: 'manager' };
+
+      render(<PlaylistBuilderPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Playlist')).toBeInTheDocument();
+      });
+
+      expect(screen.getByText('Save')).toBeInTheDocument();
+      expect(screen.getByRole('switch')).toBeInTheDocument();
+      expect(screen.getByRole('spinbutton')).not.toBeDisabled();
+      expect(screen.queryByLabelText('Remove playlist item')).not.toBeInTheDocument();
     });
 
     it('shows loading spinner initially', () => {

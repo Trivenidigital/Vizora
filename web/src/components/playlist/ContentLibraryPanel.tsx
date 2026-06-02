@@ -11,9 +11,13 @@ import DraggableContentItem from './DraggableContentItem';
 
 interface ContentLibraryPanelProps {
   organizationId: string;
+  canDragContent?: boolean;
 }
 
-export default function ContentLibraryPanel({ organizationId: _organizationId }: ContentLibraryPanelProps) {
+export default function ContentLibraryPanel({
+  organizationId: _organizationId,
+  canDragContent = true,
+}: ContentLibraryPanelProps) {
   const [content, setContent] = useState<Content[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -149,7 +153,7 @@ export default function ContentLibraryPanel({ organizationId: _organizationId }:
         ) : (
           <>
             {content.map((item) => (
-              <DraggableContentItem key={item.id} content={item} />
+              <DraggableContentItem key={item.id} content={item} disabled={!canDragContent} />
             ))}
           </>
         )}

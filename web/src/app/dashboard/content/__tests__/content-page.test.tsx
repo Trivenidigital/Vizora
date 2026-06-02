@@ -50,6 +50,26 @@ jest.mock('@/lib/hooks/useToast', () => ({
   useToast: () => ({ ...mockToast }),
 }));
 
+let mockUser: any = {
+  id: 'u1',
+  email: 'admin@test.com',
+  firstName: 'Admin',
+  lastName: 'User',
+  organizationId: 'org-1',
+  role: 'admin',
+};
+
+jest.mock('@/lib/hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: mockUser,
+    loading: false,
+    error: null,
+    isAuthenticated: !!mockUser,
+    logout: jest.fn(),
+    reload: jest.fn(),
+  }),
+}));
+
 jest.mock('@/lib/hooks/useDebounce', () => ({
   useDebounce: (val: any) => val,
 }));
@@ -247,6 +267,14 @@ const createDeferred = <T,>() => {
 describe('ContentClient', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUser = {
+      id: 'u1',
+      email: 'admin@test.com',
+      firstName: 'Admin',
+      lastName: 'User',
+      organizationId: 'org-1',
+      role: 'admin',
+    };
     mockGetContent.mockResolvedValue({ data: [], meta: { page: 1, limit: 50, total: 0, totalPages: 0 } });
     mockGetContentItem.mockResolvedValue(sampleContent[0]);
     mockGetContentTags.mockResolvedValue([
@@ -847,12 +875,75 @@ describe('ContentClient', () => {
   });
 
   it('shows error toast on fetch failure', async () => {
-    mockGetContent.mockRejectedValue(new Error('Network error'));
+    mockGetContent
+      .mockRejectedValueOnce(new Error('Network error'))
+      .mockResolvedValueOnce({ data: sampleContent, meta: { total: 3 } });
     render(<ContentClient />);
     await waitFor(() => {
       expect(mockToast.showToast).toHaveBeenCalledWith('Network error', 'error');
     });
+    expect(screen.getByRole('alert')).toHaveTextContent('Content Library Error');
+    fireEvent.click(screen.getByRole('button', { name: 'Try Again' }));
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('No content yet')).not.toBeInTheDocument();
     await waitForAuxiliaryRequestsToSettle();
+  });
+
+  it('keeps viewers on read-only content actions while preserving flagging', async () => {
+    mockUser = { ...mockUser, role: 'viewer' };
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+
+    render(<ContentClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    expect(screen.queryByText('Upload Content')).not.toBeInTheDocument();
+    expect(screen.queryByText('Push')).not.toBeInTheDocument();
+    expect(screen.queryByText('Playlist')).not.toBeInTheDocument();
+    expect(screen.queryByText('Edit')).not.toBeInTheDocument();
+    expect(screen.queryAllByText('Delete')).toHaveLength(0);
+    expect(screen.getAllByText('Flag').length).toBeGreaterThan(0);
+  });
+
+  it('does not offer viewers a duplicate flag action for already flagged content', async () => {
+    mockUser = { ...mockUser, role: 'viewer' };
+    mockGetContent.mockResolvedValue({
+      data: [{ ...sampleContent[0], status: 'flagged' }],
+      meta: { total: 1 },
+    });
+
+    render(<ContentClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    expect(screen.queryByText('Review')).not.toBeInTheDocument();
+    expect(screen.queryByText('Flag')).not.toBeInTheDocument();
+  });
+
+  it('allows managers to manage content but not delete it', async () => {
+    mockUser = { ...mockUser, role: 'manager' };
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+
+    render(<ContentClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    expect(screen.getByText('Upload Content')).toBeInTheDocument();
+    expect(screen.getAllByText('Push').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Playlist').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Edit').length).toBeGreaterThan(0);
+    expect(screen.queryAllByText('Delete')).toHaveLength(0);
   });
 
   it('renders content page header', async () => {

@@ -7,12 +7,14 @@ import { useDraggable } from '@dnd-kit/core';
 interface DraggableContentItemProps {
   content: Content;
   isDragging?: boolean;
+  disabled?: boolean;
 }
 
-export default function DraggableContentItem({ content, isDragging }: DraggableContentItemProps) {
+export default function DraggableContentItem({ content, isDragging, disabled = false }: DraggableContentItemProps) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: `content-${content.id}`,
     data: { content },
+    disabled,
   });
 
   const style = transform
@@ -48,11 +50,12 @@ export default function DraggableContentItem({ content, isDragging }: DraggableC
     <div
       ref={setNodeRef}
       style={style}
-      {...listeners}
-      {...attributes}
+      {...(disabled ? {} : listeners)}
+      {...(disabled ? {} : attributes)}
       className={`
-        p-3 bg-[var(--surface)] border border-[var(--border)] rounded-lg cursor-grab active:cursor-grabbing
+        p-3 bg-[var(--surface)] border border-[var(--border)] rounded-lg
         hover:shadow-md transition-all
+        ${disabled ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}
         ${isDragging ? 'opacity-50 shadow-lg' : ''}
       `}
     >
@@ -89,10 +92,11 @@ export default function DraggableContentItem({ content, isDragging }: DraggableC
           </div>
         </div>
 
-        {/* Drag Indicator */}
-        <div className="flex-shrink-0 text-[var(--foreground-tertiary)]">
-          <Icon name="list" size="sm" className="text-[var(--foreground-tertiary)]" />
-        </div>
+        {!disabled && (
+          <div className="flex-shrink-0 text-[var(--foreground-tertiary)]">
+            <Icon name="list" size="sm" className="text-[var(--foreground-tertiary)]" />
+          </div>
+        )}
       </div>
     </div>
   );
