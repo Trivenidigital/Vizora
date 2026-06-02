@@ -23,6 +23,11 @@ describe('PairingService', () => {
     mget: jest.Mock;
     set: jest.Mock;
     eval: jest.Mock;
+    zadd: jest.Mock;
+    zrangebyscore: jest.Mock;
+    zrem: jest.Mock;
+    zremrangebyscore: jest.Mock;
+    expire: jest.Mock;
   };
 
   const sensitiveDisplayFields = [
@@ -50,12 +55,17 @@ describe('PairingService', () => {
     string,
     { value: string; ttl: number; expiresAt: number }
   >;
+  let redisSortedSets: Map<
+    string,
+    { values: Map<string, number>; expiresAt: number }
+  >;
 
   beforeEach(() => {
     // Clear any interval from previous tests
     jest.useFakeTimers();
 
     redisStore = new Map();
+    redisSortedSets = new Map();
 
     mockDatabaseService = {
       display: {
@@ -75,6 +85,23 @@ describe('PairingService', () => {
     mockJwtService = {
       sign: jest.fn().mockReturnValue('mock-jwt-token'),
     } as any;
+
+    const getActiveSortedSet = (
+      key: string,
+    ): { values: Map<string, number>; expiresAt: number } | null => {
+      const entry = redisSortedSets.get(key);
+      if (!entry) return null;
+      if (entry.expiresAt > 0 && Date.now() >= entry.expiresAt) {
+        redisSortedSets.delete(key);
+        return null;
+      }
+      return entry;
+    };
+    const parseScore = (score: string | number): number => {
+      if (score === '-inf') return Number.NEGATIVE_INFINITY;
+      if (score === '+inf') return Number.POSITIVE_INFINITY;
+      return Number(score);
+    };
 
     redisClient = {
       scan: jest
@@ -149,6 +176,75 @@ describe('PairingService', () => {
             return 0;
           },
         ),
+      zadd: jest
+        .fn()
+        .mockImplementation(
+          async (key: string, score: number | string, member: string) => {
+            const entry =
+              getActiveSortedSet(key) ??
+              { values: new Map<string, number>(), expiresAt: 0 };
+            const existed = entry.values.has(member);
+            entry.values.set(member, Number(score));
+            redisSortedSets.set(key, entry);
+            return existed ? 0 : 1;
+          },
+        ),
+      zrangebyscore: jest
+        .fn()
+        .mockImplementation(
+          async (
+            key: string,
+            minScore: string | number,
+            maxScore: string | number,
+          ) => {
+            const entry = getActiveSortedSet(key);
+            if (!entry) return [];
+            const min = parseScore(minScore);
+            const max = parseScore(maxScore);
+            return Array.from(entry.values.entries())
+              .filter(([, score]) => score >= min && score <= max)
+              .sort(([, left], [, right]) => left - right)
+              .map(([member]) => member);
+          },
+        ),
+      zrem: jest.fn().mockImplementation(async (key: string, ...members: string[]) => {
+        const entry = getActiveSortedSet(key);
+        if (!entry) return 0;
+        let removed = 0;
+        for (const member of members) {
+          if (entry.values.delete(member)) removed++;
+        }
+        return removed;
+      }),
+      zremrangebyscore: jest
+        .fn()
+        .mockImplementation(
+          async (
+            key: string,
+            minScore: string | number,
+            maxScore: string | number,
+          ) => {
+            const entry = getActiveSortedSet(key);
+            if (!entry) return 0;
+            const min = parseScore(minScore);
+            const max = parseScore(maxScore);
+            let removed = 0;
+            for (const [member, score] of entry.values.entries()) {
+              if (score >= min && score <= max) {
+                entry.values.delete(member);
+                removed++;
+              }
+            }
+            return removed;
+          },
+        ),
+      expire: jest.fn().mockImplementation(async (key: string, ttlSeconds: number) => {
+        const entry = getActiveSortedSet(key);
+        if (!entry) return 0;
+        entry.expiresAt = Date.now() + ttlSeconds * 1000;
+        redisSortedSets.set(key, entry);
+        return 1;
+      }),
     };
 
     // Create a mock RedisService that uses an in-memory Map to simulate Redis
@@ -228,14 +324,14 @@ describe('PairingService', () => {
       expect(result).toHaveProperty('pairingUrl');
     });
 
-    it('should check existing pairing state with token-only display select', async () => {
+    it('should check existing pairing state with token and organization display select', async () => {
       mockDatabaseService.display.findUnique.mockResolvedValue(null);
 
       await service.requestPairingCode(mockRequestDto);
 
       expect(mockDatabaseService.display.findUnique).toHaveBeenCalledWith({
         where: { deviceIdentifier: 'device-123' },
-        select: { jwtToken: true },
+        select: { jwtToken: true, organizationId: true },
       });
     });
 
@@ -511,7 +607,7 @@ describe('PairingService', () => {
         1,
         {
           where: { deviceIdentifier: 'new-device' },
-          select: { jwtToken: true },
+          select: { jwtToken: true, organizationId: true },
         },
       );
       expect(mockDatabaseService.display.findUnique).toHaveBeenNthCalledWith(
@@ -950,11 +1046,11 @@ describe('PairingService', () => {
       const result = await service.getActivePairings('org-123');
 
       expect(result).toEqual([]);
+      expect(redisClient.scan).not.toHaveBeenCalled();
     });
 
     it('should not return brand-new unclaimed pairing requests to org dashboards', async () => {
       mockDatabaseService.display.findUnique.mockResolvedValue(null);
-      mockDatabaseService.display.findMany.mockResolvedValue([]);
 
       await service.requestPairingCode({
         deviceIdentifier: 'device-1',
@@ -971,11 +1067,16 @@ describe('PairingService', () => {
       const result = await service.getActivePairings('org-123');
 
       expect(result).toEqual([]);
+      expect(redisClient.scan).not.toHaveBeenCalled();
+      expect(redisClient.mget).not.toHaveBeenCalled();
+      expect(mockDatabaseService.display.findMany).not.toHaveBeenCalled();
     });
 
     it('should not return expired pairings', async () => {
-      mockDatabaseService.display.findUnique.mockResolvedValue(null);
-      mockDatabaseService.display.findMany.mockResolvedValue([]);
+      mockDatabaseService.display.findUnique.mockResolvedValue({
+        jwtToken: null,
+        organizationId: 'org-123',
+      } as any);
 
       await service.requestPairingCode({
         deviceIdentifier: 'device-expired',
@@ -985,23 +1086,30 @@ describe('PairingService', () => {
 
       // Advance time past expiration
       jest.advanceTimersByTime(5 * 60 * 1000 + 1000);
+      redisClient.scan.mockClear();
 
       const result = await service.getActivePairings('org-123');
 
       expect(result).toHaveLength(0);
+      expect(redisClient.scan).not.toHaveBeenCalled();
     });
 
     it('should batch Redis reads and only show unclaimed active pairings for displays owned by the org', async () => {
       const orgId = 'org-123';
-      mockDatabaseService.display.findUnique.mockResolvedValue(null);
+      mockDatabaseService.display.findUnique
+        .mockResolvedValueOnce({
+          jwtToken: null,
+          organizationId: orgId,
+        } as any)
+        .mockResolvedValueOnce({
+          jwtToken: null,
+          organizationId: 'org-other',
+        } as any)
+        .mockResolvedValueOnce(null);
       mockDatabaseService.display.findMany.mockResolvedValue([
         {
           deviceIdentifier: 'device-owned',
           organizationId: orgId,
-        },
-        {
-          deviceIdentifier: 'device-other-org',
-          organizationId: 'org-other',
         },
       ] as any);
 
@@ -1024,17 +1132,19 @@ describe('PairingService', () => {
 
       const result = await service.getActivePairings(orgId);
 
+      expect(redisClient.scan).not.toHaveBeenCalled();
+      expect(redisClient.zrangebyscore).toHaveBeenCalledWith(
+        `pairing-active-org:${orgId}`,
+        expect.any(Number),
+        '+inf',
+      );
       expect(redisClient.mget).toHaveBeenCalledTimes(1);
       expect(mockRedisService.get).not.toHaveBeenCalled();
       expect(mockDatabaseService.display.findMany).toHaveBeenCalledTimes(1);
       expect(mockDatabaseService.display.findMany).toHaveBeenCalledWith({
         where: {
           deviceIdentifier: {
-            in: expect.arrayContaining([
-              'device-owned',
-              'device-other-org',
-              'device-new',
-            ]),
+            in: ['device-owned'],
           },
         },
         select: { deviceIdentifier: true, organizationId: true },
@@ -1056,40 +1166,251 @@ describe('PairingService', () => {
       );
     });
 
-    it('should not return or query display ownership for completed org pairings', async () => {
+    it('uses the organization active-pairing zset instead of Redis SCAN', async () => {
       const orgId = 'org-123';
-      const userId = 'user-123';
-      mockDatabaseService.display.findUnique.mockResolvedValue(null);
-      mockDatabaseService.display.findMany.mockResolvedValue([]);
+      mockDatabaseService.display.findUnique
+        .mockResolvedValueOnce({
+          jwtToken: null,
+          organizationId: orgId,
+        } as any)
+        .mockResolvedValueOnce(null);
+      mockDatabaseService.display.findMany.mockResolvedValue([
+        {
+          deviceIdentifier: 'device-owned',
+          organizationId: orgId,
+        },
+      ] as any);
 
-      const pairingResult = await service.requestPairingCode({
-        deviceIdentifier: 'completed-device',
-        nickname: 'Completed Display',
+      await service.requestPairingCode({
+        deviceIdentifier: 'device-owned',
+        nickname: 'Owned Display',
         metadata: {},
       });
-
-      mockDatabaseService.display.create.mockResolvedValue({
-        id: 'new-id',
-        nickname: 'Completed Display',
-        deviceIdentifier: 'completed-device',
-        status: 'pairing',
-      } as any);
-
-      await service.completePairing(orgId, userId, {
-        code: pairingResult.code,
+      await service.requestPairingCode({
+        deviceIdentifier: 'device-new',
+        nickname: 'Brand New Display',
+        metadata: {},
       });
-      mockDatabaseService.display.findUnique.mockClear();
-      mockDatabaseService.display.findMany.mockClear();
-      mockRedisService.get.mockClear();
+      redisClient.scan.mockClear();
       redisClient.mget.mockClear();
+      redisClient.zrangebyscore.mockClear();
+      mockDatabaseService.display.findMany.mockClear();
 
       const result = await service.getActivePairings(orgId);
 
+      expect(redisClient.scan).not.toHaveBeenCalled();
+      expect(redisClient.zrangebyscore).toHaveBeenCalledWith(
+        `pairing-active-org:${orgId}`,
+        expect.any(Number),
+        '+inf',
+      );
       expect(redisClient.mget).toHaveBeenCalledTimes(1);
-      expect(mockRedisService.get).not.toHaveBeenCalled();
-      expect(mockDatabaseService.display.findMany).not.toHaveBeenCalled();
-      expect(mockDatabaseService.display.findUnique).not.toHaveBeenCalled();
-      expect(result).toEqual([]);
+      expect(mockDatabaseService.display.findMany).toHaveBeenCalledWith({
+        where: {
+          deviceIdentifier: {
+            in: ['device-owned'],
+          },
+        },
+        select: { deviceIdentifier: true, organizationId: true },
+      });
+      expect(result).toEqual([
+        expect.objectContaining({
+          nickname: 'Owned Display',
+          code: expect.any(String),
+        }),
+      ]);
+      expect(result).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ nickname: 'Brand New Display' }),
+        ]),
+      );
+    });
+
+    it('removes the organization active-pairing index when pairing completes', async () => {
+      const orgId = 'org-123';
+      const userId = 'user-123';
+      const previousSecret = process.env.DEVICE_JWT_SECRET;
+      process.env.DEVICE_JWT_SECRET =
+        'test-device-secret-that-is-at-least-32-chars';
+      try {
+        mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+          jwtToken: null,
+          organizationId: orgId,
+        } as any);
+
+        const pairingResult = await service.requestPairingCode({
+          deviceIdentifier: 'device-owned',
+          nickname: 'Owned Display',
+          metadata: {},
+        });
+
+        mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+          id: 'display-owned',
+          location: null,
+          organizationId: orgId,
+        } as any);
+        mockDatabaseService.display.update.mockResolvedValue({
+          id: 'display-owned',
+          nickname: 'Owned Display',
+          deviceIdentifier: 'device-owned',
+          status: 'pairing',
+        } as any);
+        redisClient.zrem.mockClear();
+
+        await service.completePairing(orgId, userId, {
+          code: pairingResult.code,
+        });
+
+        expect(redisClient.zrem).toHaveBeenCalledWith(
+          `pairing-active-org:${orgId}`,
+          pairingResult.code,
+        );
+      } finally {
+        process.env.DEVICE_JWT_SECRET = previousSecret;
+      }
+    });
+
+    it('should prune stale indexed records without exposing them', async () => {
+      const orgId = 'org-123';
+      const future = new Date(Date.now() + 300_000).toISOString();
+      const past = new Date(Date.now() - 1_000).toISOString();
+      const validRequest = {
+        code: 'OWNED1',
+        deviceIdentifier: 'device-owned',
+        nickname: 'Owned Display',
+        metadata: {},
+        createdAt: new Date().toISOString(),
+        expiresAt: future,
+        activePairingOrganizationId: orgId,
+      };
+      const requests = [
+        validRequest,
+        {
+          ...validRequest,
+          code: 'MISMAT',
+          deviceIdentifier: 'device-mismatch',
+          nickname: 'Mismatched Display',
+          activePairingOrganizationId: 'org-other',
+        },
+        {
+          ...validRequest,
+          code: 'EXPIRE',
+          deviceIdentifier: 'device-expired',
+          nickname: 'Expired Display',
+          expiresAt: past,
+        },
+        {
+          ...validRequest,
+          code: 'DONE01',
+          deviceIdentifier: 'device-completed',
+          nickname: 'Completed Display',
+          plaintextToken: 'token',
+          organizationId: orgId,
+        },
+      ];
+      for (const request of requests) {
+        redisStore.set(`pairing:${request.code}`, {
+          value: JSON.stringify(request),
+          ttl: 300,
+          expiresAt: Date.now() + 300_000,
+        });
+      }
+      redisSortedSets.set(`pairing-active-org:${orgId}`, {
+        values: new Map([
+          ['MISSING', Date.now() + 300_000],
+          ...requests.map((request) => [
+            request.code,
+            Date.now() + 300_000,
+          ] as [string, number]),
+        ]),
+        expiresAt: Date.now() + 300_000,
+      });
+      mockDatabaseService.display.findMany.mockResolvedValue([
+        {
+          deviceIdentifier: 'device-owned',
+          organizationId: orgId,
+        },
+      ] as any);
+
+      const result = await service.getActivePairings(orgId);
+
+      expect(redisClient.scan).not.toHaveBeenCalled();
+      expect(mockDatabaseService.display.findMany).toHaveBeenCalledWith({
+        where: {
+          deviceIdentifier: {
+            in: ['device-owned'],
+          },
+        },
+        select: { deviceIdentifier: true, organizationId: true },
+      });
+      expect(redisClient.zrem).toHaveBeenCalledWith(
+        `pairing-active-org:${orgId}`,
+        'MISSING',
+        'MISMAT',
+        'EXPIRE',
+        'DONE01',
+      );
+      expect(result).toEqual([
+        expect.objectContaining({
+          code: 'OWNED1',
+          nickname: 'Owned Display',
+        }),
+      ]);
+    });
+
+    it('should not return or query display ownership for completed org pairings', async () => {
+      const orgId = 'org-123';
+      const userId = 'user-123';
+      const previousSecret = process.env.DEVICE_JWT_SECRET;
+      process.env.DEVICE_JWT_SECRET =
+        'test-device-secret-that-is-at-least-32-chars';
+      try {
+        mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+          jwtToken: null,
+          organizationId: orgId,
+        } as any);
+
+        const pairingResult = await service.requestPairingCode({
+          deviceIdentifier: 'completed-device',
+          nickname: 'Completed Display',
+          metadata: {},
+        });
+
+        mockDatabaseService.display.findUnique.mockResolvedValueOnce({
+          id: 'display-owned',
+          location: null,
+          organizationId: orgId,
+        } as any);
+        mockDatabaseService.display.update.mockResolvedValue({
+          id: 'display-owned',
+          nickname: 'Completed Display',
+          deviceIdentifier: 'completed-device',
+          status: 'pairing',
+        } as any);
+
+        await service.completePairing(orgId, userId, {
+          code: pairingResult.code,
+        });
+        await redisClient.zadd(
+          `pairing-active-org:${orgId}`,
+          Date.now() + 300_000,
+          pairingResult.code,
+        );
+        mockDatabaseService.display.findUnique.mockClear();
+        mockDatabaseService.display.findMany.mockClear();
+        mockRedisService.get.mockClear();
+        redisClient.mget.mockClear();
+
+        const result = await service.getActivePairings(orgId);
+
+        expect(redisClient.mget).toHaveBeenCalledTimes(1);
+        expect(mockRedisService.get).not.toHaveBeenCalled();
+        expect(mockDatabaseService.display.findMany).not.toHaveBeenCalled();
+        expect(mockDatabaseService.display.findUnique).not.toHaveBeenCalled();
+        expect(result).toEqual([]);
+      } finally {
+        process.env.DEVICE_JWT_SECRET = previousSecret;
+      }
     });
   });
 
