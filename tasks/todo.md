@@ -1,8 +1,110 @@
 # Vizora - Task Tracker
 
-## Active: Customer Readiness Hot-Path Pass 41 (2026-06-02)
+## Active: Customer Hot-Path Follow-up Pass 42 (2026-06-02)
+
+**Branch:** `feat/customer-hotpath-followup-pass-42`
+
+**Why now:** The Pass 41 merge hardened the web display client and public
+readiness basics. The next coherent follow-up closes adjacent repo-side gaps:
+Electron display clients should use the same no-video-preload policy, public
+readiness should not expose dependency internals, missing object-storage wiring
+should fail readiness, and post-header media stream failures need actionable
+request context in logs.
+
+**New primitives introduced:** one tiny Electron renderer preload-policy helper.
+No schema, env var, runtime process, notification path, realtime substrate, MCP
+tool, Hermes skill, provider spend path, or parallel infrastructure.
+
+**Hermes-first analysis:** checked per project convention. These are in-repo
+display/runtime-health/logging mechanics; no Hermes runtime skill is applicable.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Electron display preload policy | none found | build in existing display renderer |
+| Public readiness response shaping | none found | build in existing NestJS health controller |
+| Object-storage readiness requirement | none found | build in existing HealthService |
+| Device media stream error context | none found | build in existing DeviceContentController |
+
+Awesome-hermes-agent ecosystem check: no applicable runtime/library primitive
+for Electron media preload policy, NestJS readiness shaping, or HTTP stream
+error logging; proceed with Vizora-native code.
+
+**Plan/design:**
+`docs/plans/2026-06-02-customer-hotpath-followup-pass-42.md`
+
+**Plan**
+- [x] Preserve carried dirty work on a fresh branch from merged `origin/main`.
+- [x] Document scope and Hermes-first analysis.
+- [x] Run focused verification for display, health, and device-content changes.
+- [x] Run build/hygiene verification.
+- [x] Run multi-vector subagent re-review.
+- [ ] PR, CI, merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Scoped fixes**
+- Electron display: centralize preload eligibility and skip video preloads so
+  native playback/range streaming controls large files. Existing cached video
+  paths are still usable, but video cache misses do not trigger background full
+  downloads.
+- Readiness: return a minimal public `/health/ready` payload instead of full
+  dependency checks and mark missing storage wiring unhealthy.
+- Device media streaming: include request id, content id, path, and response
+  status when a stream fails after headers are sent.
+
+**Evidence so far**
+- Pass 41 merged as PR #177. Production deploy remains blocked because
+  `/opt/vizora/app` is dirty/diverged and behind `origin/main`.
+- Red verification:
+  - `pnpm --filter @vizora/display test -- --runInBand src/renderer/preload-policy.spec.ts`
+    initially failed because the preload-policy helper did not exist, then
+    failed again on missing playback cache policy predicates before the video
+    cache-miss download guard was added.
+  - `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/content/device-content.controller.spec.ts --testNamePattern="log request context"`
+    failed as expected because post-header stream errors only logged the stream
+    error message.
+  - `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/health/health.controller.spec.ts middleware/src/modules/health/health.service.spec.ts`
+    failed as expected because public readiness exposed `checks` and missing
+    storage wiring returned degraded.
+- Focused verification:
+  - `pnpm --filter @vizora/web test -- DisplayClient.test.tsx` passed 1 suite
+    / 3 tests.
+  - `pnpm --filter @vizora/display test -- --runInBand src/renderer/ids.spec.ts src/renderer/preload-policy.spec.ts`
+    passed 2 suites / 8 tests.
+  - `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/common/interceptors/logging.interceptor.spec.ts middleware/src/modules/content/device-content.controller.spec.ts middleware/src/modules/health/health.controller.spec.ts middleware/src/modules/health/health.service.spec.ts middleware/src/modules/playlists/playlists.service.spec.ts`
+    passed 5 suites / 128 tests.
+- Broader local verification:
+  - `pnpm --filter @vizora/display test -- --runInBand` passed 7 suites / 131
+    tests, with existing console noise from older Electron tests.
+  - `pnpm --filter @vizora/display typecheck` passed.
+  - `pnpm --filter @vizora/display build` passed.
+  - `npx nx build @vizora/middleware --skip-nx-cache` passed with existing
+    webpack warnings and Nx flaky-task note for `@vizora/database:build`.
+  - `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` passed.
+  - `git diff --check` passed with Windows CRLF line-ending warnings only.
+  - `pnpm security:no-hardcoded-jwts` passed.
+- Subagent re-review:
+  - Readiness/tenant reviewer CLEAN after public readiness sanitization and
+    missing-storage readiness fixes.
+  - Media reviewer first found Electron `preloadContent()` still allowed video
+    downloads; fixed with image-only preload policy.
+  - Final media reviewer then found playback cache-miss still background
+    downloaded videos; fixed with separate read-vs-download cache policy.
+  - Final narrow media re-review CLEAN after the second Electron cache fix.
+
+## Completed: Customer Readiness Hot-Path Pass 41 (2026-06-02)
 
 **Branch:** `feat/customer-dashboard-performance-pass-41`
+
+**PR:** #177
+
+**Commit:** `fbc2ae0`
+
+**Merge SHA:** `4db861dd1124a68dbed52bc0a0b059086b490e2f`
+
+**CI:** Green - audit, build, e2e, lint, security, and test.
+
+**Deploy:** Not deployed. Production checkout is dirty/diverged and unsafe for
+automation.
 
 **Why now:** The customer/performance analysis lanes found several repo-side
 production-readiness issues. The first buildable slice should harden the
@@ -43,8 +145,8 @@ playlist fanout; proceed with Vizora-native code.
 - [x] Run focused verification.
 - [x] Run broader verification.
 - [x] Run multi-vector subagent re-review.
-- [ ] PR, CI, merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge if green.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Scoped fixes**
 - Display playback: preload image content only; do not full-fetch/cache video
@@ -117,6 +219,15 @@ playlist fanout; proceed with Vizora-native code.
 - Final subagent re-review: performance/regression reviewer CLEAN; security,
   architecture, readiness, and process reviewer CLEAN. No tenant/auth/readiness
   envelope or realtime-substrate drift found.
+- PR/CI/merge: PR #177 merged at
+  `4db861dd1124a68dbed52bc0a0b059086b490e2f`; audit, build, e2e, lint,
+  security, and test passed.
+- Deployment gate after merge: production remains on
+  `bb76aa1838740bff5b58623dfef7a906d44f46a6` while remote main is
+  `4db861dd1124a68dbed52bc0a0b059086b490e2f`; prod status is
+  `ahead 17, behind 123` with tracked and untracked files. Middleware/web are
+  online; public realtime `/health` probe returned no HTTP response. No deploy
+  or restart attempted.
 
 ## Completed: Content MinIO Tenant Boundary Pass 40 (2026-06-02)
 

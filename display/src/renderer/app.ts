@@ -1,5 +1,10 @@
 // Renderer process code
 import { getEntityId } from './ids';
+import {
+  shouldDownloadOnCacheMiss,
+  shouldReadCachedContent,
+  shouldPreloadContentType,
+} from './preload-policy';
 
 declare global {
   interface Window {
@@ -430,8 +435,9 @@ class DisplayApp {
     // Support both 'source' and 'url' field names for compatibility
     let contentSource = currentItem.content?.source || currentItem.content?.url;
 
-    // Check cache for image/video content
-    if (currentItem.content?.type === 'image' || currentItem.content?.type === 'video') {
+    // Read cached image/video content, but only images are downloaded on a miss.
+    // Videos should rely on native range streaming unless already cached.
+    if (shouldReadCachedContent(currentItem.content?.type)) {
       try {
         const contentId = getEntityId(currentItem.content);
         if (contentId && contentSource) {
@@ -439,9 +445,9 @@ class DisplayApp {
           if (cached.path) {
             contentSource = cached.path;
             console.log('[App] Using cached content:', cached.path);
-          } else {
+          } else if (shouldDownloadOnCacheMiss(currentItem.content?.type)) {
             // Background download for future use
-            const mimeType = currentItem.content.mimeType || (currentItem.content.type === 'video' ? 'video/mp4' : 'image/jpeg');
+            const mimeType = currentItem.content.mimeType || 'image/jpeg';
             window.electronAPI.cacheDownload(contentId, contentSource, mimeType)
               .catch(err => console.warn('[App] Background cache failed:', err));
           }
@@ -787,11 +793,11 @@ class DisplayApp {
     for (const item of items) {
       if (!item.content) continue;
       const type = item.content.type;
-      if (type !== 'image' && type !== 'video') continue;
+      if (!shouldPreloadContentType(type)) continue;
 
       const contentUrl = item.content.source || item.content.url;
       const contentId = getEntityId(item.content);
-      const mimeType = item.content.mimeType || (type === 'video' ? 'video/mp4' : 'image/jpeg');
+      const mimeType = item.content.mimeType || 'image/jpeg';
 
       try {
         if (!contentId || !contentUrl) {

@@ -8,6 +8,14 @@ import { Public } from '../auth/decorators/public.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SuperAdminGuard } from '../admin/guards/super-admin.guard';
 
+interface PublicReadinessResponse {
+  status: 'ok' | 'degraded' | 'unhealthy';
+  timestamp: string;
+  uptime: number;
+  version: string;
+  self_test: 'running' | 'passed' | 'failed' | 'pending';
+}
+
 @Controller('health')
 @SkipThrottle() // Health checks should not be rate limited
 export class HealthController {
@@ -45,16 +53,19 @@ export class HealthController {
           : 'failed'
         : 'pending';
 
-    const enriched = {
-      ...result,
+    const readiness: PublicReadinessResponse = {
+      status: result.status,
+      timestamp: result.timestamp,
+      uptime: result.uptime,
+      version: result.version,
       self_test: selfTestStatus,
     };
 
     if (result.status === 'unhealthy') {
-      throw new HttpException(enriched, HttpStatus.SERVICE_UNAVAILABLE);
+      throw new HttpException(readiness, HttpStatus.SERVICE_UNAVAILABLE);
     }
 
-    return enriched;
+    return readiness;
   }
 
   /**

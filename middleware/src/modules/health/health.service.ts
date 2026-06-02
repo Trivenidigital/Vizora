@@ -207,7 +207,7 @@ export class HealthService {
 
     if (!this.storage) {
       return {
-        status: 'degraded',
+        status: 'unhealthy',
         responseTime: 0,
         error: 'Storage service not configured',
         details: { configured: false },
