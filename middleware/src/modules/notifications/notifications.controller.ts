@@ -44,6 +44,7 @@ export class NotificationsController {
   @Get()
   findAll(
     @CurrentUser('organizationId') organizationId: string,
+    @CurrentUser('id') userId: string,
     @Query() query: NotificationQueryDto,
   ) {
     // Parse read filter
@@ -57,7 +58,7 @@ export class NotificationsController {
       filters.severity = query.severity;
     }
 
-    return this.notificationsService.findAll(organizationId, filters, {
+    return this.notificationsService.findAll(organizationId, userId, filters, {
       page: query.page,
       limit: query.limit,
     });
@@ -67,8 +68,11 @@ export class NotificationsController {
    * Get unread notification count
    */
   @Get('unread-count')
-  async getUnreadCount(@CurrentUser('organizationId') organizationId: string) {
-    const count = await this.notificationsService.getUnreadCount(organizationId);
+  async getUnreadCount(
+    @CurrentUser('organizationId') organizationId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    const count = await this.notificationsService.getUnreadCount(organizationId, userId);
     return { count };
   }
 
@@ -77,8 +81,11 @@ export class NotificationsController {
    */
   @Post('read-all')
   @HttpCode(HttpStatus.OK)
-  markAllAsRead(@CurrentUser('organizationId') organizationId: string) {
-    return this.notificationsService.markAllAsRead(organizationId);
+  markAllAsRead(
+    @CurrentUser('organizationId') organizationId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.notificationsService.markAllAsRead(organizationId, userId);
   }
 
   /**
@@ -87,9 +94,10 @@ export class NotificationsController {
   @Patch(':id/read')
   markAsRead(
     @CurrentUser('organizationId') organizationId: string,
+    @CurrentUser('id') userId: string,
     @Param('id', ParseIdPipe) id: string,
   ) {
-    return this.notificationsService.markAsRead(organizationId, id);
+    return this.notificationsService.markAsRead(organizationId, userId, id);
   }
 
   /**
@@ -98,8 +106,9 @@ export class NotificationsController {
   @Patch(':id/dismiss')
   dismiss(
     @CurrentUser('organizationId') organizationId: string,
+    @CurrentUser('id') userId: string,
     @Param('id', ParseIdPipe) id: string,
   ) {
-    return this.notificationsService.dismiss(organizationId, id);
+    return this.notificationsService.dismiss(organizationId, userId, id);
   }
 }

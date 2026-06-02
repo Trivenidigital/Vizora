@@ -21,6 +21,31 @@ export class NotificationsService {
     private readonly httpService: HttpService,
   ) {}
 
+  private visibleToUserWhere(
+    organizationId: string,
+    userId: string,
+    extra?: Prisma.NotificationWhereInput,
+  ): Prisma.NotificationWhereInput {
+    return {
+      organizationId,
+      dismissedAt: null,
+      OR: [{ userId: null }, { userId }],
+      ...extra,
+    };
+  }
+
+  private userScopedWhere(
+    organizationId: string,
+    userId: string,
+    extra?: Prisma.NotificationWhereInput,
+  ): Prisma.NotificationWhereInput {
+    return {
+      organizationId,
+      OR: [{ userId: null }, { userId }],
+      ...extra,
+    };
+  }
+
   /**
    * Create a new notification
    */
@@ -60,6 +85,7 @@ export class NotificationsService {
    */
   async findAll(
     organizationId: string,
+    userId: string,
     filters?: NotificationFilters,
     pagination?: PaginationDto,
   ) {
@@ -67,7 +93,10 @@ export class NotificationsService {
     const skip = (page - 1) * limit;
 
     // Build where clause with validated filters
-    const where: Prisma.NotificationWhereInput = { organizationId };
+    const where: Prisma.NotificationWhereInput = this.visibleToUserWhere(
+      organizationId,
+      userId,
+    );
 
     if (filters?.read !== undefined) {
       where.read = filters.read;
@@ -95,9 +124,9 @@ export class NotificationsService {
   /**
    * Get a single notification by ID
    */
-  async findOne(organizationId: string, id: string) {
+  async findOne(organizationId: string, userId: string, id: string) {
     const notification = await this.db.notification.findFirst({
-      where: { id, organizationId },
+      where: this.visibleToUserWhere(organizationId, userId, { id }),
     });
 
     if (!notification) {
@@ -110,26 +139,30 @@ export class NotificationsService {
   /**
    * Get the count of unread notifications for an organization
    */
-  async getUnreadCount(organizationId: string): Promise<number> {
+  async getUnreadCount(organizationId: string, userId: string): Promise<number> {
     return this.db.notification.count({
-      where: {
-        organizationId,
-        read: false,
-        dismissedAt: null,
-      },
+      where: this.visibleToUserWhere(organizationId, userId, { read: false }),
     });
   }
 
   /**
    * Mark a single notification as read
    */
-  async markAsRead(organizationId: string, id: string) {
-    await this.findOne(organizationId, id);
-
-    const notification = await this.db.notification.update({
-      where: { id },
+  async markAsRead(organizationId: string, userId: string, id: string) {
+    const result = await this.db.notification.updateMany({
+      where: this.visibleToUserWhere(organizationId, userId, { id }),
       data: { read: true },
     });
+    if (result.count === 0) {
+      throw new NotFoundException('Notification not found');
+    }
+
+    const notification = await this.db.notification.findFirst({
+      where: this.visibleToUserWhere(organizationId, userId, { id }),
+    });
+    if (!notification) {
+      throw new NotFoundException('Notification not found');
+    }
 
     this.logger.log(`Marked notification ${id} as read`);
     return notification;
@@ -138,9 +171,9 @@ export class NotificationsService {
   /**
    * Mark all notifications as read for an organization
    */
-  async markAllAsRead(organizationId: string) {
+  async markAllAsRead(organizationId: string, userId: string) {
     const result = await this.db.notification.updateMany({
-      where: { organizationId, read: false },
+      where: this.visibleToUserWhere(organizationId, userId, { read: false }),
       data: { read: true },
     });
 
@@ -151,13 +184,21 @@ export class NotificationsService {
   /**
    * Dismiss a notification (soft delete)
    */
-  async dismiss(organizationId: string, id: string) {
-    await this.findOne(organizationId, id);
-
-    const notification = await this.db.notification.update({
-      where: { id },
+  async dismiss(organizationId: string, userId: string, id: string) {
+    const result = await this.db.notification.updateMany({
+      where: this.visibleToUserWhere(organizationId, userId, { id }),
       data: { dismissedAt: new Date() },
     });
+    if (result.count === 0) {
+      throw new NotFoundException('Notification not found');
+    }
+
+    const notification = await this.db.notification.findFirst({
+      where: this.userScopedWhere(organizationId, userId, { id }),
+    });
+    if (!notification) {
+      throw new NotFoundException('Notification not found');
+    }
 
     this.logger.log(`Dismissed notification ${id}`);
     return notification;

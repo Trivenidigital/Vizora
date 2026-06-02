@@ -8,6 +8,7 @@ describe('NotificationsController', () => {
   let mockNotificationsService: jest.Mocked<NotificationsService>;
 
   const organizationId = 'org-123';
+  const userId = 'user-123';
 
   const mockNotification = {
     id: 'notif-1',
@@ -107,11 +108,12 @@ describe('NotificationsController', () => {
       mockNotificationsService.findAll.mockResolvedValue(expectedResult as any);
 
       const query = { page: 1, limit: 20 } as any;
-      const result = await controller.findAll(organizationId, query);
+      const result = await (controller as any).findAll(organizationId, userId, query);
 
       expect(result).toEqual(expectedResult);
       expect(mockNotificationsService.findAll).toHaveBeenCalledWith(
         organizationId,
+        userId,
         {},
         { page: 1, limit: 20 },
       );
@@ -121,10 +123,11 @@ describe('NotificationsController', () => {
       mockNotificationsService.findAll.mockResolvedValue({ data: [], meta: {} } as any);
 
       const query = { page: 1, limit: 20, read: 'true' } as any;
-      await controller.findAll(organizationId, query);
+      await (controller as any).findAll(organizationId, userId, query);
 
       expect(mockNotificationsService.findAll).toHaveBeenCalledWith(
         organizationId,
+        userId,
         { read: true },
         { page: 1, limit: 20 },
       );
@@ -134,10 +137,11 @@ describe('NotificationsController', () => {
       mockNotificationsService.findAll.mockResolvedValue({ data: [], meta: {} } as any);
 
       const query = { page: 1, limit: 20, read: 'false' } as any;
-      await controller.findAll(organizationId, query);
+      await (controller as any).findAll(organizationId, userId, query);
 
       expect(mockNotificationsService.findAll).toHaveBeenCalledWith(
         organizationId,
+        userId,
         { read: false },
         { page: 1, limit: 20 },
       );
@@ -147,10 +151,11 @@ describe('NotificationsController', () => {
       mockNotificationsService.findAll.mockResolvedValue({ data: [], meta: {} } as any);
 
       const query = { page: 1, limit: 20, severity: 'warning' } as any;
-      await controller.findAll(organizationId, query);
+      await (controller as any).findAll(organizationId, userId, query);
 
       expect(mockNotificationsService.findAll).toHaveBeenCalledWith(
         organizationId,
+        userId,
         { severity: 'warning' },
         { page: 1, limit: 20 },
       );
@@ -160,10 +165,11 @@ describe('NotificationsController', () => {
       mockNotificationsService.findAll.mockResolvedValue({ data: [], meta: {} } as any);
 
       const query = { page: 1, limit: 20, read: 'false', severity: 'critical' } as any;
-      await controller.findAll(organizationId, query);
+      await (controller as any).findAll(organizationId, userId, query);
 
       expect(mockNotificationsService.findAll).toHaveBeenCalledWith(
         organizationId,
+        userId,
         { read: false, severity: 'critical' },
         { page: 1, limit: 20 },
       );
@@ -177,7 +183,7 @@ describe('NotificationsController', () => {
       mockNotificationsService.findAll.mockResolvedValue(expectedResult as any);
 
       const query = { page: 1, limit: 20 } as any;
-      const result = await controller.findAll(organizationId, query);
+      const result = await (controller as any).findAll(organizationId, userId, query);
 
       expect(result).toEqual(expectedResult);
     });
@@ -187,16 +193,19 @@ describe('NotificationsController', () => {
     it('should return unread count', async () => {
       mockNotificationsService.getUnreadCount.mockResolvedValue(5);
 
-      const result = await controller.getUnreadCount(organizationId);
+      const result = await (controller as any).getUnreadCount(organizationId, userId);
 
       expect(result).toEqual({ count: 5 });
-      expect(mockNotificationsService.getUnreadCount).toHaveBeenCalledWith(organizationId);
+      expect(mockNotificationsService.getUnreadCount).toHaveBeenCalledWith(
+        organizationId,
+        userId,
+      );
     });
 
     it('should return zero when no unread notifications', async () => {
       mockNotificationsService.getUnreadCount.mockResolvedValue(0);
 
-      const result = await controller.getUnreadCount(organizationId);
+      const result = await (controller as any).getUnreadCount(organizationId, userId);
 
       expect(result).toEqual({ count: 0 });
     });
@@ -206,16 +215,19 @@ describe('NotificationsController', () => {
     it('should mark all notifications as read', async () => {
       mockNotificationsService.markAllAsRead.mockResolvedValue({ updated: 10 });
 
-      const result = await controller.markAllAsRead(organizationId);
+      const result = await (controller as any).markAllAsRead(organizationId, userId);
 
       expect(result).toEqual({ updated: 10 });
-      expect(mockNotificationsService.markAllAsRead).toHaveBeenCalledWith(organizationId);
+      expect(mockNotificationsService.markAllAsRead).toHaveBeenCalledWith(
+        organizationId,
+        userId,
+      );
     });
 
     it('should return 0 when no unread notifications', async () => {
       mockNotificationsService.markAllAsRead.mockResolvedValue({ updated: 0 });
 
-      const result = await controller.markAllAsRead(organizationId);
+      const result = await (controller as any).markAllAsRead(organizationId, userId);
 
       expect(result).toEqual({ updated: 0 });
     });
@@ -228,11 +240,12 @@ describe('NotificationsController', () => {
         read: true,
       } as any);
 
-      const result = await controller.markAsRead(organizationId, 'notif-1');
+      const result = await (controller as any).markAsRead(organizationId, userId, 'notif-1');
 
       expect(result.read).toBe(true);
       expect(mockNotificationsService.markAsRead).toHaveBeenCalledWith(
         organizationId,
+        userId,
         'notif-1',
       );
     });
@@ -241,7 +254,7 @@ describe('NotificationsController', () => {
       mockNotificationsService.markAsRead.mockRejectedValue(new NotFoundException());
 
       await expect(
-        controller.markAsRead(organizationId, 'nonexistent'),
+        (controller as any).markAsRead(organizationId, userId, 'nonexistent'),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -254,11 +267,12 @@ describe('NotificationsController', () => {
         dismissedAt,
       } as any);
 
-      const result = await controller.dismiss(organizationId, 'notif-1');
+      const result = await (controller as any).dismiss(organizationId, userId, 'notif-1');
 
       expect(result.dismissedAt).toEqual(dismissedAt);
       expect(mockNotificationsService.dismiss).toHaveBeenCalledWith(
         organizationId,
+        userId,
         'notif-1',
       );
     });
@@ -267,7 +281,7 @@ describe('NotificationsController', () => {
       mockNotificationsService.dismiss.mockRejectedValue(new NotFoundException());
 
       await expect(
-        controller.dismiss(organizationId, 'nonexistent'),
+        (controller as any).dismiss(organizationId, userId, 'nonexistent'),
       ).rejects.toThrow(NotFoundException);
     });
   });

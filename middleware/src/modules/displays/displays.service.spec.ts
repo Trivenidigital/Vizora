@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { HttpService } from '@nestjs/axios';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { of } from 'rxjs';
+import { createHash } from 'node:crypto';
 import { DisplaysService } from './displays.service';
 import { DatabaseService } from '../database/database.service';
 import { CircuitBreakerService, CircuitState } from '../common/services/circuit-breaker.service';
@@ -24,6 +25,7 @@ describe('DisplaysService', () => {
   const mockOrganizationId = 'org-123';
   const mockDisplayId = 'display-123';
   const mockDeviceIdentifier = 'device-abc-123';
+  const mockDeviceTokenHash = createHash('sha256').update('valid-device-token').digest('hex');
 
   const mockDisplay = {
     id: mockDisplayId,
@@ -413,20 +415,35 @@ describe('DisplaysService', () => {
     it('should update display heartbeat and status to online', async () => {
       databaseService.display.findFirst.mockResolvedValue({
         id: mockDisplayId,
+        deviceIdentifier: mockDeviceIdentifier,
         status: 'online',
         nickname: 'Test Display',
         organizationId: mockOrganizationId,
       } as any);
       databaseService.display.updateMany.mockResolvedValue({ count: 1 });
 
-      const result = await service.updateHeartbeat(mockDeviceIdentifier);
+      const result = await service.updateHeartbeat(mockDisplayId, {
+        organizationId: mockOrganizationId,
+        tokenHash: mockDeviceTokenHash,
+      });
 
       expect(databaseService.display.findFirst).toHaveBeenCalledWith({
-        where: { deviceIdentifier: mockDeviceIdentifier },
-        select: { id: true, status: true, nickname: true, organizationId: true },
+        where: { id: mockDisplayId },
+        select: {
+          id: true,
+          deviceIdentifier: true,
+          status: true,
+          nickname: true,
+          organizationId: true,
+        },
       });
       expect(databaseService.display.updateMany).toHaveBeenCalledWith({
-        where: { deviceIdentifier: mockDeviceIdentifier },
+        where: {
+          id: mockDisplayId,
+          organizationId: mockOrganizationId,
+          isDisabled: false,
+          jwtToken: mockDeviceTokenHash,
+        },
         data: {
           lastHeartbeat: expect.any(Date),
           status: 'online',
@@ -438,13 +455,17 @@ describe('DisplaysService', () => {
     it('should emit device.online event on status transition from offline', async () => {
       databaseService.display.findFirst.mockResolvedValue({
         id: mockDisplayId,
+        deviceIdentifier: mockDeviceIdentifier,
         status: 'offline',
         nickname: 'Test Display',
         organizationId: mockOrganizationId,
       } as any);
       databaseService.display.updateMany.mockResolvedValue({ count: 1 });
 
-      await service.updateHeartbeat(mockDeviceIdentifier);
+      await service.updateHeartbeat(mockDisplayId, {
+        organizationId: mockOrganizationId,
+        tokenHash: mockDeviceTokenHash,
+      });
 
       const eventEmitter = (service as any).eventEmitter;
       expect(eventEmitter.emit).toHaveBeenCalledWith('device.online', {
@@ -457,13 +478,17 @@ describe('DisplaysService', () => {
     it('should not emit device.online event when already online', async () => {
       databaseService.display.findFirst.mockResolvedValue({
         id: mockDisplayId,
+        deviceIdentifier: mockDeviceIdentifier,
         status: 'online',
         nickname: 'Test Display',
         organizationId: mockOrganizationId,
       } as any);
       databaseService.display.updateMany.mockResolvedValue({ count: 1 });
 
-      await service.updateHeartbeat(mockDeviceIdentifier);
+      await service.updateHeartbeat(mockDisplayId, {
+        organizationId: mockOrganizationId,
+        tokenHash: mockDeviceTokenHash,
+      });
 
       const eventEmitter = (service as any).eventEmitter;
       expect(eventEmitter.emit).not.toHaveBeenCalledWith('device.online', expect.anything());
@@ -472,9 +497,45 @@ describe('DisplaysService', () => {
     it('should throw NotFoundException if device not found', async () => {
       databaseService.display.findFirst.mockResolvedValue(null);
 
-      await expect(service.updateHeartbeat('unknown-device')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.updateHeartbeat('unknown-display', {
+          organizationId: mockOrganizationId,
+          tokenHash: mockDeviceTokenHash,
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should reject if the verified device token is no longer current at write time', async () => {
+      databaseService.display.findFirst.mockResolvedValue({
+        id: mockDisplayId,
+        deviceIdentifier: mockDeviceIdentifier,
+        status: 'offline',
+        nickname: 'Test Display',
+        organizationId: mockOrganizationId,
+      } as any);
+      databaseService.display.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.updateHeartbeat(mockDisplayId, {
+          organizationId: mockOrganizationId,
+          tokenHash: mockDeviceTokenHash,
+        }),
+      ).rejects.toThrow('Device is not authorized');
+
+      expect(databaseService.display.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: mockDisplayId,
+          organizationId: mockOrganizationId,
+          isDisabled: false,
+          jwtToken: mockDeviceTokenHash,
+        },
+        data: {
+          lastHeartbeat: expect.any(Date),
+          status: 'online',
+        },
+      });
+      const eventEmitter = (service as any).eventEmitter;
+      expect(eventEmitter.emit).not.toHaveBeenCalledWith('device.online', expect.anything());
     });
   });
 

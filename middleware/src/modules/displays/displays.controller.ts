@@ -9,7 +9,6 @@ import {
   Query,
   Req,
   UseGuards,
-  UnauthorizedException,
   ParseUUIDPipe,
   HttpCode,
   HttpStatus,
@@ -123,13 +122,16 @@ export class DisplaysController {
   @Post(':deviceId/heartbeat')
   @Public() // Bypass user JWT guard -- device JWT verified manually below
   async heartbeat(@Param('deviceId', ParseUUIDPipe) deviceId: string, @Req() req: Request) {
-    await verifyCurrentDeviceToken({
+    const verified = await verifyCurrentDeviceToken({
       jwtService: this.jwtService,
       databaseService: this.databaseService,
       token: getDeviceTokenFromRequest(req),
       expectedDisplayId: deviceId,
     });
-    return this.displaysService.updateHeartbeat(deviceId);
+    return this.displaysService.updateHeartbeat(verified.payload.sub, {
+      organizationId: verified.payload.organizationId,
+      tokenHash: verified.tokenHash,
+    });
   }
 
   @Delete(':id')

@@ -4,6 +4,7 @@ import {
   ConflictException,
   InternalServerErrorException,
   ServiceUnavailableException,
+  UnauthorizedException,
   Logger,
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -245,15 +246,20 @@ export class DisplaysService {
     );
   }
 
-  async updateHeartbeat(deviceIdentifier: string) {
-    // deviceIdentifier is @unique, and device JWT identity is verified by the controller.
-    // Defense-in-depth: using updateMany with deviceIdentifier ensures no cross-tenant writes
-    // since deviceIdentifier is globally unique (tied to hardware MAC/ID).
-
+  async updateHeartbeat(
+    displayId: string,
+    verifiedDevice: { organizationId: string; tokenHash: string },
+  ) {
     // Check previous status to detect online transition (avoid notification spam on every heartbeat)
     const display = await this.db.display.findFirst({
-      where: { deviceIdentifier },
-      select: { id: true, status: true, nickname: true, organizationId: true },
+      where: { id: displayId },
+      select: {
+        id: true,
+        deviceIdentifier: true,
+        status: true,
+        nickname: true,
+        organizationId: true,
+      },
     });
     if (!display) {
       throw new NotFoundException('Device not found');
@@ -262,21 +268,26 @@ export class DisplaysService {
     const wasOffline = display.status !== 'online';
 
     const result = await this.db.display.updateMany({
-      where: { deviceIdentifier },
+      where: {
+        id: displayId,
+        organizationId: verifiedDevice.organizationId,
+        isDisabled: false,
+        jwtToken: verifiedDevice.tokenHash,
+      },
       data: {
         lastHeartbeat: new Date(),
         status: 'online',
       },
     });
     if (result.count === 0) {
-      throw new NotFoundException('Device not found');
+      throw new UnauthorizedException('Device is not authorized');
     }
 
     // Emit device.online only on status transition (not every heartbeat)
     if (wasOffline) {
       this.eventEmitter.emit('device.online', {
         deviceId: display.id,
-        deviceName: display.nickname || deviceIdentifier,
+        deviceName: display.nickname || display.deviceIdentifier,
         organizationId: display.organizationId,
       });
     }
