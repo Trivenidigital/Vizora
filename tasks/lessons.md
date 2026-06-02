@@ -7,6 +7,7 @@
 
 ### Worktree Editing
 - In this environment `apply_patch` defaults to the primary checkout path from the initial context, not necessarily the shell command workdir. For isolated worktree tasks, use absolute paths in `apply_patch` and verify `git status` in both the primary checkout and worktree after the first edit.
+- When dispatching subagents after creating an isolated worktree, put the exact worktree path in the prompt and require them to report `git rev-parse --show-toplevel`, branch, and HEAD before analysis. Otherwise they may inspect the primary checkout and return stale findings from older branches or dirty scratch.
 
 ## Session: 2026-02-09 - Pilot Readiness Fix Sprint
 

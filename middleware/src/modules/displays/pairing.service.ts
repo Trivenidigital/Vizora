@@ -27,6 +27,7 @@ interface PairingRequest {
   createdAt: string; // ISO string for JSON serialization
   expiresAt: string; // ISO string for JSON serialization
   qrCode?: string;
+  activePairingOrganizationId?: string;
   organizationId?: string;
   plaintextToken?: string;
 }
@@ -45,6 +46,7 @@ interface PairingRequestRecord {
 
 const PAIRING_TOKEN_CHECK_SELECT = {
   jwtToken: true,
+  organizationId: true,
 } as const satisfies Prisma.DisplaySelect;
 
 const PAIRING_STATUS_SELECT = {
@@ -73,6 +75,7 @@ export class PairingService implements OnModuleDestroy {
   private readonly PAIRING_TTL_SECONDS = 300; // 5 minutes
   private readonly PAIRING_READ_BATCH_SIZE = 100;
   private readonly REDIS_KEY_PREFIX = 'pairing:';
+  private readonly REDIS_ACTIVE_ORG_INDEX_PREFIX = 'pairing-active-org:';
   private readonly REDIS_COMPLETION_CLAIM_PREFIX = 'pairing-complete-claim:';
   private readonly REDIS_NEW_DISPLAY_CLAIM_PREFIX =
     'pairing-new-display-claim:';
@@ -104,6 +107,10 @@ export class PairingService implements OnModuleDestroy {
 
   private redisKey(code: string): string {
     return `${this.REDIS_KEY_PREFIX}${code}`;
+  }
+
+  private activeOrgPairingIndexKey(organizationId: string): string {
+    return `${this.REDIS_ACTIVE_ORG_INDEX_PREFIX}${organizationId}`;
   }
 
   private completionClaimKey(code: string): string {
@@ -170,6 +177,73 @@ export class PairingService implements OnModuleDestroy {
         `Failed to delete pairing request for code ${code}: ${error}`,
       );
       return false;
+    }
+  }
+
+  private async setActiveOrgPairingIndex(
+    organizationId: string | undefined,
+    code: string,
+    expiresAt: Date,
+  ): Promise<void> {
+    if (!organizationId) return;
+
+    const client = this.redisService.getClient();
+    if (!client) return;
+
+    try {
+      const indexKey = this.activeOrgPairingIndexKey(organizationId);
+      await client.zadd(indexKey, expiresAt.getTime(), code);
+      await client.expire(indexKey, this.PAIRING_TTL_SECONDS);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to index active pairing code ${code} for org ${organizationId}: ${error}`,
+      );
+    }
+  }
+
+  private async deleteActiveOrgPairingIndex(
+    organizationId: string | undefined,
+    code: string,
+  ): Promise<void> {
+    if (!organizationId) return;
+    await this.removeActiveOrgPairingCodes(organizationId, [code]);
+  }
+
+  private async removeActiveOrgPairingCodes(
+    organizationId: string,
+    codes: string[],
+  ): Promise<void> {
+    if (codes.length === 0) return;
+
+    const client = this.redisService.getClient();
+    if (!client) return;
+
+    try {
+      await client.zrem(this.activeOrgPairingIndexKey(organizationId), ...codes);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to remove active pairing codes for org ${organizationId}: ${error}`,
+      );
+    }
+  }
+
+  private async getActiveOrgPairingCodes(
+    organizationId: string,
+    now: Date,
+  ): Promise<string[]> {
+    const client = this.redisService.getClient();
+    if (!client) return [];
+
+    try {
+      const indexKey = this.activeOrgPairingIndexKey(organizationId);
+      const nowMs = now.getTime();
+      await client.zremrangebyscore(indexKey, '-inf', nowMs);
+      return await client.zrangebyscore(indexKey, nowMs + 1, '+inf');
+    } catch (error) {
+      this.logger.error(
+        `Failed to read active pairing index for org ${organizationId}: ${error}`,
+      );
+      return [];
     }
   }
 
@@ -363,6 +437,7 @@ export class PairingService implements OnModuleDestroy {
       createdAt: now.toISOString(),
       expiresAt: expiresAt.toISOString(),
       qrCode: qrCodeDataUrl,
+      activePairingOrganizationId: existingDisplay?.organizationId,
     };
 
     const stored = await this.setPairingRequest(code, pairingRequest);
@@ -371,6 +446,11 @@ export class PairingService implements OnModuleDestroy {
         'Failed to store pairing request. Please try again.',
       );
     }
+    await this.setActiveOrgPairingIndex(
+      pairingRequest.activePairingOrganizationId,
+      code,
+      expiresAt,
+    );
 
     this.logger.log(
       `Pairing code generated: ${code} for device ${deviceIdentifier}`,
@@ -394,6 +474,10 @@ export class PairingService implements OnModuleDestroy {
 
     // Check if expired (safety check — Redis TTL should handle this)
     if (new Date() > new Date(request.expiresAt)) {
+      await this.deleteActiveOrgPairingIndex(
+        request.activePairingOrganizationId,
+        code,
+      );
       await this.deletePairingRequest(code);
       throw new BadRequestException('Pairing code has expired');
     }
@@ -408,6 +492,10 @@ export class PairingService implements OnModuleDestroy {
       });
 
       // Pairing complete! Clean up request and return plaintext token
+      await this.deleteActiveOrgPairingIndex(
+        request.activePairingOrganizationId,
+        code,
+      );
       await this.deletePairingRequest(code);
 
       return {
@@ -438,11 +526,19 @@ export class PairingService implements OnModuleDestroy {
     }
 
     if (request.plaintextToken || request.organizationId) {
+      await this.deleteActiveOrgPairingIndex(
+        request.activePairingOrganizationId,
+        code,
+      );
       throw new BadRequestException('Pairing code has already been completed');
     }
 
     // Check if expired (safety check — Redis TTL should handle this)
     if (new Date() > new Date(request.expiresAt)) {
+      await this.deleteActiveOrgPairingIndex(
+        request.activePairingOrganizationId,
+        code,
+      );
       await this.deletePairingRequest(code);
       throw new BadRequestException('Pairing code has expired');
     }
@@ -575,11 +671,19 @@ export class PairingService implements OnModuleDestroy {
       request.organizationId = organizationId;
       const finalized = await this.setPairingRequest(code, request);
       if (!finalized) {
+        await this.deleteActiveOrgPairingIndex(
+          request.activePairingOrganizationId,
+          code,
+        );
         releaseCompletionClaim = false;
         throw new InternalServerErrorException(
           'Failed to finalize pairing token handoff',
         );
       }
+      await this.deleteActiveOrgPairingIndex(
+        request.activePairingOrganizationId,
+        code,
+      );
 
       return {
         success: true,
@@ -610,27 +714,34 @@ export class PairingService implements OnModuleDestroy {
     // Only show pending requests for devices that already belong to this org.
     const activePairings: ActivePairingResponse[] = [];
 
-    // Use SCAN to find all pairing keys in Redis
-    const keys = await this.scanPairingKeys();
-    const records = await this.getPairingRequestRecords(keys);
     const now = new Date();
+    const codes = await this.getActiveOrgPairingCodes(organizationId, now);
+    const keys = codes.map((code) => this.redisKey(code));
+    const records = await this.getPairingRequestRecords(keys);
+    const recordCodes = new Set(records.map(({ code }) => code));
+    const staleCodes = codes.filter((code) => !recordCodes.has(code));
     const unclaimedRequests: PairingRequest[] = [];
 
-    for (const { request } of records) {
+    for (const { code, request } of records) {
       // Check if expired (safety check)
       if (now >= new Date(request.expiresAt)) {
+        staleCodes.push(code);
         continue;
       }
 
       // Completed records temporarily hold a plaintext device token for the
       // physical display. Do not expose their codes through dashboard list APIs.
-      if (request.organizationId === organizationId) {
+      if (request.plaintextToken || request.organizationId) {
+        staleCodes.push(code);
         continue;
       }
 
-      if (!request.organizationId) {
-        unclaimedRequests.push(request);
+      if (request.activePairingOrganizationId !== organizationId) {
+        staleCodes.push(code);
+        continue;
       }
+
+      unclaimedRequests.push(request);
     }
 
     const displayOrganizationsByDevice =
@@ -651,8 +762,12 @@ export class PairingService implements OnModuleDestroy {
           createdAt: request.createdAt,
           expiresAt: request.expiresAt,
         });
+      } else {
+        staleCodes.push(request.code);
       }
     }
+
+    await this.removeActiveOrgPairingCodes(organizationId, staleCodes);
 
     return activePairings;
   }
@@ -830,6 +945,10 @@ export class PairingService implements OnModuleDestroy {
       const request = await this.getPairingRequest(code);
 
       if (request && new Date() > new Date(request.expiresAt)) {
+        await this.deleteActiveOrgPairingIndex(
+          request.activePairingOrganizationId,
+          code,
+        );
         await this.deletePairingRequest(code);
         this.logger.debug(`Cleaned up expired pairing code: ${code}`);
       }

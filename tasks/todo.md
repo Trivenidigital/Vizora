@@ -1,8 +1,91 @@
 # Vizora - Task Tracker
 
-## Active Workstream: Backend Heartbeat and Notification Scoping Pass 46 (2026-06-02)
+## Active Workstream: Pairing Active Index Pass 47 (2026-06-02)
+
+**Branch:** `feat/dashboard-customer-readiness-pass-47`
+
+**Why now:** PR #186 is merged and no PRs remain open, but deployment remains
+blocked by dirty/diverged production state. The remaining verified
+customer-critical performance gap in the active worktree is pairing-list
+scalability: `PairingService.getActivePairings()` still scans every `pairing:*`
+Redis key for every dashboard org request. Recent stale-review candidates
+around media streaming, random health telemetry, and hard-coded dashboard health
+do not reproduce on current `origin/main`.
+
+**New primitives introduced:** one Redis sorted-set key prefix inside the
+existing pairing service: `pairing-active-org:{organizationId}` with pairing
+codes scored by expiry and a five-minute sliding TTL. No new route, model,
+migration, module, env var, process, response shape, realtime path, MCP tool,
+Hermes skill, or AI/provider spend path.
+
+**Hermes-first analysis:** checked per project convention. This is local
+NestJS/Redis request-serving performance, not a business-agent, MCP, Hermes
+runtime, or provider-spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Dashboard pairing Redis index | none applicable | build in existing `PairingService` |
+| Pairing tenant visibility | none applicable | preserve existing service-level visibility rules |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+an in-process NestJS Redis index on the dashboard pairing hot path.
+
+**Plan/design:**
+`docs/plans/2026-06-02-pairing-active-index-pass-47.md`
+
+**Plan**
+- [x] Add red pairing service coverage proving active-list uses the org-specific
+  active zset instead of Redis `SCAN`.
+- [x] Add red pairing service coverage proving completed indexed pairings are
+  removed/hidden.
+- [x] Implement pairing active-index helpers and request/completion cleanup.
+- [x] Run focused pairing tests.
+- [x] Run multi-vector subagent diff review.
+- [x] Run broader middleware verification and build.
+- [ ] PR, CI, merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Evidence so far**
+- Current `origin/main` merge SHA after Pass 46: `4eef5d5a51afea83a660195d6f374e741a554434`.
+- No open PRs after merging PR #186.
+- Production deploy gate remains blocked: `/opt/vizora/app` is `main...origin/main [ahead 17, behind 161]` with 72 dirty/untracked paths; readiness is degraded by high middleware memory.
+- Stale subagent findings were traced to reviewers inspecting `C:\projects\vizora`
+  instead of the active isolated worktree. `tasks/lessons.md` now captures the
+  worktree-verification rule.
+- Focused pairing service test is green:
+  `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/displays/pairing.service.spec.ts`
+  => 42/42 passing.
+- Diff review is CLEAN from both tenant/security and performance/regression
+  subagents after the revised zset design.
+- Verification:
+  - `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false` => pass.
+  - `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/displays/pairing.service.spec.ts middleware/src/modules/displays/pairing.controller.spec.ts`
+    => 54/54 passing.
+  - `npx nx build @vizora/middleware` => pass with existing webpack warnings.
+  - `pnpm --filter @vizora/middleware test -- --runInBand` => 147 suites /
+    2993 tests passing.
+  - Root `pnpm lint` is not Windows-compatible (`ESLINT_USE_FLAT_CONFIG=...`);
+    PowerShell-equivalent `$env:ESLINT_USE_FLAT_CONFIG='false'; npx eslint --ext .ts,.tsx middleware/src realtime/src`
+    => pass with warnings only.
+  - `pnpm security:no-hardcoded-jwts` => pass.
+  - CI-gated middleware E2E subset:
+    `pnpm --filter @vizora/middleware exec jest --config=jest.e2e.config.js --runInBand --testPathPattern="(agents|customer-critical-path)"`
+    => 2 suites / 4 tests passing.
+
+## Completed: Backend Heartbeat and Notification Scoping Pass 46 (2026-06-02)
 
 **Branch:** `fix/backend-heartbeat-notifications-pass-46`
+
+**PR:** #186
+
+**Commit:** `5c76f374a77c02da192f81c09a41b2a8cf798d3c`
+
+**Merge SHA:** `4eef5d5a51afea83a660195d6f374e741a554434`
+
+**CI:** Green - audit, build, e2e, lint, security, and test.
+
+**Deploy:** Not deployed. Production checkout remains dirty/diverged and unsafe
+for automated pull/reload; middleware readiness is degraded by high memory.
 
 **Why now:** Pass 45 is merged and deployment remains blocked by dirty/diverged
 production state. The highest-value buildable backend defects from the
@@ -44,10 +127,10 @@ Socket.IO room filtering; proceed with Vizora-native code.
 - [x] Add red realtime coverage for targeted notification delivery.
 - [x] Implement targeted realtime delivery.
 - [x] Run focused middleware/realtime tests.
-- [ ] Run multi-vector subagent diff review.
-- [ ] Run broader middleware/realtime verification and build.
-- [ ] PR, CI, merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] Run multi-vector subagent diff review.
+- [x] Run broader middleware/realtime verification and build.
+- [x] PR, CI, merge if green.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Evidence so far**
 - Red middleware verification:
