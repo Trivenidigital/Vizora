@@ -74,6 +74,7 @@ describe('AuthService', () => {
   let mockRedisService: any;
   let mockMailService: any;
   let mockGeoService: any;
+  let mockStorageService: any;
   let mockAlertRulesService: any;
 
   const mockUser = {
@@ -109,6 +110,9 @@ describe('AuthService', () => {
         findUnique: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        count: jest.fn(),
+        findMany: jest.fn(),
+        deleteMany: jest.fn(),
       },
       organization: {
         findUnique: jest.fn(),
@@ -118,10 +122,17 @@ describe('AuthService', () => {
         create: jest.fn().mockResolvedValue({ id: 'audit-current' }),
         findFirst: jest.fn().mockResolvedValue(null),
         findMany: jest.fn().mockResolvedValue([]),
+        deleteMany: jest.fn(),
       },
       passwordResetToken: {
         findUnique: jest.fn(),
         update: jest.fn(),
+        deleteMany: jest.fn(),
+      },
+      content: {
+        findMany: jest.fn(),
+        updateMany: jest.fn(),
+        deleteMany: jest.fn(),
       },
       // Mock $transaction to execute the callback with the same mock database
       $transaction: jest.fn().mockImplementation(async (callback) => {
@@ -158,7 +169,7 @@ describe('AuthService', () => {
       cancelSubscription: jest.fn().mockResolvedValue(undefined),
     };
 
-    const mockStorageService = {
+    mockStorageService = {
       uploadFile: jest.fn().mockResolvedValue(undefined),
       deleteFile: jest.fn().mockResolvedValue(undefined),
       getPresignedUrl: jest.fn().mockResolvedValue('https://minio/avatar.jpg'),
@@ -966,6 +977,91 @@ describe('AuthService', () => {
       await service.logout(mockUser.id);
 
       expect(mockJwtService.decode).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('deleteAccount', () => {
+    function buildAccountDeletionTx() {
+      return {
+        supportMessage: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        supportRequest: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        notification: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        apiKey: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        billingTransaction: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        contentImpression: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        promotionRedemption: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        schedule: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        displayGroup: {
+          findMany: jest.fn().mockResolvedValue([]),
+          deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+        },
+        displayGroupMember: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        display: {
+          findMany: jest.fn().mockResolvedValue([]),
+          deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+        },
+        displayTag: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        playlist: {
+          findMany: jest.fn().mockResolvedValue([]),
+          deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+        },
+        playlistItem: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        content: {
+          findMany: jest.fn().mockResolvedValue([]),
+          updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+          deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+        },
+        contentTag: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        contentFolder: {
+          updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+          deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+        },
+        tag: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        auditLog: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        passwordResetToken: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+        user: {
+          findMany: jest.fn().mockResolvedValue([{ id: 'user-123' }]),
+          deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+        organization: { delete: jest.fn().mockResolvedValue(mockOrganization) },
+      };
+    }
+
+    it('should delete only same-organization MinIO content and thumbnail objects for sole-admin account deletion', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        organization: mockOrganization,
+      });
+      mockDatabaseService.user.count.mockResolvedValue(1);
+      mockDatabaseService.content.findMany.mockResolvedValue([
+        {
+          url: 'minio://org-123/content/file.png',
+          thumbnail: 'minio://org-123/thumbnails/file.jpg',
+        },
+        {
+          url: 'minio://other-org/content/secret.png',
+          thumbnail: 'minio://other-org/thumbnails/secret.jpg',
+        },
+        {
+          url: 'https://cdn.example.com/vizora-content/other-org/external.png',
+          thumbnail: '/static/thumbnails/local.jpg',
+        },
+      ]);
+      mockDatabaseService.$transaction.mockImplementation(async (callback) => {
+        return callback(buildAccountDeletionTx());
+      });
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('random-disabled-password-hash');
+
+      await service.deleteAccount('user-123', 'correct-password');
+
+      expect(mockStorageService.deleteFile).toHaveBeenCalledTimes(2);
+      expect(mockStorageService.deleteFile).toHaveBeenCalledWith('org-123/content/file.png');
+      expect(mockStorageService.deleteFile).toHaveBeenCalledWith('org-123/thumbnails/file.jpg');
+      expect(mockStorageService.deleteFile).not.toHaveBeenCalledWith('other-org/content/secret.png');
+      expect(mockStorageService.deleteFile).not.toHaveBeenCalledWith('other-org/thumbnails/secret.jpg');
+      expect(mockStorageService.deleteFile).not.toHaveBeenCalledWith('vizora-content/other-org/external.png');
+      expect(mockStorageService.deleteFile).not.toHaveBeenCalledWith('static/thumbnails/local.jpg');
     });
   });
 

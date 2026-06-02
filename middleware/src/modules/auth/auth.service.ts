@@ -24,6 +24,7 @@ import { AUTH_CONSTANTS } from './constants/auth.constants';
 import { GeoService } from '../common/services/geo.service';
 import { BillingService } from '../billing/billing.service';
 import { StorageService } from '../storage/storage.service';
+import { getCleanupSafeMinioObjectKey, isMinioUrl } from '../storage/minio-object-key';
 import { AlertRulesService } from '../notifications/alert-rules/alert-rules.service';
 
 // Account lockout constants
@@ -1066,7 +1067,7 @@ export class AuthService {
       });
 
       // 4d. Delete files from MinIO after successful DB transaction (best-effort)
-      await this.deleteStorageFiles(contentWithUrls);
+      await this.deleteStorageFiles(orgId, contentWithUrls);
     } else {
       // 5. Not sole admin — just remove user from org
       await this.databaseService.$transaction(async (tx) => {
@@ -1124,17 +1125,26 @@ export class AuthService {
 
   /**
    * Delete content files from MinIO storage (best-effort, non-blocking).
-   * Extracts MinIO object keys from content URLs and deletes them.
+   * Deletes only canonical minio:// objects owned by this organization.
    */
-  private async deleteStorageFiles(contentRecords: Array<{ url: string; thumbnail: string | null }>): Promise<void> {
+  private async deleteStorageFiles(
+    organizationId: string,
+    contentRecords: Array<{ url: string | null; thumbnail: string | null }>,
+  ): Promise<void> {
     const objectKeys: string[] = [];
     for (const record of contentRecords) {
-      // Extract MinIO object key from URL (format: /content/orgId/filename or full URL)
-      const key = this.extractObjectKey(record.url);
+      const key = getCleanupSafeMinioObjectKey(organizationId, record.url);
       if (key) objectKeys.push(key);
+      else if (isMinioUrl(record.url)) {
+        this.logger.warn('Skipping foreign MinIO content object during account deletion');
+      }
+
       if (record.thumbnail) {
-        const thumbKey = this.extractObjectKey(record.thumbnail);
+        const thumbKey = getCleanupSafeMinioObjectKey(organizationId, record.thumbnail);
         if (thumbKey) objectKeys.push(thumbKey);
+        else if (isMinioUrl(record.thumbnail)) {
+          this.logger.warn('Skipping foreign MinIO thumbnail object during account deletion');
+        }
       }
     }
 
@@ -1149,31 +1159,6 @@ export class AuthService {
     if (objectKeys.length > 0) {
       this.logger.log(`Deleted ${objectKeys.length} storage files for account deletion`);
     }
-  }
-
-  /**
-   * Extract MinIO object key from a content URL.
-   * Handles both relative paths (/content/...) and full URLs (https://minio.../bucket/...).
-   */
-  private extractObjectKey(url: string): string | null {
-    if (!url) return null;
-    // Skip external URLs (not stored in our MinIO)
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      try {
-        const parsed = new URL(url);
-        // Only process MinIO URLs (contain our bucket name in path)
-        const pathParts = parsed.pathname.split('/').filter(Boolean);
-        // MinIO URLs: /bucket-name/object-key — skip the bucket name
-        if (pathParts.length >= 2) {
-          return pathParts.slice(1).join('/');
-        }
-      } catch {
-        return null;
-      }
-      return null;
-    }
-    // Relative path — use as-is (strip leading slash)
-    return url.startsWith('/') ? url.substring(1) : url;
   }
 
   private generateToken(user: { id: string; email: string; role: string; isSuperAdmin?: boolean }, organization: { id: string }): string {

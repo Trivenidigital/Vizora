@@ -21,6 +21,13 @@ import { StorageService } from '../storage/storage.service';
 import type { WidgetDataSource } from './widget-data-sources';
 import { buildContentListWhere, type ContentListFilters } from './content-list-query';
 import { CONTENT_LIST_SELECT, mapContentListResponse } from './content-list-select';
+import {
+  assertOrgOwnedMinioObjectKey,
+  getCleanupSafeMinioObjectKey,
+  getOwnedMinioObjectKey,
+  isMinioUrl,
+  MINIO_URL_PREFIX,
+} from '../storage/minio-object-key';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -146,6 +153,9 @@ export class ContentService {
   }
 
   async create(organizationId: string, createContentDto: CreateContentDto) {
+    getOwnedMinioObjectKey(organizationId, createContentDto.url);
+    getOwnedMinioObjectKey(organizationId, createContentDto.thumbnail);
+
     const content = await this.db.content.create({
       data: {
         ...createContentDto,
@@ -324,6 +334,8 @@ export class ContentService {
 
   async update(organizationId: string, id: string, updateContentDto: UpdateContentDto) {
     await this.findOne(organizationId, id);
+    getOwnedMinioObjectKey(organizationId, updateContentDto.url);
+    getOwnedMinioObjectKey(organizationId, updateContentDto.thumbnail);
 
     // Defense-in-depth: include organizationId in where clause to prevent TOCTOU races
     const result = await this.db.content.updateMany({
@@ -343,20 +355,22 @@ export class ContentService {
 
     // Delete file from MinIO storage if it exists
     if (content.fileKey) {
+      assertOrgOwnedMinioObjectKey(organizationId, content.fileKey);
       try {
         await this.storageService.deleteFile(content.fileKey);
       } catch (error) {
         this.logger.error(`Failed to delete file ${content.fileKey} from storage: ${error}`);
         throw new ServiceUnavailableException('Content file could not be deleted from storage; DB row retained for retry');
       }
-    } else if (content.url?.startsWith('minio://')) {
-      // Fall back to extracting object key from minio:// URL
-      const objectKey = content.url.substring('minio://'.length);
-      try {
-        await this.storageService.deleteFile(objectKey);
-      } catch (error) {
-        this.logger.error(`Failed to delete file ${objectKey} from storage: ${error}`);
-        throw new ServiceUnavailableException('Content file could not be deleted from storage; DB row retained for retry');
+    } else {
+      const objectKey = getOwnedMinioObjectKey(organizationId, content.url);
+      if (objectKey) {
+        try {
+          await this.storageService.deleteFile(objectKey);
+        } catch (error) {
+          this.logger.error(`Failed to delete file ${objectKey} from storage: ${error}`);
+          throw new ServiceUnavailableException('Content file could not be deleted from storage; DB row retained for retry');
+        }
       }
     }
 
@@ -413,12 +427,23 @@ export class ContentService {
     newUrl: string,
     options: { name?: string; keepBackup?: boolean; thumbnail?: string; fileSize?: number; mimeType?: string } = {},
   ) {
+    getOwnedMinioObjectKey(organizationId, newUrl);
+    getOwnedMinioObjectKey(organizationId, options.thumbnail);
+
     const existingContent = await this.findOne(organizationId, id);
-    const previousObjectKey = existingContent.url?.startsWith('minio://')
-      ? existingContent.url.substring('minio://'.length)
-      : null;
+    const previousObjectKey = getCleanupSafeMinioObjectKey(organizationId, existingContent.url);
+    const backupThumbnail = this.getBackupSafeThumbnail(organizationId, existingContent.thumbnail);
+    const thumbnailUpdate = this.getReplacementThumbnailUpdate(
+      organizationId,
+      existingContent.thumbnail,
+      options.thumbnail,
+    );
 
     if (options.keepBackup) {
+      if (isMinioUrl(existingContent.url) && !previousObjectKey) {
+        throw new BadRequestException('Cannot keep backup for content file outside organization scope');
+      }
+
       // Create backup and update original in a transaction to prevent data loss
       const updatedContent = await this.db.$transaction(async (tx) => {
         const backupContent = await tx.content.create({
@@ -427,7 +452,7 @@ export class ContentService {
             description: existingContent.description,
             type: existingContent.type,
             url: existingContent.url,
-            thumbnail: existingContent.thumbnail,
+            thumbnail: backupThumbnail,
             duration: existingContent.duration,
             fileSize: existingContent.fileSize,
             mimeType: existingContent.mimeType,
@@ -448,7 +473,7 @@ export class ContentService {
           data: {
             url: newUrl,
             name: options.name || existingContent.name,
-            thumbnail: options.thumbnail,
+            ...thumbnailUpdate,
             fileSize: options.fileSize,
             mimeType: options.mimeType,
             versionNumber: existingContent.versionNumber + 1,
@@ -467,7 +492,7 @@ export class ContentService {
       data: {
         url: newUrl,
         name: options.name || existingContent.name,
-        thumbnail: options.thumbnail,
+        ...thumbnailUpdate,
         fileSize: options.fileSize,
         mimeType: options.mimeType,
         versionNumber: existingContent.versionNumber + 1,
@@ -479,7 +504,7 @@ export class ContentService {
     }
     const updatedContent = await this.db.content.findUnique({ where: { id } });
 
-    if (previousObjectKey && newUrl !== `minio://${previousObjectKey}`) {
+    if (previousObjectKey && newUrl !== `${MINIO_URL_PREFIX}${previousObjectKey}`) {
       await this.cleanupPreviousReplacementObject(
         organizationId,
         id,
@@ -490,6 +515,39 @@ export class ContentService {
     }
 
     return this.mapContentResponse(updatedContent);
+  }
+
+  private getBackupSafeThumbnail(
+    organizationId: string,
+    existingThumbnail: unknown,
+  ): string | null | undefined {
+    if (
+      isMinioUrl(existingThumbnail) &&
+      !getCleanupSafeMinioObjectKey(organizationId, existingThumbnail)
+    ) {
+      return null;
+    }
+
+    return existingThumbnail as string | null | undefined;
+  }
+
+  private getReplacementThumbnailUpdate(
+    organizationId: string,
+    existingThumbnail: unknown,
+    replacementThumbnail?: string,
+  ): { thumbnail?: string | null } {
+    if (replacementThumbnail !== undefined) {
+      return { thumbnail: replacementThumbnail };
+    }
+
+    if (
+      isMinioUrl(existingThumbnail) &&
+      !getCleanupSafeMinioObjectKey(organizationId, existingThumbnail)
+    ) {
+      return { thumbnail: null };
+    }
+
+    return {};
   }
 
   private async cleanupPreviousReplacementObject(
@@ -817,9 +875,18 @@ export class ContentService {
     const failedIds: string[] = [];
     await Promise.all(
       items.map(async (item) => {
-        const objectKey = item.url?.startsWith('minio://')
-          ? item.url.substring('minio://'.length)
-          : null;
+        let objectKey: string | null = null;
+        try {
+          objectKey = getOwnedMinioObjectKey(organizationId, item.url);
+        } catch (err) {
+          failedIds.push(item.id);
+          this.logger.warn(
+            `Bulk delete: content ${item.id} points at a MinIO object outside organization scope: ${
+              err instanceof Error ? err.message : err
+            }. DB row retained for operator review.`,
+          );
+          return;
+        }
         if (!objectKey) {
           // No file to delete (e.g., url-type content) — safe to drop DB row.
           deletableIds.push(item.id);

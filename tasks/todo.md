@@ -1,5 +1,119 @@
 # Vizora - Task Tracker
 
+## Active: Content MinIO Tenant Boundary Pass 40 (2026-06-02)
+
+**Branch:** `feat/customer-performance-readiness`
+
+**Why now:** Reviewer lane C found a high-severity storage tenant-boundary gap:
+device content streaming guards MinIO object keys by organization prefix, but
+dashboard download/delete paths can operate on any `minio://` key already
+persisted on an org-owned content row.
+
+**New primitives introduced:** one storage-module MinIO ownership helper. No
+schema, env var, runtime process, realtime substrate, notification path, MCP
+tool, Hermes skill, provider spend path, or parallel storage path.
+
+**Hermes-first analysis:** not applicable. This is storage tenant-boundary
+hardening inside existing NestJS content/storage services, not a business-agent,
+MCP, Hermes, AI/provider, or spend-path change.
+
+**Plan/design:**
+`docs/plans/2026-06-02-content-minio-tenant-boundary-pass-40.md`
+
+**Plan**
+- [x] Start fresh branch from merged `origin/main`.
+- [x] Run multi-vector review lanes for customer dashboard, performance, and
+  architecture/security.
+- [x] Verify the high-severity MinIO object-key finding against repo truth.
+- [x] Add failing tests for foreign MinIO keys on download, thumbnail read,
+  create/update persistence, single delete, and bulk delete.
+- [x] Implement shared org-owned MinIO object-key helper and wire it through
+  create/update/download/delete and org/account teardown cleanup paths.
+- [x] Run focused verification.
+- [x] Run broader verification.
+- [x] Run subagent re-review before PR/merge.
+- [ ] PR, CI, merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Evidence so far:**
+- Current prod deploy gate remains blocked: `/opt/vizora/app` is on `main` at
+  `bb76aa1838740bff5b58623dfef7a906d44f46a6`, remote main is
+  `35dd7397bcab6729f14ead9a8a59ee8539631af1`, and prod is dirty/diverged
+  (`ahead 17, behind 123`) with tracked and untracked template/Hermes/public
+  files. No deploy attempted.
+- Reviewer lane C finding: `DeviceContentController` checks MinIO object keys
+  start with `${organizationId}/`, while `ContentController.getDownloadUrl`,
+  `ContentService.remove`, and `ContentService.bulkDelete` extract keys without
+  that guard.
+- Local verification: `CreateContentDto` allows `minio://...` by regex, while
+  the controller's URL validator rejects non-HTTP(S) on JSON create; update and
+  service-level callers still need a service-side boundary check.
+- Red verification:
+  `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/content/content.service.spec.ts middleware/src/modules/content/content.controller.spec.ts`
+  failed as expected before implementation: foreign MinIO keys were presigned,
+  service create/update/remove did not reject with `BadRequestException`, and
+  bulk delete called storage deletion for `other-org/secret.png`.
+- Implementation: added `middleware/src/modules/storage/minio-object-key.ts`
+  and wired it into content create/update, dashboard download URL generation,
+  manual MinIO thumbnail reads, single delete, replacement cleanup, and bulk
+  delete.
+- Focused verification:
+  `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/content/content.service.spec.ts middleware/src/modules/content/content.controller.spec.ts`
+  passed 2 suites / 163 tests after initial implementation.
+- Diff review follow-up: replacement cleanup originally reused the strict
+  ownership helper for the old URL, which blocked normal replacement of legacy
+  polluted rows. Added a red regression proving
+  `minio://other-org/... -> minio://org-123/...` simple replacement should
+  repair the DB pointer without deleting the foreign object, plus positive
+  same-org download, thumbnail read, and single-delete coverage.
+- Review-fix verification:
+  `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/content/content.service.spec.ts middleware/src/modules/content/content.controller.spec.ts`
+  passed 2 suites / 168 tests. The backup replacement path remains fail-closed
+  for polluted old MinIO URLs so the bad pointer is not preserved in an
+  archived backup row.
+- Subagent re-review found two same-class teardown gaps outside content
+  controller/service paths: organization deletion and sole-admin account
+  deletion could derive storage delete keys from polluted content URLs and
+  thumbnails. Added red tests, then moved the helper to the storage module and
+  applied cleanup-safe org-prefix checks to both teardown paths.
+- Reviewer-fix red verification:
+  `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/organizations/organizations.service.spec.ts middleware/src/modules/auth/auth.service.spec.ts`
+  failed as expected before teardown fixes: organization cleanup deleted
+  `other-org/secret.png`, and account deletion attempted six storage deletes
+  instead of the two same-org MinIO objects.
+- Reviewer-fix green verification:
+  `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/organizations/organizations.service.spec.ts middleware/src/modules/auth/auth.service.spec.ts`
+  passed 2 suites / 90 tests.
+- Post-helper-move content verification:
+  `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern=modules/content`
+  passed 19 suites / 567 tests.
+- Final security re-review found one remaining medium thumbnail persistence
+  gap: content create/update/replacement could preserve `thumbnail:
+  minio://other-org/...` even though teardown no longer deletes it. Added red
+  tests for create/update thumbnail rejection and replacement thumbnail cleanup,
+  then validated with
+  `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/content/content.service.spec.ts`
+  passing 1 suite / 121 tests.
+- Final focused affected verification:
+  `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/content/content.service.spec.ts middleware/src/modules/content/content.controller.spec.ts middleware/src/modules/auth/auth.service.spec.ts middleware/src/modules/organizations/organizations.service.spec.ts`
+  passed 4 suites / 262 tests.
+- Broader content verification:
+  `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern=modules/content`
+  passed 19 suites / 571 tests.
+- Full middleware verification:
+  `pnpm --filter @vizora/middleware test -- --runInBand` passed 146 suites /
+  2959 tests, 1 snapshot.
+- Build/hygiene verification:
+  `npx nx build @vizora/middleware --skip-nx-cache` exited 0 with the existing
+  webpack warning class; `git diff --check` exited 0 aside from CRLF warnings;
+  `pnpm security:no-hardcoded-jwts` reported no hardcoded JWT-looking tokens.
+- Final subagent re-review: CLEAN. The prior thumbnail finding is resolved;
+  content presign/read/delete, bulk delete, org cleanup, and sole-admin account
+  cleanup now either require org-owned MinIO keys or skip/retain polluted
+  foreign pointers without touching foreign storage objects.
+
+---
+
 ## Completed: Dashboard Action Truth Pass 39 (2026-06-01)
 
 **Branch:** `feat/dashboard-action-truth-pass-39`

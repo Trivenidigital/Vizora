@@ -229,6 +229,21 @@ describe('OrganizationsService', () => {
       expect(mockDatabaseService.$transaction).toHaveBeenCalled();
     });
 
+    it('should skip foreign MinIO objects during organization deletion cleanup', async () => {
+      mockDatabaseService.organization.findUnique.mockResolvedValue(mockOrganization);
+      mockDatabaseService.content.findMany.mockResolvedValue([
+        { id: 'c1', url: 'minio://org-123/file.png' },
+        { id: 'c2', url: 'minio://other-org/secret.png' },
+      ]);
+      mockDatabaseService.user.findMany.mockResolvedValue([]);
+
+      await service.remove('org-123', 'admin-user');
+
+      expect(mockStorageService.deleteFile).toHaveBeenCalledTimes(1);
+      expect(mockStorageService.deleteFile).toHaveBeenCalledWith('org-123/file.png');
+      expect(mockStorageService.deleteFile).not.toHaveBeenCalledWith('other-org/secret.png');
+    });
+
     it('should throw NotFoundException if organization not found', async () => {
       mockDatabaseService.organization.findUnique.mockResolvedValue(null);
 
