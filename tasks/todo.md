@@ -1,6 +1,78 @@
 # Vizora - Task Tracker
 
-## Active Workstream: Realtime Command Timeout Pass 52 (2026-06-02)
+## Active Workstream: Dashboard Overview Accessibility Pass 53 (2026-06-02)
+
+**Branch:** `fix/customer-dashboard-next-pass-53`
+
+**Why now:** PR #192 merged with green CI, but production deployment remains
+blocked by dirty/diverged prod state. From a customer dashboard perspective, the
+overview stat cards are primary navigation affordances, but Devices, Content,
+and Playlists were clickable `<div>` elements instead of real route links.
+
+**New primitives introduced:** none. This pass reuses the existing dashboard
+page, existing card styling, existing router navigation, and existing Jest/RTL
+coverage. No new route, model, migration, module, env var, process, response
+shape, realtime event, MCP tool, Hermes skill, or AI/provider spend path.
+
+**Hermes-first analysis:** checked per project convention. This is local
+dashboard accessibility/interaction polish, not a business-agent, MCP, Hermes
+runtime, or provider-spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Dashboard card navigation accessibility | none applicable | use styled Next `Link` elements in existing page |
+| Customer dashboard UX review | none applicable | keep fix in the existing dashboard component/test |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+React card semantics in Vizora's dashboard.
+
+**Plan**
+- [x] Add a focused red test proving overview card navigation is exposed through semantic controls.
+- [x] Convert navigable stat cards to route links without changing destinations or data flow.
+- [x] Run focused dashboard page tests.
+- [x] Run multi-vector diff review.
+- [x] Run broader web verification.
+- [ ] PR, CI, and merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Evidence so far**
+- Current `origin/main`: `680b7a6f161248f26ee2aae123dcbdc0f6b36ce2`.
+- Red focused run:
+  - `pnpm --filter @vizora/web test -- --runInBand src/app/dashboard/__tests__/dashboard-page.test.tsx`
+    failed because no semantic navigation affordance existed for the overview
+    cards.
+- Fix:
+  - Converted the Devices, Content, and Playlists overview cards from clickable
+    `<div>` elements to styled Next `Link` controls with `href` destinations
+    and focus ring styling.
+  - Left the non-navigating System Status card as static content.
+- Green focused run:
+  - Same command => 1 suite / 18 tests passing.
+- Review:
+  - UX/accessibility reviewer initially found that the interim `button` version
+    used button semantics for route navigation and overrode visible stat text
+    with `aria-label`. Accepted and changed the implementation to route links
+    with visible text as the accessible name. Final re-review returned CLEAN.
+  - Test/release reviewer returned CLEAN on the link-based implementation after
+    independently running the focused dashboard test, web type-check, and diff
+    check.
+- Broader verification:
+  - `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` => passing.
+  - `pnpm --filter @vizora/web test -- --runInBand` => 105 suites / 1108 tests
+    passing, with existing React `act(...)` and jsdom navigation warnings.
+  - Production-like web build with public URLs set to local/prod-safe values:
+    `npx nx build @vizora/web` => passing, with existing Next/Nx warnings.
+  - `pnpm security:no-hardcoded-jwts` => passing.
+  - `git diff --check` => exit 0, with only LF/CRLF normalization warnings.
+- Browser smoke:
+  - Started temporary local web server on port 3001 and used a dummy
+    JWT-shaped cookie only to pass the client proxy route guard. No backend
+    auth or production state was touched.
+  - Playwright checked desktop 1366x900 and mobile 390x844. The Devices,
+    Content, and Playlists overview links were present, nonzero-sized, and had
+    expected hrefs; no page errors were reported.
+
+## Completed Workstream: Realtime Command Timeout Pass 52 (2026-06-02)
 
 **Branch:** `fix/display-realtime-timeouts-pass-52`
 
@@ -36,8 +108,8 @@ NestJS Axios timeout configuration on Vizora's realtime gateway handoffs.
 - [x] Run focused middleware tests.
 - [x] Run multi-vector diff review.
 - [x] Run broader middleware verification.
-- [ ] PR, CI, and merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, and merge if green.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Evidence so far**
 - Current `origin/main`: `c75643b89686e4729a7dca2a1e5abc2a1071ec91`.
@@ -80,6 +152,18 @@ NestJS Axios timeout configuration on Vizora's realtime gateway handoffs.
   - `pnpm security:no-hardcoded-jwts` => passing.
   - `git diff --check` => exit 0, with only LF/CRLF normalization warnings for
     `tasks/todo.md`.
+- PR / CI / merge:
+  - PR #192: `https://github.com/Trivenidigital/Vizora/pull/192`.
+  - Squash merge commit: `680b7a6f161248f26ee2aae123dcbdc0f6b36ce2`.
+  - CI green: audit 25s, lint 35s, security 24s, build 1m26s, test 4m17s,
+    e2e 8m53s.
+- Deploy gate:
+  - Not deployed. Read-only production check showed prod at
+    `bb76aa1838740bff5b58623dfef7a906d44f46a6`, remote main at
+    `680b7a6f161248f26ee2aae123dcbdc0f6b36ce2`, 72 dirty/untracked paths, and
+    branch state `ahead 17, behind 164`.
+  - Core PM2 services were online, but `/api/v1/health/ready` was degraded on
+    the existing memory check. No pull/restart/deploy was performed.
 
 ## Completed Workstream: Dashboard Settings Trust Pass 51 (2026-06-02)
 

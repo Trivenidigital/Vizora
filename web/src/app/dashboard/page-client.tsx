@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import type { StorageInfo } from '@/lib/api/organizations';
@@ -466,9 +467,9 @@ export default function DashboardClient({
 
  {/* Stats Grid */}
  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
- <div
- className="eh-dash-card p-6 hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer animate-[fadeIn_0.3s_ease-out]"
- onClick={() => router.push('/dashboard/devices')}
+ <Link
+ href="/dashboard/devices"
+ className="eh-dash-card w-full p-6 text-left hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#00E5A0]/40 transition-all duration-300 cursor-pointer animate-[fadeIn_0.3s_ease-out]"
  >
  <div className="flex items-center justify-between mb-4">
  <p className="text-sm font-medium text-[var(--foreground-secondary)]">Total Devices</p>
@@ -481,11 +482,11 @@ export default function DashboardClient({
  {stats.devices.online} online
  </p>
  </div>
- </div>
+ </Link>
 
- <div
- className="eh-dash-card p-6 hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer animate-[fadeIn_0.4s_ease-out]"
- onClick={() => router.push('/dashboard/content')}
+ <Link
+ href="/dashboard/content"
+ className="eh-dash-card w-full p-6 text-left hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#00E5A0]/40 transition-all duration-300 cursor-pointer animate-[fadeIn_0.4s_ease-out]"
  >
  <div className="flex items-center justify-between mb-4">
  <p className="text-sm font-medium text-[var(--foreground-secondary)]">Content Items</p>
@@ -497,11 +498,11 @@ export default function DashboardClient({
  ? `${stats.content.processing} processing`
  : 'All ready'}
  </p>
- </div>
+ </Link>
 
- <div
- className="eh-dash-card p-6 hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer animate-[fadeIn_0.5s_ease-out]"
- onClick={() => router.push('/dashboard/playlists')}
+ <Link
+ href="/dashboard/playlists"
+ className="eh-dash-card w-full p-6 text-left hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#00E5A0]/40 transition-all duration-300 cursor-pointer animate-[fadeIn_0.5s_ease-out]"
  >
  <div className="flex items-center justify-between mb-4">
  <p className="text-sm font-medium text-[var(--foreground-secondary)]">Playlists</p>
@@ -511,7 +512,7 @@ export default function DashboardClient({
  <p className="text-sm text-[var(--foreground-tertiary)]">
  {stats.playlists.active} ready
  </p>
- </div>
+ </Link>
 
  <div className={`${healthSummary.cardClassName} p-6 rounded-lg border border-[var(--border)] hover:-translate-y-[2px] hover:shadow-md transition-all duration-300 text-white animate-[fadeIn_0.6s_ease-out]`}>
  <div className="flex items-center justify-between mb-4">
