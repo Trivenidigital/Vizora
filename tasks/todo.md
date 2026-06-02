@@ -1,8 +1,19 @@
 # Vizora - Task Tracker
 
-## Active: Customer Hot-Path Follow-up Pass 42 (2026-06-02)
+## Completed: Customer Hot-Path Follow-up Pass 42 (2026-06-02)
 
 **Branch:** `feat/customer-hotpath-followup-pass-42`
+
+**PR:** #178
+
+**Commits:** `f109579`, `151e3d5`
+
+**Merge SHA:** `a89d200dffb7f56b230265ed673d06697a6d3fba`
+
+**CI:** Green - audit, build, e2e, lint, security, and test.
+
+**Deploy:** Not deployed. Production checkout is dirty/diverged and unsafe for
+automation.
 
 **Why now:** The Pass 41 merge hardened the web display client and public
 readiness basics. The next coherent follow-up closes adjacent repo-side gaps:
@@ -38,8 +49,8 @@ error logging; proceed with Vizora-native code.
 - [x] Run focused verification for display, health, and device-content changes.
 - [x] Run build/hygiene verification.
 - [x] Run multi-vector subagent re-review.
-- [ ] PR, CI, merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge if green.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Scoped fixes**
 - Electron display: centralize preload eligibility and skip video preloads so
@@ -101,6 +112,14 @@ error logging; proceed with Vizora-native code.
     response mark headers sent on an actual write, writing a partial chunk
     before stream failure, and asserting the `(status=200)` log suffix. Final
     re-review CLEAN.
+- PR/CI/merge: PR #178 merged at
+  `a89d200dffb7f56b230265ed673d06697a6d3fba`; audit, build, e2e, lint,
+  security, and test passed.
+- Deployment gate after merge: production remains on
+  `bb76aa1838740bff5b58623dfef7a906d44f46a6` while remote main is
+  `a89d200dffb7f56b230265ed673d06697a6d3fba`; prod status is
+  `ahead 17, behind 146` with tracked and untracked files. Middleware/web are
+  HTTP 200; realtime `/health` is HTTP 404. No deploy or restart attempted.
 
 ## Completed: Customer Readiness Hot-Path Pass 41 (2026-06-02)
 
