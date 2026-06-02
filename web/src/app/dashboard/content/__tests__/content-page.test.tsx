@@ -13,6 +13,7 @@ const mockUpdateContent = jest.fn();
 const mockUploadContent = jest.fn();
 const mockCreateContent = jest.fn();
 const mockUploadContentWithProgress = jest.fn();
+const mockGetStorageInfo = jest.fn();
 const mockGenerateThumbnail = jest.fn();
 const mockAddPlaylistItem = jest.fn();
 const mockValidateForm = jest.fn<Record<string, string>, [unknown, unknown]>(() => ({}));
@@ -32,6 +33,7 @@ jest.mock('@/lib/api', () => ({
     uploadContent: (...args: any[]) => mockUploadContent(...args),
     createContent: (...args: any[]) => mockCreateContent(...args),
     uploadContentWithProgress: (...args: any[]) => mockUploadContentWithProgress(...args),
+    getStorageInfo: (...args: any[]) => mockGetStorageInfo(...args),
     generateThumbnail: (...args: any[]) => mockGenerateThumbnail(...args),
     addPlaylistItem: (...args: any[]) => mockAddPlaylistItem(...args),
   },
@@ -289,6 +291,12 @@ describe('ContentClient', () => {
     mockUploadContent.mockResolvedValue({ id: 'new-1', title: 'New Content' });
     mockCreateContent.mockResolvedValue({ id: 'new-1', title: 'New Content' });
     mockUploadContentWithProgress.mockResolvedValue({ id: 'new-1', title: 'New Content' });
+    mockGetStorageInfo.mockResolvedValue({
+      usedBytes: 0,
+      quotaBytes: 1024 * 1024 * 1024,
+      availableBytes: 1024 * 1024 * 1024,
+      usagePercent: 0,
+    });
     mockGenerateThumbnail.mockResolvedValue({});
     mockAddPlaylistItem.mockResolvedValue({});
     mockValidateForm.mockReturnValue({});
@@ -1267,6 +1275,110 @@ describe('ContentClient', () => {
     expect(mockUploadContentWithProgress.mock.calls[0][0].type).toBe('image');
     expect(mockUploadContentWithProgress.mock.calls[0][0].file).toBe(imageFile);
     expect(mockCreateContent).not.toHaveBeenCalledWith(expect.objectContaining({ file: imageFile }));
+  });
+
+  it('does not start a queued single-file upload when storage quota is already exhausted', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    mockGetStorageInfo.mockResolvedValueOnce({
+      usedBytes: 100,
+      quotaBytes: 104,
+      availableBytes: 4,
+      usagePercent: 96,
+    });
+    render(<ContentClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getAllByText('Upload Content')[0]);
+    const imageFile = new File(['image-bytes'], 'too-large.png', { type: 'image/png' });
+
+    await act(async () => {
+      lastDropzoneOptions.onDrop([imageFile]);
+    });
+
+    fireEvent.click(screen.getByText('Upload 1 File'));
+
+    await waitFor(() => {
+      expect(mockGetStorageInfo).toHaveBeenCalledTimes(1);
+      expect(mockToast.error).toHaveBeenCalledWith(expect.stringContaining('Not enough storage'));
+    });
+    expect(mockUploadContentWithProgress).not.toHaveBeenCalled();
+  });
+
+  it('does not send queued file bytes when storage quota is zero', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    mockGetStorageInfo.mockResolvedValueOnce({
+      usedBytes: 0,
+      quotaBytes: 0,
+      availableBytes: 0,
+      usagePercent: 0,
+    });
+    render(<ContentClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getAllByText('Upload Content')[0]);
+    const imageFile = new File(['image-bytes'], 'zero-quota.png', { type: 'image/png' });
+
+    await act(async () => {
+      lastDropzoneOptions.onDrop([imageFile]);
+    });
+
+    const uploadButton = screen.getByText('Upload 1 File').closest('button');
+    fireEvent.click(uploadButton!);
+
+    await waitFor(() => {
+      expect(mockGetStorageInfo).toHaveBeenCalledTimes(1);
+      expect(mockToast.error).toHaveBeenCalledWith(expect.stringContaining('Not enough storage'));
+    });
+    expect(mockUploadContentWithProgress).not.toHaveBeenCalled();
+    expect(screen.getByText('Upload Queue (1 file)')).toBeInTheDocument();
+    expect(screen.getByText('zero-quota.png')).toBeInTheDocument();
+    expect(uploadButton).not.toBeDisabled();
+  });
+
+  it('does not start queued bulk upload when combined retryable bytes exceed storage quota', async () => {
+    mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    mockGetStorageInfo.mockResolvedValueOnce({
+      usedBytes: 100,
+      quotaBytes: 110,
+      availableBytes: 10,
+      usagePercent: 91,
+    });
+    render(<ContentClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+    });
+    await waitForAuxiliaryRequestsToSettle();
+
+    fireEvent.click(screen.getAllByText('Upload Content')[0]);
+    const files = [
+      new File(['123456'], 'first.png', { type: 'image/png' }),
+      new File(['123456'], 'second.png', { type: 'image/png' }),
+    ];
+
+    await act(async () => {
+      lastDropzoneOptions.onDrop(files);
+    });
+
+    fireEvent.click(screen.getByText('Upload 2 Files'));
+
+    await waitFor(() => {
+      expect(mockGetStorageInfo).toHaveBeenCalledTimes(1);
+      expect(mockToast.error).toHaveBeenCalledWith(expect.stringContaining('Not enough storage'));
+    });
+    expect(mockUploadContentWithProgress).not.toHaveBeenCalled();
+    expect(screen.getByText('Upload Queue (2 files)')).toBeInTheDocument();
+    expect(screen.getByText('first.png')).toBeInTheDocument();
+    expect(screen.getByText('second.png')).toBeInTheDocument();
+    expect(screen.getByText('Upload 2 Files').closest('button')).not.toBeDisabled();
   });
 
   it('keeps queued files visible by blocking URL mode until the queue is cleared', async () => {

@@ -1,5 +1,100 @@
 # Vizora - Task Tracker
 
+## Active Workstream: Dashboard Upload Preflight Pass 45 (2026-06-02)
+
+**Branch:** `feat/customer-dashboard-improvement-pass-45`
+
+**Why now:** PRs #182-#184 are merged and no PRs remain open, but production
+deploy is blocked by dirty/diverged prod state. The next buildable
+customer-facing performance/trust slice is web-only: dashboard SSR already
+fetches summary/storage/health/activity data but the client still auto-refreshes
+on mount, and content uploads spend browser/server bandwidth before checking
+known organization storage quota.
+
+**New primitives introduced:** none. Reuse existing dashboard server prefetch,
+existing `apiClient.getStorageInfo()`, existing content upload queue/progress
+path, and existing web Jest suites.
+
+**Hermes-first analysis:** checked per project convention. These are dashboard
+hydration and browser upload-preflight behaviors, not business-agent, MCP,
+Hermes runtime, or AI/provider-spend tasks.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Dashboard initial API refresh suppression | none found | build in existing `DashboardClient` |
+| Browser upload quota preflight | none found | build in existing content upload UI using existing storage endpoint |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+React dashboard hydration fetch suppression or browser-side storage quota
+preflight; proceed with Vizora-native code.
+
+**Plan/design:**
+`docs/plans/2026-06-02-dashboard-upload-preflight-pass-45.md`
+
+**Plan**
+- [x] Reconcile backlog/current-state and choose a repo-side web performance
+  slice.
+- [x] Add red dashboard tests for complete-SSR no-refresh and missing-data
+  recovery.
+- [x] Add red content upload tests for single and bulk quota preflight.
+- [x] Implement dashboard refresh suppression and upload preflight.
+- [x] Run focused web tests.
+- [x] Run multi-vector subagent review.
+- [x] Run broader web verification and build.
+- [ ] PR, CI, merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Evidence so far**
+- Red verification:
+  `pnpm --filter @vizora/web test -- --runInBand web/src/app/dashboard/__tests__/dashboard-page.test.tsx web/src/app/dashboard/content/__tests__/content-page.test.tsx`
+  failed as expected because complete server dashboard snapshots still triggered
+  `getAnalyticsSummary()` on mount and queued uploads never called
+  `getStorageInfo()` before starting XHR uploads.
+- Focused green verification:
+  `pnpm --filter @vizora/web test -- --runInBand web/src/app/dashboard/__tests__/dashboard-page.test.tsx web/src/app/dashboard/content/__tests__/content-page.test.tsx`
+  passed 2 suites / 67 tests after implementation.
+- Diff review finding fixed: both reviewers found the frontend treated
+  `quotaBytes <= 0` as unlimited even though backend quota reservation rejects
+  positive uploads against nonpositive quotas. The preflight now treats
+  nonpositive quota as zero available bytes and keeps the queued files visible
+  and retryable after blocking.
+- Post-review focused verification:
+  `pnpm --filter @vizora/web test -- --runInBand web/src/app/dashboard/__tests__/dashboard-page.test.tsx web/src/app/dashboard/content/__tests__/content-page.test.tsx`
+  passed 2 suites / 68 tests. `pnpm --filter @vizora/web exec tsc --noEmit --pretty false`
+  passed.
+- Follow-up subagent review: CLEAN after the nonpositive-quota fix. Reviewer
+  confirmed preflight semantics align with backend quota reservation, blocked
+  queues remain visible/retryable, and incomplete dashboard snapshots still
+  recover through `loadStats(false)`.
+- Broader verification:
+  - `pnpm --filter @vizora/web test -- --runInBand` passed 103 suites / 1100
+    tests, with existing React `act(...)` and jsdom navigation warning noise in
+    unrelated suites.
+  - `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` passed.
+  - `ESLINT_USE_FLAT_CONFIG=false npx eslint web/src/app/dashboard/page-client.tsx web/src/app/dashboard/content/page-client.tsx web/src/app/dashboard/__tests__/dashboard-page.test.tsx web/src/app/dashboard/content/__tests__/content-page.test.tsx`
+    passed with 0 errors and existing `any` warnings in the touched dashboard
+    files.
+  - `pnpm security:no-hardcoded-jwts` passed.
+  - `git diff --check` passed with Windows CRLF warnings only.
+  - `NODE_OPTIONS=--max-old-space-size=4096 NEXT_PUBLIC_SOCKET_URL=http://localhost:3002 NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1 BACKEND_URL=http://localhost:3000 pnpm --filter @vizora/web build`
+    passed with existing Next middleware/proxy and TypeScript project-reference
+    warnings.
+
+**Queued next-pass findings**
+- Backend/customer: REST heartbeat verifies `:deviceId` as display id but
+  `DisplaysService.updateHeartbeat()` looks up by `deviceIdentifier`; add
+  id/deviceIdentifier mismatch coverage and align the service/controller
+  contract.
+- Backend/security: notification list, read, dismiss, and read-all APIs need
+  current-user scoping for user-targeted notifications and should filter
+  `dismissedAt: null` before pagination.
+- Release safety: CI lacks a web unit job and customer-critical Playwright
+  smoke gate; security/audit gates are advisory in places.
+- Release safety: deploy verification and Docker health checks still probe
+  stale routes (`/templates`, `/devices`, `/api/health`, realtime `/health`)
+  instead of current `/api/v1` routes/auth expectations.
+- Admin trust: hard-coded admin backlog page is stale against `backlog.md`.
+
 ## Completed: CSRF + Pairing Authorization Pass 44 (2026-06-02)
 
 **Branches:** `feat/customer-dashboard-improvement-pass-44`,
