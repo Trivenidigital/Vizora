@@ -1,8 +1,124 @@
 # Vizora - Task Tracker
 
-## Active Workstream: Dashboard Upload Preflight Pass 45 (2026-06-02)
+## Active Workstream: Backend Heartbeat and Notification Scoping Pass 46 (2026-06-02)
+
+**Branch:** `fix/backend-heartbeat-notifications-pass-46`
+
+**Why now:** Pass 45 is merged and deployment remains blocked by dirty/diverged
+production state. The highest-value buildable backend defects from the
+customer-readiness review are both local, testable, and customer-visible:
+device REST heartbeats can miss the row because the controller verifies a
+display id while the service queries by `deviceIdentifier`, personal
+notifications are not scoped to the current user on list/count/read/dismiss
+paths, and targeted `notification:new` events can still leak live through the
+realtime org room.
+
+**New primitives introduced:** none. Reuse existing device JWT verification,
+DisplaysService heartbeat status-transition behavior, NotificationsService,
+Notification model, response envelope, and `/api/v1` routing.
+
+**Hermes-first analysis:** checked per project convention. These are local
+middleware identity/tenant-boundary fixes, not business-agent, MCP, Hermes
+runtime, or AI/provider-spend tasks.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| REST display heartbeat identity semantics | none found | build in existing displays controller/service path |
+| Notification user visibility and mutation scoping | none found | build in existing notifications controller/service path |
+| Targeted realtime notification delivery | none found | build in existing Socket.IO org-room delivery path |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+NestJS route identity alignment, local Prisma notification filters, or
+Socket.IO room filtering; proceed with Vizora-native code.
+
+**Plan/design:**
+`docs/plans/2026-06-02-backend-heartbeat-notifications-pass-46.md`
+
+**Plan**
+- [x] Add red display service coverage for id/deviceIdentifier mismatch.
+- [x] Add red display service coverage for verified-token write-site races.
+- [x] Add red notification service coverage for user visibility and dismissed
+  filtering before pagination/mutation.
+- [x] Add red notification controller coverage for forwarding current user id.
+- [x] Implement heartbeat id alignment and notification user scoping.
+- [x] Add red realtime coverage for targeted notification delivery.
+- [x] Implement targeted realtime delivery.
+- [x] Run focused middleware/realtime tests.
+- [ ] Run multi-vector subagent diff review.
+- [ ] Run broader middleware/realtime verification and build.
+- [ ] PR, CI, merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Evidence so far**
+- Red middleware verification:
+  `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/displays/displays.service.spec.ts middleware/src/modules/displays/displays.controller.spec.ts middleware/src/modules/notifications/notifications.service.spec.ts middleware/src/modules/notifications/notifications.controller.spec.ts`
+  failed as expected because heartbeat still queried `deviceIdentifier` and
+  notification methods still treated the new `userId` argument as the old
+  filters/id argument.
+- Focused middleware green verification: same command passed 4 suites / 118
+  tests after implementation.
+- Red realtime verification:
+  `pnpm --filter @vizora/realtime test -- --runInBand realtime/src/gateways/device.gateway.spec.ts`
+  failed as expected because sibling dashboard sockets received targeted
+  `notification:new` events.
+- Focused realtime green verification: same command passed 1 suite / 103 tests
+  after targeted delivery filtering.
+- Security review finding fixed: reviewer identified that heartbeat verification
+  and heartbeat update were separate database operations. The controller now
+  passes the verified device `organizationId` and token hash into
+  `DisplaysService.updateHeartbeat()`, and the service update predicate includes
+  `id`, `organizationId`, `isDisabled: false`, and `jwtToken`. If that predicate
+  no longer matches, the service rejects the heartbeat and does not emit
+  `device.online`.
+- Review-fix verification:
+  `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/displays/displays.service.spec.ts middleware/src/modules/displays/displays.controller.spec.ts`
+  passed 2 suites / 69 tests.
+- Post-review focused verification:
+  `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/displays/displays.service.spec.ts middleware/src/modules/displays/displays.controller.spec.ts middleware/src/modules/notifications/notifications.service.spec.ts middleware/src/modules/notifications/notifications.controller.spec.ts`
+  passed 4 suites / 119 tests.
+- Post-review focused realtime verification:
+  `pnpm --filter @vizora/realtime test -- --runInBand realtime/src/gateways/device.gateway.spec.ts`
+  passed 1 suite / 103 tests.
+- Follow-up security review: CLEAN. Reviewer confirmed the heartbeat
+  write-site race is closed, notification REST scoping is intact, and targeted
+  realtime notification delivery skips sibling dashboards and device sockets.
+- Broader verification:
+  - `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false`
+    passed.
+  - `pnpm --filter @vizora/realtime exec tsc --noEmit --project tsconfig.json --pretty false`
+    passed.
+  - `pnpm --filter @vizora/middleware test -- --runInBand` passed 147 suites /
+    2990 tests.
+  - `pnpm --filter @vizora/realtime test -- --runInBand` passed 12 suites /
+    286 tests.
+  - `pnpm --filter @vizora/web test -- --runInBand web/src/lib/hooks/__tests__/useNotifications.test.ts web/src/components/NotificationBell.test.tsx web/src/components/__tests__/NotificationBell.test.tsx`
+    passed 3 suites / 16 tests with existing React `act(...)` warnings in
+    `useNotifications.test.ts`.
+  - Changed-file ESLint with `ESLINT_USE_FLAT_CONFIG=false` passed with 0
+    errors. Existing warnings remain in touched realtime/test files and
+    `notifications.service.ts`.
+  - `npx nx build @vizora/realtime` passed with existing webpack/source-map
+    warnings.
+  - First `npx nx build @vizora/middleware` run failed in the shared
+    `@vizora/database:build` copy step with a Windows file-lock `EPIPE` while
+    middleware and realtime builds were running concurrently. Sequential rerun
+    passed with existing webpack warnings.
+  - `pnpm security:no-hardcoded-jwts` passed.
+
+## Completed: Dashboard Upload Preflight Pass 45 (2026-06-02)
 
 **Branch:** `feat/customer-dashboard-improvement-pass-45`
+
+**PR:** #185
+
+**Commit:** `e8f84d4553f6a9f40d09011ae8a32d103c5286a4`
+
+**Merge SHA:** `1376aadf44adf7c54006e4d12bb8dea2fc4a06b5`
+
+**CI:** Green - audit, build, e2e, lint, security, and test.
+
+**Deploy:** Not deployed. Production checkout remains dirty/diverged and unsafe
+for automated pull/reload; middleware readiness is degraded by high memory.
 
 **Why now:** PRs #182-#184 are merged and no PRs remain open, but production
 deploy is blocked by dirty/diverged prod state. The next buildable
@@ -41,8 +157,8 @@ preflight; proceed with Vizora-native code.
 - [x] Run focused web tests.
 - [x] Run multi-vector subagent review.
 - [x] Run broader web verification and build.
-- [ ] PR, CI, merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge if green.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Evidence so far**
 - Red verification:

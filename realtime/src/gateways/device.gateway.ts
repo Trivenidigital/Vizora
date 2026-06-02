@@ -264,6 +264,11 @@ export class DeviceGateway
   ): Promise<number> {
     const allSockets = await this.server.in(`org:${organizationId}`).fetchSockets();
     let emitted = 0;
+    const targetedNotificationUserId = event === 'notification:new' &&
+      typeof data.userId === 'string' &&
+      data.userId.trim() !== ''
+      ? data.userId
+      : null;
 
     for (const socket of allSockets as Array<{
       id?: string;
@@ -276,8 +281,18 @@ export class DeviceGateway
       }
 
       if (this.isDashboardSocket(socket)) {
+        if (
+          targetedNotificationUserId &&
+          socket.data?.userId !== targetedNotificationUserId
+        ) {
+          continue;
+        }
         socket.emit?.(event, data);
         emitted += 1;
+        continue;
+      }
+
+      if (targetedNotificationUserId) {
         continue;
       }
 

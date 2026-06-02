@@ -9,6 +9,18 @@ describe('NotificationsService', () => {
   let mockHttpService: any;
 
   const organizationId = 'org-123';
+  const userId = 'user-123';
+  const visibleNotificationWhere = (extra: Record<string, unknown> = {}) => ({
+    organizationId,
+    dismissedAt: null,
+    OR: [{ userId: null }, { userId }],
+    ...extra,
+  });
+  const scopedNotificationWhere = (extra: Record<string, unknown> = {}) => ({
+    organizationId,
+    OR: [{ userId: null }, { userId }],
+    ...extra,
+  });
 
   const mockNotification = {
     id: 'notif-1',
@@ -211,7 +223,12 @@ describe('NotificationsService', () => {
       db.notification.findMany.mockResolvedValue([mockNotification]);
       db.notification.count.mockResolvedValue(1);
 
-      const result = await service.findAll(organizationId, {}, { page: 1, limit: 10 });
+      const result = await (service as any).findAll(
+        organizationId,
+        userId,
+        {},
+        { page: 1, limit: 10 },
+      );
 
       expect(result.data).toEqual([mockNotification]);
       expect(result.meta.total).toBe(1);
@@ -223,24 +240,51 @@ describe('NotificationsService', () => {
       db.notification.findMany.mockResolvedValue([]);
       db.notification.count.mockResolvedValue(0);
 
-      await service.findAll(organizationId, { read: false }, { page: 1, limit: 10 });
+      await (service as any).findAll(
+        organizationId,
+        userId,
+        { read: false },
+        { page: 1, limit: 10 },
+      );
 
       expect(db.notification.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { organizationId, read: false },
+          where: visibleNotificationWhere({ read: false }),
         }),
       );
+    });
+
+    it('should filter dismissed notifications before pagination and hide other users personal rows', async () => {
+      db.notification.findMany.mockResolvedValue([]);
+      db.notification.count.mockResolvedValue(0);
+
+      await (service as any).findAll(organizationId, userId, {}, { page: 2, limit: 5 });
+
+      const expectedWhere = visibleNotificationWhere();
+      expect(db.notification.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expectedWhere,
+          skip: 5,
+          take: 5,
+        }),
+      );
+      expect(db.notification.count).toHaveBeenCalledWith({ where: expectedWhere });
     });
 
     it('should filter by severity', async () => {
       db.notification.findMany.mockResolvedValue([]);
       db.notification.count.mockResolvedValue(0);
 
-      await service.findAll(organizationId, { severity: 'warning' }, { page: 1, limit: 10 });
+      await (service as any).findAll(
+        organizationId,
+        userId,
+        { severity: 'warning' },
+        { page: 1, limit: 10 },
+      );
 
       expect(db.notification.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { organizationId, severity: 'warning' },
+          where: visibleNotificationWhere({ severity: 'warning' }),
         }),
       );
     });
@@ -249,11 +293,16 @@ describe('NotificationsService', () => {
       db.notification.findMany.mockResolvedValue([]);
       db.notification.count.mockResolvedValue(0);
 
-      await service.findAll(organizationId, { severity: 'invalid' }, { page: 1, limit: 10 });
+      await (service as any).findAll(
+        organizationId,
+        userId,
+        { severity: 'invalid' },
+        { page: 1, limit: 10 },
+      );
 
       expect(db.notification.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { organizationId },
+          where: visibleNotificationWhere(),
         }),
       );
     });
@@ -262,7 +311,7 @@ describe('NotificationsService', () => {
       db.notification.findMany.mockResolvedValue([]);
       db.notification.count.mockResolvedValue(0);
 
-      await service.findAll(organizationId, {});
+      await (service as any).findAll(organizationId, userId, {});
 
       expect(db.notification.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -276,7 +325,7 @@ describe('NotificationsService', () => {
       db.notification.findMany.mockResolvedValue([]);
       db.notification.count.mockResolvedValue(0);
 
-      await service.findAll(organizationId, {}, { page: 3, limit: 5 });
+      await (service as any).findAll(organizationId, userId, {}, { page: 3, limit: 5 });
 
       expect(db.notification.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -290,11 +339,14 @@ describe('NotificationsService', () => {
       db.notification.findMany.mockResolvedValue([]);
       db.notification.count.mockResolvedValue(0);
 
-      await service.findAll(organizationId, { read: true, severity: 'critical' });
+      await (service as any).findAll(organizationId, userId, {
+        read: true,
+        severity: 'critical',
+      });
 
       expect(db.notification.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { organizationId, read: true, severity: 'critical' },
+          where: visibleNotificationWhere({ read: true, severity: 'critical' }),
         }),
       );
     });
@@ -303,7 +355,7 @@ describe('NotificationsService', () => {
       db.notification.findMany.mockResolvedValue([]);
       db.notification.count.mockResolvedValue(0);
 
-      await service.findAll(organizationId);
+      await (service as any).findAll(organizationId, userId);
 
       expect(db.notification.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -317,18 +369,18 @@ describe('NotificationsService', () => {
     it('should return a notification by id', async () => {
       db.notification.findFirst.mockResolvedValue(mockNotification);
 
-      const result = await service.findOne(organizationId, 'notif-1');
+      const result = await (service as any).findOne(organizationId, userId, 'notif-1');
 
       expect(result).toEqual(mockNotification);
       expect(db.notification.findFirst).toHaveBeenCalledWith({
-        where: { id: 'notif-1', organizationId },
+        where: visibleNotificationWhere({ id: 'notif-1' }),
       });
     });
 
     it('should throw NotFoundException when notification not found', async () => {
       db.notification.findFirst.mockResolvedValue(null);
 
-      await expect(service.findOne(organizationId, 'nonexistent')).rejects.toThrow(
+      await expect((service as any).findOne(organizationId, userId, 'nonexistent')).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -338,22 +390,18 @@ describe('NotificationsService', () => {
     it('should return count of unread notifications', async () => {
       db.notification.count.mockResolvedValue(5);
 
-      const result = await service.getUnreadCount(organizationId);
+      const result = await (service as any).getUnreadCount(organizationId, userId);
 
       expect(result).toBe(5);
       expect(db.notification.count).toHaveBeenCalledWith({
-        where: {
-          organizationId,
-          read: false,
-          dismissedAt: null,
-        },
+        where: visibleNotificationWhere({ read: false }),
       });
     });
 
     it('should return 0 when no unread notifications', async () => {
       db.notification.count.mockResolvedValue(0);
 
-      const result = await service.getUnreadCount(organizationId);
+      const result = await (service as any).getUnreadCount(organizationId, userId);
 
       expect(result).toBe(0);
     });
@@ -361,24 +409,27 @@ describe('NotificationsService', () => {
 
   describe('markAsRead', () => {
     it('should mark a notification as read', async () => {
-      db.notification.findFirst.mockResolvedValue(mockNotification);
-      db.notification.update.mockResolvedValue({ ...mockNotification, read: true });
+      db.notification.updateMany.mockResolvedValue({ count: 1 });
+      db.notification.findFirst.mockResolvedValue({ ...mockNotification, read: true });
 
-      const result = await service.markAsRead(organizationId, 'notif-1');
+      const result = await (service as any).markAsRead(organizationId, userId, 'notif-1');
 
       expect(result.read).toBe(true);
-      expect(db.notification.update).toHaveBeenCalledWith({
-        where: { id: 'notif-1' },
+      expect(db.notification.findFirst).toHaveBeenCalledWith({
+        where: visibleNotificationWhere({ id: 'notif-1' }),
+      });
+      expect(db.notification.updateMany).toHaveBeenCalledWith({
+        where: visibleNotificationWhere({ id: 'notif-1' }),
         data: { read: true },
       });
     });
 
     it('should throw NotFoundException for nonexistent notification', async () => {
-      db.notification.findFirst.mockResolvedValue(null);
+      db.notification.updateMany.mockResolvedValue({ count: 0 });
 
-      await expect(service.markAsRead(organizationId, 'nonexistent')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        (service as any).markAsRead(organizationId, userId, 'nonexistent'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -386,11 +437,11 @@ describe('NotificationsService', () => {
     it('should mark all unread notifications as read', async () => {
       db.notification.updateMany.mockResolvedValue({ count: 10 });
 
-      const result = await service.markAllAsRead(organizationId);
+      const result = await (service as any).markAllAsRead(organizationId, userId);
 
       expect(result.updated).toBe(10);
       expect(db.notification.updateMany).toHaveBeenCalledWith({
-        where: { organizationId, read: false },
+        where: visibleNotificationWhere({ read: false }),
         data: { read: true },
       });
     });
@@ -398,7 +449,7 @@ describe('NotificationsService', () => {
     it('should return 0 when no unread notifications', async () => {
       db.notification.updateMany.mockResolvedValue({ count: 0 });
 
-      const result = await service.markAllAsRead(organizationId);
+      const result = await (service as any).markAllAsRead(organizationId, userId);
 
       expect(result.updated).toBe(0);
     });
@@ -407,24 +458,27 @@ describe('NotificationsService', () => {
   describe('dismiss', () => {
     it('should dismiss a notification', async () => {
       const dismissedAt = new Date();
-      db.notification.findFirst.mockResolvedValue(mockNotification);
-      db.notification.update.mockResolvedValue({ ...mockNotification, dismissedAt });
+      db.notification.updateMany.mockResolvedValue({ count: 1 });
+      db.notification.findFirst.mockResolvedValue({ ...mockNotification, dismissedAt });
 
-      const result = await service.dismiss(organizationId, 'notif-1');
+      const result = await (service as any).dismiss(organizationId, userId, 'notif-1');
 
       expect(result.dismissedAt).toBeDefined();
-      expect(db.notification.update).toHaveBeenCalledWith({
-        where: { id: 'notif-1' },
+      expect(db.notification.findFirst).toHaveBeenCalledWith({
+        where: scopedNotificationWhere({ id: 'notif-1' }),
+      });
+      expect(db.notification.updateMany).toHaveBeenCalledWith({
+        where: visibleNotificationWhere({ id: 'notif-1' }),
         data: { dismissedAt: expect.any(Date) },
       });
     });
 
     it('should throw NotFoundException for nonexistent notification', async () => {
-      db.notification.findFirst.mockResolvedValue(null);
+      db.notification.updateMany.mockResolvedValue({ count: 0 });
 
-      await expect(service.dismiss(organizationId, 'nonexistent')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        (service as any).dismiss(organizationId, userId, 'nonexistent'),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 

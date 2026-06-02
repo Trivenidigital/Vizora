@@ -180,7 +180,10 @@ describe('DisplaysController', () => {
       const result = await controller.heartbeat('device-123', mockReq as any);
 
       expect(result).toEqual(expectedResult);
-      expect(mockDisplaysService.updateHeartbeat).toHaveBeenCalledWith('device-123');
+      expect(mockDisplaysService.updateHeartbeat).toHaveBeenCalledWith('device-123', {
+        organizationId,
+        tokenHash: hashToken('valid-device-token'),
+      });
     });
 
     it('should reject a signed heartbeat token that is not the current stored token', async () => {

@@ -1821,6 +1821,47 @@ describe('DeviceGateway', () => {
         }),
       );
     });
+
+    it('should emit targeted notification events only to the matching dashboard user', async () => {
+      const targetDashboardSocket = {
+        id: 'dashboard-target',
+        data: { isDashboard: true, userId: 'user-1', organizationId: 'org-1' },
+        emit: jest.fn(),
+      };
+      const siblingDashboardSocket = {
+        id: 'dashboard-sibling',
+        data: { isDashboard: true, userId: 'user-2', organizationId: 'org-1' },
+        emit: jest.fn(),
+      };
+      const deviceSocket = createDeliverySocket('device-socket');
+      mockServer.in.mockReturnValueOnce({
+        fetchSockets: jest.fn().mockResolvedValue([
+          targetDashboardSocket,
+          siblingDashboardSocket,
+          deviceSocket,
+        ]),
+      });
+
+      await gateway.broadcastToOrganization('org-1', 'notification:new', {
+        id: 'notif-1',
+        title: 'Personal alert',
+        userId: 'user-1',
+      });
+
+      expect(targetDashboardSocket.emit).toHaveBeenCalledWith(
+        'notification:new',
+        expect.objectContaining({
+          id: 'notif-1',
+          userId: 'user-1',
+          timestamp: expect.any(String),
+        }),
+      );
+      expect(siblingDashboardSocket.emit).not.toHaveBeenCalled();
+      expect(deviceSocket.emit).not.toHaveBeenCalledWith(
+        'notification:new',
+        expect.objectContaining({ id: 'notif-1' }),
+      );
+    });
   });
 
   describe('handleJoinOrganization', () => {
