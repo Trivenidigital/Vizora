@@ -1,8 +1,19 @@
 # Vizora - Task Tracker
 
-## Active: Content MinIO Tenant Boundary Pass 40 (2026-06-02)
+## Completed: Content MinIO Tenant Boundary Pass 40 (2026-06-02)
 
 **Branch:** `feat/customer-performance-readiness`
+
+**PR:** #175
+
+**Commit:** `ddad81b`
+
+**Merge SHA:** `591ab52395a8f3df758a785c223b97f678af5623`
+
+**CI:** Green — lint, test, build, security, e2e, and Security Audit.
+
+**Deploy:** Not deployed. Production checkout is dirty/diverged and unsafe for
+automation.
 
 **Why now:** Reviewer lane C found a high-severity storage tenant-boundary gap:
 device content streaming guards MinIO object keys by organization prefix, but
@@ -32,15 +43,16 @@ MCP, Hermes, AI/provider, or spend-path change.
 - [x] Run focused verification.
 - [x] Run broader verification.
 - [x] Run subagent re-review before PR/merge.
-- [ ] PR, CI, merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge if green.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
-**Evidence so far:**
-- Current prod deploy gate remains blocked: `/opt/vizora/app` is on `main` at
+**Evidence:**
+- Final prod deploy gate remains blocked: `/opt/vizora/app` is on `main` at
   `bb76aa1838740bff5b58623dfef7a906d44f46a6`, remote main is
-  `35dd7397bcab6729f14ead9a8a59ee8539631af1`, and prod is dirty/diverged
+  `591ab52395a8f3df758a785c223b97f678af5623`, and prod is dirty/diverged
   (`ahead 17, behind 123`) with tracked and untracked template/Hermes/public
-  files. No deploy attempted.
+  files. Middleware health returned OK, web returned HTTP 200, realtime
+  `/health` returned HTTP 404. No deploy attempted.
 - Reviewer lane C finding: `DeviceContentController` checks MinIO object keys
   start with `${organizationId}/`, while `ContentController.getDownloadUrl`,
   `ContentService.remove`, and `ContentService.bulkDelete` extract keys without
@@ -111,6 +123,9 @@ MCP, Hermes, AI/provider, or spend-path change.
   content presign/read/delete, bulk delete, org cleanup, and sole-admin account
   cleanup now either require org-owned MinIO keys or skip/retain polluted
   foreign pointers without touching foreign storage objects.
+- PR #175 CI: lint, test, build, security, e2e, and Security Audit all passed.
+- PR #175 merged at
+  `591ab52395a8f3df758a785c223b97f678af5623`; remote feature branch deleted.
 
 ---
 
