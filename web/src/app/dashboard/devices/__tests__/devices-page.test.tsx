@@ -12,6 +12,15 @@ const mockBulkDeleteDisplays = jest.fn();
 const mockBulkAssignPlaylist = jest.fn();
 const mockBulkAssignGroup = jest.fn();
 
+let mockUser: any = {
+  id: 'u1',
+  email: 'test@test.com',
+  firstName: 'Test',
+  lastName: 'User',
+  organizationId: 'org-1',
+  role: 'admin',
+};
+
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
@@ -45,10 +54,10 @@ jest.mock('@/lib/api', () => ({
 
 jest.mock('@/lib/hooks/useAuth', () => ({
   useAuth: () => ({
-    user: { id: 'u1', email: 'test@test.com', firstName: 'Test', lastName: 'User', organizationId: 'org-1', role: 'admin' },
+    user: mockUser,
     loading: false,
     error: null,
-    isAuthenticated: true,
+    isAuthenticated: !!mockUser,
     logout: jest.fn(),
     reload: jest.fn(),
   }),
@@ -158,11 +167,23 @@ jest.mock('@/components/DeviceGroupSelector', () => {
 });
 
 jest.mock('@/components/DevicePreviewModal', () => {
-  return function MockDevicePreview() { return null; };
+  return function MockDevicePreview({ isOpen, canRequestScreenshot }: any) {
+    return isOpen ? (
+      <div data-testid="device-preview-modal">
+        {canRequestScreenshot && <button>Refresh Screenshot</button>}
+      </div>
+    ) : null;
+  };
 });
 
 jest.mock('@/components/PlaylistQuickSelect', () => {
-  return function MockPlaylistSelect() { return null; };
+  return function MockPlaylistSelect({ device, disabled }: any) {
+    return (
+      <select data-testid={`playlist-select-${device.id}`} disabled={disabled}>
+        <option>No playlist</option>
+      </select>
+    );
+  };
 });
 
 jest.mock('@/components/fleet', () => ({
@@ -214,6 +235,14 @@ const samplePlaylists = [
 describe('DevicesClient', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUser = {
+      id: 'u1',
+      email: 'test@test.com',
+      firstName: 'Test',
+      lastName: 'User',
+      organizationId: 'org-1',
+      role: 'admin',
+    };
     mockGetDisplays.mockResolvedValue({ data: [], meta: { total: 0 } });
     mockGetPlaylists.mockResolvedValue({ data: [] });
     mockGetDisplayGroups.mockResolvedValue({ data: [] });
@@ -323,6 +352,64 @@ describe('DevicesClient', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
     }, { timeout: 3000 });
+    expect(screen.getByRole('alert')).toHaveTextContent('Devices Error');
+    expect(screen.getByRole('button', { name: 'Try Again' })).toBeInTheDocument();
+    expect(screen.queryByText('No devices yet')).not.toBeInTheDocument();
+  });
+
+  it('keeps viewers on read-only device actions', async () => {
+    mockUser = { ...mockUser, role: 'viewer' };
+
+    render(
+      <DevicesClient
+        initialDevices={sampleDevices as any}
+        initialPlaylists={samplePlaylists as any}
+        initialDevicesComplete
+        initialPlaylistsComplete
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Lobby Display')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByTestId('fleet-dropdown')).not.toBeInTheDocument();
+    expect(screen.queryByText('Emergency Override')).not.toBeInTheDocument();
+    expect(screen.getByText('Pair New Device')).toBeInTheDocument();
+    expect(screen.queryByText('Edit')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pair')).not.toBeInTheDocument();
+    expect(screen.queryByText('Delete')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Preview').length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId(/playlist-select-/).every((select) => select.hasAttribute('disabled'))).toBe(true);
+
+    fireEvent.click(screen.getAllByText('Preview')[0]);
+
+    expect(screen.getByTestId('device-preview-modal')).toBeInTheDocument();
+    expect(screen.queryByText('Refresh Screenshot')).not.toBeInTheDocument();
+  });
+
+  it('allows managers to pair and assign devices without exposing admin-only deletes or emergency override', async () => {
+    mockUser = { ...mockUser, role: 'manager' };
+
+    render(
+      <DevicesClient
+        initialDevices={sampleDevices as any}
+        initialPlaylists={samplePlaylists as any}
+        initialDevicesComplete
+        initialPlaylistsComplete
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Lobby Display')).toBeInTheDocument();
+    });
+
+    expect(screen.getByTestId('fleet-dropdown')).toBeInTheDocument();
+    expect(screen.getByText('Pair New Device')).toBeInTheDocument();
+    expect(screen.getAllByText('Edit').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Pair').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Emergency Override')).not.toBeInTheDocument();
+    expect(screen.queryByText('Delete')).not.toBeInTheDocument();
   });
 
   it('renders device page header', async () => {

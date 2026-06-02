@@ -6,7 +6,9 @@ import { apiClient } from '@/lib/api';
 import { Playlist, PlaylistItem, Content } from '@/lib/types';
 import { Icon } from '@/theme/icons';
 import { useToast } from '@/lib/hooks/useToast';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { usePlaylistHistory } from '@/lib/hooks/usePlaylistHistory';
+import { getDashboardPermissions } from '@/lib/permissions';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import ContentLibraryPanel from '@/components/playlist/ContentLibraryPanel';
 import PlaylistEditorPanel from '@/components/playlist/PlaylistEditorPanel';
@@ -33,6 +35,10 @@ export default function PlaylistBuilderPage() {
  const params = useParams();
  const playlistId = params.id as string;
  const toast = useToast();
+ const { user } = useAuth();
+ const permissions = getDashboardPermissions(user);
+ const canManagePlaylist = permissions.canManagePlaylists;
+ const canRemovePlaylistItems = permissions.canRemovePlaylistItems;
 
  const [playlist, setPlaylist] = useState<Playlist | null>(null);
  const [loading, setLoading] = useState(true);
@@ -71,19 +77,19 @@ export default function PlaylistBuilderPage() {
 
  // Wrapped undo handler that shows toast feedback
  const handleUndo = useCallback(() => {
- if (canUndo) {
+ if (canManagePlaylist && canUndo) {
  undo();
  toast.info('Undo');
  }
- }, [canUndo, undo, toast]);
+ }, [canManagePlaylist, canUndo, undo, toast]);
 
  // Wrapped redo handler that shows toast feedback
  const handleRedo = useCallback(() => {
- if (canRedo) {
+ if (canManagePlaylist && canRedo) {
  redo();
  toast.info('Redo');
  }
- }, [canRedo, redo, toast]);
+ }, [canManagePlaylist, canRedo, redo, toast]);
 
  // Keyboard shortcuts for undo/redo
  useEffect(() => {
@@ -93,7 +99,7 @@ export default function PlaylistBuilderPage() {
  return;
  }
 
- if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+ if (canManagePlaylist && (e.metaKey || e.ctrlKey) && e.key === 'z') {
  if (e.shiftKey) {
  handleRedo();
  } else {
@@ -105,7 +111,7 @@ export default function PlaylistBuilderPage() {
 
  window.addEventListener('keydown', handleKeyDown);
  return () => window.removeEventListener('keydown', handleKeyDown);
- }, [handleUndo, handleRedo]);
+ }, [canManagePlaylist, handleUndo, handleRedo]);
 
  const loadPlaylist = async (resetUndoHistory = true) => {
  try {
@@ -125,6 +131,7 @@ export default function PlaylistBuilderPage() {
  };
 
  const handleDragStart = (event: DragStartEvent) => {
+ if (!canManagePlaylist) return;
  const { active } = event;
  if (active.data.current?.content) {
  setActiveContent(active.data.current.content);
@@ -135,6 +142,7 @@ export default function PlaylistBuilderPage() {
  const { active, over } = event;
  setActiveContent(null);
 
+ if (!canManagePlaylist) return;
  if (!over || !playlist) return;
 
  // Check if dragging from content library to playlist
@@ -188,6 +196,7 @@ export default function PlaylistBuilderPage() {
  };
 
  const handleRemoveItem = async (itemId: string) => {
+ if (!canRemovePlaylistItems) return;
  if (!playlist) return;
 
  // Optimistically update UI
@@ -207,6 +216,7 @@ export default function PlaylistBuilderPage() {
  };
 
  const handleUpdateDuration = async (itemId: string, duration: number) => {
+ if (!canManagePlaylist) return;
  if (!playlist) return;
 
  // Optimistically update UI
@@ -228,6 +238,7 @@ export default function PlaylistBuilderPage() {
  };
 
  const handleReorder = async (itemIds: string[]) => {
+ if (!canManagePlaylist) return;
  if (!playlist) return;
 
  // Create reordered items array based on new order
@@ -252,6 +263,7 @@ export default function PlaylistBuilderPage() {
  };
 
  const handleSave = async () => {
+ if (!canManagePlaylist) return;
  if (!playlist) return;
 
  try {
@@ -302,6 +314,7 @@ export default function PlaylistBuilderPage() {
  {playlist.description && (
  <p className="text-sm text-[var(--foreground-secondary)]">{playlist.description}</p>
  )}
+ {canManagePlaylist && (
  <label className="flex items-center gap-2 cursor-pointer select-none">
  <button
    role="switch"
@@ -329,11 +342,13 @@ export default function PlaylistBuilderPage() {
  </button>
  <span className="text-xs text-[var(--foreground-tertiary)]">Loop</span>
  </label>
+ )}
  </div>
  </div>
  </div>
  <div className="flex items-center gap-3">
  {/* Undo/Redo buttons */}
+ {canManagePlaylist && (
  <div className="flex items-center gap-1 mr-2">
  <button
  onClick={handleUndo}
@@ -352,6 +367,8 @@ export default function PlaylistBuilderPage() {
  <Icon name="redo" size="md" className="text-[var(--foreground-secondary)]" />
  </button>
  </div>
+ )}
+ {canManagePlaylist && (
  <button
  onClick={handleSave}
  disabled={saving}
@@ -361,6 +378,7 @@ export default function PlaylistBuilderPage() {
  <Icon name="check" size="sm" className="text-white" />
  Save
  </button>
+ )}
  </div>
  </div>
 
@@ -374,7 +392,7 @@ export default function PlaylistBuilderPage() {
  >
  {/* Left Panel - Content Library */}
  <div className="w-80 flex-shrink-0">
- <ContentLibraryPanel organizationId={playlist.id} />
+ <ContentLibraryPanel organizationId={playlist.id} canDragContent={canManagePlaylist} />
  </div>
 
  {/* Center Panel - Playlist Editor */}
@@ -384,6 +402,9 @@ export default function PlaylistBuilderPage() {
  onRemoveItem={handleRemoveItem}
  onUpdateDuration={handleUpdateDuration}
  onReorder={handleReorder}
+ canReorder={canManagePlaylist}
+ canUpdateDuration={canManagePlaylist}
+ canRemoveItems={canRemovePlaylistItems}
  />
  </div>
 

@@ -1,5 +1,84 @@
 # Vizora - Task Tracker
 
+## Active: Dashboard Action Truth Pass 39 (2026-06-01)
+
+**Branch:** `feat/dashboard-action-truth-pass-39`
+
+**Why now:** Pass 38 fixed a destructive confirmation gap. The next customer
+trust issue is dashboard action truthfulness: viewers and managers can still see
+some controls that backend roles reject, and failed primary list loads can still
+look like real empty accounts.
+
+**New primitives introduced:** one frontend permission helper. No backend route,
+schema, env var, realtime substrate, notification path, MCP tool, Hermes skill,
+provider spend path, or runtime process changes.
+
+**Hermes-first analysis:** not applicable. This is dashboard UI state and tests,
+not a business-agent, MCP, Hermes, AI/provider, or spend-path change.
+
+**Plan/design:**
+`docs/plans/2026-06-01-dashboard-action-truth-pass-39.md`
+
+**Plan**
+- [x] Start fresh isolated branch from updated `origin/main`.
+- [x] Drift-check backend role contracts and existing list-error patterns.
+- [x] Document pass 39 design and scope.
+- [x] Add failing tests for permission helper, role-gated controls, and primary
+  load-error panels.
+- [x] Implement minimal permission helper, UI gates, read-only playlist select,
+  and list-error panels.
+- [x] Run multi-vector subagent review before broader verification.
+- [x] Run focused and broader verification.
+- [ ] PR, CI, merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Evidence so far:**
+- Drift-check: schedules already has `loadError` with an inline panel and
+  suppresses empty state while failed.
+- Drift-check: content/devices/playlists primary loads still toast on failure
+  and can render empty states.
+- Drift-check: backend `@Roles` contracts show admin/manager can create/update
+  content/devices/playlists; admin-only deletes apply to content, devices,
+  playlists, and playlist item removal. Emergency override is admin-only by
+  fleet service guard.
+- Implementation: added `web/src/lib/permissions.ts` and focused tests for
+  admin/manager/viewer/missing-user permissions.
+- Implementation: content, devices, and playlists now suppress unauthorized
+  mutation controls and modal submit surfaces; devices keep Pair New Device
+  visible because backend `/devices/pairing/complete` has no role decorator.
+- Implementation: content, devices, and playlists now render persistent
+  `DashboardSectionError` panels on primary load failure and suppress misleading
+  empty states while errors are active.
+- Implementation: device playlist quick-select is disabled for viewers;
+  emergency override create/clear is admin-only; screenshot read remains
+  available in preview but screenshot capture request controls are hidden unless
+  the user can manage devices.
+- Review: UX/test reviewer found a medium false affordance where viewers could
+  still re-flag already-flagged content; fixed by excluding `flagged` from the
+  viewer flag branch and adding a regression test.
+- Review: RBAC/security reviewer found a medium false affordance where viewers
+  could request a screenshot capture from the device preview modal; fixed by
+  passing `canRequestScreenshot` into `DevicePreviewModal` and adding page +
+  component regression tests.
+- Review: final RBAC/security reviewer found a medium direct-route gap where
+  `/dashboard/playlists/:id` still exposed viewer/manager backend-rejected
+  mutations; fixed by applying the same permission helper to the builder route
+  and shared playlist panels. Re-review returned CLEAN.
+- Review: UX/test/release re-review returned CLEAN after the flagged-content
+  and screenshot-capture fixes.
+- Focused verification:
+  `pnpm --filter @vizora/web test -- --runInBand web/src/lib/__tests__/permissions.test.ts web/src/app/dashboard/content/__tests__/content-page.test.tsx web/src/app/dashboard/devices/__tests__/devices-page.test.tsx web/src/app/dashboard/playlists/__tests__/playlists-page.test.tsx web/src/components/__tests__/DevicePreviewModal.test.tsx web/src/components/__tests__/PlaylistBuilder.test.tsx`
+  passed 6 suites / 144 tests. The existing playlist-builder tests emitted
+  React `act(...)` warnings but exited 0.
+- Broader verification:
+  `pnpm --filter @vizora/web test -- --runInBand` passed 102 suites / 1080
+  tests with existing React `act(...)` warnings in several suites;
+  `npx nx build @vizora/web --skip-nx-cache` passed with production env
+  placeholders; `pnpm security:no-hardcoded-jwts` passed; `git diff --check`
+  passed with Windows CRLF warnings only.
+
+---
+
 ## Completed: Dashboard Safety and Truth Pass 38 (2026-06-01)
 
 **Branch:** `feat/customer-dashboard-pass-38`

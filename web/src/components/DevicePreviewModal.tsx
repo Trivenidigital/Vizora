@@ -13,9 +13,15 @@ interface DevicePreviewModalProps {
   device: Display;
   isOpen: boolean;
   onClose: () => void;
+  canRequestScreenshot?: boolean;
 }
 
-export default function DevicePreviewModal({ device, isOpen, onClose }: DevicePreviewModalProps) {
+export default function DevicePreviewModal({
+  device,
+  isOpen,
+  onClose,
+  canRequestScreenshot = true,
+}: DevicePreviewModalProps) {
   const toast = useToast();
   const [screenshot, setScreenshot] = useState<ScreenshotResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -140,6 +146,10 @@ export default function DevicePreviewModal({ device, isOpen, onClose }: DevicePr
   };
 
   const handleRefresh = async () => {
+    if (!canRequestScreenshot) {
+      return;
+    }
+
     if (device.status !== 'online') {
       toast.error('Device must be online to capture a screenshot');
       return;
@@ -234,23 +244,25 @@ export default function DevicePreviewModal({ device, isOpen, onClose }: DevicePr
               </div>
             </div>
           </div>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing || device.status !== 'online'}
-            className="flex items-center gap-2 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
-          >
-            {refreshing ? (
-              <>
-                <LoadingSpinner size="sm" />
-                <span>Capturing...</span>
-              </>
-            ) : (
-              <>
-                <Icon name="refresh" size="lg" className="text-[#061A21]" />
-                <span>Refresh Screenshot</span>
-              </>
-            )}
-          </button>
+          {canRequestScreenshot && (
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing || device.status !== 'online'}
+              className="flex items-center gap-2 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
+            >
+              {refreshing ? (
+                <>
+                  <LoadingSpinner size="sm" />
+                  <span>Capturing...</span>
+                </>
+              ) : (
+                <>
+                  <Icon name="refresh" size="lg" className="text-[#061A21]" />
+                  <span>Refresh Screenshot</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
 
         {/* Screenshot Display Area */}
@@ -298,19 +310,21 @@ export default function DevicePreviewModal({ device, isOpen, onClose }: DevicePr
               <p className="text-[var(--foreground-secondary)] mb-2">
                 No screenshot available yet
               </p>
-              <button
-                onClick={handleRefresh}
-                disabled={device.status !== 'online'}
-                className="text-[#00E5A0] hover:text-[#00CC8E] text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {device.status === 'online' ? 'Capture Screenshot' : 'Device is offline'}
-              </button>
+              {canRequestScreenshot && (
+                <button
+                  onClick={handleRefresh}
+                  disabled={device.status !== 'online'}
+                  className="text-[#00E5A0] hover:text-[#00CC8E] text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {device.status === 'online' ? 'Capture Screenshot' : 'Device is offline'}
+                </button>
+              )}
             </div>
           )}
         </div>
 
         {/* Info Message */}
-        {device.status !== 'online' && (
+        {canRequestScreenshot && device.status !== 'online' && (
           <div className="bg-warning-50 dark:bg-warning-900 border border-warning-200 dark:border-warning-700 rounded-lg p-3">
             <p className="text-sm text-warning-800 dark:text-warning-200 flex items-center gap-2">
               <Icon name="warning" size="lg" className="text-warning-600 dark:text-warning-400" />

@@ -15,11 +15,14 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import EmptyState from '@/components/EmptyState';
 import SearchFilter from '@/components/SearchFilter';
 import ContentTagger, { ContentTag } from '@/components/ContentTagger';
+import DashboardSectionError from '@/components/DashboardSectionError';
 import { ViewToggle, getInitialView } from '@/components/ViewToggle';
 import { useToast } from '@/lib/hooks/useToast';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useRealtimeEvents, useOptimisticState, useErrorRecovery } from '@/lib/hooks';
 import { contentUploadSchema, validateForm } from '@/lib/validation';
+import { getDashboardPermissions } from '@/lib/permissions';
 import { Icon } from '@/theme/icons';
 import type { IconName } from '@/theme/icons';
 
@@ -95,10 +98,14 @@ const getUploadButtonLabel = (queue: UploadQueueItem[]): string => {
 export default function ContentClient() {
  const toast = useToast();
  const { showToast } = toast;
+ const { user } = useAuth();
+ const permissions = getDashboardPermissions(user);
+ const canSelectContent = permissions.canManageContent || permissions.canDeleteContent;
  const [content, setContent] = useState<Content[]>([]);
  const [contentMeta, setContentMeta] = useState<ContentPageMeta>(EMPTY_CONTENT_META);
  const [contentPage, setContentPage] = useState(1);
  const [loading, setLoading] = useState(true);
+ const [contentLoadError, setContentLoadError] = useState<Error | null>(null);
  const [selectedContent, setSelectedContent] = useState<Content | null>(null);
  const [contentDetailLoadingId, setContentDetailLoadingId] = useState<string | null>(null);
  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -252,6 +259,7 @@ export default function ContentClient() {
  const folderId = selectedFolderId;
  try {
  setLoading(true);
+ setContentLoadError(null);
  const params = buildContentListParams();
  const response = folderId
  ? await apiClient.getFolderContent(folderId, params)
@@ -274,6 +282,7 @@ export default function ContentClient() {
  }
  setContent(items);
  setContentMeta(meta);
+ setContentLoadError(null);
  setSelectedItems(previous => {
  const visibleIds = new Set(items.map(item => item.id));
  return new Set(Array.from(previous).filter(id => visibleIds.has(id)));
@@ -282,7 +291,9 @@ export default function ContentClient() {
  if (requestId !== loadContentRequestRef.current) {
  return;
  }
-  showToast(error.message || 'Failed to load content', 'error');
+ const message = error.message || 'Failed to load content';
+ setContentLoadError(error instanceof Error ? error : new Error(message));
+  showToast(message, 'error');
   } finally {
  if (requestId === loadContentRequestRef.current) {
  setLoading(false);
@@ -1135,7 +1146,7 @@ export default function ContentClient() {
  setSelectedItems(new Set());
  setContentPage(1);
  }}
- onCreateFolder={() => setIsCreateFolderModalOpen(true)}
+ onCreateFolder={permissions.canManageContent ? () => setIsCreateFolderModalOpen(true) : undefined}
  />
  </div>
 
@@ -1170,6 +1181,7 @@ export default function ContentClient() {
  )}
  </p>
  </div>
+ {permissions.canManageContent && (
  <button
  onClick={() => setIsUploadModalOpen(true)}
  className="eh-btn-neon px-6 py-3 rounded-xl flex items-center gap-2"
@@ -1177,6 +1189,7 @@ export default function ContentClient() {
  <Icon name="add" size="lg" className="text-[#061A21]" />
  <span>Upload Content</span>
  </button>
+ )}
  </div>
 
  {/* Unified Toolbar */}
@@ -1365,7 +1378,7 @@ export default function ContentClient() {
  />
 
  {/* Bulk Actions Toolbar */}
- {selectedItems.size > 0 && (
+ {selectedItems.size > 0 && canSelectContent && (
  <div className="eh-bulk-bar">
  <div className="flex items-center gap-4">
  <span className="text-sm font-medium">
@@ -1379,6 +1392,7 @@ export default function ContentClient() {
  </button>
  </div>
  <div className="flex items-center gap-2">
+ {permissions.canManageContent && (
  <button
  onClick={() => setIsMoveToFolderModalOpen(true)}
  disabled={actionLoading}
@@ -1387,6 +1401,8 @@ export default function ContentClient() {
  <Icon name="folder" size="md" />
  Move to Folder
  </button>
+ )}
+ {permissions.canDeleteContent && (
  <button
  onClick={handleBulkDelete}
  disabled={actionLoading}
@@ -1396,6 +1412,7 @@ export default function ContentClient() {
  <Icon name="delete" size="md" />
  Delete Selected
  </button>
+ )}
  </div>
  </div>
  )}
@@ -1436,21 +1453,30 @@ export default function ContentClient() {
  <div className="eh-dash-card p-12">
  <LoadingSpinner size="lg" />
  </div>
+ ) : contentLoadError ? (
+ <DashboardSectionError
+ section="Content Library"
+ error={contentLoadError}
+ reset={() => {
+ void loadContent();
+ }}
+ />
  ) : filteredContent.length === 0 ? (
  <EmptyState
  icon="folder"
  title={hasActiveFilters ? 'No matching content' : 'No content yet'}
  description={hasActiveFilters ? 'Try changing or clearing your filters' : 'Start by uploading your first media file'}
- action={{
+ action={permissions.canManageContent ? {
  label: 'Upload Content',
  onClick: () => setIsUploadModalOpen(true),
- }}
+ } : undefined}
  />
  ) : viewMode === 'list' ? (
  <div className="eh-dash-card overflow-hidden">
  <table className="min-w-full divide-y divide-[var(--border)]">
  <thead>
  <tr>
+ {canSelectContent && (
  <th className="eh-th">
  <input
  type="checkbox"
@@ -1460,6 +1486,7 @@ export default function ContentClient() {
  className="rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
  />
  </th>
+ )}
  <th className="eh-th">Content</th>
  <th className="eh-th">Type</th>
  <th className="eh-th">Status</th>
@@ -1470,6 +1497,7 @@ export default function ContentClient() {
  <tbody className="divide-y divide-[var(--border)]">
  {filteredContent.map((item) => (
  <tr key={item.id} className="eh-tr-hover">
+ {canSelectContent && (
  <td className="eh-td">
  <input
  type="checkbox"
@@ -1480,6 +1508,7 @@ export default function ContentClient() {
  onClick={(e) => e.stopPropagation()}
  />
  </td>
+ )}
  <td className="eh-td">
  <div
  role="button"
@@ -1528,7 +1557,7 @@ export default function ContentClient() {
  </td>
  <td className="eh-td text-right text-sm font-medium">
  <div className="flex justify-end gap-2">
- {item.status === 'flagged' ? (
+ {item.status === 'flagged' && permissions.canReviewContent ? (
  <button
  onClick={() => handleReview(item)}
  disabled={isContentDetailLoading(item.id)}
@@ -1537,7 +1566,7 @@ export default function ContentClient() {
  >
  <Icon name="shield" size="md" />
  </button>
- ) : item.status !== 'archived' && item.status !== 'rejected' ? (
+ ) : item.status !== 'flagged' && item.status !== 'archived' && item.status !== 'rejected' ? (
  <button
  onClick={() => handleFlag(item)}
  className="eh-icon-btn"
@@ -1546,6 +1575,7 @@ export default function ContentClient() {
  <Icon name="warning" size="md" />
  </button>
  ) : null}
+ {permissions.canManageContent && (
  <button
  onClick={() => handlePushToDevice(item)}
  className="eh-icon-btn"
@@ -1553,6 +1583,8 @@ export default function ContentClient() {
  >
  <Icon name="push" size="md" />
  </button>
+ )}
+ {permissions.canManageContent && (
  <button
  onClick={() => handleAddToPlaylist(item)}
  className="eh-icon-btn"
@@ -1560,6 +1592,8 @@ export default function ContentClient() {
  >
  <Icon name="add" size="md" />
  </button>
+ )}
+ {permissions.canManageContent && (
  <button
  onClick={() => handleEdit(item)}
  disabled={isContentDetailLoading(item.id)}
@@ -1568,6 +1602,8 @@ export default function ContentClient() {
  >
  <Icon name="edit" size="md" />
  </button>
+ )}
+ {permissions.canDeleteContent && (
  <button
  onClick={() => handleDelete(item)}
  className="eh-icon-btn-danger"
@@ -1575,6 +1611,7 @@ export default function ContentClient() {
  >
  <Icon name="delete" size="md" />
  </button>
+ )}
  </div>
  </td>
  </tr>
@@ -1609,6 +1646,7 @@ export default function ContentClient() {
  />
  ) : null}
  <Icon name={getTypeIcon(item.type)} size="6xl" className={`text-white ${item.thumbnailUrl ? 'hidden' : ''}`} />
+ {canSelectContent && (
  <div className="absolute top-3 left-3">
  <input
  type="checkbox"
@@ -1618,6 +1656,7 @@ export default function ContentClient() {
  className="w-5 h-5 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)] bg-[var(--surface)] shadow-sm"
  />
  </div>
+ )}
  <span
  className={`absolute top-3 right-3 px-3 py-1 text-xs rounded-full font-semibold ${getStatusColor(
  item.status
@@ -1640,7 +1679,7 @@ export default function ContentClient() {
  </div>
  )}
  <div className="grid grid-cols-2 gap-3">
- {item.status === 'flagged' ? (
+ {item.status === 'flagged' && permissions.canReviewContent ? (
  <button
  onClick={() => handleReview(item)}
  disabled={isContentDetailLoading(item.id)}
@@ -1649,7 +1688,7 @@ export default function ContentClient() {
  <Icon name="shield" size="sm" />
  Review
  </button>
- ) : item.status !== 'archived' && item.status !== 'rejected' ? (
+ ) : item.status !== 'flagged' && item.status !== 'archived' && item.status !== 'rejected' ? (
  <button
  onClick={() => handleFlag(item)}
  className="eh-icon-btn text-sm py-2 rounded-lg font-medium flex items-center justify-center gap-1"
@@ -1660,6 +1699,7 @@ export default function ContentClient() {
  ) : (
  <div />
  )}
+ {permissions.canManageContent && (
  <button
  onClick={() => handlePushToDevice(item)}
  className="eh-icon-btn text-sm py-2 rounded-lg font-medium flex items-center justify-center gap-1"
@@ -1667,6 +1707,8 @@ export default function ContentClient() {
  <Icon name="push" size="sm" />
  Push
  </button>
+ )}
+ {permissions.canManageContent && (
  <button
  onClick={() => handleAddToPlaylist(item)}
  className="eh-icon-btn text-sm py-2 rounded-lg font-medium flex items-center justify-center gap-1"
@@ -1674,6 +1716,8 @@ export default function ContentClient() {
  <Icon name="add" size="sm" />
  Playlist
  </button>
+ )}
+ {permissions.canManageContent && (
  <button
  onClick={() => handleEdit(item)}
  disabled={isContentDetailLoading(item.id)}
@@ -1682,6 +1726,8 @@ export default function ContentClient() {
  <Icon name="edit" size="sm" />
  Edit
  </button>
+ )}
+ {permissions.canDeleteContent && (
  <button
  onClick={() => handleDelete(item)}
  className="eh-icon-btn-danger text-sm py-2 rounded-lg font-medium flex items-center justify-center gap-1"
@@ -1689,6 +1735,7 @@ export default function ContentClient() {
  <Icon name="delete" size="sm" />
  Delete
  </button>
+ )}
  </div>
  </div>
  </div>
@@ -1698,7 +1745,7 @@ export default function ContentClient() {
 
  {/* Upload Modal */}
  <Modal
- isOpen={isUploadModalOpen}
+ isOpen={isUploadModalOpen && permissions.canManageContent}
  onClose={() => {
  if (actionLoading) return;
  if (uploadForm.url.startsWith('blob:')) {
@@ -1982,7 +2029,7 @@ export default function ContentClient() {
 
  {/* Edit Content Modal */}
  <Modal
- isOpen={isEditModalOpen}
+ isOpen={isEditModalOpen && permissions.canManageContent}
  onClose={() => {
  setIsEditModalOpen(false);
  setFormErrors({});
@@ -2053,7 +2100,7 @@ export default function ContentClient() {
 
  {/* Push to Device Modal */}
  <Modal
- isOpen={isPushModalOpen}
+ isOpen={isPushModalOpen && permissions.canManageContent}
  onClose={() => setIsPushModalOpen(false)}
  title="Push Content to Devices"
  >
@@ -2181,7 +2228,7 @@ export default function ContentClient() {
 
  {/* Add to Playlist Modal */}
  <Modal
- isOpen={isAddToPlaylistModalOpen}
+ isOpen={isAddToPlaylistModalOpen && permissions.canManageContent}
  onClose={() => setIsAddToPlaylistModalOpen(false)}
  title="Add to Playlist"
  >
@@ -2247,7 +2294,7 @@ export default function ContentClient() {
 
  {/* Delete Confirmation */}
  <ConfirmDialog
- isOpen={isDeleteModalOpen}
+ isOpen={isDeleteModalOpen && permissions.canDeleteContent}
  onClose={() => setIsDeleteModalOpen(false)}
  onConfirm={confirmDelete}
  title="Delete Content"
@@ -2257,7 +2304,7 @@ export default function ContentClient() {
  />
 
  <ConfirmDialog
- isOpen={isBulkDeleteModalOpen}
+ isOpen={isBulkDeleteModalOpen && permissions.canDeleteContent}
  onClose={() => {
  if (!actionLoading) setIsBulkDeleteModalOpen(false);
  }}
@@ -2270,7 +2317,7 @@ export default function ContentClient() {
 
  {/* Create Folder Modal */}
  <Modal
- isOpen={isCreateFolderModalOpen}
+ isOpen={isCreateFolderModalOpen && permissions.canManageContent}
  onClose={() => {
  setIsCreateFolderModalOpen(false);
  setNewFolderName('');
@@ -2383,7 +2430,7 @@ export default function ContentClient() {
 
  {/* Review Flagged Content Modal */}
  <Modal
- isOpen={isReviewModalOpen}
+ isOpen={isReviewModalOpen && permissions.canReviewContent}
  onClose={() => {
  setIsReviewModalOpen(false);
  setReviewReason('');
@@ -2455,7 +2502,7 @@ export default function ContentClient() {
 
  {/* Move to Folder Modal */}
  <Modal
- isOpen={isMoveToFolderModalOpen}
+ isOpen={isMoveToFolderModalOpen && permissions.canManageContent}
  onClose={() => {
  setIsMoveToFolderModalOpen(false);
  setTargetFolderId(null);

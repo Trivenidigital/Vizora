@@ -34,7 +34,11 @@ function getTimeRemaining(expiresAt: string): string {
   return `${seconds}s remaining`;
 }
 
-export default function ActiveOverrideBanner() {
+interface ActiveOverrideBannerProps {
+  canClearOverride?: boolean;
+}
+
+export default function ActiveOverrideBanner({ canClearOverride = true }: ActiveOverrideBannerProps) {
   const toast = useToast();
   const [overrides, setOverrides] = useState<Override[]>([]);
   const [, setTick] = useState(0); // force re-render for countdown
@@ -91,12 +95,14 @@ export default function ActiveOverrideBanner() {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => handleClear(override.commandId)}
-            className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white text-sm font-medium rounded-lg transition flex-shrink-0"
-          >
-            Clear Override
-          </button>
+          {canClearOverride && (
+            <button
+              onClick={() => handleClear(override.commandId)}
+              className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white text-sm font-medium rounded-lg transition flex-shrink-0"
+            >
+              Clear Override
+            </button>
+          )}
         </div>
       ))}
     </div>

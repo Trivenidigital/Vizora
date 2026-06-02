@@ -4,6 +4,15 @@ import '@testing-library/jest-dom';
 
 const mockPush = jest.fn();
 
+let mockUser: any = {
+  id: 'u1',
+  email: 'admin@test.com',
+  firstName: 'Admin',
+  lastName: 'User',
+  organizationId: 'org-1',
+  role: 'admin',
+};
+
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
@@ -35,6 +44,17 @@ const mockToast = {
 };
 jest.mock('@/lib/hooks/useToast', () => ({
   useToast: () => mockToast,
+}));
+
+jest.mock('@/lib/hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: mockUser,
+    loading: false,
+    error: null,
+    isAuthenticated: !!mockUser,
+    logout: jest.fn(),
+    reload: jest.fn(),
+  }),
 }));
 
 jest.mock('@/lib/hooks/useDebounce', () => ({
@@ -183,6 +203,14 @@ const mockDevices = [
 describe('PlaylistsClient', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUser = {
+      id: 'u1',
+      email: 'admin@test.com',
+      firstName: 'Admin',
+      lastName: 'User',
+      organizationId: 'org-1',
+      role: 'admin',
+    };
     (apiClient.getPlaylists as jest.Mock).mockResolvedValue({ data: mockPlaylists });
     (apiClient.getContent as jest.Mock).mockResolvedValue({ data: [] });
     (apiClient.getDisplays as jest.Mock).mockResolvedValue({ data: [] });
@@ -441,6 +469,39 @@ describe('PlaylistsClient', () => {
     });
   });
 
+  it('keeps viewers on read-only playlist actions', async () => {
+    mockUser = { ...mockUser, role: 'viewer' };
+
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Promo')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('Create Playlist')).not.toBeInTheDocument();
+    expect(screen.queryByText('Edit')).not.toBeInTheDocument();
+    expect(screen.queryByText('Assign')).not.toBeInTheDocument();
+    expect(screen.queryByText('Duplicate')).not.toBeInTheDocument();
+    expect(screen.queryAllByText('Delete')).toHaveLength(0);
+    expect(screen.getAllByText('Preview').length).toBeGreaterThan(0);
+  });
+
+  it('allows managers to manage playlists without exposing admin-only deletes', async () => {
+    mockUser = { ...mockUser, role: 'manager' };
+
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Promo')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Create Playlist')).toBeInTheDocument();
+    expect(screen.getAllByText('Edit').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Assign').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Duplicate').length).toBeGreaterThan(0);
+    expect(screen.queryAllByText('Delete')).toHaveLength(0);
+  });
+
   it('opens create modal when Create Playlist is clicked', async () => {
     render(<PlaylistsClient />);
 
@@ -477,6 +538,9 @@ describe('PlaylistsClient', () => {
     await waitFor(() => {
       expect(mockToast.error).toHaveBeenCalledWith('Network error');
     });
+    expect(screen.getByRole('alert')).toHaveTextContent('Playlists Error');
+    expect(screen.getByRole('button', { name: 'Try Again' })).toBeInTheDocument();
+    expect(screen.queryByText('No playlists yet')).not.toBeInTheDocument();
   });
 
   it('opens delete confirmation when Delete is clicked', async () => {
