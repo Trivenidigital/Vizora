@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { FoldersController } from './folders.controller';
 import { FoldersService } from './folders.service';
+import { DatabaseService } from '../database/database.service';
 
 describe('FoldersController', () => {
   let controller: FoldersController;
@@ -34,7 +35,10 @@ describe('FoldersController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [FoldersController],
-      providers: [{ provide: FoldersService, useValue: mockFoldersService }],
+      providers: [
+        { provide: FoldersService, useValue: mockFoldersService },
+        { provide: DatabaseService, useValue: { organization: { findUnique: jest.fn() } } },
+      ],
     }).compile();
 
     controller = module.get<FoldersController>(FoldersController);

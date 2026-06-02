@@ -8,6 +8,7 @@ jest.mock('isomorphic-dompurify', () => ({
 import { Test, TestingModule } from '@nestjs/testing';
 import { TemplatesController } from './templates.controller';
 import { ContentService } from '../content.service';
+import { DatabaseService } from '../../database/database.service';
 
 describe('TemplatesController', () => {
   let controller: TemplatesController;
@@ -29,6 +30,7 @@ describe('TemplatesController', () => {
       controllers: [TemplatesController],
       providers: [
         { provide: ContentService, useValue: mockContentService },
+        { provide: DatabaseService, useValue: { organization: { findUnique: jest.fn() } } },
       ],
     }).compile();
 

@@ -14,6 +14,7 @@ import {
 import { ParseIdPipe } from '../common/pipes/parse-id.pipe';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequiresSubscription } from '../billing/decorators/requires-subscription.decorator';
 import { FoldersService } from './folders.service';
 import { CreateFolderDto } from './dto/create-folder.dto';
 import { UpdateFolderDto } from './dto/update-folder.dto';
@@ -28,6 +29,7 @@ export class FoldersController {
 
   @Post()
   @Roles('admin', 'manager')
+  @RequiresSubscription()
   create(
     @CurrentUser('organizationId') organizationId: string,
     @Body() createFolderDto: CreateFolderDto,
@@ -56,6 +58,7 @@ export class FoldersController {
 
   @Patch(':id')
   @Roles('admin', 'manager')
+  @RequiresSubscription()
   update(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id', ParseIdPipe) id: string,
@@ -66,6 +69,7 @@ export class FoldersController {
 
   @Delete(':id')
   @Roles('admin', 'manager')
+  @RequiresSubscription()
   remove(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id', ParseIdPipe) id: string,
@@ -75,6 +79,7 @@ export class FoldersController {
 
   @Post(':id/content')
   @Roles('admin', 'manager')
+  @RequiresSubscription()
   @HttpCode(HttpStatus.OK)
   moveContent(
     @CurrentUser('organizationId') organizationId: string,

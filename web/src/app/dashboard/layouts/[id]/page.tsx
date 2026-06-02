@@ -24,6 +24,10 @@ interface LayoutData {
   zones: Zone[];
   description?: string;
   createdAt?: string;
+  metadata?: {
+    layoutType?: string;
+    zones?: Zone[];
+  };
 }
 
 interface ContentItem {
@@ -72,6 +76,28 @@ function getDefaultZones(layoutType: string): Zone[] {
     default:
       return [{ id: 'zone-a', name: 'Full', gridArea: '1 / 1 / 2 / 2' }];
   }
+}
+
+function normalizeLayoutResponse(data: any): LayoutData | null {
+  if (!data) {
+    return null;
+  }
+
+  const metadata = data.metadata && typeof data.metadata === 'object' && !Array.isArray(data.metadata)
+    ? data.metadata
+    : {};
+  const layoutType = data.layoutType || metadata.layoutType || 'custom';
+  const zones = Array.isArray(data.zones)
+    ? data.zones
+    : Array.isArray(metadata.zones)
+      ? metadata.zones
+      : [];
+
+  return {
+    ...data,
+    layoutType,
+    zones,
+  };
 }
 
 // Get CSS grid template based on layout type
@@ -137,11 +163,14 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
       }
 
       if (data) {
-        setLayout(data);
+        const normalizedLayout = normalizeLayoutResponse(data);
+        if (!normalizedLayout) return;
+
+        setLayout(normalizedLayout);
         // Use the layout zones if present, otherwise build defaults from type
-        const layoutZones = data.zones && data.zones.length > 0
-          ? data.zones
-          : getDefaultZones(data.layoutType);
+        const layoutZones = normalizedLayout.zones.length > 0
+          ? normalizedLayout.zones
+          : getDefaultZones(normalizedLayout.layoutType);
         setZones(layoutZones);
       }
     } catch (error: any) {

@@ -12,6 +12,7 @@ import {
 import { ParseIdPipe } from '../../common/pipes/parse-id.pipe';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
+import { RequiresSubscription } from '../../billing/decorators/requires-subscription.decorator';
 import { ContentService } from '../content.service';
 import { CreateLayoutDto } from '../dto/create-layout.dto';
 import { UpdateLayoutDto } from '../dto/update-layout.dto';
@@ -40,6 +41,7 @@ export class LayoutsController {
 
   @Post()
   @Roles('admin', 'manager')
+  @RequiresSubscription()
   createLayout(
     @CurrentUser('organizationId') organizationId: string,
     @Body() dto: CreateLayoutDto,
@@ -49,6 +51,7 @@ export class LayoutsController {
 
   @Patch(':id')
   @Roles('admin', 'manager')
+  @RequiresSubscription()
   updateLayout(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id', ParseIdPipe) id: string,
@@ -68,6 +71,7 @@ export class LayoutsController {
 
   @Delete(':id')
   @Roles('admin', 'manager')
+  @RequiresSubscription()
   deleteLayout(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id', ParseIdPipe) id: string,

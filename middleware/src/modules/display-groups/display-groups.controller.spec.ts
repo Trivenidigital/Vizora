@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { DisplayGroupsController } from './display-groups.controller';
 import { DisplayGroupsService } from './display-groups.service';
+import { DatabaseService } from '../database/database.service';
 
 describe('DisplayGroupsController', () => {
   let controller: DisplayGroupsController;
@@ -22,7 +23,10 @@ describe('DisplayGroupsController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [DisplayGroupsController],
-      providers: [{ provide: DisplayGroupsService, useValue: mockDisplayGroupsService }],
+      providers: [
+        { provide: DisplayGroupsService, useValue: mockDisplayGroupsService },
+        { provide: DatabaseService, useValue: { organization: { findUnique: jest.fn() } } },
+      ],
     }).compile();
 
     controller = module.get<DisplayGroupsController>(DisplayGroupsController);

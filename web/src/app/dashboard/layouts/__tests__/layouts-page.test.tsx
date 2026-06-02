@@ -168,6 +168,34 @@ describe('LayoutsPage', () => {
     expect(screen.getByText('Dashboard Grid')).toBeInTheDocument();
   });
 
+  it('normalizes backend layout metadata before rendering saved layouts', async () => {
+    mockGet.mockResolvedValue({
+      data: [
+        {
+          id: 'server-layout',
+          name: 'Server Layout',
+          description: 'Layout returned by middleware',
+          metadata: {
+            layoutType: 'split-horizontal',
+            zones: [
+              { id: 'left', name: 'Left', gridArea: '1 / 1 / 2 / 2' },
+              { id: 'right', name: 'Right', gridArea: '1 / 2 / 2 / 3' },
+            ],
+          },
+          createdAt: '2026-02-01T00:00:00Z',
+        },
+      ],
+    });
+
+    render(<LayoutsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Server Layout')).toBeInTheDocument();
+    });
+
+    expect(screen.getAllByText('Split Horizontal').length).toBeGreaterThan(1);
+  });
+
   it('handles fetch failure gracefully', async () => {
     mockGetLayoutPresets.mockRejectedValue(new Error('Failed'));
     render(<LayoutsPage />);
@@ -200,5 +228,42 @@ describe('LayoutsPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Split Horizontal')).toBeInTheDocument();
     });
+  });
+
+  it('creates a layout from backend preset data with layoutType', async () => {
+    mockGetLayoutPresets.mockResolvedValue([
+      {
+        id: 'split-horizontal',
+        layoutType: 'split-horizontal',
+        name: 'Server Split',
+        description: 'Two zones from the middleware preset API',
+        zones: [
+          { id: 'left', name: 'Left', gridArea: '1 / 1 / 2 / 2' },
+          { id: 'right', name: 'Right', gridArea: '1 / 2 / 2 / 3' },
+        ],
+      },
+    ]);
+
+    render(<LayoutsPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Server Split')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Use Preset'));
+    fireEvent.change(screen.getByPlaceholderText('e.g., Lobby Main Display'), {
+      target: { value: 'Lobby Main Display' },
+    });
+    const createButtons = screen.getAllByRole('button', { name: /create layout/i });
+    fireEvent.click(createButtons[createButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(mockCreateLayout).toHaveBeenCalledWith({
+        name: 'Lobby Main Display',
+        layoutType: 'split-horizontal',
+        description: undefined,
+      });
+    });
+    expect(mockPush).toHaveBeenCalledWith('/dashboard/layouts/new-1');
   });
 });

@@ -12,6 +12,7 @@ jest.mock('dns/promises', () => ({
 import { Test, TestingModule } from '@nestjs/testing';
 import { WidgetsController } from './widgets.controller';
 import { ContentService } from '../content.service';
+import { DatabaseService } from '../../database/database.service';
 import { lookup } from 'dns/promises';
 
 describe('WidgetsController', () => {
@@ -34,6 +35,7 @@ describe('WidgetsController', () => {
       controllers: [WidgetsController],
       providers: [
         { provide: ContentService, useValue: mockContentService },
+        { provide: DatabaseService, useValue: { organization: { findUnique: jest.fn() } } },
       ],
     }).compile();
 

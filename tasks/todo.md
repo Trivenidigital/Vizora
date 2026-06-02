@@ -1,6 +1,101 @@
 # Vizora - Task Tracker
 
-## Active Workstream: Pairing Active Index Pass 47 (2026-06-02)
+## Active Workstream: Dashboard Write Gates and Layout Create Pass 48 (2026-06-02)
+
+**Branch:** `fix/dashboard-write-gates-layout-pass-48`
+
+**Why now:** PR #187 is merged with green CI and no PRs remain open, but
+production deploy remains blocked by dirty/diverged production state. The next
+customer-dashboard findings are small, repo-side, testable regressions:
+dashboard-adjacent write routes miss the existing subscription-active guard,
+and normal dashboard layout creation can fail because the frontend omits
+server-owned preset zones.
+
+**New primitives introduced:** none. This pass reuses the existing
+`@RequiresSubscription()` decorator / `SubscriptionActiveGuard` and the existing
+`LAYOUT_PRESETS` table. No new route, model, migration, module, env var,
+process, response shape, realtime path, MCP tool, Hermes skill, or AI/provider
+spend path.
+
+**Hermes-first analysis:** checked per project convention. This is local
+NestJS controller authorization and layout DTO/service contract repair, not a
+business-agent, MCP, Hermes runtime, or provider-spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Dashboard write gating | none applicable | reuse existing billing guard decorator |
+| Layout preset materialization | none applicable | reuse existing `LAYOUT_PRESETS` |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+NestJS guard metadata or preset-backed layout creation.
+
+**Plan/design:**
+`docs/plans/2026-06-02-dashboard-write-gates-layout-pass-48.md`
+
+**Plan**
+- [x] Drift-check current guard/decorator usage and dashboard layout payloads.
+- [x] Document pass 48 design and test plan.
+- [x] Add guard metadata regression coverage for newly gated mutating handlers.
+- [x] Add executable guard-resolution coverage for display-group/folder modules.
+- [x] Add service regression coverage for preset-based layout creation without
+  zones.
+- [x] Add dashboard regressions for server-shaped presets and metadata-backed
+  saved-layout/editor loads.
+- [x] Patch controllers, modules, layout DTO, layout creation service, and
+  dashboard normalization.
+- [x] Run focused middleware/web tests.
+- [x] Run multi-vector subagent diff review.
+- [x] Run broader middleware verification and build.
+- [ ] PR, CI, merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Evidence so far**
+- Current `origin/main`: `913ed1b0661209858f45f1b034daac3c695de942`.
+- No open PRs after merging PR #187.
+- Production deploy gate remains blocked: `/opt/vizora/app` is
+  `main...origin/main [ahead 17, behind 164]` with 72 dirty/untracked paths;
+  middleware/web/realtime are online, `/api/v1/health` is 200, and readiness is
+  degraded by high middleware heap memory.
+- Focused verification:
+  - `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/billing/subscription-write-gates.spec.ts src/modules/content/content.service.spec.ts`
+    => 2 suites / 151 tests passing.
+  - `pnpm --filter @vizora/web test -- --runInBand --runTestsByPath src/app/dashboard/layouts/__tests__/layouts-page.test.tsx src/app/dashboard/layouts/[id]/__tests__/layout-editor-page.test.tsx`
+    => 2 suites / 13 tests passing; existing React `act()` warnings remain in
+    the older layouts page tests.
+- Targeted controller slice:
+  - `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/content/controllers/layouts.controller.spec.ts src/modules/content/controllers/templates.controller.spec.ts src/modules/content/controllers/widgets.controller.spec.ts src/modules/content/controllers/bulk-operations.controller.spec.ts src/modules/display-groups/display-groups.controller.spec.ts src/modules/folders/folders.controller.spec.ts src/modules/billing/subscription-write-gates.spec.ts`
+    => 7 suites / 149 tests passing.
+- Full verification:
+  - `pnpm --filter @vizora/middleware test -- --runInBand`
+    => 148 suites / 3023 tests passing / 1 snapshot.
+  - `pnpm --filter @vizora/web test -- --runInBand`
+    => 104 suites / 1103 tests passing; existing React `act()` warnings remain
+    in older unrelated tests.
+  - `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false`
+    => passing.
+  - `pnpm --filter @vizora/web exec tsc --noEmit --pretty false`
+    => passing.
+  - Changed-file ESLint => 0 errors / 19 warnings, mostly existing `any`
+    warnings plus existing unused `idx` in the layout editor.
+  - `git diff --check` => passing, with CRLF normalization warnings.
+  - `npx nx build @vizora/middleware` => passing, with existing webpack
+    warnings.
+  - `npx nx build @vizora/web` with production env values => passing, with
+    existing Next middleware/proxy warning.
+  - `pnpm security:no-hardcoded-jwts` => passing.
+- Review:
+  - Plan/security reviewer found missing `BillingModule` imports for
+    display-groups and folders; fixed and covered with executable guard
+    resolution tests.
+  - Plan/layout reviewer found backend `layoutType`/metadata shape drift
+    against the dashboard; fixed with list/editor normalization and tests.
+  - Diff security/module reviewer returned CLEAN after focused tests and
+    `git diff --check`.
+  - Diff layout reviewer found saved-layout list normalization was still
+    incomplete; fixed with metadata-backed saved-layout coverage.
+  - Follow-up layout reviewer returned CLEAN.
+
+## Completed: Pairing Active Index Pass 47 (2026-06-02)
 
 **Branch:** `feat/dashboard-customer-readiness-pass-47`
 
@@ -42,13 +137,17 @@ an in-process NestJS Redis index on the dashboard pairing hot path.
 - [x] Run focused pairing tests.
 - [x] Run multi-vector subagent diff review.
 - [x] Run broader middleware verification and build.
-- [ ] PR, CI, merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge if green. PR #187 merged to `origin/main` at
+  `913ed1b0661209858f45f1b034daac3c695de942`.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe. Gate
+  remains blocked by dirty/diverged production checkout.
 
 **Evidence so far**
-- Current `origin/main` merge SHA after Pass 46: `4eef5d5a51afea83a660195d6f374e741a554434`.
+- Current `origin/main` merge SHA after Pass 47: `913ed1b0661209858f45f1b034daac3c695de942`.
 - No open PRs after merging PR #186.
-- Production deploy gate remains blocked: `/opt/vizora/app` is `main...origin/main [ahead 17, behind 161]` with 72 dirty/untracked paths; readiness is degraded by high middleware memory.
+- PR #187: https://github.com/Trivenidigital/Vizora/pull/187.
+- Feature commit: `71fdcb723409c8b2590829da24fc0328e7e64c11`.
+- Production deploy gate remains blocked: `/opt/vizora/app` is `main...origin/main [ahead 17, behind 164]` with 72 dirty/untracked paths; readiness is degraded by high middleware memory.
 - Stale subagent findings were traced to reviewers inspecting `C:\projects\vizora`
   instead of the active isolated worktree. `tasks/lessons.md` now captures the
   worktree-verification rule.
@@ -71,6 +170,8 @@ an in-process NestJS Redis index on the dashboard pairing hot path.
   - CI-gated middleware E2E subset:
     `pnpm --filter @vizora/middleware exec jest --config=jest.e2e.config.js --runInBand --testPathPattern="(agents|customer-critical-path)"`
     => 2 suites / 4 tests passing.
+  - PR #187 CI passed lint, audit, test, build, security, and e2e before
+    merge.
 
 ## Completed: Backend Heartbeat and Notification Scoping Pass 46 (2026-06-02)
 
