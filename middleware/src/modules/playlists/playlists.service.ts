@@ -281,7 +281,7 @@ export class PlaylistsService {
     this.eventEmitter.emit('playlist.updated', { entityId: id, organizationId });
 
     // Notify all displays using this playlist
-    this.notifyDisplaysOfPlaylistUpdate(id, updatedPlaylist).catch(error => {
+    this.notifyDisplaysOfPlaylistUpdate(organizationId, id, updatedPlaylist).catch(error => {
       this.logger.error(`Failed to notify displays of playlist update: ${error.message}`);
     });
 
@@ -318,7 +318,7 @@ export class PlaylistsService {
     });
 
     // Notify displays about the playlist change
-    this.notifyPlaylistChangeAfterItemUpdate(playlistId);
+    this.notifyPlaylistChangeAfterItemUpdate(organizationId, playlistId);
 
     return newItem;
   }
@@ -340,7 +340,7 @@ export class PlaylistsService {
       include: { content: true },
     });
 
-    this.notifyPlaylistChangeAfterItemUpdate(playlistId);
+    this.notifyPlaylistChangeAfterItemUpdate(organizationId, playlistId);
 
     return updatedItem;
   }
@@ -360,7 +360,7 @@ export class PlaylistsService {
     const deletedItem = { id: itemId, playlistId };
 
     // Notify displays about the playlist change
-    this.notifyPlaylistChangeAfterItemUpdate(playlistId);
+    this.notifyPlaylistChangeAfterItemUpdate(organizationId, playlistId);
 
     return deletedItem;
   }
@@ -368,7 +368,10 @@ export class PlaylistsService {
   /**
    * Helper to notify displays after adding/removing playlist items
    */
-  private async notifyPlaylistChangeAfterItemUpdate(playlistId: string): Promise<void> {
+  private async notifyPlaylistChangeAfterItemUpdate(
+    organizationId: string,
+    playlistId: string,
+  ): Promise<void> {
     // Fetch the full playlist with items
     const playlist = await this.db.playlist.findUnique({
       where: { id: playlistId },
@@ -381,7 +384,7 @@ export class PlaylistsService {
     });
 
     if (playlist) {
-      this.notifyDisplaysOfPlaylistUpdate(playlistId, playlist).catch(error => {
+      this.notifyDisplaysOfPlaylistUpdate(organizationId, playlistId, playlist).catch(error => {
         this.logger.error(`Failed to notify displays after item update: ${error.message}`);
       });
     }
@@ -425,7 +428,7 @@ export class PlaylistsService {
     const updatedPlaylist = await this.findOne(organizationId, playlistId);
 
     // Notify displays
-    this.notifyDisplaysOfPlaylistUpdate(playlistId, updatedPlaylist).catch(error => {
+    this.notifyDisplaysOfPlaylistUpdate(organizationId, playlistId, updatedPlaylist).catch(error => {
       this.logger.error(`Failed to notify displays of playlist reorder: ${error.message}`);
     });
 
@@ -508,7 +511,7 @@ export class PlaylistsService {
         );
         return;
       }
-      await this.notifyDisplaysOfPlaylistUpdate(payload.entityId, playlist);
+      await this.notifyDisplaysOfPlaylistUpdate(payload.organizationId, payload.entityId, playlist);
     } catch (err) {
       this.logger.error(
         `Failed to notify displays of expired-content playlist refresh for ${payload.entityId}: ${
@@ -521,13 +524,17 @@ export class PlaylistsService {
   /**
    * Notify all displays using a playlist about the update
    */
-  private async notifyDisplaysOfPlaylistUpdate(playlistId: string, playlist: unknown): Promise<void> {
+  private async notifyDisplaysOfPlaylistUpdate(
+    organizationId: string,
+    playlistId: string,
+    playlist: unknown,
+  ): Promise<void> {
     const headers = this.getInternalApiHeaders();
     if (!headers) return;
 
     // Find all displays currently using this playlist
     const displays = await this.db.display.findMany({
-      where: { currentPlaylistId: playlistId },
+      where: { currentPlaylistId: playlistId, organizationId },
       select: { id: true },
     });
 

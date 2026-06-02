@@ -76,10 +76,11 @@ export function DisplayClient() {
     player.updatePlaylist(playlist);
     setState('PLAYING');
 
-    // Preload first 5 media items
+    // Preload image items only. Videos should rely on native range streaming;
+    // Cache API preloads would fetch the full file before playback.
     const urls = playlist.items
       .slice(0, 5)
-      .filter((item) => item.content && (item.content.type === 'image' || item.content.type === 'video'))
+      .filter((item) => item.content?.type === 'image')
       .map((item) => authenticateDisplayContentUrl(item.content!.url, credentials?.deviceToken))
       .filter(Boolean);
     if (urls.length > 0) preloadItems(urls);

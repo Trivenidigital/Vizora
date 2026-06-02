@@ -61,9 +61,9 @@ export class HealthService {
 
     let status: 'ok' | 'degraded' | 'unhealthy';
     if (hasUnhealthy) {
-      // Database unhealthy = overall unhealthy
+      // Database and object storage are required for customer-facing readiness.
       // Redis unhealthy = degraded (it's optional for basic functionality)
-      if (database.status === 'unhealthy') {
+      if (database.status === 'unhealthy' || minio.status === 'unhealthy') {
         status = 'unhealthy';
       } else {
         status = 'degraded';

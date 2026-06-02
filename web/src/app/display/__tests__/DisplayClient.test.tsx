@@ -91,7 +91,37 @@ describe('DisplayClient', () => {
     });
   });
 
-  it('preloads authenticated device-content URLs after playlist updates', async () => {
+  it('preloads authenticated image device-content URLs after playlist updates', async () => {
+    render(<DisplayClient />);
+
+    await waitFor(() => expect(capturedPlaylistUpdate).toBeDefined());
+
+    capturedPlaylistUpdate?.({
+      id: 'playlist-1',
+      name: 'Main',
+      items: [
+        {
+          id: 'item-1',
+          contentId: 'content-1',
+          duration: 10,
+          order: 0,
+          content: {
+            id: 'content-1',
+            name: 'Image',
+            type: 'image',
+            url: '/api/v1/device-content/content-1/file',
+          },
+        },
+      ],
+    });
+
+    expect(updatePlaylist).toHaveBeenCalled();
+    expect(mockPreloadItems).toHaveBeenCalledWith([
+      '/api/v1/device-content/content-1/file?token=device-token-123',
+    ]);
+  });
+
+  it('does not preload video files before playback', async () => {
     render(<DisplayClient />);
 
     await waitFor(() => expect(capturedPlaylistUpdate).toBeDefined());
@@ -112,12 +142,24 @@ describe('DisplayClient', () => {
             url: '/api/v1/device-content/content-1/file',
           },
         },
+        {
+          id: 'item-2',
+          contentId: 'content-2',
+          duration: 10,
+          order: 1,
+          content: {
+            id: 'content-2',
+            name: 'Image',
+            type: 'image',
+            url: '/api/v1/device-content/content-2/file',
+          },
+        },
       ],
     });
 
     expect(updatePlaylist).toHaveBeenCalled();
     expect(mockPreloadItems).toHaveBeenCalledWith([
-      '/api/v1/device-content/content-1/file?token=device-token-123',
+      '/api/v1/device-content/content-2/file?token=device-token-123',
     ]);
   });
 

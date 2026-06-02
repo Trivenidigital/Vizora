@@ -1,6 +1,6 @@
 import { LoggingInterceptor } from './logging.interceptor';
 import { ExecutionContext, CallHandler, Logger } from '@nestjs/common';
-import { of, throwError } from 'rxjs';
+import { firstValueFrom, of, throwError } from 'rxjs';
 
 describe('LoggingInterceptor', () => {
   let interceptor: LoggingInterceptor;
@@ -180,6 +180,57 @@ describe('LoggingInterceptor', () => {
           done();
         },
       });
+    });
+  });
+
+  describe('device media stream logging', () => {
+    it('suppresses normal and slow logs for successful device-content file streams', async () => {
+      mockRequest.url = '/api/v1/device-content/content-1/file?token=secret-token';
+      const startTime = Date.now();
+      let callCount = 0;
+      jest.spyOn(Date, 'now').mockImplementation(() => {
+        callCount += 1;
+        return callCount > 1 ? startTime + 2500 : startTime;
+      });
+
+      await firstValueFrom(interceptor.intercept(mockExecutionContext, mockCallHandler));
+
+      expect(logSpy).not.toHaveBeenCalled();
+      expect(warnSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining('Slow request detected'),
+        'Performance',
+      );
+    });
+
+    it('still logs device-content file stream errors', (done) => {
+      mockRequest.url = '/api/v1/device-content/content-1/file?token=secret-token';
+      const error = { status: 500, message: 'stream failed' };
+      mockCallHandler.handle = jest.fn().mockReturnValue(throwError(() => error));
+
+      const result$ = interceptor.intercept(mockExecutionContext, mockCallHandler);
+
+      result$.subscribe({
+        error: () => {
+          expect(errorSpy).toHaveBeenCalledWith(
+            expect.stringContaining('stream failed'),
+            undefined,
+            expect.any(String),
+          );
+          done();
+        },
+      });
+    });
+
+    it('still logs completed 4xx device-content file responses', async () => {
+      mockRequest.url = '/api/v1/device-content/content-1/file?token=secret-token';
+      mockResponse.statusCode = 416;
+
+      await firstValueFrom(interceptor.intercept(mockExecutionContext, mockCallHandler));
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('GET /api/v1/device-content/content-1/file?token=REDACTED 416'),
+        expect.any(String),
+      );
     });
   });
 

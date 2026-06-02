@@ -11,6 +11,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 describe('HealthController', () => {
   let controller: HealthController;
   let healthService: jest.Mocked<HealthService>;
+  let selfTestService: jest.Mocked<StartupSelfTestService>;
 
   const mockHealthyResponse = {
     status: 'ok' as const,
@@ -20,8 +21,8 @@ describe('HealthController', () => {
     checks: {
       database: { status: 'healthy' as const, responseTime: 5 },
       redis: { status: 'healthy' as const, responseTime: 3 },
-      memory: {
-        status: 'healthy' as const,
+        memory: {
+          status: 'healthy' as const,
         responseTime: 0,
         details: {
           heapUsedMB: 50,
@@ -30,6 +31,7 @@ describe('HealthController', () => {
           rssMB: 120,
         },
       },
+      minio: { status: 'healthy' as const, responseTime: 4 },
     },
   };
 
@@ -42,6 +44,7 @@ describe('HealthController', () => {
       database: { status: 'unhealthy' as const, responseTime: 100, error: 'Connection refused' },
       redis: { status: 'healthy' as const, responseTime: 3 },
       memory: { status: 'healthy' as const, responseTime: 0 },
+      minio: { status: 'healthy' as const, responseTime: 4 },
     },
   };
 
@@ -54,6 +57,7 @@ describe('HealthController', () => {
       database: { status: 'healthy' as const, responseTime: 5 },
       redis: { status: 'unhealthy' as const, responseTime: 10, error: 'Connection refused' },
       memory: { status: 'healthy' as const, responseTime: 0 },
+      minio: { status: 'healthy' as const, responseTime: 4 },
     },
   };
 
@@ -89,6 +93,7 @@ describe('HealthController', () => {
 
     controller = module.get<HealthController>(HealthController);
     healthService = module.get(HealthService);
+    selfTestService = module.get(StartupSelfTestService);
   });
 
   describe('health', () => {
@@ -158,6 +163,24 @@ describe('HealthController', () => {
 
       expect(result.uptime).toBe(3600);
       expect(result.version).toBe('1.0.0');
+    });
+
+    it('should not expose detailed self-test failure messages on the public readiness endpoint', async () => {
+      healthService.check.mockResolvedValue(mockHealthyResponse);
+      selfTestService.result = {
+        passed: false,
+        timestamp: '2026-02-01T10:00:00.000Z',
+        duration_ms: 12,
+        results: {
+          smtp: { passed: false, message: 'SMTP_PASS is not configured' },
+          database: { passed: true, message: 'ok' },
+        },
+      } as any;
+
+      const result = await controller.ready();
+
+      expect(result).toHaveProperty('self_test', 'failed');
+      expect(result).not.toHaveProperty('self_test_failures');
     });
   });
 
