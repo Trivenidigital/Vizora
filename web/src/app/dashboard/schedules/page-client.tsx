@@ -600,6 +600,17 @@ export default function SchedulesClient() {
  return playlists.find(p => p.id === playlistId)?.name || 'Unknown Playlist';
  };
 
+ const getDisplayTargetLabel = (displayId: string): string | null => {
+ const display = devices.find((device) => device.id === displayId);
+ if (!display) return null;
+
+ const nickname = display.nickname?.trim();
+ if (nickname) return nickname;
+
+ const location = display.location?.trim();
+ return location || null;
+ };
+
  const getScheduleTargetDescription = (schedule: Schedule) => {
  if (schedule.displayGroupId) {
  const group = displayGroups.find((g: any) => g.id === schedule.displayGroupId);
@@ -607,7 +618,24 @@ export default function SchedulesClient() {
  return `${group?.name || schedule.displayGroupId}${typeof displayCount === 'number' ? ` (${displayCount} devices)` : ''}`;
  }
 
- const count = schedule.deviceIds?.length || 0;
+ const targetIds = schedule.deviceIds && schedule.deviceIds.length > 0
+ ? schedule.deviceIds
+ : schedule.displayId
+ ? [schedule.displayId]
+ : [];
+ const count = targetIds.length;
+ const targetLabels = targetIds
+ .map((displayId) => getDisplayTargetLabel(displayId))
+ .filter((label): label is string => Boolean(label));
+
+ if (targetLabels.length > 0) {
+ const visibleLabels = targetLabels.slice(0, 2).join(', ');
+ const remainingCount = count - targetLabels.length;
+ const hiddenKnownCount = Math.max(targetLabels.length - 2, 0);
+ const moreCount = remainingCount + hiddenKnownCount;
+ return moreCount > 0 ? `${visibleLabels} + ${moreCount} more` : visibleLabels;
+ }
+
  return `${count} device${count !== 1 ? 's' : ''}`;
  };
 
@@ -749,6 +777,7 @@ export default function SchedulesClient() {
  <div className="space-y-4">
  {schedules.map(schedule => {
  const scheduleActive = getScheduleActiveState(schedule);
+ const targetDescription = getScheduleTargetDescription(schedule);
  return (
  <div
  key={schedule.id}
@@ -790,7 +819,7 @@ export default function SchedulesClient() {
  </div>
  <div>
  <span className="font-medium text-[var(--foreground-secondary)]">Target:</span>
- <p className="text-[var(--foreground-secondary)] truncate">{getScheduleTargetDescription(schedule)}</p>
+ <p className="text-[var(--foreground-secondary)] truncate" title={targetDescription}>{targetDescription}</p>
  </div>
  </div>
  </div>

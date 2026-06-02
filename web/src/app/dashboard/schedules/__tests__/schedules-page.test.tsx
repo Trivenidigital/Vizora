@@ -274,6 +274,44 @@ describe('SchedulesClient', () => {
     });
   });
 
+  it('renders individual schedule targets with display names', async () => {
+    mockGetSchedules.mockResolvedValue({ data: sampleSchedules });
+    mockGetDisplays.mockResolvedValue({ data: sampleDisplays });
+
+    render(<SchedulesClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Announcements')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('Lobby Display')).toBeInTheDocument();
+    expect(screen.queryByText(/^1 device$/)).not.toBeInTheDocument();
+    expect(screen.getByText('Lobby Display')).toHaveAttribute('title', 'Lobby Display');
+  });
+
+  it('falls back to target counts instead of raw display identifiers when names are unavailable', async () => {
+    mockGetSchedules.mockResolvedValue({ data: sampleSchedules });
+    mockGetDisplays.mockResolvedValue({
+      data: [{
+        id: 'd1',
+        nickname: '',
+        deviceId: 'device-token-123',
+        deviceIdentifier: 'hardware-token-456',
+        status: 'online',
+      }],
+    });
+
+    render(<SchedulesClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Announcements')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/^1 device$/)).toBeInTheDocument();
+    expect(screen.queryByText('device-token-123')).not.toBeInTheDocument();
+    expect(screen.queryByText('hardware-token-456')).not.toBeInTheDocument();
+  });
+
   it('renders inactive schedules differently', async () => {
     mockGetSchedules.mockResolvedValue({ data: sampleSchedules });
     render(<SchedulesClient />);
