@@ -133,6 +133,38 @@ describe('DashboardClient', () => {
     expect(screen.getByText('System Status')).toBeInTheDocument();
   });
 
+  it('exposes navigable overview cards as accessible links', async () => {
+    await renderDashboardClient({
+      initialStats: {
+        devices: { total: 2, online: 1 },
+        content: { total: 12, processing: 3 },
+        playlists: { total: 4, active: 2 },
+      },
+      initialContentSampleReady: true,
+      initialPlaylistsSampleReady: true,
+      initialStorageInfo: {
+        usedBytes: 512,
+        quotaBytes: 2048,
+        availableBytes: 1536,
+        usagePercent: 25,
+      },
+      initialSystemHealth: { status: 'ok' },
+    });
+
+    expect(screen.getByRole('link', { name: /total devices/i })).toHaveAttribute(
+      'href',
+      '/dashboard/devices',
+    );
+    expect(screen.getByRole('link', { name: /content items/i })).toHaveAttribute(
+      'href',
+      '/dashboard/content',
+    );
+    expect(screen.getByRole('link', { name: /playlists/i })).toHaveAttribute(
+      'href',
+      '/dashboard/playlists',
+    );
+  });
+
   it('renders quick actions section', async () => {
     await renderDashboardClient();
     expect(screen.getByText('Quick Actions')).toBeInTheDocument();
