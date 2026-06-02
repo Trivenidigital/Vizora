@@ -1,5 +1,96 @@
 # Vizora - Task Tracker
 
+## Active Workstream: Readiness Memory Calibration Pass 49 (2026-06-02)
+
+**Branch:** `feat/customer-dashboard-perf-pass-49`
+
+**Why now:** PR #188 is merged with green CI and no open PRs remain, but
+production deployment remains blocked by dirty/diverged prod state. The latest
+prod gate shows `/api/v1/health/ready` degraded only because V8 heap usage is
+98.2% at a small absolute size (`152MB / 155MB`) while RSS is `389MB`, below
+the existing 512 MB middleware PM2/ops budget. This creates a false deploy and
+customer trust signal.
+
+**New primitives introduced:** none. This pass reuses the existing
+`HealthService` memory check and the existing PM2/health-guardian 512 MB
+middleware memory budget. No new route, model, migration, module, env var,
+process, response shape, realtime path, MCP tool, Hermes skill, or AI/provider
+spend path.
+
+**Hermes-first analysis:** checked per project convention. This is local NestJS
+health/readiness calibration, not a business-agent, MCP, Hermes runtime, or
+provider-spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Health memory calibration | none applicable | reuse existing `HealthService` |
+| Ops memory budget | none applicable | align with existing PM2/health-guardian budget |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+NestJS readiness memory thresholds.
+
+**Plan/design:**
+`docs/plans/2026-06-02-readiness-memory-calibration-pass-49.md`
+
+**Plan**
+- [x] Add red health-service coverage for the production false-positive memory
+  case.
+- [x] Add red health-service coverage for real RSS pressure.
+- [x] Add red health-service coverage for large saturated heap pressure.
+- [x] Implement calibrated memory thresholds.
+- [x] Run focused health tests.
+- [x] Run multi-vector diff review.
+- [x] Run broader middleware verification and build.
+- [ ] PR, CI, merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Evidence so far**
+- Current `origin/main`: `6025c49d794a00297f1caaf4b4d451a0994b55d1`.
+- No open PRs after merging PR #188.
+- Production deploy gate remains blocked: `/opt/vizora/app` is still dirty with
+  72 dirty/untracked paths; production HEAD is
+  `bb76aa1838740bff5b58623dfef7a906d44f46a6`, while remote main is
+  `6025c49d794a00297f1caaf4b4d451a0994b55d1`.
+- Production runtime: middleware/web/realtime are online; most ops/Hermes cron
+  processes are stopped. `/api/v1/health` and `/api/v1/health/live` return OK.
+  `/api/v1/health/ready` is degraded by memory only
+  (`heapUsedMB=152`, `heapTotalMB=155`, `heapUsagePercent=98.2`,
+  `rssMB=389`).
+- Red/green verification:
+  - `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/health/health.service.spec.ts`
+    failed before implementation on the small saturated heap case and RSS
+    pressure cases.
+  - Same command passed after implementation: 1 suite / 26 tests.
+- Review:
+  - Health/ops/runtime reviewer returned CLEAN: the 512 MB budget matches
+    `ecosystem.config.js` and `scripts/ops/health-guardian.ts`, real RSS
+    pressure still surfaces, public readiness semantics are unchanged, and no
+    operator-gated assumption was introduced.
+  - Code/test/release reviewer returned CLEAN: threshold math, tests, public
+    response shape, TypeScript, and release-safety evidence were clean.
+- Full verification:
+  - `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/health/health.service.spec.ts src/modules/health/health.controller.spec.ts`
+    => 2 suites / 37 tests passing.
+  - `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false`
+    => passing.
+  - Changed-file ESLint => passing with only the existing eslintrc deprecation
+    warning.
+  - `pnpm security:no-hardcoded-jwts` => passing.
+  - `git diff --check` => passing with CRLF normalization warnings.
+  - `pnpm --filter @vizora/middleware test -- --runInBand`
+    => 148 suites / 3027 tests passing / 1 snapshot.
+  - `npx nx build @vizora/middleware` => passing with existing webpack
+    warnings.
+- Deferred follow-up candidates from parallel analysis:
+  - Release-readiness gate drift: smoke script's realtime probe still uses a
+    stale path and CI builds web without running web unit tests.
+  - Dashboard trust: settings admin email appears editable but is not persisted;
+    widgets failures can look like an empty account; playlists list may eagerly
+    fetch content for an unreachable builder.
+  - Middleware hot paths: add realtime HTTP timeouts from `DisplaysService`,
+    align playlist update duplicate-content handling with create, and gate very
+    short content searches.
+
 ## Active Workstream: Dashboard Write Gates and Layout Create Pass 48 (2026-06-02)
 
 **Branch:** `fix/dashboard-write-gates-layout-pass-48`

@@ -29,6 +29,12 @@ const HEALTH_CIRCUIT_CONFIG = {
   resetTimeout: 10000,
 };
 
+const MIDDLEWARE_MEMORY_BUDGET_MB = 512;
+const MEMORY_DEGRADED_PERCENT = 85;
+const MEMORY_UNHEALTHY_PERCENT = 95;
+const LARGE_HEAP_DEGRADED_MB = 384;
+const LARGE_HEAP_UNHEALTHY_MB = 448;
+
 @Injectable()
 export class HealthService {
   private static readonly OPS_STATUS_KEY = 'vizora:ops:status';
@@ -246,12 +252,18 @@ export class HealthService {
     const heapTotalMB = Math.round(used.heapTotal / 1024 / 1024);
     const heapUsagePercent = (used.heapUsed / used.heapTotal) * 100;
     const rssMB = Math.round(used.rss / 1024 / 1024);
+    const rssUsagePercent = (rssMB / MIDDLEWARE_MEMORY_BUDGET_MB) * 100;
+    const isRssDegraded = rssUsagePercent > MEMORY_DEGRADED_PERCENT;
+    const isRssUnhealthy = rssUsagePercent > MEMORY_UNHEALTHY_PERCENT;
+    const isLargeHeapDegraded = heapUsagePercent > MEMORY_DEGRADED_PERCENT
+      && heapUsedMB >= LARGE_HEAP_DEGRADED_MB;
+    const isLargeHeapUnhealthy = heapUsagePercent > MEMORY_UNHEALTHY_PERCENT
+      && heapUsedMB >= LARGE_HEAP_UNHEALTHY_MB;
 
-    // Consider degraded if heap usage > 85%, unhealthy if > 95%
     let status: 'healthy' | 'degraded' | 'unhealthy';
-    if (heapUsagePercent > 95) {
+    if (isRssUnhealthy || isLargeHeapUnhealthy) {
       status = 'unhealthy';
-    } else if (heapUsagePercent > 85) {
+    } else if (isRssDegraded || isLargeHeapDegraded) {
       status = 'degraded';
     } else {
       status = 'healthy';
@@ -262,6 +274,8 @@ export class HealthService {
       heapTotalMB,
       heapUsagePercent: Math.round(heapUsagePercent * 10) / 10,
       rssMB,
+      rssUsagePercent: Math.round(rssUsagePercent * 10) / 10,
+      memoryBudgetMB: MIDDLEWARE_MEMORY_BUDGET_MB,
     };
 
     return {
@@ -269,7 +283,7 @@ export class HealthService {
       responseTime: 0,
       details,
       ...(status !== 'healthy' && {
-        error: `High memory usage: ${heapUsedMB}MB / ${heapTotalMB}MB (${heapUsagePercent.toFixed(1)}%)`,
+        error: `High memory usage: RSS ${rssMB}MB / ${MIDDLEWARE_MEMORY_BUDGET_MB}MB (${rssUsagePercent.toFixed(1)}%), heap ${heapUsedMB}MB / ${heapTotalMB}MB (${heapUsagePercent.toFixed(1)}%)`,
       }),
     };
   }

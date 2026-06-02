@@ -268,6 +268,84 @@ describe('HealthService', () => {
         // In test environment, memory should be normal
         expect(result.checks.memory.status).toBe('healthy');
       });
+
+      it('should stay healthy when a small V8 heap is saturated but RSS is below the process budget', async () => {
+        memoryUsageSpy.mockReturnValue({
+          heapUsed: 152 * 1024 * 1024,
+          heapTotal: 155 * 1024 * 1024,
+          rss: 389 * 1024 * 1024,
+          external: 10 * 1024 * 1024,
+          arrayBuffers: 5 * 1024 * 1024,
+        } as NodeJS.MemoryUsage);
+
+        const result = await service.check();
+
+        expect(result.status).toBe('ok');
+        expect(result.checks.memory.status).toBe('healthy');
+        expect(result.checks.memory.details).toMatchObject({
+          heapUsedMB: 152,
+          heapTotalMB: 155,
+          heapUsagePercent: 98.1,
+          rssMB: 389,
+          rssUsagePercent: 76,
+        });
+      });
+
+      it('should degrade when RSS exceeds 85 percent of the middleware process budget', async () => {
+        memoryUsageSpy.mockReturnValue({
+          heapUsed: 120 * 1024 * 1024,
+          heapTotal: 256 * 1024 * 1024,
+          rss: 460 * 1024 * 1024,
+          external: 10 * 1024 * 1024,
+          arrayBuffers: 5 * 1024 * 1024,
+        } as NodeJS.MemoryUsage);
+
+        const result = await service.check();
+
+        expect(result.status).toBe('degraded');
+        expect(result.checks.memory.status).toBe('degraded');
+        expect(result.checks.memory.error).toContain('High memory usage');
+        expect(result.checks.memory.details).toMatchObject({
+          rssMB: 460,
+          rssUsagePercent: 89.8,
+        });
+      });
+
+      it('should be unhealthy when RSS exceeds 95 percent of the middleware process budget', async () => {
+        memoryUsageSpy.mockReturnValue({
+          heapUsed: 120 * 1024 * 1024,
+          heapTotal: 256 * 1024 * 1024,
+          rss: 500 * 1024 * 1024,
+          external: 10 * 1024 * 1024,
+          arrayBuffers: 5 * 1024 * 1024,
+        } as NodeJS.MemoryUsage);
+
+        const result = await service.check();
+
+        expect(result.status).toBe('degraded');
+        expect(result.checks.memory.status).toBe('unhealthy');
+        expect(result.checks.memory.error).toContain('High memory usage');
+        expect(result.checks.memory.details).toMatchObject({
+          rssMB: 500,
+          rssUsagePercent: 97.7,
+        });
+      });
+
+      it('should degrade when a large heap is saturated even before RSS reaches the process budget', async () => {
+        memoryUsageSpy.mockReturnValue({
+          heapUsed: 400 * 1024 * 1024,
+          heapTotal: 450 * 1024 * 1024,
+          rss: 420 * 1024 * 1024,
+          external: 10 * 1024 * 1024,
+          arrayBuffers: 5 * 1024 * 1024,
+        } as NodeJS.MemoryUsage);
+
+        const result = await service.check();
+
+        expect(result.status).toBe('degraded');
+        expect(result.checks.memory.status).toBe('degraded');
+        expect(result.checks.memory.error).toContain('High memory usage');
+      });
     });
 
     describe('when both database and redis are unhealthy', () => {
