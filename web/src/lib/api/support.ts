@@ -9,16 +9,16 @@ import { ApiClient } from './client';
 
 declare module './client' {
   interface ApiClient {
-    createSupportRequest(data: { message: string; context?: SupportContext }): Promise<SupportRequestResponse>;
+    createSupportRequest(data: { message: string; context?: SupportContext; clientMutationId?: string }): Promise<SupportRequestResponse>;
     getSupportRequests(params?: SupportQueryParams): Promise<PaginatedResponse<SupportRequest>>;
     getSupportRequest(id: string): Promise<SupportRequest>;
     updateSupportRequest(id: string, data: { status?: string; priority?: string; resolutionNotes?: string }): Promise<SupportRequest>;
-    addSupportMessage(requestId: string, content: string): Promise<SupportMessage>;
+    addSupportMessage(requestId: string, content: string, clientMutationId?: string): Promise<SupportMessage>;
     getSupportStats(): Promise<SupportStats>;
   }
 }
 
-ApiClient.prototype.createSupportRequest = async function (data: { message: string; context?: SupportContext }): Promise<SupportRequestResponse> {
+ApiClient.prototype.createSupportRequest = async function (data: { message: string; context?: SupportContext; clientMutationId?: string }): Promise<SupportRequestResponse> {
   return this.request<SupportRequestResponse>('/support/requests', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -48,10 +48,10 @@ ApiClient.prototype.updateSupportRequest = async function (id: string, data: { s
   });
 };
 
-ApiClient.prototype.addSupportMessage = async function (requestId: string, content: string): Promise<SupportMessage> {
+ApiClient.prototype.addSupportMessage = async function (requestId: string, content: string, clientMutationId?: string): Promise<SupportMessage> {
   return this.request<SupportMessage>(`/support/requests/${requestId}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, clientMutationId }),
   });
 };
 

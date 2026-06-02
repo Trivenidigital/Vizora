@@ -57,6 +57,7 @@ describe('SupportService', () => {
       },
       supportMessage: {
         create: jest.fn(),
+        findFirst: jest.fn(),
         findMany: jest.fn(),
       },
       $queryRaw: jest.fn(),
@@ -100,30 +101,32 @@ describe('SupportService', () => {
       db.supportMessage.create.mockResolvedValue(mockMessage);
     });
 
-    it('should create request, user message, and assistant message', async () => {
+    it('should create request with user and assistant messages atomically', async () => {
       const result = await service.createRequest(userId, orgId, {
         message: 'The app keeps crashing when I open settings',
       });
 
       expect(result.request).toEqual(mockRequest);
-      expect(result.requestNumber).toBe(mockRequest.id.substring(0, 8).toUpperCase());
       expect(db.supportRequest.create).toHaveBeenCalledTimes(1);
-      expect(db.supportMessage.create).toHaveBeenCalledTimes(2);
-
-      // First call: user message
-      expect(db.supportMessage.create).toHaveBeenNthCalledWith(1, {
+      expect(db.supportMessage.create).not.toHaveBeenCalled();
+      expect(db.supportRequest.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
-          requestId: mockRequest.id,
-          role: 'user',
-          content: 'The app keeps crashing when I open settings',
-        }),
-      });
-
-      // Second call: assistant message
-      expect(db.supportMessage.create).toHaveBeenNthCalledWith(2, {
-        data: expect.objectContaining({
-          requestId: mockRequest.id,
-          role: 'assistant',
+          id: expect.any(String),
+          organizationId: orgId,
+          userId,
+          description: 'The app keeps crashing when I open settings',
+          messages: {
+            create: [
+              expect.objectContaining({
+                role: 'user',
+                content: 'The app keeps crashing when I open settings',
+              }),
+              expect.objectContaining({
+                role: 'assistant',
+                content: expect.stringContaining("I've logged this as bug report"),
+              }),
+            ],
+          },
         }),
       });
     });
@@ -233,6 +236,76 @@ describe('SupportService', () => {
       });
 
       expect(result.responseText).toBe('To pair a device, go to Devices page...');
+    });
+
+    it('returns an existing request for a repeated client mutation id without writing again', async () => {
+      db.supportRequest.findFirst.mockResolvedValueOnce({
+        ...mockRequest,
+        messages: [
+          mockMessage,
+          {
+            ...mockMessage,
+            id: 'msg-assistant',
+            role: 'assistant',
+            content: 'Existing response',
+          },
+        ],
+      });
+
+      const result = await service.createRequest(userId, orgId, {
+        message: 'The app keeps crashing',
+        clientMutationId: 'client-mutation-1',
+      });
+
+      expect(result.request.id).toBe(mockRequest.id);
+      expect(result.responseText).toBe('Existing response');
+      expect(db.supportRequest.create).not.toHaveBeenCalled();
+      expect(db.supportMessage.create).not.toHaveBeenCalled();
+      expect(classifier.classify).not.toHaveBeenCalled();
+    });
+
+    it('stores the client mutation id on new requests and initial messages', async () => {
+      await service.createRequest(userId, orgId, {
+        message: 'The app keeps crashing',
+        clientMutationId: 'client-mutation-2',
+      });
+
+      const createData = db.supportRequest.create.mock.calls[0][0].data;
+      expect(createData).toEqual(expect.objectContaining({
+        clientMutationId: 'client-mutation-2',
+      }));
+      expect(createData.messages.create[0]).toEqual(expect.objectContaining({
+        role: 'user',
+        clientMutationId: 'client-mutation-2',
+      }));
+    });
+
+    it('returns the raced existing request when concurrent same-key create hits P2002', async () => {
+      db.supportRequest.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          ...mockRequest,
+          messages: [
+            mockMessage,
+            {
+              ...mockMessage,
+              id: 'msg-assistant',
+              role: 'assistant',
+              content: 'Raced response',
+            },
+          ],
+        });
+      db.supportRequest.create.mockRejectedValueOnce({ code: 'P2002' });
+
+      const result = await service.createRequest(userId, orgId, {
+        message: 'The app keeps crashing',
+        clientMutationId: 'client-mutation-race',
+      });
+
+      expect(result.request.id).toBe(mockRequest.id);
+      expect(result.responseText).toBe('Raced response');
+      expect(db.supportRequest.findFirst).toHaveBeenCalledTimes(2);
+      expect(db.supportMessage.create).not.toHaveBeenCalled();
     });
   });
 
@@ -690,6 +763,104 @@ describe('SupportService', () => {
       await service.addMessage(mockRequest.id, adminUser, 'This was fixed');
 
       expect(db.supportRequest.update).not.toHaveBeenCalled();
+    });
+
+    it('returns an existing message for a repeated client mutation id without writing again', async () => {
+      db.supportRequest.findUnique.mockResolvedValue(mockRequest);
+      db.supportMessage.findFirst.mockResolvedValueOnce({
+        ...mockMessage,
+        content: 'Retry me safely',
+        clientMutationId: 'client-message-1',
+      });
+
+      const result = await service.addMessage(
+        mockRequest.id,
+        regularUser,
+        'Retry me safely',
+        'client-message-1',
+      );
+
+      expect(result.content).toBe('Retry me safely');
+      expect(db.supportMessage.create).not.toHaveBeenCalled();
+      expect(db.supportRequest.update).not.toHaveBeenCalled();
+    });
+
+    it('reopens resolved requests when returning an existing repeated user message', async () => {
+      db.supportRequest.findUnique.mockResolvedValue({
+        ...mockRequest,
+        status: 'resolved',
+      });
+      db.supportMessage.findFirst.mockResolvedValueOnce({
+        ...mockMessage,
+        content: 'Retry me safely',
+        clientMutationId: 'client-message-1',
+      });
+
+      const result = await service.addMessage(
+        mockRequest.id,
+        regularUser,
+        'Retry me safely',
+        'client-message-1',
+      );
+
+      expect(result.content).toBe('Retry me safely');
+      expect(db.supportMessage.create).not.toHaveBeenCalled();
+      expect(db.supportRequest.update).toHaveBeenCalledWith({
+        where: { id: mockRequest.id },
+        data: { status: 'open' },
+      });
+    });
+
+    it('stores the client mutation id on new support messages', async () => {
+      db.supportRequest.findUnique.mockResolvedValue(mockRequest);
+      db.supportMessage.findFirst.mockResolvedValueOnce(null);
+      db.supportMessage.create.mockResolvedValue({
+        ...mockMessage,
+        content: 'Retry me safely',
+        clientMutationId: 'client-message-2',
+      });
+
+      await service.addMessage(
+        mockRequest.id,
+        regularUser,
+        'Retry me safely',
+        'client-message-2',
+      );
+
+      expect(db.supportMessage.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          clientMutationId: 'client-message-2',
+        }),
+      });
+    });
+
+    it('returns the raced existing message when concurrent same-key create hits P2002', async () => {
+      db.supportRequest.findUnique.mockResolvedValue({
+        ...mockRequest,
+        status: 'resolved',
+      });
+      db.supportMessage.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          ...mockMessage,
+          content: 'Retry me safely',
+          clientMutationId: 'client-message-race',
+        });
+      db.supportMessage.create.mockRejectedValueOnce({ code: 'P2002' });
+
+      const result = await service.addMessage(
+        mockRequest.id,
+        regularUser,
+        'Retry me safely',
+        'client-message-race',
+      );
+
+      expect(result.content).toBe('Retry me safely');
+      expect(db.supportMessage.findFirst).toHaveBeenCalledTimes(2);
+      expect(db.supportRequest.update).toHaveBeenCalledWith({
+        where: { id: mockRequest.id },
+        data: { status: 'open' },
+      });
     });
   });
 

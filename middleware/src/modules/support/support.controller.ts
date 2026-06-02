@@ -51,7 +51,8 @@ export class SupportController {
   ) {
     return this.supportService.createRequest(userId, organizationId, {
       message: dto.message,
-      context: dto.context,
+      ...(dto.context ? { context: dto.context } : {}),
+      ...(dto.clientMutationId ? { clientMutationId: dto.clientMutationId } : {}),
     });
   }
 
@@ -140,11 +141,16 @@ export class SupportController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateSupportMessageDto,
   ) {
-    return this.supportService.addMessage(requestId, {
-      id: user.id,
-      organizationId: user.organizationId,
-      role: user.role,
-      isSuperAdmin: user.isSuperAdmin || false,
-    }, dto.content);
+    return this.supportService.addMessage(
+      requestId,
+      {
+        id: user.id,
+        organizationId: user.organizationId,
+        role: user.role,
+        isSuperAdmin: user.isSuperAdmin || false,
+      },
+      dto.content,
+      dto.clientMutationId,
+    );
   }
 }

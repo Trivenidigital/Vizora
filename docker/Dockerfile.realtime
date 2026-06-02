@@ -22,6 +22,9 @@ COPY packages/database/ ./packages/database/
 COPY tsconfig.base.json ./
 COPY nx.json ./
 
+# Generate Prisma client
+RUN cd packages/database && pnpm prisma generate
+
 # Build the application
 RUN pnpm nx build realtime
 

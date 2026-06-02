@@ -1,5 +1,122 @@
 # Vizora - Task Tracker
 
+## Active: Dashboard Role Truth Pass 43 (2026-06-02)
+
+**Branch:** `feat/dashboard-role-truth-pass-43`
+
+**Why now:** Customer-dashboard review found high-trust UI gaps where read-only
+users can see write workflows and support messages can disappear after a send
+failure. Drift check shows device pairing is already role-gated; schedules and
+support failed-send state remain concrete repo-side gaps.
+
+**New primitives introduced:** `canManageSchedules` and `canDeleteSchedules`
+on the existing dashboard permission helper; optional `clientMutationId` on
+support requests/messages with scoped unique indexes. No env var, runtime
+process, notification path, realtime substrate, MCP tool, Hermes skill,
+provider spend path, or parallel infrastructure.
+
+**Hermes-first analysis:** checked per project convention. These are local
+dashboard role/state concerns, not agent-runtime tasks.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Dashboard role-based action gating | none found | build in existing web permission helper |
+| Support chat failed-message state | none found | build in existing support chat provider/panel |
+| Support retry idempotency | none found | build in existing support API/service with Prisma indexes |
+
+Awesome-hermes-agent ecosystem check: no applicable runtime/library primitive
+for React dashboard role gating or support-chat failure state; proceed with
+Vizora-native code.
+
+**Plan/design:**
+`docs/plans/2026-06-02-dashboard-role-truth-pass-43.md`
+
+**Plan**
+- [x] Drift-check stale device pairing role finding.
+- [x] Document scope and Hermes-first analysis.
+- [x] Add red tests for schedule role truth and support failed sends.
+- [x] Implement permission/helper and support state fixes.
+- [x] Run focused and broader web verification.
+- [x] Run multi-vector subagent review.
+- [ ] PR, CI, merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Scoped fixes**
+- Schedules: viewers see read-only schedule information; create/edit/duplicate
+  controls are admin/manager-only; delete is admin-only.
+- Support chat: failed existing-message and new-conversation sends keep the
+  customer text visible with an idempotent error/retry state instead of
+  silently removing it.
+- Release hygiene: realtime Docker builds generate Prisma in the builder stage,
+  then copy the generated database package into the runtime image; Docker
+  context ignores nested workspace `node_modules`.
+
+**Evidence so far**
+- Drift check: `web/src/app/dashboard/devices/page-client.tsx` already uses
+  `getDashboardPermissions` and gates pairing/device mutation entry points, so
+  the older viewer-pairing finding is stale.
+- Backend schedule role truth: `SchedulesController` allows
+  create/update/duplicate/conflict-check for admin/manager and delete for
+  admin only.
+- Red verification:
+  `pnpm --filter @vizora/web test -- --runInBand web/src/lib/__tests__/permissions.test.ts web/src/app/dashboard/schedules/__tests__/schedules-page.test.tsx web/src/components/support/__tests__/SupportChat.test.tsx`
+  failed as expected because schedule controls ignored role permissions, the
+  shared dashboard permission helper lacked schedule flags, and failed support
+  sends removed the optimistic customer message.
+- Focused verification:
+  `pnpm --filter @vizora/web test -- --runInBand web/src/lib/__tests__/permissions.test.ts web/src/app/dashboard/schedules/__tests__/schedules-page.test.tsx web/src/components/support/__tests__/SupportChat.test.tsx`
+  passed 3 suites / 42 tests after implementation.
+- Review findings fixed:
+  - Schedule Duplicate now calls the existing backend duplicate endpoint
+    instead of opening a prefilled create form.
+  - Manager individual-device create is single-target, so it cannot need
+    admin-only delete rollback after partial batch failure.
+  - Support retries now carry a durable client mutation id through the web API,
+    DTOs, service, Prisma schema, and migration.
+- Review-fix verification:
+  - `pnpm exec prisma generate --schema prisma/schema.prisma` from
+    `packages/database` passed.
+  - `pnpm --filter @vizora/web test -- --runInBand web/src/app/dashboard/schedules/__tests__/schedules-page.test.tsx web/src/components/support/__tests__/SupportChat.test.tsx`
+    passed 2 suites / 43 tests.
+  - `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/support/support.service.spec.ts middleware/src/modules/support/support.controller.spec.ts`
+    passed 2 suites / 66 tests.
+- Second review findings fixed:
+  - Support request creation now writes the request and initial messages in one
+    nested Prisma create, so a failed assistant-message write cannot leave a
+    partial request.
+  - Support message duplicate/race paths now re-read on `P2002` and reopen
+    resolved/closed user tickets when the duplicate is the durable retry
+    result.
+  - Viewer schedule empty-state copy no longer invites create actions; admin
+    delete and manager update paths have explicit test coverage.
+  - Realtime Dockerfile no longer runs the dev-only Prisma CLI in the runtime
+    stage, and `.dockerignore` excludes nested workspace `node_modules`.
+- Broad local verification:
+  - `pnpm --filter @vizora/web test -- --runInBand` passed 102 suites / 1092
+    tests, with existing React `act()` console warnings in unrelated suites.
+  - `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` passed.
+  - `NODE_OPTIONS=--max-old-space-size=4096 NEXT_PUBLIC_API_URL=http://localhost:3000 NEXT_PUBLIC_SOCKET_URL=http://localhost:3002 npx nx build @vizora/web --skip-nx-cache`
+    passed with existing Next middleware/proxy and Nx flaky-task warnings.
+  - `pnpm --filter @vizora/middleware test -- --runInBand` passed 146 suites /
+    2975 tests.
+  - `pnpm --filter @vizora/realtime test -- --runInBand` passed 12 suites /
+    285 tests.
+  - `git diff --check` passed with Windows CRLF warnings only.
+  - `pnpm security:no-hardcoded-jwts` passed.
+  - `docker build -f docker/Dockerfile.realtime -t vizora-realtime-pass43 .`
+    now gets past Docker context loading but is blocked before project code by
+    local Docker TLS trust (`UNABLE_TO_VERIFY_LEAF_SIGNATURE` fetching pnpm);
+    a minimal `node:22-alpine` package fetch has the same TLS failure. No
+    insecure TLS bypass was added.
+- Final subagent re-review:
+  - Schedule/RBAC reviewer CLEAN after manager update, admin delete, and
+    viewer empty-state tests.
+  - Support idempotency reviewer CLEAN after nested create, `P2002` re-read,
+    scoped unique indexes, and reopen-on-duplicate handling.
+  - Release/Docker reviewer CLEAN after moving Prisma generation to the builder
+    stage only and excluding nested workspace `node_modules` from Docker
+    context.
+
 ## Completed: Customer Hot-Path Follow-up Pass 42 (2026-06-02)
 
 **Branch:** `feat/customer-hotpath-followup-pass-42`
