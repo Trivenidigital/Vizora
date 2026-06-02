@@ -173,6 +173,28 @@ describe('ContentService', () => {
         }),
       });
     });
+
+    it('should reject MinIO URLs outside the organization prefix', async () => {
+      await expect(
+        service.create('org-123', {
+          ...createDto,
+          url: 'minio://other-org/uploads/secret.jpg',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockDatabaseService.content.create).not.toHaveBeenCalled();
+    });
+
+    it('should reject MinIO thumbnails outside the organization prefix', async () => {
+      await expect(
+        service.create('org-123', {
+          ...createDto,
+          thumbnail: 'minio://other-org/thumbnails/secret.jpg',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockDatabaseService.content.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('findAll', () => {
@@ -554,6 +576,30 @@ describe('ContentService', () => {
       });
     });
 
+    it('should reject MinIO URL updates outside the organization prefix', async () => {
+      mockDatabaseService.content.findFirst.mockResolvedValue(mockContent);
+
+      await expect(
+        service.update('org-123', 'content-123', {
+          url: 'minio://other-org/uploads/secret.jpg',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockDatabaseService.content.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('should reject MinIO thumbnail updates outside the organization prefix', async () => {
+      mockDatabaseService.content.findFirst.mockResolvedValue(mockContent);
+
+      await expect(
+        service.update('org-123', 'content-123', {
+          thumbnail: 'minio://other-org/thumbnails/secret.jpg',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockDatabaseService.content.updateMany).not.toHaveBeenCalled();
+    });
+
     it('should throw NotFoundException if content not found', async () => {
       mockDatabaseService.content.findFirst.mockResolvedValue(null);
 
@@ -592,6 +638,40 @@ describe('ContentService', () => {
         'Content file could not be deleted from storage',
       );
 
+      expect(mockDatabaseService.content.deleteMany).not.toHaveBeenCalled();
+      expect(mockStorageQuotaService.decrementUsage).not.toHaveBeenCalled();
+    });
+
+    it('should delete same-organization MinIO object before removing the DB row', async () => {
+      mockDatabaseService.content.findFirst.mockResolvedValue({
+        ...mockContent,
+        url: 'minio://org-123/uploads/file.jpg',
+        fileSize: 1000,
+      });
+      mockDatabaseService.content.deleteMany.mockResolvedValue({ count: 1 });
+
+      const result = await service.remove('org-123', 'content-123');
+
+      expect(result).toEqual({ count: 1 });
+      expect(mockStorageService.deleteFile).toHaveBeenCalledWith('org-123/uploads/file.jpg');
+      expect(mockDatabaseService.content.deleteMany).toHaveBeenCalledWith({
+        where: { id: 'content-123', organizationId: 'org-123' },
+      });
+      expect(mockStorageQuotaService.decrementUsage).toHaveBeenCalledWith('org-123', 1000);
+    });
+
+    it('should reject MinIO deletes outside the organization prefix without deleting storage or DB row', async () => {
+      mockDatabaseService.content.findFirst.mockResolvedValue({
+        ...mockContent,
+        url: 'minio://other-org/uploads/secret.jpg',
+        fileSize: 1000,
+      });
+
+      await expect(service.remove('org-123', 'content-123')).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(mockStorageService.deleteFile).not.toHaveBeenCalled();
       expect(mockDatabaseService.content.deleteMany).not.toHaveBeenCalled();
       expect(mockStorageQuotaService.decrementUsage).not.toHaveBeenCalled();
     });
@@ -1137,6 +1217,63 @@ describe('ContentService', () => {
       expect(mockStorageService.deleteFile).toHaveBeenCalledWith('org-123/uploads/old.jpg');
     });
 
+    it('should repair a polluted old MinIO URL during simple replacement without deleting the foreign object', async () => {
+      mockDatabaseService.content.findFirst.mockResolvedValue({
+        ...existingContent,
+        url: 'minio://other-org/uploads/old.jpg',
+      });
+      mockDatabaseService.content.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.content.findUnique.mockResolvedValue({
+        ...existingContent,
+        url: 'minio://org-123/uploads/new.jpg',
+        versionNumber: 2,
+      });
+
+      const result = await service.replaceFile(
+        'org-123',
+        'content-123',
+        'minio://org-123/uploads/new.jpg',
+      );
+
+      expect(result.url).toBe('minio://org-123/uploads/new.jpg');
+      expect(mockStorageService.deleteFile).not.toHaveBeenCalled();
+      expect(mockDatabaseService.content.updateMany).toHaveBeenCalledWith({
+        where: { id: 'content-123', organizationId: 'org-123' },
+        data: expect.objectContaining({
+          url: 'minio://org-123/uploads/new.jpg',
+          versionNumber: 2,
+        }),
+      });
+    });
+
+    it('should clear a polluted MinIO thumbnail during simple replacement', async () => {
+      mockDatabaseService.content.findFirst.mockResolvedValue({
+        ...existingContent,
+        thumbnail: 'minio://other-org/thumbnails/old.jpg',
+      });
+      mockDatabaseService.content.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.content.findUnique.mockResolvedValue({
+        ...existingContent,
+        url: 'minio://org-123/uploads/new.jpg',
+        thumbnail: null,
+        versionNumber: 2,
+      });
+
+      await service.replaceFile(
+        'org-123',
+        'content-123',
+        'minio://org-123/uploads/new.jpg',
+      );
+
+      expect(mockDatabaseService.content.updateMany).toHaveBeenCalledWith({
+        where: { id: 'content-123', organizationId: 'org-123' },
+        data: expect.objectContaining({
+          url: 'minio://org-123/uploads/new.jpg',
+          thumbnail: null,
+        }),
+      });
+    });
+
     it('should account and mark metadata when old MinIO object cleanup fails', async () => {
       mockDatabaseService.content.findFirst.mockResolvedValue({
         ...existingContent,
@@ -1223,6 +1360,66 @@ describe('ContentService', () => {
           versionNumber: existingContent.versionNumber,
         }),
       });
+    });
+
+    it('should not preserve a polluted MinIO thumbnail during backup replacement', async () => {
+      const backupContent = {
+        ...existingContent,
+        id: 'backup-123',
+        thumbnail: null,
+        status: 'archived',
+      };
+      mockDatabaseService.content.findFirst.mockResolvedValue({
+        ...existingContent,
+        thumbnail: 'minio://other-org/thumbnails/old.jpg',
+      });
+      mockDatabaseService.content.create.mockResolvedValue(backupContent);
+      mockDatabaseService.content.update.mockResolvedValue({
+        ...existingContent,
+        url: 'minio://org-123/uploads/new.jpg',
+        thumbnail: null,
+        versionNumber: 2,
+        previousVersionId: 'backup-123',
+      });
+
+      await service.replaceFile(
+        'org-123',
+        'content-123',
+        'minio://org-123/uploads/new.jpg',
+        { keepBackup: true },
+      );
+
+      expect(mockDatabaseService.content.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          thumbnail: null,
+        }),
+      });
+      expect(mockDatabaseService.content.update).toHaveBeenCalledWith({
+        where: { id: 'content-123' },
+        data: expect.objectContaining({
+          thumbnail: null,
+        }),
+      });
+    });
+
+    it('should reject backup replacement when the old MinIO URL is outside the organization prefix', async () => {
+      mockDatabaseService.content.findFirst.mockResolvedValue({
+        ...existingContent,
+        url: 'minio://other-org/uploads/old.jpg',
+      });
+
+      await expect(
+        service.replaceFile(
+          'org-123',
+          'content-123',
+          'minio://org-123/uploads/new.jpg',
+          { keepBackup: true },
+        ),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockDatabaseService.content.create).not.toHaveBeenCalled();
+      expect(mockDatabaseService.content.update).not.toHaveBeenCalled();
+      expect(mockStorageService.deleteFile).not.toHaveBeenCalled();
     });
 
     it('should update name when provided', async () => {
@@ -1816,11 +2013,11 @@ describe('ContentService', () => {
       // remained, the DB row was gone — quota counted, no operator
       // visibility. Now only successful-MinIO ids get DB-deleted.
       mockDatabaseService.content.findMany.mockResolvedValue([
-        { id: 'good-1', fileSize: 1000, url: 'minio://o/good-1.png' },
-        { id: 'bad-1', fileSize: 2000, url: 'minio://o/bad-1.png' },
+        { id: 'good-1', fileSize: 1000, url: 'minio://org-123/good-1.png' },
+        { id: 'bad-1', fileSize: 2000, url: 'minio://org-123/bad-1.png' },
       ]);
       mockStorageService.deleteFile.mockImplementation(async (key: string) => {
-        if (key === 'o/bad-1.png') throw new Error('connection refused');
+        if (key === 'org-123/bad-1.png') throw new Error('connection refused');
       });
       mockDatabaseService.content.deleteMany.mockResolvedValue({ count: 1 });
 
@@ -1857,8 +2054,8 @@ describe('ContentService', () => {
 
     it('continues bulk delete and adjusts quota when a DB delete fails after storage cleanup', async () => {
       mockDatabaseService.content.findMany.mockResolvedValue([
-        { id: 'id-1', fileSize: 1000, fileKey: null, url: 'minio://o/id-1.png' },
-        { id: 'id-2', fileSize: 2000, fileKey: null, url: 'minio://o/id-2.png' },
+        { id: 'id-1', fileSize: 1000, fileKey: null, url: 'minio://org-123/id-1.png' },
+        { id: 'id-2', fileSize: 2000, fileKey: null, url: 'minio://org-123/id-2.png' },
       ]);
       mockDatabaseService.content.deleteMany
         .mockRejectedValueOnce(new Error('db temporarily unavailable'))
@@ -1885,6 +2082,33 @@ describe('ContentService', () => {
       });
       expect(mockStorageQuotaService.decrementUsage).toHaveBeenCalledWith('org-123', 1000);
       expect(mockStorageQuotaService.decrementUsage).toHaveBeenCalledWith('org-123', 2000);
+    });
+
+    it('keeps foreign MinIO keys out of storage deletion during bulk delete', async () => {
+      mockDatabaseService.content.findMany.mockResolvedValue([
+        { id: 'good-1', fileSize: 1000, url: 'minio://org-123/good-1.png' },
+        { id: 'foreign-1', fileSize: 2000, url: 'minio://other-org/secret.png' },
+      ]);
+      mockDatabaseService.content.deleteMany.mockResolvedValue({ count: 1 });
+
+      const result = await service.bulkDelete('org-123', { ids: ['good-1', 'foreign-1'] });
+
+      expect(mockStorageService.deleteFile).toHaveBeenCalledTimes(1);
+      expect(mockStorageService.deleteFile).toHaveBeenCalledWith('org-123/good-1.png');
+      expect(mockStorageService.deleteFile).not.toHaveBeenCalledWith('other-org/secret.png');
+      expect(mockDatabaseService.content.deleteMany).toHaveBeenCalledWith({
+        where: { id: 'good-1', organizationId: 'org-123' },
+      });
+      expect(mockDatabaseService.content.deleteMany).not.toHaveBeenCalledWith({
+        where: { id: 'foreign-1', organizationId: 'org-123' },
+      });
+      expect(result).toEqual({
+        deleted: 1,
+        failed: 1,
+        failedIds: ['foreign-1'],
+      });
+      expect(mockStorageQuotaService.decrementUsage).toHaveBeenCalledWith('org-123', 1000);
+      expect(mockStorageQuotaService.decrementUsage).not.toHaveBeenCalledWith('org-123', 2000);
     });
   });
 

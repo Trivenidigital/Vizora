@@ -42,13 +42,12 @@ import {
 } from './dto/approval.dto';
 import { ReviewContentDto } from './dto/review-content.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { getOwnedMinioObjectKey, MINIO_URL_PREFIX } from '../storage/minio-object-key';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { randomUUID } from 'crypto';
 
-// Prefix used to identify MinIO-stored content
-const MINIO_URL_PREFIX = 'minio://';
 const MAX_CONTENT_UPLOAD_SIZE = 100 * 1024 * 1024;
 const CONTENT_UPLOAD_TMP_ROOT = path.join(os.tmpdir(), 'vizora-content-uploads');
 
@@ -411,9 +410,8 @@ export class ContentController {
       throw new NotFoundException('Content has no associated file');
     }
 
-    // Check if content is stored in MinIO
-    if (content.url.startsWith(MINIO_URL_PREFIX)) {
-      const objectKey = content.url.substring(MINIO_URL_PREFIX.length);
+    const objectKey = getOwnedMinioObjectKey(organizationId, content.url);
+    if (objectKey) {
       const expiry = Math.min(parseInt(expirySeconds, 10) || 3600, 86400);
 
       if (!this.storageService.isMinioAvailable()) {
@@ -467,8 +465,8 @@ export class ContentController {
 
     // For MinIO-stored content, fetch the object directly via StorageService
     // to avoid SSRF validation blocking internal MinIO URLs
-    if (content.url.startsWith(MINIO_URL_PREFIX)) {
-      const objectKey = content.url.substring(MINIO_URL_PREFIX.length);
+    const objectKey = getOwnedMinioObjectKey(organizationId, content.url);
+    if (objectKey) {
       if (!this.storageService.isMinioAvailable()) {
         throw new BadRequestException('Storage service is currently unavailable');
       }

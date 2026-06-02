@@ -6,6 +6,7 @@ import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { BrandingConfigDto } from './dto/branding-config.dto';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 import { StorageService } from '../storage/storage.service';
+import { getCleanupSafeMinioObjectKey, isMinioUrl } from '../storage/minio-object-key';
 import { RedisService } from '../redis/redis.service';
 
 @Injectable()
@@ -599,13 +600,15 @@ export class OrganizationsService {
     // 3. Clean up MinIO files (after successful DB delete — orphaned files are
     // safer than deleted files with live DB records)
     for (const item of content) {
-      if (item.url?.startsWith('minio://')) {
-        const objectKey = item.url.substring('minio://'.length);
+      const objectKey = getCleanupSafeMinioObjectKey(id, item.url);
+      if (objectKey) {
         try {
           await this.storageService.deleteFile(objectKey);
         } catch (err) {
           this.logger.warn(`Failed to delete MinIO object ${objectKey}: ${err}`);
         }
+      } else if (isMinioUrl(item.url)) {
+        this.logger.warn(`Skipping foreign MinIO object during organization deletion for content ${item.id}`);
       }
     }
 

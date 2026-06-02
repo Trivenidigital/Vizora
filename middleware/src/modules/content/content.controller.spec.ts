@@ -16,6 +16,7 @@ import { StorageService } from '../storage/storage.service';
 import { StorageQuotaService } from '../storage/storage-quota.service';
 import { SubscriptionActiveGuard } from '../billing/guards/subscription-active.guard';
 import { DatabaseService } from '../database/database.service';
+import { Readable } from 'stream';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -88,6 +89,7 @@ describe('ContentController', () => {
       listObjects: jest.fn(),
       copyFile: jest.fn(),
       getBucket: jest.fn().mockReturnValue('vizora-content'),
+      getObject: jest.fn(),
     } as any;
 
     mockStorageQuotaService = {
@@ -529,6 +531,43 @@ describe('ContentController', () => {
     });
   });
 
+  describe('getDownloadUrl', () => {
+    it('should generate a presigned URL for same-organization MinIO content', async () => {
+      mockContentService.findOne.mockResolvedValue({
+        id: 'content-123',
+        url: 'minio://org-123/uploads/file.jpg',
+      } as any);
+      mockStorageService.isMinioAvailable.mockReturnValue(true);
+      mockStorageService.getPresignedUrl.mockResolvedValue('https://minio.example/signed');
+
+      const result = await controller.getDownloadUrl(organizationId, 'content-123');
+
+      expect(result).toEqual({
+        url: 'https://minio.example/signed',
+        expiresIn: 3600,
+      });
+      expect(mockStorageService.getPresignedUrl).toHaveBeenCalledWith(
+        'org-123/uploads/file.jpg',
+        3600,
+      );
+    });
+
+    it('should reject MinIO content whose object key is outside the organization prefix', async () => {
+      mockContentService.findOne.mockResolvedValue({
+        id: 'content-123',
+        url: 'minio://other-org/uploads/secret.jpg',
+      } as any);
+      mockStorageService.isMinioAvailable.mockReturnValue(true);
+      mockStorageService.getPresignedUrl.mockResolvedValue('https://minio.example/signed');
+
+      await expect(
+        controller.getDownloadUrl(organizationId, 'content-123'),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockStorageService.getPresignedUrl).not.toHaveBeenCalled();
+    });
+  });
+
   describe('generateThumbnail', () => {
     it('should generate thumbnail for image content', async () => {
       const content = { id: 'content-123', type: 'image', url: 'https://example.com/image.jpg' };
@@ -556,6 +595,52 @@ describe('ContentController', () => {
         thumbnail: null,
       });
       expect(mockThumbnailService.generateThumbnailFromUrl).not.toHaveBeenCalled();
+    });
+
+    it('should generate thumbnails from same-organization MinIO content objects', async () => {
+      const content = {
+        id: 'content-123',
+        type: 'image',
+        url: 'minio://org-123/uploads/file.jpg',
+        mimeType: 'image/jpeg',
+      };
+      mockContentService.findOne.mockResolvedValue(content as any);
+      mockStorageService.isMinioAvailable.mockReturnValue(true);
+      mockStorageService.getObject.mockResolvedValue(Readable.from([Buffer.from('image')]) as any);
+      mockThumbnailService.generateThumbnail.mockResolvedValue('/static/thumbnails/minio-thumb.jpg');
+      mockContentService.update.mockResolvedValue({} as any);
+
+      const result = await controller.generateThumbnail(organizationId, 'content-123');
+
+      expect(result).toEqual({ thumbnail: '/static/thumbnails/minio-thumb.jpg' });
+      expect(mockStorageService.getObject).toHaveBeenCalledWith('org-123/uploads/file.jpg');
+      expect(mockThumbnailService.generateThumbnail).toHaveBeenCalledWith(
+        content.id,
+        expect.any(Buffer),
+        content.mimeType,
+      );
+      expect(mockContentService.update).toHaveBeenCalledWith(organizationId, 'content-123', {
+        thumbnail: '/static/thumbnails/minio-thumb.jpg',
+      });
+    });
+
+    it('should reject MinIO thumbnail reads outside the organization prefix', async () => {
+      const content = {
+        id: 'content-123',
+        type: 'image',
+        url: 'minio://other-org/uploads/secret.jpg',
+        mimeType: 'image/jpeg',
+      };
+      mockContentService.findOne.mockResolvedValue(content as any);
+      mockStorageService.isMinioAvailable.mockReturnValue(true);
+      mockStorageService.getObject.mockResolvedValue(Readable.from([Buffer.from('image')]) as any);
+
+      await expect(
+        controller.generateThumbnail(organizationId, 'content-123'),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockStorageService.getObject).not.toHaveBeenCalled();
+      expect(mockThumbnailService.generateThumbnail).not.toHaveBeenCalled();
     });
   });
 
