@@ -86,7 +86,7 @@ Run in this order:
 2. `pnpm --filter @vizora/realtime test` → expect 212/212
 3. `pnpm --filter @vizora/web test` → expect 864/864
 4. `bash scripts/smoke/api-critical-path.sh` (against localhost first; creates smoke-test rows)
-5. `ssh root@vizora.cloud 'cd /opt/vizora/app && API_BASE=https://vizora.cloud WEB_BASE=https://vizora.cloud bash scripts/smoke/api-critical-path.sh'` (against prod API/web ingress from the VPS; creates smoke-test rows; realtime health remains local `RT_BASE=http://localhost:3002`)
+5. `ssh root@vizora.cloud 'cd /opt/vizora/app && API_BASE=https://vizora.cloud WEB_BASE=https://vizora.cloud bash scripts/smoke/api-critical-path.sh'` (against prod API/web ingress from the VPS; creates smoke-test rows; realtime health remains local `RT_BASE=http://localhost:3002` and probes `/health`)
 6. Open `https://vizora.cloud` in a fresh incognito browser → verify landing page renders, all CTAs work
 7. Sign up with a NEW disposable email → verify welcome email lands within 60s
 8. Click email verify link → verify landed in dashboard
@@ -177,7 +177,7 @@ cat .ssh_seed.txt
 
 # Check 5: All health endpoints. Realtime is intentionally checked over
 # localhost on the VPS; direct public :3002 HTTPS is not the supported ingress.
-for url in https://vizora.cloud/api/v1/health https://vizora.cloud/ http://localhost:3002/api/health; do
+for url in https://vizora.cloud/api/v1/health https://vizora.cloud/ http://localhost:3002/health; do
   ssh root@vizora.cloud "curl -s -o /dev/null -w '$url -> %{http_code}\n' '$url'"
 done
 ```

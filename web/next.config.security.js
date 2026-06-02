@@ -33,17 +33,60 @@ function joinCsp(directives) {
     .join('; ');
 }
 
+function resolveEnvValue(env, alias, envVar) {
+  if (Object.prototype.hasOwnProperty.call(env, alias)) {
+    return env[alias] || null;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(env, envVar)) {
+    return env[envVar] || null;
+  }
+
+  return null;
+}
+
+function isLoopbackOrigin(origin) {
+  if (!origin) return false;
+
+  const hostname = new URL(origin).hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  return (
+    hostname === 'localhost' ||
+    hostname === '0.0.0.0' ||
+    hostname === '::1' ||
+    /^127\./.test(hostname)
+  );
+}
+
+function assertPublicProductionOrigin(envVar, origin) {
+  if (origin && isLoopbackOrigin(origin)) {
+    throw new Error(
+      `${envVar} must not use a localhost or loopback origin in production.`,
+    );
+  }
+}
+
 function buildSecurityHeaderRoutes(env = process.env) {
   const nodeEnv = env.nodeEnv ?? env.NODE_ENV;
   const isProd = nodeEnv === 'production';
   const isDev = nodeEnv === 'development';
-  const socketOrigin = parseOriginSafe('NEXT_PUBLIC_SOCKET_URL', env.socketUrl ?? env.NEXT_PUBLIC_SOCKET_URL);
-  const apiOrigin = parseOriginSafe('NEXT_PUBLIC_API_URL', env.apiUrl ?? env.NEXT_PUBLIC_API_URL);
+  const socketOrigin = parseOriginSafe(
+    'NEXT_PUBLIC_SOCKET_URL',
+    resolveEnvValue(env, 'socketUrl', 'NEXT_PUBLIC_SOCKET_URL'),
+  );
+  const apiOrigin = parseOriginSafe(
+    'NEXT_PUBLIC_API_URL',
+    resolveEnvValue(env, 'apiUrl', 'NEXT_PUBLIC_API_URL'),
+  );
 
   if (isProd && !socketOrigin) {
     throw new Error(
       'NEXT_PUBLIC_SOCKET_URL must be set in production so web CSP connect-src is not permissive or broken.',
     );
+  }
+
+  if (isProd) {
+    assertPublicProductionOrigin('NEXT_PUBLIC_SOCKET_URL', socketOrigin);
+    assertPublicProductionOrigin('NEXT_PUBLIC_API_URL', apiOrigin);
   }
 
   const socketWsOrigin = toWebSocketOrigin(socketOrigin);

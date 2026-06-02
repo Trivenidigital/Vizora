@@ -286,7 +286,7 @@ echo
 # ---------- Health ----------
 probe_status "Middleware health" "200" "$API_BASE/api/v1/health"
 probe_status "Web home" "200" "$WEB_BASE"
-probe_status "Realtime health" "200" "$RT_BASE/api/health"
+probe_status "Realtime health" "200" "$RT_BASE/health"
 
 # ---------- Auth ----------
 echo
