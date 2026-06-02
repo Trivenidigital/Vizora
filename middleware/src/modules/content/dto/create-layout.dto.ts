@@ -35,10 +35,11 @@ export class CreateLayoutDto {
   @IsEnum(['split-horizontal', 'split-vertical', 'grid-2x2', 'main-sidebar', 'l-shape', 'custom'])
   layoutType: string;
 
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => LayoutZoneDto)
-  zones: LayoutZoneDto[];
+  zones?: LayoutZoneDto[];
 
   @IsOptional()
   @IsObject()

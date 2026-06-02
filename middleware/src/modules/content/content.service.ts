@@ -12,7 +12,7 @@ import { BulkUpdateDto, BulkArchiveDto, BulkRestoreDto, BulkDeleteDto, BulkTagDt
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { TemplateRenderingService } from './template-rendering.service';
-import { CreateLayoutDto } from './dto/create-layout.dto';
+import { CreateLayoutDto, LayoutZoneDto } from './dto/create-layout.dto';
 import { CreateWidgetDto } from './dto/create-widget.dto';
 import { LAYOUT_PRESETS } from './layout-presets';
 import { DataSourceRegistryService } from './data-source-registry.service';
@@ -1537,9 +1537,18 @@ export class ContentService {
    * Create a new multi-zone layout
    */
   async createLayout(organizationId: string, dto: CreateLayoutDto) {
+    const zones = dto.zones ?? this.getPresetZonesForType(dto.layoutType);
+    if (!zones || zones.length === 0) {
+      throw new BadRequestException(
+        dto.layoutType === 'custom'
+          ? 'Layout zones are required for custom layouts'
+          : `Unknown layout preset: ${dto.layoutType}`,
+      );
+    }
+
     const metadata = {
       layoutType: dto.layoutType,
-      zones: dto.zones,
+      zones,
       gridTemplate: dto.gridTemplate || this.getGridTemplateForType(dto.layoutType),
       gap: dto.gap ?? 0,
       backgroundColor: dto.backgroundColor || '#000000',
@@ -1681,6 +1690,11 @@ export class ContentService {
     }
     // Default for custom layouts
     return { columns: '1fr', rows: '1fr' };
+  }
+
+  private getPresetZonesForType(layoutType: string): LayoutZoneDto[] | undefined {
+    const preset = LAYOUT_PRESETS.find(p => p.layoutType === layoutType);
+    return preset?.zones.map((zone) => ({ ...zone }));
   }
 
   // ============================================================================

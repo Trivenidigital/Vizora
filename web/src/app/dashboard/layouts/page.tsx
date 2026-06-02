@@ -139,7 +139,9 @@ const DEFAULT_PRESETS = [
 ];
 
 interface LayoutPreset {
-  type: string;
+  type?: string;
+  layoutType?: string;
+  id?: string;
   name: string;
   description: string;
   zones: number | { id: string; x: number; y: number; width: number; height: number; label?: string }[];
@@ -153,6 +155,47 @@ interface Layout {
   description?: string;
   createdAt?: string;
   updatedAt?: string;
+  metadata?: {
+    layoutType?: string;
+    zones?: any[];
+  };
+}
+
+function getPresetType(preset: LayoutPreset): string {
+  return preset.type || preset.layoutType || preset.id || 'custom';
+}
+
+function getPresetZoneCount(preset: LayoutPreset): number {
+  return Array.isArray(preset.zones) ? preset.zones.length : preset.zones;
+}
+
+function normalizeLayoutPreset(preset: LayoutPreset): LayoutPreset | null {
+  const type = getPresetType(preset);
+  if (!type || !preset.name) {
+    return null;
+  }
+
+  return {
+    ...preset,
+    type,
+    zones: preset.zones ?? 0,
+  };
+}
+
+function normalizeLayout(layout: Layout): Layout {
+  const metadata = layout.metadata && typeof layout.metadata === 'object' && !Array.isArray(layout.metadata)
+    ? layout.metadata
+    : {};
+
+  return {
+    ...layout,
+    layoutType: layout.layoutType || metadata.layoutType || 'custom',
+    zones: Array.isArray(layout.zones)
+      ? layout.zones
+      : Array.isArray(metadata.zones)
+        ? metadata.zones
+        : layout.zones,
+  };
 }
 
 export default function LayoutsPage() {
@@ -184,7 +227,12 @@ export default function LayoutsPage() {
     try {
       const presetData = await apiClient.getLayoutPresets();
       if (presetData && presetData.length > 0) {
-        setPresets(presetData);
+        const normalizedPresets = presetData
+          .map((preset) => normalizeLayoutPreset(preset as LayoutPreset))
+          .filter((preset): preset is LayoutPreset => preset !== null);
+        if (normalizedPresets.length > 0) {
+          setPresets(normalizedPresets);
+        }
       }
     } catch {
       // Use default presets as fallback
@@ -194,7 +242,7 @@ export default function LayoutsPage() {
     try {
       const response = await apiClient.get<any>('/content/layouts');
       const layoutList = response?.data || response || [];
-      setLayouts(Array.isArray(layoutList) ? layoutList : []);
+      setLayouts(Array.isArray(layoutList) ? layoutList.map(normalizeLayout) : []);
     } catch {
       setLayouts([]);
     }
@@ -212,7 +260,7 @@ export default function LayoutsPage() {
     try {
       const newLayout = await apiClient.createLayout({
         name: layoutName.trim(),
-        layoutType: selectedPreset.type,
+        layoutType: getPresetType(selectedPreset),
         description: layoutDescription.trim() || undefined,
       });
       toast.success('Layout created successfully');
@@ -347,7 +395,7 @@ export default function LayoutsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               {presets.map((preset) => (
                 <div
-                  key={preset.type}
+                  key={getPresetType(preset)}
                   className="eh-dash-card rounded-lg border border-[var(--border)] p-5 hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer group"
                   onClick={() => {
                     setSelectedPreset(preset);
@@ -356,10 +404,10 @@ export default function LayoutsPage() {
                     setIsCreateModalOpen(true);
                   }}
                 >
-                  <LayoutPreviewGrid type={preset.type} />
+                  <LayoutPreviewGrid type={getPresetType(preset)} />
                   <div className="mt-3">
                     <h4 className="font-semibold text-[var(--foreground)] text-sm">{preset.name}</h4>
-                    <p className="text-xs text-[var(--foreground-tertiary)] mt-1">{Array.isArray(preset.zones) ? preset.zones.length : preset.zones} zone{(Array.isArray(preset.zones) ? preset.zones.length : preset.zones) > 1 ? 's' : ''}</p>
+                    <p className="text-xs text-[var(--foreground-tertiary)] mt-1">{getPresetZoneCount(preset)} zone{getPresetZoneCount(preset) > 1 ? 's' : ''}</p>
                     <p className="text-xs text-[var(--foreground-secondary)] mt-1 line-clamp-2">{preset.description}</p>
                   </div>
                   <button
@@ -405,17 +453,17 @@ export default function LayoutsPage() {
               <p className="text-[var(--foreground-secondary)]">Select a layout preset:</p>
               {presets.map((preset) => (
                 <button
-                  key={preset.type}
+                  key={getPresetType(preset)}
                   onClick={() => setSelectedPreset(preset)}
                   className="w-full flex items-center gap-4 p-3 rounded-lg border border-[var(--border)] hover:border-[#00E5A0] hover:bg-[#00E5A0]/5 transition text-left"
                 >
                   <div className="w-24 flex-shrink-0">
-                    <LayoutPreviewGrid type={preset.type} />
+                    <LayoutPreviewGrid type={getPresetType(preset)} />
                   </div>
                   <div>
                     <div className="font-medium text-[var(--foreground)]">{preset.name}</div>
                     <div className="text-xs text-[var(--foreground-tertiary)]">
-                      {Array.isArray(preset.zones) ? preset.zones.length : preset.zones} zone{(Array.isArray(preset.zones) ? preset.zones.length : preset.zones) > 1 ? 's' : ''} -- {preset.description}
+                      {getPresetZoneCount(preset)} zone{getPresetZoneCount(preset) > 1 ? 's' : ''} -- {preset.description}
                     </div>
                   </div>
                 </button>
@@ -426,11 +474,11 @@ export default function LayoutsPage() {
               {/* Selected Preset Preview */}
               <div className="flex items-center gap-4 p-3 bg-[var(--background)] rounded-lg border border-[var(--border)]">
                 <div className="w-20 flex-shrink-0">
-                  <LayoutPreviewGrid type={selectedPreset.type} />
+                  <LayoutPreviewGrid type={getPresetType(selectedPreset)} />
                 </div>
                 <div>
                   <div className="font-medium text-[var(--foreground)]">{selectedPreset.name}</div>
-                  <div className="text-xs text-[var(--foreground-tertiary)]">{Array.isArray(selectedPreset.zones) ? selectedPreset.zones.length : selectedPreset.zones} zones</div>
+                  <div className="text-xs text-[var(--foreground-tertiary)]">{getPresetZoneCount(selectedPreset)} zones</div>
                 </div>
                 <button
                   onClick={() => setSelectedPreset(null)}

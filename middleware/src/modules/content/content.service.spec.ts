@@ -427,6 +427,74 @@ describe('ContentService', () => {
     });
   });
 
+  describe('createLayout', () => {
+    it('materializes preset zones when dashboard creation omits zones', async () => {
+      mockDatabaseService.content.create.mockResolvedValue({
+        ...mockContent,
+        id: 'layout-1',
+        name: 'Lobby Split',
+        type: 'layout',
+        url: '',
+        metadata: {
+          layoutType: 'split-horizontal',
+          zones: [
+            { id: 'left', name: 'Left', gridArea: '1 / 1 / 2 / 2' },
+            { id: 'right', name: 'Right', gridArea: '1 / 2 / 2 / 3' },
+          ],
+          gridTemplate: { columns: '1fr 1fr', rows: '1fr' },
+          gap: 0,
+          backgroundColor: '#000000',
+        },
+      });
+
+      const result = await service.createLayout('org-123', {
+        name: 'Lobby Split',
+        layoutType: 'split-horizontal',
+        description: 'Preset create from dashboard',
+      } as any);
+
+      expect(mockDatabaseService.content.create).toHaveBeenCalledWith({
+        data: {
+          name: 'Lobby Split',
+          description: 'Preset create from dashboard',
+          type: 'layout',
+          url: '',
+          metadata: {
+            layoutType: 'split-horizontal',
+            zones: [
+              { id: 'left', name: 'Left', gridArea: '1 / 1 / 2 / 2' },
+              { id: 'right', name: 'Right', gridArea: '1 / 2 / 2 / 3' },
+            ],
+            gridTemplate: { columns: '1fr 1fr', rows: '1fr' },
+            gap: 0,
+            backgroundColor: '#000000',
+          },
+          organizationId: 'org-123',
+        },
+      });
+      expect(result.metadata).toEqual(
+        expect.objectContaining({
+          layoutType: 'split-horizontal',
+          zones: expect.arrayContaining([
+            expect.objectContaining({ id: 'left', name: 'Left' }),
+            expect.objectContaining({ id: 'right', name: 'Right' }),
+          ]),
+        }),
+      );
+    });
+
+    it('rejects custom layouts without explicit zones', async () => {
+      await expect(
+        service.createLayout('org-123', {
+          name: 'Custom Layout',
+          layoutType: 'custom',
+        } as any),
+      ).rejects.toThrow('Layout zones are required for custom layouts');
+
+      expect(mockDatabaseService.content.create).not.toHaveBeenCalled();
+    });
+  });
+
   describe('getResolvedLayout', () => {
     it('emits display-compatible resolvedPlaylist and resolvedContent zone fields', async () => {
       mockDatabaseService.content.findFirst.mockResolvedValue({

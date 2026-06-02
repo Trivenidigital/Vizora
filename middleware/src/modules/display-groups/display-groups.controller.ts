@@ -12,6 +12,7 @@ import {
 import { ParseIdPipe } from '../common/pipes/parse-id.pipe';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequiresSubscription } from '../billing/decorators/requires-subscription.decorator';
 import { DisplayGroupsService } from './display-groups.service';
 import { CreateDisplayGroupDto } from './dto/create-display-group.dto';
 import { UpdateDisplayGroupDto } from './dto/update-display-group.dto';
@@ -26,6 +27,7 @@ export class DisplayGroupsController {
 
   @Post()
   @Roles('admin', 'manager')
+  @RequiresSubscription()
   create(
     @CurrentUser('organizationId') organizationId: string,
     @Body() createDisplayGroupDto: CreateDisplayGroupDto,
@@ -51,6 +53,7 @@ export class DisplayGroupsController {
 
   @Patch(':id')
   @Roles('admin', 'manager')
+  @RequiresSubscription()
   update(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id', ParseIdPipe) id: string,
@@ -61,6 +64,7 @@ export class DisplayGroupsController {
 
   @Delete(':id')
   @Roles('admin')
+  @RequiresSubscription()
   remove(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id', ParseIdPipe) id: string,
@@ -70,6 +74,7 @@ export class DisplayGroupsController {
 
   @Post(':id/displays')
   @Roles('admin', 'manager')
+  @RequiresSubscription()
   addDisplays(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id', ParseIdPipe) id: string,
@@ -80,6 +85,7 @@ export class DisplayGroupsController {
 
   @Delete(':id/displays')
   @Roles('admin', 'manager')
+  @RequiresSubscription()
   removeDisplays(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id', ParseIdPipe) id: string,

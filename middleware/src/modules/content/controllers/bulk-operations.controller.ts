@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
+import { RequiresSubscription } from '../../billing/decorators/requires-subscription.decorator';
 import { ContentService } from '../content.service';
 import { BulkUpdateDto, BulkArchiveDto, BulkRestoreDto, BulkDeleteDto, BulkTagDto, BulkDurationDto } from '../dto/bulk-operations.dto';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
@@ -19,6 +20,7 @@ export class BulkOperationsController {
 
   @Post('update')
   @Roles('admin', 'manager')
+  @RequiresSubscription()
   @HttpCode(HttpStatus.OK)
   bulkUpdate(
     @CurrentUser('organizationId') organizationId: string,
@@ -29,6 +31,7 @@ export class BulkOperationsController {
 
   @Post('archive')
   @Roles('admin', 'manager')
+  @RequiresSubscription()
   @HttpCode(HttpStatus.OK)
   bulkArchive(
     @CurrentUser('organizationId') organizationId: string,
@@ -39,6 +42,7 @@ export class BulkOperationsController {
 
   @Post('restore')
   @Roles('admin', 'manager')
+  @RequiresSubscription()
   @HttpCode(HttpStatus.OK)
   bulkRestore(
     @CurrentUser('organizationId') organizationId: string,
@@ -49,6 +53,7 @@ export class BulkOperationsController {
 
   @Post('delete')
   @Roles('admin')
+  @RequiresSubscription()
   @HttpCode(HttpStatus.OK)
   bulkDelete(
     @CurrentUser('organizationId') organizationId: string,
@@ -59,6 +64,7 @@ export class BulkOperationsController {
 
   @Post('tags')
   @Roles('admin', 'manager')
+  @RequiresSubscription()
   @HttpCode(HttpStatus.OK)
   bulkAddTags(
     @CurrentUser('organizationId') organizationId: string,
@@ -69,6 +75,7 @@ export class BulkOperationsController {
 
   @Post('duration')
   @Roles('admin', 'manager')
+  @RequiresSubscription()
   @HttpCode(HttpStatus.OK)
   bulkSetDuration(
     @CurrentUser('organizationId') organizationId: string,

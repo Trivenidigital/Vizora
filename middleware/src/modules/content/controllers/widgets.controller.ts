@@ -16,6 +16,7 @@ import {
 import { ParseIdPipe } from '../../common/pipes/parse-id.pipe';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
+import { RequiresSubscription } from '../../billing/decorators/requires-subscription.decorator';
 import { ContentService } from '../content.service';
 import { CreateWidgetDto } from '../dto/create-widget.dto';
 import { PaginationDto } from '../../common/dto/pagination.dto';
@@ -225,6 +226,7 @@ export class WidgetsController {
 
   @Post()
   @Roles('admin', 'manager')
+  @RequiresSubscription()
   createWidget(
     @CurrentUser('organizationId') organizationId: string,
     @Body() dto: CreateWidgetDto,
@@ -234,6 +236,7 @@ export class WidgetsController {
 
   @Patch(':id')
   @Roles('admin', 'manager')
+  @RequiresSubscription()
   updateWidget(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id', ParseIdPipe) id: string,
@@ -244,6 +247,7 @@ export class WidgetsController {
 
   @Post(':id/refresh')
   @Roles('admin', 'manager')
+  @RequiresSubscription()
   @HttpCode(HttpStatus.OK)
   refreshWidget(
     @CurrentUser('organizationId') organizationId: string,

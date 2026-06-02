@@ -12,6 +12,7 @@ import {
 import { ParseIdPipe } from '../../common/pipes/parse-id.pipe';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
+import { RequiresSubscription } from '../../billing/decorators/requires-subscription.decorator';
 import { ContentService } from '../content.service';
 import { CreateTemplateDto } from '../dto/create-template.dto';
 import { UpdateTemplateDto } from '../dto/update-template.dto';
@@ -26,6 +27,7 @@ export class TemplatesController {
 
   @Post()
   @Roles('admin', 'manager')
+  @RequiresSubscription()
   createTemplate(
     @CurrentUser('organizationId') organizationId: string,
     @Body() dto: CreateTemplateDto,
@@ -35,6 +37,7 @@ export class TemplatesController {
 
   @Patch(':id')
   @Roles('admin', 'manager')
+  @RequiresSubscription()
   updateTemplate(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id', ParseIdPipe) id: string,
@@ -77,6 +80,7 @@ export class TemplatesController {
 
   @Post(':id/refresh')
   @Roles('admin', 'manager')
+  @RequiresSubscription()
   @HttpCode(HttpStatus.OK)
   refreshTemplate(
     @CurrentUser('organizationId') organizationId: string,
