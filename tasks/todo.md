@@ -69,7 +69,8 @@ with Vizora-native code.
     empty-state CTA, or existing-device pair action.
 - Focused review-fix verification:
   `pnpm --filter @vizora/middleware test -- --runInBand src/modules/common/middleware/csrf.middleware.spec.ts src/app/app.module.spec.ts src/modules/displays/pairing.controller.spec.ts src/modules/displays/pairing.service.spec.ts`
-  passed 4 suites / 82 tests after adding concurrent pairing-claim coverage.
+  passed 4 suites / 86 tests after adding concurrent pairing-claim and
+  org-level new-display serialization coverage.
 - Review audit findings fixed:
   - Pairing completion's Redis claim helpers were present but incomplete in the
     dead-session state; the service now rejects concurrent completion claims
@@ -78,6 +79,18 @@ with Vizora-native code.
     now suppressed from `getActivePairings()` dashboard list responses.
   - E2E browser-CSRF helpers strip stale CSRF cookies from auth-cookie bundles so
     duplicate CSRF cookies cannot make valid browser writes fail.
+  - Backend clean-gate found quota enforcement was still raceable across two
+    different new-device pairing codes for the same org; new-display pairing
+    now takes an org-scoped Redis claim before quota check/create and releases
+    it after the create/failure path.
+  - Google auth endpoints are explicitly exempted from CSRF so raw OAuth POST
+    callbacks are not gated by dashboard CSRF cookies.
+- Latest focused quota-race verification:
+  `pnpm --filter @vizora/middleware test -- --runInBand src/modules/displays/pairing.service.spec.ts`
+  passed 1 suite / 39 tests, including org-level new-display serialization.
+- Latest focused middleware verification:
+  `pnpm --filter @vizora/middleware test -- --runInBand src/modules/common/middleware/csrf.middleware.spec.ts src/app/app.module.spec.ts src/modules/displays/pairing.controller.spec.ts src/modules/displays/pairing.service.spec.ts`
+  passed 4 suites / 86 tests.
 - Runtime E2E verification:
   `pnpm --filter @vizora/middleware test:e2e -- --runInBand --testPathPattern="customer-critical-path"`
   passed 1 suite / 3 tests, including missing-CSRF rejection, viewer pairing

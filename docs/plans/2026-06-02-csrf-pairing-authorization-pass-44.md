@@ -52,8 +52,9 @@ with Vizora-native code.
 3. Decorate `PairingController.completePairing()` with admin/manager roles and
    active-subscription gating; enforce screen quota inside `PairingService`
    only when pairing creates a new display.
-4. Add an atomic Redis completion claim and keep completed token-bearing pairing
-   codes out of the dashboard active-pairing list.
+4. Add Redis completion claims: per-code for one-time completion, and
+   org-scoped around new-display quota check/create so two different pairing
+   codes cannot race past screen quota.
 5. Add an explicit `canPairDevices` dashboard permission and use it for
    top-level device-pairing CTAs, empty states, and the standalone pair page.
 6. Run focused middleware/web tests, dispatch multi-vector review, then run the
