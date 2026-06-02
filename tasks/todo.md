@@ -1,5 +1,123 @@
 # Vizora - Task Tracker
 
+## Active: Customer Readiness Hot-Path Pass 41 (2026-06-02)
+
+**Branch:** `feat/customer-dashboard-performance-pass-41`
+
+**Why now:** The customer/performance analysis lanes found several repo-side
+production-readiness issues. The first buildable slice should harden the
+customer-1 hot paths that are small enough to verify in one PR: display media
+prefetching, streaming-route logging, readiness semantics, and playlist
+tenant-boundary fanout.
+
+**New primitives introduced:** one logging skip metadata decorator on the
+existing LoggingInterceptor. No schema, env var, runtime process, notification
+path, realtime substrate, MCP tool, Hermes skill, provider spend path, or
+parallel infrastructure.
+
+**Hermes-first analysis:** checked per project convention. The Hermes Agent
+Skills Hub currently reports no listed skills, and the awesome-hermes-agent
+community index is informational rather than a runtime primitive for these
+in-repo hot-path fixes.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Display playback cache policy | none found | build in Vizora display client |
+| Middleware health/readiness | none found | build in existing NestJS health module |
+| HTTP media-stream logging | none found | build in existing LoggingInterceptor |
+| Playlist realtime fanout tenant scope | none found | build in existing playlist/realtime path |
+
+Awesome-hermes-agent ecosystem check: no applicable runtime/library primitive
+for display media caching, NestJS readiness, HTTP logging, or tenant-scoped
+playlist fanout; proceed with Vizora-native code.
+
+**Plan/design:**
+`docs/plans/2026-06-02-customer-readiness-hotpath-pass-41.md`
+
+**Plan**
+- [x] Start fresh branch from merged `origin/main`.
+- [x] Run multi-vector analysis lanes: customer UX, performance, backend
+  security/readiness, and customer-critical tests.
+- [x] Add red tests for scoped hot-path fixes.
+- [x] Implement display/media/readiness/playlist fanout fixes.
+- [x] Run focused verification.
+- [x] Run broader verification.
+- [x] Run multi-vector subagent re-review.
+- [ ] PR, CI, merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Scoped fixes**
+- Display playback: preload image content only; do not full-fetch/cache video
+  files before playback.
+- Middleware logging: suppress normal and slow-request logs for successful
+  device-content media streaming while preserving request IDs and error logs.
+- Readiness: make public `/health/ready` fail when MinIO/storage is unhealthy
+  and stop exposing detailed self-test failure messages on the public endpoint.
+- Playlist fanout: scope display lookup for playlist-update push by
+  `organizationId` so polluted display rows cannot receive cross-tenant
+  playlist payloads.
+
+**Backlog/customer-improvement findings to carry forward**
+- P1 schedule role truth: viewers can currently open create/edit/delete
+  schedule workflows.
+- P1 support chat failure state: failed sends can disappear without a visible
+  retry/error state.
+- P2 device pairing role truth: viewer users see pairing entry points.
+- P2 dashboard landing role truth: quick actions advertise write workflows to
+  all roles.
+- P2 settings email truth: editable admin email is not persisted by the save
+  path.
+- P2 team/API key admin gates: sensitive controls are visible to non-admins.
+- P3 content push semantics: offline devices can be selected with unclear
+  delivery expectations.
+- Test gaps: strict browser upload, pairing, playlist/schedule, support, and
+  fleet-command critical paths still need stronger Playwright/API smoke
+  coverage.
+- Performance backlog: dashboard all-page overfetch, playlist list payload
+  bloat, output sanitization cost on large list responses, search indexes, and
+  pairing Redis scan remain for follow-up passes.
+
+**Evidence so far**
+- PR #175 and #176 merged; no open PRs at the start of this pass.
+- Production deploy remains blocked from prior probe: `/opt/vizora/app` is
+  dirty/diverged and behind `origin/main`. No deploy will be attempted unless
+  the checkout becomes safe.
+- Red verification:
+  - `pnpm --filter @vizora/web test -- DisplayClient.test.tsx` failed as
+    expected because video device-content URLs were included in `preloadItems`.
+  - `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/common/interceptors/logging.interceptor.spec.ts middleware/src/modules/health/health.controller.spec.ts middleware/src/modules/health/health.service.spec.ts middleware/src/modules/playlists/playlists.service.spec.ts`
+    failed as expected because successful media streams were logged, MinIO
+    outage was degraded, public readiness exposed `self_test_failures`, and
+    playlist fanout queried displays without `organizationId`.
+- Focused green verification:
+  - `pnpm --filter @vizora/web test -- DisplayClient.test.tsx` passed 1 suite
+    / 3 tests.
+  - `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/common/interceptors/logging.interceptor.spec.ts middleware/src/modules/health/health.controller.spec.ts middleware/src/modules/health/health.service.spec.ts middleware/src/modules/playlists/playlists.service.spec.ts`
+    passed 4 suites / 85 tests.
+- Subagent re-review follow-up: reviewers found that media-stream logging also
+  suppressed completed 4xx responses such as 416, and that the plan needed the
+  mandatory Hermes-first table. Added a red test for completed 4xx media
+  responses before narrowing the logging skip to 2xx/3xx successes.
+- Reviewer-fix focused green:
+  `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/common/interceptors/logging.interceptor.spec.ts`
+  passed 1 suite / 22 tests.
+- Broader affected verification:
+  - `pnpm --filter @vizora/web test -- src/app/display` passed 6 suites / 25
+    tests.
+  - `pnpm --filter @vizora/middleware test -- --runInBand middleware/src/modules/content/device-content.controller.spec.ts middleware/src/modules/common/interceptors/logging.interceptor.spec.ts middleware/src/modules/health/health.controller.spec.ts middleware/src/modules/health/health.service.spec.ts middleware/src/modules/playlists/playlists.service.spec.ts`
+    passed 5 suites / 126 tests.
+- Build and hygiene verification:
+  - `npx nx build @vizora/middleware --skip-nx-cache` passed with existing
+    webpack warnings and Nx flaky-task note for `@vizora/database:build`.
+  - `NEXT_PUBLIC_API_URL=http://localhost:3000 NEXT_PUBLIC_SOCKET_URL=http://localhost:3002 NODE_OPTIONS=--max-old-space-size=4096 npx nx build @vizora/web --skip-nx-cache`
+    passed with existing Next middleware/proxy and TypeScript project-reference
+    warnings.
+  - `git diff --check` passed with Windows CRLF line-ending warnings only.
+  - `pnpm security:no-hardcoded-jwts` passed.
+- Final subagent re-review: performance/regression reviewer CLEAN; security,
+  architecture, readiness, and process reviewer CLEAN. No tenant/auth/readiness
+  envelope or realtime-substrate drift found.
+
 ## Completed: Content MinIO Tenant Boundary Pass 40 (2026-06-02)
 
 **Branch:** `feat/customer-performance-readiness`

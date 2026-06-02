@@ -633,7 +633,7 @@ describe('PlaylistsService', () => {
       await new Promise((r) => setTimeout(r, 50));
 
       expect(mockDatabaseService.display.findMany).toHaveBeenCalledWith({
-        where: { currentPlaylistId: 'playlist-123' },
+        where: { currentPlaylistId: 'playlist-123', organizationId: 'org-123' },
         select: { id: true },
       });
       expect(mockCircuitBreaker.executeWithFallback).toHaveBeenCalledTimes(2);
@@ -708,7 +708,7 @@ describe('PlaylistsService', () => {
       };
 
       const notifyPromise = (service as any)
-        .notifyDisplaysOfPlaylistUpdate('playlist-123', updatedPlaylist)
+        .notifyDisplaysOfPlaylistUpdate('org-123', 'playlist-123', updatedPlaylist)
         .finally(() => {
           completed = true;
         });
@@ -750,7 +750,7 @@ describe('PlaylistsService', () => {
         }
       });
 
-      await (service as any).notifyDisplaysOfPlaylistUpdate('playlist-123', updatedPlaylist);
+      await (service as any).notifyDisplaysOfPlaylistUpdate('org-123', 'playlist-123', updatedPlaylist);
 
       expect(mockCircuitBreaker.executeWithFallback).toHaveBeenCalledTimes(displays.length);
     });

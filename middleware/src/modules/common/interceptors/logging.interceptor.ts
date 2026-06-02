@@ -4,11 +4,16 @@ import {
   ExecutionContext,
   CallHandler,
   Logger,
+  SetMetadata,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { Request, Response } from 'express';
 import * as crypto from 'crypto';
+
+export const SKIP_HTTP_LOGGING_KEY = 'skipHttpLogging';
+export const SkipHttpLogging = () => SetMetadata(SKIP_HTTP_LOGGING_KEY, true);
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -34,9 +39,12 @@ interface LogMetadata {
 export class LoggingInterceptor implements NestInterceptor {
   private readonly logger = new Logger('HTTP');
 
+  constructor(private readonly reflector?: Reflector) {}
+
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const response = context.switchToHttp().getResponse<Response>();
+    const skipSuccessfulLogging = this.shouldSkipSuccessfulLogging(context, request);
 
     // Use incoming X-Request-ID if valid (alphanumeric/dashes, max 128 chars), else generate
     const incomingId = request.headers['x-request-id'] as string;
@@ -61,7 +69,7 @@ export class LoggingInterceptor implements NestInterceptor {
     };
 
     // Log incoming request (debug level in production)
-    if (process.env.NODE_ENV !== 'production') {
+    if (process.env.NODE_ENV !== 'production' && !skipSuccessfulLogging) {
       this.logger.debug(`[${requestId}] --> ${metadata.method} ${metadata.url}`, 'Request');
     }
 
@@ -72,7 +80,9 @@ export class LoggingInterceptor implements NestInterceptor {
           metadata.statusCode = response.statusCode;
           metadata.duration = duration;
 
-          this.logRequest(metadata);
+          if (!skipSuccessfulLogging || response.statusCode >= 400) {
+            this.logRequest(metadata);
+          }
         },
         error: (error) => {
           const duration = Date.now() - startTime;
@@ -117,6 +127,18 @@ export class LoggingInterceptor implements NestInterceptor {
     }
   }
 
+  private shouldSkipSuccessfulLogging(
+    context: ExecutionContext,
+    request: AuthenticatedRequest,
+  ): boolean {
+    const skipFromMetadata = this.reflector?.getAllAndOverride<boolean>(
+      SKIP_HTTP_LOGGING_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+
+    return Boolean(skipFromMetadata) || LoggingInterceptor.isDeviceContentFileUrl(request.url);
+  }
+
   private generateRequestId(): string {
     return crypto.randomUUID();
   }
@@ -158,5 +180,10 @@ export class LoggingInterceptor implements NestInterceptor {
       })
       .join('&');
     return `${path}?${redacted}`;
+  }
+
+  static isDeviceContentFileUrl(url: string): boolean {
+    const path = url.split('?')[0];
+    return /^\/(?:api\/v1\/)?device-content\/[^/]+\/file$/.test(path);
   }
 }

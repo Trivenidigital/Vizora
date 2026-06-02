@@ -48,13 +48,6 @@ export class HealthController {
     const enriched = {
       ...result,
       self_test: selfTestStatus,
-      ...(this.selfTest.result && !this.selfTest.result.passed
-        ? {
-            self_test_failures: Object.entries(this.selfTest.result.results)
-              .filter(([, r]) => !r.passed)
-              .map(([name, r]) => `${name}: ${r.message}`),
-          }
-        : {}),
     };
 
     if (result.status === 'unhealthy') {

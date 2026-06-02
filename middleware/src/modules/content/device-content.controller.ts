@@ -15,6 +15,7 @@ import { ParseIdPipe } from '../common/pipes/parse-id.pipe';
 import type { Request, Response } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { Public } from '../auth/decorators/public.decorator';
+import { SkipHttpLogging } from '../common/interceptors/logging.interceptor';
 import { SkipEnvelope } from '../common/interceptors/response-envelope.interceptor';
 import { SkipOutputSanitize } from '../common/interceptors/sanitize.interceptor';
 import { ContentService } from './content.service';
@@ -762,6 +763,7 @@ export class DeviceContentController {
   @Get(':id/file')
   @Public()
   @SkipEnvelope()
+  @SkipHttpLogging()
   @SkipOutputSanitize()
   async serveFile(
     @Param('id', ParseIdPipe) id: string,

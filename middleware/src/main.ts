@@ -140,7 +140,7 @@ async function bootstrap() {
   // Order matters: logging first, then Sentry error tracking, then sanitization, then envelope
   const reflector = app.get(Reflector);
   app.useGlobalInterceptors(
-    new LoggingInterceptor(),
+    new LoggingInterceptor(reflector),
     new SentryInterceptor(),
     new SanitizeInterceptor(reflector),
     new ResponseEnvelopeInterceptor(reflector),
