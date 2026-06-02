@@ -34,6 +34,8 @@ interface GatewayBroadcastResult {
   failed?: number;
 }
 
+const REALTIME_HTTP_TIMEOUT_MS = 15000;
+
 interface OverrideRecord {
   commandId: string;
   contentId: string;
@@ -274,7 +276,7 @@ export class FleetService {
           this.httpService.post(
             url,
             gatewayBody,
-            { headers },
+            { headers, timeout: REALTIME_HTTP_TIMEOUT_MS },
           ),
         );
         return response.data;

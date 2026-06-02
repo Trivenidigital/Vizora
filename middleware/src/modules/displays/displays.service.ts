@@ -41,6 +41,7 @@ const REALTIME_CIRCUIT_CONFIG = {
   successThreshold: 2,
   failureWindow: 60000, // 1 minute
 };
+const REALTIME_HTTP_TIMEOUT_MS = 15000;
 
 @Injectable()
 export class DisplaysService {
@@ -226,7 +227,7 @@ export class DisplaysService {
           this.httpService.post(url, {
             deviceId: displayId,
             playlist,
-          }, { headers }),
+          }, { headers, timeout: REALTIME_HTTP_TIMEOUT_MS }),
         );
         this.logger.log(`Notified realtime service of playlist update for display ${displayId}`);
       },
@@ -559,7 +560,7 @@ export class DisplaysService {
               duration: content.duration,
             },
             duration,
-          }, { headers }),
+          }, { headers, timeout: REALTIME_HTTP_TIMEOUT_MS }),
         );
         this.logger.log(`Pushed content ${contentId} to display ${displayId} for ${duration} min`);
         return response.data as { success?: boolean; message?: string };
@@ -707,7 +708,7 @@ export class DisplaysService {
                 type: 'screenshot',
                 payload: { requestId },
               },
-            }, { headers }),
+            }, { headers, timeout: REALTIME_HTTP_TIMEOUT_MS }),
           );
           if (response.data?.success === false) {
             throw new ServiceUnavailableException(
@@ -865,7 +866,7 @@ export class DisplaysService {
               type: command,
               payload,
             },
-          }, { headers }),
+          }, { headers, timeout: REALTIME_HTTP_TIMEOUT_MS }),
         );
         this.logger.log(`Command '${command}' sent to device ${displayId}`);
       },

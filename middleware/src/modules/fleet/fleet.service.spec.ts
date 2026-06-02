@@ -309,6 +309,16 @@ describe('FleetService', () => {
       expect(result.devicesDelivered).toBe(0);
       expect(result.devicesQueued).toBe(1);
       expect(result.devicesFailed).toBe(0);
+      expect(httpService.post).toHaveBeenCalledWith(
+        expect.stringContaining('/api/commands/broadcast'),
+        expect.objectContaining({
+          deviceIds: [mockDeviceId],
+        }),
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'x-internal-api-key': expect.any(String) }),
+          timeout: 15000,
+        }),
+      );
     });
 
     it('should resolve content from DB and include it in gateway payload for push_content', async () => {

@@ -1,6 +1,87 @@
 # Vizora - Task Tracker
 
-## Active Workstream: Dashboard Settings Trust Pass 51 (2026-06-02)
+## Active Workstream: Realtime Command Timeout Pass 52 (2026-06-02)
+
+**Branch:** `fix/display-realtime-timeouts-pass-52`
+
+**Why now:** PR #191 merged with green CI, but production deployment remains
+blocked by dirty/diverged prod state. The next performance/reliability gap is
+bounded middleware request time for realtime command handoffs: DisplaysService
+and FleetService call the realtime gateway through Axios without an explicit
+timeout, while adjacent realtime paths already use bounded timeouts and the
+realtime gateway's ACK-backed delivery contract waits up to 10s.
+
+**New primitives introduced:** none. This pass reuses the existing
+`HttpService`, circuit-breaker/fallback paths, internal realtime endpoints, and
+NestJS service methods. No new route, model, migration, module, env var,
+process, response shape, realtime event, MCP tool, Hermes skill, or AI/provider
+spend path.
+
+**Hermes-first analysis:** checked per project convention. This is local
+middleware service-to-service timeout hardening, not a business-agent, MCP,
+Hermes runtime, or provider-spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Realtime command HTTP timeout | none applicable | reuse existing Axios `timeout` option above the gateway ACK window |
+| Circuit-breaker fallback | none applicable | preserve existing `CircuitBreakerService` path |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+NestJS Axios timeout configuration on Vizora's realtime gateway handoffs.
+
+**Plan**
+- [x] Add focused red tests that assert realtime HTTP handoffs include a bounded timeout.
+- [x] Patch DisplaysService realtime calls with shared timeout config.
+- [x] Patch FleetService gateway broadcast calls with the same timeout.
+- [x] Run focused middleware tests.
+- [x] Run multi-vector diff review.
+- [x] Run broader middleware verification.
+- [ ] PR, CI, and merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Evidence so far**
+- Current `origin/main`: `c75643b89686e4729a7dca2a1e5abc2a1071ec91`.
+- Drift evidence:
+  - `DisplaysService` had timeout-less `HttpService.post` calls for playlist
+    update notification, direct content push, screenshot request, and
+    enable/disable display commands.
+  - `FleetService` had a timeout-less broadcast call to
+    `/api/commands/broadcast`.
+  - Adjacent realtime paths already use bounded Axios calls:
+    `PlaylistsService` uses `timeout: 5000`, and notification broadcast uses
+    `timeout: 3000`; realtime gateway ACK-backed device delivery waits up to
+    10s.
+- Red focused run:
+  - `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/displays/displays.service.spec.ts src/modules/fleet/fleet.service.spec.ts`
+    failed on 6 expected assertions because realtime handoff options lacked a
+    bounded timeout.
+- Fix:
+  - Added `REALTIME_HTTP_TIMEOUT_MS = 15000` in DisplaysService and FleetService
+    so middleware waits longer than the gateway's 10s ACK window while still
+    bounding broken realtime calls.
+  - Passed the timeout through existing Axios calls without changing routes,
+    payloads, auth headers, response handling, or circuit-breaker names.
+- Green focused run:
+  - Same command => 2 suites / 74 tests passing.
+- Review:
+  - Realtime/circuit reviewer initially found a high-risk timeout-contract
+    mismatch: a 5s middleware timeout would preempt the realtime gateway's
+    10s ACK-backed delivery window and could falsely fail delivered commands.
+    Fixed by raising the shared timeout to 15s; final re-review returned CLEAN.
+  - Test/release reviewer returned CLEAN after independently re-running the
+    focused tests, middleware type-check, full middleware suite, and diff check.
+- Broader verification:
+  - `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false` =>
+    passing.
+  - `pnpm --filter @vizora/middleware test -- --runInBand` => 148 suites /
+    3028 tests passing.
+  - `npx nx build @vizora/middleware` => passing, with existing webpack/Nx
+    warnings only.
+  - `pnpm security:no-hardcoded-jwts` => passing.
+  - `git diff --check` => exit 0, with only LF/CRLF normalization warnings for
+    `tasks/todo.md`.
+
+## Completed Workstream: Dashboard Settings Trust Pass 51 (2026-06-02)
 
 **Branch:** `fix/customer-dashboard-settings-pass-51`
 
@@ -34,8 +115,8 @@ React settings-form affordance alignment.
 - [x] Run focused web verification.
 - [x] Run multi-vector diff review.
 - [x] Run broader verification.
-- [ ] PR, CI, and merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, and merge if green.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Evidence so far**
 - Current `origin/main`: `b07f8e671d680aff389a4dc80c398963bc39773e`.
@@ -69,6 +150,20 @@ React settings-form affordance alignment.
   - Production-like web build with public URLs set to `https://vizora.cloud`:
     `npx nx build @vizora/web` => passing, with existing Nx/Next warnings.
   - `git diff --check` => exit 0, with only LF/CRLF normalization warnings.
+- CI result on PR #191:
+  - audit pass 29s
+  - lint pass 35s
+  - security pass 33s
+  - build pass 1m30s
+  - test pass 4m27s
+  - e2e pass 8m52s
+- PR #191 merged to `origin/main` at
+  `c75643b89686e4729a7dca2a1e5abc2a1071ec91`.
+- Post-merge production deploy gate remained blocked: prod HEAD is still
+  `bb76aa1838740bff5b58623dfef7a906d44f46a6`, remote main is
+  `c75643b89686e4729a7dca2a1e5abc2a1071ec91`, `/opt/vizora/app` has
+  72 dirty/untracked paths and is `ahead 17, behind 164`. No production pull,
+  restart, or deploy was performed.
 
 ## Completed Workstream: Release Readiness Gates Pass 50 (2026-06-02)
 

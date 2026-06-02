@@ -358,6 +358,29 @@ describe('DisplaysService', () => {
       expect(result.nickname).toBe('Updated Display');
     });
 
+    it('notifies realtime playlist updates with a bounded HTTP timeout', async () => {
+      const playlist = {
+        id: 'playlist-1',
+        organizationId: mockOrganizationId,
+        items: [],
+      };
+      httpService.post.mockReturnValue(of({ data: { success: true } }) as any);
+
+      await (service as any).notifyPlaylistUpdate(mockDisplayId, playlist);
+
+      expect(httpService.post).toHaveBeenCalledWith(
+        expect.stringContaining('/api/push/playlist'),
+        {
+          deviceId: mockDisplayId,
+          playlist,
+        },
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'x-internal-api-key': expect.any(String) }),
+          timeout: 15000,
+        }),
+      );
+    });
+
     it('should throw NotFoundException if display not found', async () => {
       databaseService.display.findFirst.mockResolvedValue(null);
 
@@ -599,6 +622,7 @@ describe('DisplaysService', () => {
         }),
         expect.objectContaining({
           headers: expect.objectContaining({ 'x-internal-api-key': expect.any(String) }),
+          timeout: 15000,
         }),
       );
     });
@@ -684,6 +708,7 @@ describe('DisplaysService', () => {
         },
         expect.objectContaining({
           headers: expect.objectContaining({ 'x-internal-api-key': expect.any(String) }),
+          timeout: 15000,
         }),
       );
     });
@@ -704,6 +729,7 @@ describe('DisplaysService', () => {
         },
         expect.objectContaining({
           headers: expect.objectContaining({ 'x-internal-api-key': expect.any(String) }),
+          timeout: 15000,
         }),
       );
     });
@@ -1068,6 +1094,17 @@ describe('DisplaysService', () => {
       await expect(
         service.pushContent(mockOrganizationId, mockDisplayId, mockContent.id, 5),
       ).resolves.toEqual({ success: true, message: 'Content pushed to display' });
+
+      expect(httpService.post).toHaveBeenCalledWith(
+        expect.stringContaining('/api/push/content'),
+        expect.objectContaining({
+          deviceId: mockDisplayId,
+        }),
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'x-internal-api-key': expect.any(String) }),
+          timeout: 15000,
+        }),
+      );
     });
 
     it('throws ServiceUnavailableException when realtime reports delivery failure', async () => {
