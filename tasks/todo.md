@@ -42,7 +42,8 @@ with Vizora-native code.
 - [x] Implement CSRF middleware registration and pairing backend/frontend gates.
 - [x] Run focused tests.
 - [x] Run multi-vector code review.
-- [ ] Run broader verification, PR, CI, merge, and deployment gate.
+- [x] Run broader local verification.
+- [ ] PR, CI, merge, and deployment gate.
 
 **Evidence so far**
 - Red verification:
@@ -99,9 +100,18 @@ with Vizora-native code.
   `pnpm --filter @vizora/web test -- --runInBand web/src/lib/__tests__/permissions.test.ts web/src/app/dashboard/devices/__tests__/devices-page.test.tsx web/src/app/dashboard/devices/pair/__tests__/pair-device-page.test.tsx`
   passed 3 suites / 27 tests.
 - Broader verification:
+  - `pnpm --filter @vizora/middleware test -- --runInBand` passed 147 suites /
+    2988 tests on the current worktree after the final lint cleanup.
+  - `pnpm --filter @vizora/web test -- --runInBand` passed 103 suites / 1097
+    tests, with existing React `act()` warning noise in unrelated suites.
+  - `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false`
+    passed.
+  - `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` passed.
+  - `ESLINT_USE_FLAT_CONFIG=false npx eslint middleware/src/modules/displays/pairing.service.ts middleware/src/modules/displays/pairing.service.spec.ts`
+    passed with 0 errors / 0 warnings in touched TypeScript files; ESLint
+    emitted its existing eslintrc deprecation warning.
   - `npx nx build @vizora/middleware` passed with the existing webpack warning
     class.
-  - `pnpm --filter @vizora/web exec tsc --noEmit` passed.
   - `pnpm security:no-hardcoded-jwts` passed.
   - `git diff --check` passed aside from existing CRLF conversion warnings.
   - Plain `npx nx build @vizora/web` failed before compilation because
