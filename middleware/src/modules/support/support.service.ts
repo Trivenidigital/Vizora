@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -7,6 +8,7 @@ import { SupportKnowledgeService } from './support-knowledge.service';
 
 interface CreateRequestInput {
   message: string;
+  clientMutationId?: string;
   context?: {
     pageUrl?: string;
     browserInfo?: string;
@@ -30,6 +32,13 @@ interface UserInfo {
   isSuperAdmin: boolean;
 }
 
+const isUniqueConstraintError = (error: unknown): boolean => {
+  return typeof error === 'object'
+    && error !== null
+    && 'code' in error
+    && (error as { code?: string }).code === 'P2002';
+};
+
 @Injectable()
 export class SupportService {
   private readonly logger = new Logger(SupportService.name);
@@ -46,6 +55,33 @@ export class SupportService {
    */
   async createRequest(userId: string, organizationId: string, input: CreateRequestInput) {
     const { message, context } = input;
+    const clientMutationId = input.clientMutationId?.trim() || undefined;
+
+    const findExistingRequest = async () => {
+      if (!clientMutationId) return null;
+      const existing = await this.db.supportRequest.findFirst({
+        where: { organizationId, userId, clientMutationId },
+        include: {
+          messages: { orderBy: { createdAt: 'asc' } },
+        },
+      });
+      return existing;
+    };
+
+    const buildExistingResponse = (existing: NonNullable<Awaited<ReturnType<typeof findExistingRequest>>>) => {
+      const responseText = existing.messages.find((m) => m.role === 'assistant')?.content ?? '';
+      return {
+        request: existing,
+        responseText,
+        response: responseText,
+        requestNumber: existing.id.substring(0, 8).toUpperCase(),
+      };
+    };
+
+    const existing = await findExistingRequest();
+    if (existing) {
+      return buildExistingResponse(existing);
+    }
 
     // Classify the message
     const { category, priority } = this.classifier.classify(message);
@@ -58,49 +94,58 @@ export class SupportService {
     const aiSummary = this.classifier.generateSummary(message, category);
     const aiSuggestedAction = this.classifier.suggestAction(category, priority);
 
-    // Create the support request
-    const request = await this.db.supportRequest.create({
-      data: {
-        organizationId,
-        userId,
-        category,
-        priority,
-        status: 'open',
-        title,
-        description: message,
-        aiSummary,
-        aiSuggestedAction,
-        pageUrl: context?.pageUrl,
-        browserInfo: context?.browserInfo,
-        consoleErrors: context?.consoleErrors,
-      },
-    });
-
-    const requestNumber = request.id.substring(0, 8).toUpperCase();
-
-    // Create the user's initial message
-    await this.db.supportMessage.create({
-      data: {
-        requestId: request.id,
-        organizationId,
-        userId,
-        role: 'user',
-        content: message,
-      },
-    });
+    const requestId = randomUUID();
+    const requestNumber = requestId.substring(0, 8).toUpperCase();
 
     // Generate and save the assistant response
     const responseText = this.generateResponse(category, priority, requestNumber, kbResult?.answer);
 
-    await this.db.supportMessage.create({
-      data: {
-        requestId: request.id,
-        organizationId,
-        userId, // system message attributed to the user's context
-        role: 'assistant',
-        content: responseText,
-      },
-    });
+    let request;
+    try {
+      request = await this.db.supportRequest.create({
+        data: {
+          id: requestId,
+          organizationId,
+          userId,
+          category,
+          priority,
+          status: 'open',
+          title,
+          description: message,
+          aiSummary,
+          aiSuggestedAction,
+          clientMutationId,
+          pageUrl: context?.pageUrl,
+          browserInfo: context?.browserInfo,
+          consoleErrors: context?.consoleErrors,
+          messages: {
+            create: [
+              {
+                organizationId,
+                userId,
+                role: 'user',
+                content: message,
+                clientMutationId,
+              },
+              {
+                organizationId,
+                userId,
+                role: 'assistant',
+                content: responseText,
+              },
+            ],
+          },
+        },
+      });
+    } catch (error) {
+      if (clientMutationId && isUniqueConstraintError(error)) {
+        const racedRequest = await findExistingRequest();
+        if (racedRequest) {
+          return buildExistingResponse(racedRequest);
+        }
+      }
+      throw error;
+    }
 
     // Notify admin if critical or high priority
     if (priority === 'critical' || priority === 'high') {
@@ -122,6 +167,7 @@ export class SupportService {
     return {
       request,
       responseText,
+      response: responseText,
       requestNumber,
     };
   }
@@ -469,6 +515,7 @@ export class SupportService {
     requestId: string,
     user: UserInfo,
     content: string,
+    clientMutationId?: string,
   ) {
     const request = await this.db.supportRequest.findUnique({
       where: { id: requestId },
@@ -490,25 +537,62 @@ export class SupportService {
 
     // Determine role based on user
     const role = (user.role === 'admin' || user.isSuperAdmin) ? 'admin' : 'user';
+    const normalizedClientMutationId = clientMutationId?.trim() || undefined;
 
-    const message = await this.db.supportMessage.create({
-      data: {
-        requestId,
-        organizationId: request.organizationId,
-        userId: user.id,
-        role,
-        content,
-      },
-    });
+    const reopenIfNeeded = async () => {
+      if (role === 'user' && (request.status === 'resolved' || request.status === 'closed')) {
+        await this.db.supportRequest.update({
+          where: { id: requestId },
+          data: { status: 'open' },
+        });
+        this.logger.log(`Reopened support request ${requestId} due to new user message`);
+      }
+    };
+
+    const findExistingMessage = async () => {
+      if (!normalizedClientMutationId) return null;
+      return this.db.supportMessage.findFirst({
+        where: {
+          requestId,
+          userId: user.id,
+          clientMutationId: normalizedClientMutationId,
+        },
+      });
+    };
+
+    if (normalizedClientMutationId) {
+      const existingMessage = await findExistingMessage();
+      if (existingMessage) {
+        await reopenIfNeeded();
+        return existingMessage;
+      }
+    }
+
+    let message;
+    try {
+      message = await this.db.supportMessage.create({
+        data: {
+          requestId,
+          organizationId: request.organizationId,
+          userId: user.id,
+          role,
+          content,
+          clientMutationId: normalizedClientMutationId,
+        },
+      });
+    } catch (error) {
+      if (normalizedClientMutationId && isUniqueConstraintError(error)) {
+        const existingMessage = await findExistingMessage();
+        if (existingMessage) {
+          await reopenIfNeeded();
+          return existingMessage;
+        }
+      }
+      throw error;
+    }
 
     // If the request was resolved/closed and user sends a new message, reopen it
-    if (role === 'user' && (request.status === 'resolved' || request.status === 'closed')) {
-      await this.db.supportRequest.update({
-        where: { id: requestId },
-        data: { status: 'open' },
-      });
-      this.logger.log(`Reopened support request ${requestId} due to new user message`);
-    }
+    await reopenIfNeeded();
 
     this.logger.log(`Added ${role} message to support request ${requestId}`);
 

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { act, render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { ApiError } from '@/lib/error-handler';
 import SchedulesClient from '../page-client';
 
@@ -9,7 +9,9 @@ const mockGetDisplayGroups = jest.fn();
 const mockCreateSchedule = jest.fn();
 const mockUpdateSchedule = jest.fn();
 const mockDeleteSchedule = jest.fn();
+const mockDuplicateSchedule = jest.fn();
 const mockCheckScheduleConflicts = jest.fn();
+let mockCurrentUser: { role: string } | null = { role: 'admin' };
 
 jest.mock('@/lib/api', () => ({
   apiClient: {
@@ -20,6 +22,7 @@ jest.mock('@/lib/api', () => ({
     createSchedule: (...args: any[]) => mockCreateSchedule(...args),
     updateSchedule: (...args: any[]) => mockUpdateSchedule(...args),
     deleteSchedule: (...args: any[]) => mockDeleteSchedule(...args),
+    duplicateSchedule: (...args: any[]) => mockDuplicateSchedule(...args),
     checkScheduleConflicts: (...args: any[]) => mockCheckScheduleConflicts(...args),
   },
 }));
@@ -38,6 +41,17 @@ jest.mock('@/lib/hooks/useToast', () => ({
 
 jest.mock('@/lib/hooks', () => ({
   useRealtimeEvents: jest.fn(() => ({ isConnected: false, isOffline: true })),
+}));
+
+jest.mock('@/lib/hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: mockCurrentUser,
+    loading: false,
+    error: null,
+    isAuthenticated: !!mockCurrentUser,
+    logout: jest.fn(),
+    reload: jest.fn(),
+  }),
 }));
 
 jest.mock('@/theme/icons', () => ({
@@ -162,6 +176,7 @@ const sampleGroups = [
 describe('SchedulesClient', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCurrentUser = { role: 'admin' };
     mockGetSchedules.mockResolvedValue({ data: [] });
     mockGetPlaylists.mockResolvedValue({ data: [] });
     mockGetDisplays.mockResolvedValue({ data: [] });
@@ -169,6 +184,12 @@ describe('SchedulesClient', () => {
     mockCreateSchedule.mockResolvedValue({ id: 'new-1' });
     mockUpdateSchedule.mockImplementation((id, payload) => Promise.resolve({ id, ...payload, isActive: true }));
     mockDeleteSchedule.mockResolvedValue({});
+    mockDuplicateSchedule.mockResolvedValue({
+      ...sampleSchedules[0],
+      id: 's1-copy',
+      name: 'Morning Announcements (Copy)',
+      isActive: false,
+    });
     mockCheckScheduleConflicts.mockResolvedValue({ hasConflicts: false, conflicts: [] });
   });
 
@@ -261,6 +282,139 @@ describe('SchedulesClient', () => {
     });
     expect(screen.getAllByText('Active')).toHaveLength(2);
     expect(screen.getByText('Inactive')).toBeInTheDocument();
+  });
+
+  it('renders schedules read-only for viewer users', async () => {
+    mockCurrentUser = { role: 'viewer' };
+    mockGetSchedules.mockResolvedValue({ data: sampleSchedules });
+
+    render(<SchedulesClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Announcements')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('Create Schedule')).not.toBeInTheDocument();
+    expect(screen.queryByText('Edit')).not.toBeInTheDocument();
+    expect(screen.queryByText('Duplicate')).not.toBeInTheDocument();
+    expect(screen.queryByText('Delete')).not.toBeInTheDocument();
+  });
+
+  it('allows managers to create and duplicate schedules but not delete them', async () => {
+    mockCurrentUser = { role: 'manager' };
+    mockGetSchedules.mockResolvedValue({ data: sampleSchedules });
+
+    render(<SchedulesClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Announcements')).toBeInTheDocument();
+    });
+
+    expect(screen.getAllByText('Create Schedule')).toHaveLength(1);
+    expect(screen.getAllByText('Edit')).toHaveLength(sampleSchedules.length);
+    expect(screen.getAllByText('Duplicate')).toHaveLength(sampleSchedules.length);
+    expect(screen.queryByText('Delete')).not.toBeInTheDocument();
+  });
+
+  it('uses read-only empty-state copy for viewers with no schedules', async () => {
+    mockCurrentUser = { role: 'viewer' };
+    mockGetSchedules.mockResolvedValue({ data: [] });
+
+    render(<SchedulesClient />);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
+    });
+
+    expect(screen.getByText('No schedules are configured for this organization yet')).toBeInTheDocument();
+    expect(screen.queryByText('Create your first schedule to automate content playback on your devices')).not.toBeInTheDocument();
+    expect(screen.queryByText('Create Schedule')).not.toBeInTheDocument();
+  });
+
+  it('duplicates schedules through the backend duplicate endpoint', async () => {
+    mockCurrentUser = { role: 'manager' };
+    mockGetSchedules.mockResolvedValue({ data: sampleSchedules });
+
+    render(<SchedulesClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Announcements')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getAllByText('Duplicate')[0]);
+    });
+
+    await waitFor(() => {
+      expect(mockDuplicateSchedule).toHaveBeenCalledWith('s1');
+    });
+    expect(mockCreateSchedule).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('modal')).not.toBeInTheDocument();
+  });
+
+  it('keeps manager create to one individual device so rollback never needs admin-only delete', async () => {
+    mockCurrentUser = { role: 'manager' };
+    mockGetPlaylists.mockResolvedValue({ data: samplePlaylists });
+    mockGetDisplays.mockResolvedValue({ data: sampleDisplays });
+    mockCreateSchedule.mockResolvedValue({
+      ...sampleSchedules[0],
+      id: 'new-manager-schedule',
+      displayId: 'd2',
+      daysOfWeek: [1, 2, 3, 4, 5],
+      isActive: true,
+    });
+
+    render(<SchedulesClient />);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Create Schedule'));
+    fireEvent.change(screen.getByPlaceholderText('e.g., Morning Content, Holiday Special'), {
+      target: { value: 'Manager schedule' },
+    });
+    fireEvent.change(screen.getByDisplayValue('Select a playlist...'), {
+      target: { value: 'p1' },
+    });
+    fireEvent.click(screen.getByLabelText('Lobby Display'));
+    fireEvent.click(screen.getByLabelText('Conference Room'));
+    fireEvent.click(screen.getByText('Create'));
+
+    await waitFor(() => {
+      expect(mockCreateSchedule).toHaveBeenCalledTimes(1);
+    });
+    expect(mockCreateSchedule).toHaveBeenCalledWith(expect.objectContaining({ displayId: 'd2' }));
+    expect(mockDeleteSchedule).not.toHaveBeenCalled();
+  });
+
+  it('allows admins to delete schedules', async () => {
+    mockGetSchedules.mockResolvedValue({ data: sampleSchedules });
+
+    render(<SchedulesClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Announcements')).toBeInTheDocument();
+    });
+
+    expect(screen.getAllByText('Delete')).toHaveLength(sampleSchedules.length);
+  });
+
+  it('allows admins to confirm schedule deletion', async () => {
+    mockGetSchedules.mockResolvedValue({ data: sampleSchedules });
+
+    render(<SchedulesClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Announcements')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Delete')[0]);
+    fireEvent.click(screen.getByText('Confirm'));
+
+    await waitFor(() => {
+      expect(mockDeleteSchedule).toHaveBeenCalledWith('s1');
+    });
   });
 
   it('checks candidate schedules for conflicts and displays warnings', async () => {
@@ -389,6 +543,7 @@ describe('SchedulesClient', () => {
   });
 
   it('creates one backend schedule per selected device target', async () => {
+    mockCurrentUser = { role: 'admin' };
     mockGetSchedules.mockResolvedValue({ data: [] });
     mockGetPlaylists.mockResolvedValue({ data: samplePlaylists });
     mockGetDisplays.mockResolvedValue({ data: sampleDisplays });
@@ -423,6 +578,7 @@ describe('SchedulesClient', () => {
   });
 
   it('rolls back already-created device schedules if a later target create fails', async () => {
+    mockCurrentUser = { role: 'admin' };
     mockGetSchedules.mockResolvedValue({ data: [] });
     mockGetPlaylists.mockResolvedValue({ data: samplePlaylists });
     mockGetDisplays.mockResolvedValue({ data: sampleDisplays });
@@ -476,6 +632,7 @@ describe('SchedulesClient', () => {
   });
 
   it('submits null opposite target when editing a group schedule to an individual device', async () => {
+    mockCurrentUser = { role: 'manager' };
     mockGetSchedules.mockResolvedValue({ data: sampleSchedules });
     mockGetPlaylists.mockResolvedValue({ data: samplePlaylists });
     mockGetDisplays.mockResolvedValue({ data: sampleDisplays });
@@ -515,20 +672,13 @@ describe('SchedulesClient', () => {
       expect(screen.getByText('Weekend Specials')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getAllByText('Duplicate')[1]);
-    fireEvent.click(screen.getByText('Create'));
+    await act(async () => {
+      fireEvent.click(screen.getAllByText('Duplicate')[1]);
+    });
 
     await waitFor(() => {
-      expect(mockCreateSchedule).toHaveBeenCalledWith(
-        expect.objectContaining({
-          displayGroupId: 'g1',
-        }),
-      );
+      expect(mockDuplicateSchedule).toHaveBeenCalledWith('s2');
     });
-    expect(mockCreateSchedule).toHaveBeenCalledWith(
-      expect.not.objectContaining({
-        displayId: 'g1',
-      }),
-    );
+    expect(mockCreateSchedule).not.toHaveBeenCalled();
   });
 });

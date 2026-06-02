@@ -14,6 +14,8 @@ import dynamic from 'next/dynamic';
 const ScheduleCalendar = dynamic(() => import('@/components/ScheduleCalendar'), { ssr: false });
 import { useToast } from '@/lib/hooks/useToast';
 import { useRealtimeEvents } from '@/lib/hooks';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { getDashboardPermissions } from '@/lib/permissions';
 import { Icon } from '@/theme/icons';
 import { format } from 'date-fns';
 import { isApiError } from '@/lib/error-handler';
@@ -111,6 +113,9 @@ const formatConflictTimeRange = (conflict: { startTime?: number | string | null;
 
 export default function SchedulesClient() {
  const toast = useToast();
+ const { user } = useAuth();
+ const permissions = getDashboardPermissions(user);
+ const canCreateMultipleDeviceSchedules = permissions.canDeleteSchedules;
  const [schedules, setSchedules] = useState<Schedule[]>([]);
  const [devices, setDevices] = useState<Display[]>([]);
  const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
@@ -185,7 +190,7 @@ export default function SchedulesClient() {
  }, []);
 
  useEffect(() => {
- const modalOpen = isCreateModalOpen || isEditModalOpen;
+ const modalOpen = permissions.canManageSchedules && (isCreateModalOpen || isEditModalOpen);
  const daysOfWeek = dayNamesToNumbers(formData.days);
  const targetIds = targetType === 'device' ? formData.deviceIds : formData.deviceIds.slice(0, 1);
 
@@ -286,6 +291,7 @@ export default function SchedulesClient() {
  selectedSchedule?.endDate,
  updateConflictWarnings,
  updateConflictCheckFailed,
+ permissions.canManageSchedules,
  ]);
 
  const loadData = async () => {
@@ -368,6 +374,13 @@ export default function SchedulesClient() {
  if (formData.deviceIds.length === 0) {
  errors.deviceIds = 'Select at least one device';
  }
+ if (
+ targetType === 'device'
+ && !canCreateMultipleDeviceSchedules
+ && formData.deviceIds.length > 1
+ ) {
+ errors.deviceIds = 'Select one device';
+ }
  if (formData.duration < 1 || formData.duration > 1440) {
  errors.duration = 'Duration must be between 1 and 1440 minutes';
  }
@@ -386,6 +399,7 @@ export default function SchedulesClient() {
  };
 
  const handleCreate = async () => {
+ if (!permissions.canManageSchedules) return;
  if (!validateForm()) return;
 
  try {
@@ -417,11 +431,13 @@ export default function SchedulesClient() {
  }
  } catch (error) {
  if (createdSchedules.length > 0) {
+ if (permissions.canDeleteSchedules) {
  await Promise.allSettled(
  createdSchedules
  .filter((schedule) => schedule?.id)
  .map((schedule) => apiClient.deleteSchedule(schedule.id)),
  );
+ }
  await loadData();
  }
  throw error;
@@ -449,6 +465,7 @@ export default function SchedulesClient() {
  };
 
  const handleUpdate = async () => {
+ if (!permissions.canManageSchedules) return;
  if (!validateForm() || !selectedSchedule) return;
 
  try {
@@ -490,6 +507,7 @@ export default function SchedulesClient() {
  };
 
  const handleDelete = async () => {
+ if (!permissions.canDeleteSchedules) return;
  if (!selectedSchedule) return;
 
  try {
@@ -509,6 +527,7 @@ export default function SchedulesClient() {
  };
 
  const openEditModal = (schedule: Schedule) => {
+ if (!permissions.canManageSchedules) return;
  clearConflictCheckCache();
  setSelectedSchedule(schedule);
  setFormData({
@@ -526,6 +545,7 @@ export default function SchedulesClient() {
  };
 
  const openDeleteModal = (schedule: Schedule) => {
+ if (!permissions.canDeleteSchedules) return;
  setSelectedSchedule(schedule);
  setIsDeleteModalOpen(true);
  };
@@ -546,6 +566,34 @@ export default function SchedulesClient() {
  setTargetType('device');
  updateConflictWarnings([]);
  updateConflictCheckFailed(false);
+ };
+
+ const openCreateModal = () => {
+ if (!permissions.canManageSchedules) return;
+ resetForm();
+ setIsCreateModalOpen(true);
+ };
+
+ const handleDuplicate = async (schedule: Schedule) => {
+ if (!permissions.canManageSchedules) return;
+ try {
+ setActionLoading(true);
+ const duplicatedSchedule = await apiClient.duplicateSchedule(schedule.id);
+ const uiSchedule: Schedule = {
+ ...duplicatedSchedule,
+ days: dayNumbersToNames(duplicatedSchedule.daysOfWeek || []),
+ deviceIds: duplicatedSchedule.displayId ? [duplicatedSchedule.displayId] : duplicatedSchedule.displayGroupId ? [duplicatedSchedule.displayGroupId] : [],
+ duration: calculateDuration(duplicatedSchedule.startTime, duplicatedSchedule.endTime),
+ timezone: schedule.timezone || 'UTC',
+ active: duplicatedSchedule.isActive,
+ };
+ setSchedules((prev) => [uiSchedule, ...prev]);
+ toast.success('Schedule duplicated successfully');
+ } catch (error: any) {
+ toast.error(error.message || 'Failed to duplicate schedule');
+ } finally {
+ setActionLoading(false);
+ }
  };
 
  const getPlaylistName = (playlistId: string) => {
@@ -641,16 +689,15 @@ export default function SchedulesClient() {
  </button>
  </div>
  {/* Create button */}
+ {permissions.canManageSchedules && (
  <button
- onClick={() => {
- resetForm();
- setIsCreateModalOpen(true);
- }}
+ onClick={openCreateModal}
  className="eh-btn-neon rounded-xl px-6 py-3 transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2 active:scale-95"
  >
  <Icon name="add" size="lg" className="text-white" />
  <span>Create Schedule</span>
  </button>
+ )}
  </div>
  </div>
 
@@ -672,6 +719,7 @@ export default function SchedulesClient() {
  schedules={schedules}
  onSelectEvent={(schedule) => openEditModal(schedule)}
  onSelectSlot={(slotInfo) => {
+ if (!permissions.canManageSchedules) return;
  resetForm();
  const startTime = format(slotInfo.start, 'HH:mm');
  const endTime = format(slotInfo.end, 'HH:mm');
@@ -688,14 +736,13 @@ export default function SchedulesClient() {
  <EmptyState
  icon="schedules"
  title="No schedules yet"
- description="Create your first schedule to automate content playback on your devices"
- action={{
+ description={permissions.canManageSchedules
+ ? 'Create your first schedule to automate content playback on your devices'
+ : 'No schedules are configured for this organization yet'}
+ action={permissions.canManageSchedules ? {
  label: 'Create Schedule',
- onClick: () => {
- resetForm();
- setIsCreateModalOpen(true);
- },
- }}
+ onClick: openCreateModal,
+ } : undefined}
  />
  ) : (
  /* Schedules List */
@@ -751,6 +798,7 @@ export default function SchedulesClient() {
  </div>
 
  {/* Action Buttons */}
+ {permissions.canManageSchedules && (
  <div className="flex gap-2 mt-4 pt-4 border-t border-[var(--border)]">
  <button
  onClick={() => openEditModal(schedule)}
@@ -759,32 +807,21 @@ export default function SchedulesClient() {
  Edit
  </button>
  <button
- onClick={() => {
- // Don't set selectedSchedule so it's treated as a new schedule
- setSelectedSchedule(null);
- setTargetType((schedule as any).displayGroupId ? 'group' : 'device');
- setFormData({
- name: `${schedule.name} (Copy)`,
- startTime: schedule.startTime != null ? minutesToHHMM(schedule.startTime) : '09:00',
- duration: schedule.duration || 60,
- days: schedule.days || [],
- timezone: schedule.timezone || 'UTC',
- playlistId: schedule.playlistId,
- deviceIds: schedule.deviceIds || [],
- });
- setIsCreateModalOpen(true);
- }}
+ onClick={() => { void handleDuplicate(schedule); }}
  className="px-4 py-2 text-sm bg-[var(--background)] text-[var(--foreground-secondary)] rounded-lg hover:bg-[var(--surface-hover)] transition font-medium active:scale-95"
  >
  Duplicate
  </button>
+ {permissions.canDeleteSchedules && (
  <button
  onClick={() => openDeleteModal(schedule)}
  className="px-4 py-2 text-sm bg-red-50 dark:bg-red-900 text-red-600 dark:text-red-200 rounded-lg hover:bg-red-100 dark:hover:bg-red-800 transition font-medium active:scale-95"
  >
  Delete
  </button>
+ )}
  </div>
+ )}
  </div>
  );
  })}
@@ -808,7 +845,7 @@ export default function SchedulesClient() {
  )}
 
  {/* Create/Edit Schedule Modal */}
- {(isCreateModalOpen || isEditModalOpen) && (
+ {permissions.canManageSchedules && (isCreateModalOpen || isEditModalOpen) && (
  <Modal
  isOpen={isCreateModalOpen || isEditModalOpen}
  onClose={() => {
@@ -1008,7 +1045,9 @@ export default function SchedulesClient() {
  checked={formData.deviceIds.includes(device.id)}
  onChange={e => {
  const newDeviceIds = e.target.checked
+ ? canCreateMultipleDeviceSchedules
  ? [...formData.deviceIds, device.id]
+ : [device.id]
  : formData.deviceIds.filter(id => id !== device.id);
  setFormData({ ...formData, deviceIds: newDeviceIds });
  if (formErrors.deviceIds) setFormErrors({ ...formErrors, deviceIds: '' });
@@ -1086,7 +1125,7 @@ export default function SchedulesClient() {
  )}
 
  {/* Delete Confirmation */}
- {isDeleteModalOpen && selectedSchedule && (
+ {permissions.canDeleteSchedules && isDeleteModalOpen && selectedSchedule && (
  <ConfirmDialog
  isOpen={isDeleteModalOpen}
  onClose={() => {

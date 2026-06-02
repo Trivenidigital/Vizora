@@ -13,6 +13,8 @@ describe('getDashboardPermissions', () => {
       canManagePlaylists: true,
       canDeletePlaylists: true,
       canRemovePlaylistItems: true,
+      canManageSchedules: true,
+      canDeleteSchedules: true,
     });
   });
 
@@ -28,6 +30,8 @@ describe('getDashboardPermissions', () => {
       canManagePlaylists: true,
       canDeletePlaylists: false,
       canRemovePlaylistItems: false,
+      canManageSchedules: true,
+      canDeleteSchedules: false,
     });
   });
 
@@ -39,12 +43,15 @@ describe('getDashboardPermissions', () => {
       canDeleteDevices: false,
       canManagePlaylists: false,
       canDeletePlaylists: false,
+      canManageSchedules: false,
+      canDeleteSchedules: false,
     });
 
     expect(getDashboardPermissions(null)).toMatchObject({
       canManageContent: false,
       canManageDevices: false,
       canManagePlaylists: false,
+      canManageSchedules: false,
     });
   });
 });

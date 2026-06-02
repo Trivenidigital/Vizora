@@ -28,4 +28,10 @@ export class CreateSupportRequestDto {
   @ValidateNested()
   @Type(() => SupportContextDto)
   context?: SupportContextDto;
+
+  @ApiProperty({ description: 'Client-generated idempotency key for safe retries', required: false })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  clientMutationId?: string;
 }

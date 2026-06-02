@@ -76,6 +76,24 @@ describe('SupportController', () => {
       expect(result.request).toEqual(mockRequest);
       expect(result.responseText).toBeDefined();
     });
+
+    it('forwards clientMutationId for idempotent request retries', async () => {
+      supportService.createRequest.mockResolvedValue({
+        request: mockRequest as any,
+        responseText: 'We have received your request.',
+        requestNumber: 'REQ-1234',
+      });
+
+      await controller.createRequest('user-123', 'org-123', {
+        message: 'The app keeps crashing',
+        clientMutationId: 'client-mutation-1',
+      } as any);
+
+      expect(supportService.createRequest).toHaveBeenCalledWith('user-123', 'org-123', {
+        message: 'The app keeps crashing',
+        clientMutationId: 'client-mutation-1',
+      });
+    });
   });
 
   describe('GET /support/requests', () => {
@@ -220,8 +238,32 @@ describe('SupportController', () => {
           isSuperAdmin: false,
         },
         'Any update on this?',
+        undefined,
       );
       expect(result.content).toBe('Any update on this?');
+    });
+
+    it('forwards clientMutationId for idempotent message retries', async () => {
+      const dto = { content: 'Any update on this?', clientMutationId: 'client-message-1' };
+
+      supportService.addMessage.mockResolvedValue({
+        id: 'msg-1',
+        requestId: 'req-12345678-abcd',
+        organizationId: 'org-123',
+        userId: 'user-123',
+        role: 'admin',
+        content: 'Any update on this?',
+        createdAt: new Date(),
+      } as any);
+
+      await controller.addMessage('req-12345678-abcd', mockUser, dto as any);
+
+      expect(supportService.addMessage).toHaveBeenCalledWith(
+        'req-12345678-abcd',
+        expect.objectContaining({ id: 'user-123' }),
+        'Any update on this?',
+        'client-message-1',
+      );
     });
   });
 

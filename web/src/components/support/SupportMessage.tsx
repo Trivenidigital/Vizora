@@ -1,9 +1,14 @@
 'use client';
 
+import { RefreshCw } from 'lucide-react';
+
 interface SupportMessageProps {
   role: 'user' | 'assistant' | 'admin';
   content: string;
   createdAt: string;
+  deliveryStatus?: 'sending' | 'sent' | 'failed';
+  errorMessage?: string;
+  onRetry?: () => void;
 }
 
 function formatTimeAgo(dateString: string): string {
@@ -101,8 +106,16 @@ function renderMessageContent(text: string): React.ReactNode[] {
   return elements;
 }
 
-export default function SupportMessage({ role, content, createdAt }: SupportMessageProps) {
+export default function SupportMessage({
+  role,
+  content,
+  createdAt,
+  deliveryStatus,
+  errorMessage,
+  onRetry,
+}: SupportMessageProps) {
   const isUser = role === 'user';
+  const failed = deliveryStatus === 'failed';
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
@@ -131,6 +144,23 @@ export default function SupportMessage({ role, content, createdAt }: SupportMess
         <div className={`mt-1 text-xs text-gray-500 ${isUser ? 'text-right' : 'text-left'}`}>
           {formatTimeAgo(createdAt)}
         </div>
+
+        {failed && (
+          <div className={`mt-1 flex items-center gap-2 text-xs text-red-300 ${isUser ? 'justify-end' : 'justify-start'}`}>
+            <span>{errorMessage || 'Message not sent'}</span>
+            {onRetry && (
+              <button
+                type="button"
+                onClick={onRetry}
+                aria-label="Retry message"
+                className="inline-flex items-center gap-1 rounded-md border border-red-400/30 px-2 py-1 text-red-100 hover:bg-red-500/10 transition"
+              >
+                <RefreshCw className="h-3 w-3" />
+                <span>Retry</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

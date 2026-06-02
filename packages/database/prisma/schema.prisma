@@ -766,6 +766,7 @@ model SupportRequest {
   description       String
   aiSummary         String?
   aiSuggestedAction String?
+  clientMutationId  String? @db.VarChar(80)
   aiCategory        String? // TicketCategoryV2 slug — see docs/hermes/ticket-categories-2026-04-24.md
 
   pageUrl       String? @db.VarChar(500)
@@ -790,6 +791,7 @@ model SupportRequest {
   @@index([userId])
   @@index([organizationId, status])
   @@index([organizationId, createdAt])
+  @@unique([organizationId, userId, clientMutationId], map: "support_requests_org_user_client_mutation_key")
   @@map("support_requests")
 }
 
@@ -802,6 +804,7 @@ model SupportMessage {
   role       String // 'user', 'assistant', 'admin' — conversation role
   authorType String @default("user") // 'user' | 'admin' | 'agent' — source (agent = automation)
   content    String
+  clientMutationId String? @db.VarChar(80)
 
   createdAt DateTime @default(now())
 
@@ -811,6 +814,7 @@ model SupportMessage {
   @@index([requestId])
   @@index([organizationId])
   @@index([requestId, authorType])
+  @@unique([requestId, userId, clientMutationId], map: "support_messages_request_user_client_mutation_key")
   @@map("support_messages")
 }
 

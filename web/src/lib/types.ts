@@ -615,6 +615,9 @@ export interface SupportMessage {
   role: 'user' | 'assistant' | 'admin';
   content: string;
   createdAt: string;
+  clientMutationId?: string | null;
+  deliveryStatus?: 'sending' | 'sent' | 'failed';
+  errorMessage?: string;
 }
 
 export interface SupportContext {
@@ -635,6 +638,7 @@ export interface SupportStats {
 export interface SupportRequestResponse {
   request: SupportRequest;
   response: string;
+  responseText?: string;
 }
 
 export interface SupportQueryParams {

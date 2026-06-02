@@ -27,7 +27,8 @@ interface SupportChatState {
 // (TS4058).
 export interface SupportChatContextValue extends SupportChatState {
   toggleChat: () => void;
-  sendMessage: (content: string) => Promise<void>;
+  sendMessage: (content: string, clientMutationId?: string) => Promise<void>;
+  retryFailedMessage: (messageId: string) => Promise<void>;
   startNewConversation: () => void;
   startComposing: (prefill?: string) => void;
   selectConversation: (id: string) => Promise<void>;
@@ -40,6 +41,14 @@ export const SupportChatContext = createContext<SupportChatContextValue | null>(
 // Keep last 10 console errors for context capture
 const recentErrors: string[] = [];
 let consoleErrorIntercepted = false;
+const SEND_FAILED_MESSAGE = 'Message not sent';
+
+function createClientMutationId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `support-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
 
 function interceptConsoleErrors() {
   if (consoleErrorIntercepted || typeof window === 'undefined') return;
@@ -150,7 +159,7 @@ export function SupportChatProvider({ children }: { children: React.ReactNode })
     }
   }, []);
 
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, clientMutationId = createClientMutationId()) => {
     if (!content.trim()) return;
 
     const context = captureContext();
@@ -159,38 +168,47 @@ export function SupportChatProvider({ children }: { children: React.ReactNode })
     if (activeRequestId) {
       // Add to existing conversation
       const optimisticMsg: SupportMessage = {
-        id: `temp-${Date.now()}`,
+        id: `temp-${clientMutationId}`,
         requestId: activeRequestId,
         organizationId: '',
         userId: '',
         role: 'user',
         content: content.trim(),
         createdAt: new Date().toISOString(),
+        clientMutationId,
+        deliveryStatus: 'sending',
       };
       setMessages((prev) => [...prev, optimisticMsg]);
 
       try {
-        const serverMsg = await apiClient.addSupportMessage(activeRequestId, content.trim());
+        const serverMsg = await apiClient.addSupportMessage(activeRequestId, content.trim(), clientMutationId);
         // Replace optimistic message with server response
         setMessages((prev) =>
           prev.map((m) => (m.id === optimisticMsg.id ? serverMsg : m))
         );
       } catch {
-        // Remove optimistic message on error
-        setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === optimisticMsg.id
+              ? { ...optimisticMsg, deliveryStatus: 'failed', errorMessage: SEND_FAILED_MESSAGE }
+              : m
+          )
+        );
       } finally {
         setIsLoading(false);
       }
     } else {
       // Create new conversation
       const optimisticMsg: SupportMessage = {
-        id: `temp-${Date.now()}`,
+        id: `temp-${clientMutationId}`,
         requestId: '',
         organizationId: '',
         userId: '',
         role: 'user',
         content: content.trim(),
         createdAt: new Date().toISOString(),
+        clientMutationId,
+        deliveryStatus: 'sending',
       };
       setMessages([optimisticMsg]);
 
@@ -198,6 +216,7 @@ export function SupportChatProvider({ children }: { children: React.ReactNode })
         const result = await apiClient.createSupportRequest({
           message: content.trim(),
           context,
+          clientMutationId,
         });
         const newRequest = result.request;
         setActiveRequestId(newRequest.id);
@@ -216,14 +235,15 @@ export function SupportChatProvider({ children }: { children: React.ReactNode })
         ];
 
         // Add the assistant response if available
-        if (result.response) {
+        const responseText = result.response ?? result.responseText;
+        if (responseText) {
           newMessages.push({
             id: newRequest.id + '-assistant',
             requestId: newRequest.id,
             organizationId: newRequest.organizationId,
             userId: '',
             role: 'assistant',
-            content: result.response,
+            content: responseText,
             createdAt: new Date().toISOString(),
           });
         }
@@ -241,12 +261,23 @@ export function SupportChatProvider({ children }: { children: React.ReactNode })
           ...prev,
         ]);
       } catch {
-        setMessages([]);
+        setMessages([{ ...optimisticMsg, deliveryStatus: 'failed', errorMessage: SEND_FAILED_MESSAGE }]);
+        setIsComposing(true);
       } finally {
         setIsLoading(false);
       }
     }
   }, [activeRequestId]);
+
+  const retryFailedMessage = useCallback(async (messageId: string) => {
+    const failedMessage = messages.find(
+      (message) => message.id === messageId && message.deliveryStatus === 'failed',
+    );
+    if (!failedMessage) return;
+
+    setMessages((prev) => prev.filter((message) => message.id !== messageId));
+    await sendMessage(failedMessage.content, failedMessage.clientMutationId || undefined);
+  }, [messages, sendMessage]);
 
   const value: SupportChatContextValue = {
     isOpen,
@@ -259,6 +290,7 @@ export function SupportChatProvider({ children }: { children: React.ReactNode })
     inputText,
     toggleChat,
     sendMessage,
+    retryFailedMessage,
     startNewConversation,
     startComposing,
     selectConversation,

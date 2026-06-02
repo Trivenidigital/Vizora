@@ -263,7 +263,8 @@ describe('SupportChat', () => {
     await waitFor(() => {
       expect(mockApiClient.addSupportMessage).toHaveBeenCalledWith(
         'conv1',
-        'I need help with something'
+        'I need help with something',
+        expect.any(String)
       );
     });
   });
@@ -336,6 +337,207 @@ describe('SupportChat', () => {
 
     // The user message should appear immediately (optimistically)
     expect(screen.getByText('My optimistic message')).toBeInTheDocument();
+  });
+
+  it('keeps failed existing-conversation messages visible with retry affordance', async () => {
+    mockApiClient.getSupportRequests.mockResolvedValue({
+      data: [
+        {
+          id: 'conv1',
+          title: 'Active conversation',
+          status: 'open',
+          description: 'Issue',
+          createdAt: new Date().toISOString(),
+        },
+      ],
+      meta: { total: 1, page: 1, limit: 20, totalPages: 1 },
+    } as any);
+
+    mockApiClient.getSupportRequest.mockResolvedValue({
+      id: 'conv1',
+      title: 'Active conversation',
+      status: 'open',
+      description: 'Issue',
+      messages: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    } as any);
+    mockApiClient.addSupportMessage.mockRejectedValueOnce(new Error('network down'));
+
+    await act(async () => {
+      renderChat();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('Open support chat'));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Active conversation'));
+    });
+
+    const textarea = await screen.findByPlaceholderText('Type a message...');
+    await act(async () => {
+      fireEvent.change(textarea, { target: { value: 'Please do not lose this' } });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('Send message'));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Please do not lose this')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Message not sent')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /retry message/i })).toBeInTheDocument();
+  });
+
+  it('retries failed existing-conversation messages with the same client mutation id', async () => {
+    mockApiClient.getSupportRequests.mockResolvedValue({
+      data: [
+        {
+          id: 'conv1',
+          title: 'Active conversation',
+          status: 'open',
+          description: 'Issue',
+          createdAt: new Date().toISOString(),
+        },
+      ],
+      meta: { total: 1, page: 1, limit: 20, totalPages: 1 },
+    } as any);
+
+    mockApiClient.getSupportRequest.mockResolvedValue({
+      id: 'conv1',
+      title: 'Active conversation',
+      status: 'open',
+      description: 'Issue',
+      messages: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    } as any);
+    mockApiClient.addSupportMessage
+      .mockRejectedValueOnce(new Error('network down'))
+      .mockResolvedValueOnce({
+        id: 'msg-retry',
+        requestId: 'conv1',
+        organizationId: 'org-1',
+        userId: 'user-1',
+        role: 'user',
+        content: 'Retry me safely',
+        createdAt: new Date().toISOString(),
+      } as any);
+
+    await act(async () => {
+      renderChat();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('Open support chat'));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Active conversation'));
+    });
+
+    const textarea = await screen.findByPlaceholderText('Type a message...');
+    await act(async () => {
+      fireEvent.change(textarea, { target: { value: 'Retry me safely' } });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('Send message'));
+    });
+
+    const retryButton = await screen.findByRole('button', { name: /retry message/i });
+    const firstMutationId = mockApiClient.addSupportMessage.mock.calls[0][2];
+    await act(async () => {
+      fireEvent.click(retryButton);
+    });
+
+    await waitFor(() => {
+      expect(mockApiClient.addSupportMessage).toHaveBeenCalledTimes(2);
+    });
+    expect(mockApiClient.addSupportMessage.mock.calls[1]).toEqual([
+      'conv1',
+      'Retry me safely',
+      firstMutationId,
+    ]);
+  });
+
+  it('keeps failed new-conversation messages visible with retry affordance', async () => {
+    mockApiClient.createSupportRequest.mockRejectedValueOnce(new Error('network down'));
+
+    await act(async () => {
+      renderChat();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('Open support chat'));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Get help'));
+    });
+
+    const textarea = screen.getByPlaceholderText('Type a message...');
+    await act(async () => {
+      fireEvent.change(textarea, { target: { value: 'I need help with playback' } });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('Send message'));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('I need help with playback')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Message not sent')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /retry message/i })).toBeInTheDocument();
+  });
+
+  it('retries failed new-conversation messages with the same client mutation id', async () => {
+    mockApiClient.createSupportRequest
+      .mockRejectedValueOnce(new Error('network down'))
+      .mockResolvedValueOnce({
+        request: {
+          id: 'req-retry',
+          title: null,
+          status: 'open',
+          description: 'Retry request safely',
+          organizationId: 'org-1',
+          userId: 'user-1',
+          category: 'help_question',
+          priority: 'medium',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        response: 'Retry accepted',
+      } as any);
+
+    await act(async () => {
+      renderChat();
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('Open support chat'));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByText('Get help'));
+    });
+
+    const textarea = screen.getByPlaceholderText('Type a message...');
+    await act(async () => {
+      fireEvent.change(textarea, { target: { value: 'Retry request safely' } });
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('Send message'));
+    });
+
+    const retryButton = await screen.findByRole('button', { name: /retry message/i });
+    const firstMutationId = (mockApiClient.createSupportRequest.mock.calls[0][0] as any).clientMutationId;
+    await act(async () => {
+      fireEvent.click(retryButton);
+    });
+
+    await waitFor(() => {
+      expect(mockApiClient.createSupportRequest).toHaveBeenCalledTimes(2);
+    });
+    expect(mockApiClient.createSupportRequest.mock.calls[1][0]).toEqual(
+      expect.objectContaining({
+        message: 'Retry request safely',
+        clientMutationId: firstMutationId,
+      }),
+    );
   });
 
   it('displays assistant response after API returns for new conversation', async () => {

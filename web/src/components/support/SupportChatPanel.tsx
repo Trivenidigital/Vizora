@@ -43,6 +43,7 @@ export default function SupportChatPanel() {
     setInputText,
     toggleChat,
     sendMessage,
+    retryFailedMessage,
     startNewConversation,
     startComposing,
     selectConversation,
@@ -201,6 +202,9 @@ export default function SupportChatPanel() {
                 role={msg.role}
                 content={msg.content}
                 createdAt={msg.createdAt}
+                deliveryStatus={msg.deliveryStatus}
+                errorMessage={msg.errorMessage}
+                onRetry={msg.deliveryStatus === 'failed' ? () => { void retryFailedMessage(msg.id); } : undefined}
               />
             ))}
             {isLoading && (

@@ -13,6 +13,8 @@ export type DashboardPermissions = {
   canManagePlaylists: boolean;
   canDeletePlaylists: boolean;
   canRemovePlaylistItems: boolean;
+  canManageSchedules: boolean;
+  canDeleteSchedules: boolean;
 };
 
 const isAdmin = (role?: string | null) => role === 'admin';
@@ -35,5 +37,7 @@ export function getDashboardPermissions(user: RoleUser): DashboardPermissions {
     canManagePlaylists: adminOrManager,
     canDeletePlaylists: admin,
     canRemovePlaylistItems: admin,
+    canManageSchedules: adminOrManager,
+    canDeleteSchedules: admin,
   };
 }
