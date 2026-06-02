@@ -616,7 +616,7 @@ export class PairingService implements OnModuleDestroy {
     const now = new Date();
     const unclaimedRequests: PairingRequest[] = [];
 
-    for (const { code, request } of records) {
+    for (const { request } of records) {
       // Check if expired (safety check)
       if (now >= new Date(request.expiresAt)) {
         continue;
