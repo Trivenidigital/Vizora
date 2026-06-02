@@ -33,6 +33,57 @@ describe('next.config security headers', () => {
     );
   });
 
+  it('rejects localhost public origins in production builds', () => {
+    expect(() =>
+      buildSecurityHeaderRoutes({
+        nodeEnv: 'production',
+        socketUrl: 'http://localhost:3002',
+      }),
+    ).toThrow(/NEXT_PUBLIC_SOCKET_URL must not use a localhost or loopback origin in production/);
+
+    expect(() =>
+      buildSecurityHeaderRoutes({
+        nodeEnv: 'production',
+        socketUrl: 'https://rt.vizora.example',
+        apiUrl: 'http://127.0.0.1:3000',
+      }),
+    ).toThrow(/NEXT_PUBLIC_API_URL must not use a localhost or loopback origin in production/);
+  });
+
+  it('does not leak ambient process env into explicit env-object production checks', () => {
+    const previousApiUrl = process.env.NEXT_PUBLIC_API_URL;
+    const previousSocketUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
+
+    process.env.NEXT_PUBLIC_API_URL = 'http://localhost:3000';
+    process.env.NEXT_PUBLIC_SOCKET_URL = 'http://localhost:3002';
+
+    try {
+      const routes = buildSecurityHeaderRoutes({
+        nodeEnv: 'production',
+        socketUrl: 'https://rt.vizora.example',
+      });
+
+      const headerText = routes
+        .flatMap(route => route.headers)
+        .map(header => `${header.key}: ${header.value}`)
+        .join('\n');
+
+      expect(headerText).not.toContain('localhost');
+    } finally {
+      if (previousApiUrl === undefined) {
+        delete process.env.NEXT_PUBLIC_API_URL;
+      } else {
+        process.env.NEXT_PUBLIC_API_URL = previousApiUrl;
+      }
+
+      if (previousSocketUrl === undefined) {
+        delete process.env.NEXT_PUBLIC_SOCKET_URL;
+      } else {
+        process.env.NEXT_PUBLIC_SOCKET_URL = previousSocketUrl;
+      }
+    }
+  });
+
   it('allows display clients to fetch protected content from the public API origin', () => {
     const routes = buildSecurityHeaderRoutes({
       nodeEnv: 'production',

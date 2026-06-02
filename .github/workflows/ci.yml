@@ -98,6 +98,10 @@ jobs:
         working-directory: realtime
         run: pnpm test --passWithNoTests
 
+      - name: Run web unit tests
+        working-directory: web
+        run: pnpm test --runInBand
+
       - name: Run display unit tests
         working-directory: display
         run: pnpm test:ci
@@ -205,6 +209,10 @@ jobs:
         run: npx nx build @vizora/middleware
 
       - name: Build web
+        env:
+          NEXT_PUBLIC_API_URL: https://vizora.cloud
+          NEXT_PUBLIC_SOCKET_URL: https://vizora.cloud
+          BACKEND_URL: https://vizora.cloud
         run: npx nx build @vizora/web
 
       - name: Build realtime

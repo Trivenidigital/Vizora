@@ -1,6 +1,115 @@
 # Vizora - Task Tracker
 
-## Active Workstream: Readiness Memory Calibration Pass 49 (2026-06-02)
+## Active Workstream: Release Readiness Gates Pass 50 (2026-06-02)
+
+**Branch:** `fix/release-readiness-gates-pass-50`
+
+**Why now:** PR #189 merged with green CI, but the next buildable
+customer-readiness gap is release-gate drift: the operator smoke script and
+first-customer runbook still use the stale realtime `/api/health` path, and CI
+builds the web dashboard without running the web unit-test suite in the test
+job. These are small repo-side fixes that reduce fake-green launch evidence.
+
+**New primitives introduced:** none. This pass changes existing CI, smoke, and
+runbook surfaces only. No new route, model, migration, module, env var,
+process, response shape, realtime event, MCP tool, Hermes skill, or AI/provider
+spend path.
+
+**Hermes-first analysis:** checked per project convention. This is local
+release-gate alignment, not a business-agent, MCP, Hermes runtime, or
+provider-spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| CI test gating | none applicable | update existing GitHub Actions workflow |
+| Smoke health endpoint | none applicable | update existing smoke script |
+| Operator runbook | none applicable | update existing runbook |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+GitHub Actions coverage or shell smoke endpoint alignment.
+
+**Plan/design:**
+`docs/plans/2026-06-02-release-readiness-gates-pass-50.md`
+
+**Plan**
+- [x] Add static regression coverage for release-readiness gates.
+- [x] Prove the regression test fails on current main.
+- [x] Patch smoke script, runbook, and CI workflow.
+- [x] Run focused static/ops verification.
+- [x] Run multi-vector diff review.
+- [x] Run broader verification, including the newly gated web unit tests.
+- [ ] PR, CI, merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Evidence so far**
+- Current `origin/main`: `f524b6b0eb6a70a7fad7ea3241939a69709d02dc`.
+- Red regression run:
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`
+    failed on all three intended assertions: smoke realtime path, runbook
+    realtime path, and missing CI web unit-test gate.
+- Review:
+  - Operator/runbook reviewer returned CLEAN: localhost realtime `/health`
+    matches the documented production ingress model, and tracker wording does
+    not overclaim deployment.
+  - Release/CI reviewer first found a medium issue: the static CI guard matched
+    the web unit-test step anywhere in the workflow, not specifically in the
+    `test` job. Fixed by extracting the CI `test` job block before assertion.
+  - Release/CI re-review returned CLEAN after the static guard hardening.
+  - Production CSP/security reviewer found a medium issue in the initial
+    CI-env fix: explicit empty API/socket overrides would have masked production
+    env drift. Fixed at the helper level and added loopback-origin rejection;
+    re-review returned CLEAN.
+  - CI/build-env reviewer found a high issue after adding loopback rejection:
+    workflow-level localhost public URLs would fail the web build. Fixed by
+    overriding `Build web` with non-loopback public origins and adding static
+    coverage; re-review returned CLEAN.
+- Verification:
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`
+    => 4 tests passing.
+  - `pnpm test:ops` => 9 tests passing.
+  - `pnpm test --runInBand next.config.security.test.js` from `web/`
+    => 1 suite / 6 tests passing.
+  - CI-style focused reproduction with localhost public env and
+    `pnpm test --runInBand next.config.security.test.js` from `web/`
+    => 1 suite / 6 tests passing.
+  - `bash -n scripts/smoke/api-critical-path.sh` => passing.
+  - `pnpm security:no-hardcoded-jwts` => passing.
+  - `git diff --check` => exit 0 with only CRLF normalization warnings.
+  - `pnpm test --runInBand` from `web/`
+    => 104 suites / 1105 tests passing, with existing React `act(...)`
+    warnings in several suites.
+  - `npx nx build @vizora/web` with production-like public origins
+    (`https://vizora.cloud`) => passing.
+- CI result on PR #190:
+  - First run failed in the newly added web unit-test step. Root cause: on the
+    Linux runner with `working-directory: web`, `pnpm test -- --runInBand`
+    invoked `jest -- --runInBand`, so Jest treated `--runInBand` as a test
+    path pattern and found no tests.
+  - Fixed by changing the CI step and static guard to the workspace-local
+    command `pnpm test --runInBand`.
+  - Second run reached the web suite and failed `next.config.security.test.js`
+    because CI's top-level localhost `NEXT_PUBLIC_API_URL` /
+    `NEXT_PUBLIC_SOCKET_URL` leaked into production CSP unit-test scenarios.
+    Root cause: `buildSecurityHeaderRoutes()` passed explicit `undefined`
+    values into `parseOriginSafe()`, whose default parameter then fell back to
+    ambient `process.env`. Fixed at the helper level so a supplied env object is
+    self-contained.
+  - Added a production-readiness guard so `NEXT_PUBLIC_API_URL` and
+    `NEXT_PUBLIC_SOCKET_URL` cannot use localhost/loopback origins in
+    production CSP generation.
+  - CI/env reviewer found the new production loopback guard would fail the web
+    build job because workflow-level public URLs are localhost. Fixed by
+    overriding the `Build web` step to production-like non-loopback public
+    origins and adding static coverage for that override.
+  - Local reproduction after fix:
+    `NEXT_PUBLIC_API_URL=http://localhost:3000 NEXT_PUBLIC_SOCKET_URL=http://localhost:3002 pnpm test --runInBand next.config.security.test.js`
+    => 1 suite / 6 tests passing.
+  - `npx nx build @vizora/web` with
+    `NEXT_PUBLIC_API_URL=https://vizora.cloud`,
+    `NEXT_PUBLIC_SOCKET_URL=https://vizora.cloud`, and
+    `BACKEND_URL=https://vizora.cloud` => passing.
+
+## Completed Workstream: Readiness Memory Calibration Pass 49 (2026-06-02)
 
 **Branch:** `feat/customer-dashboard-perf-pass-49`
 
@@ -41,8 +150,8 @@ NestJS readiness memory thresholds.
 - [x] Run focused health tests.
 - [x] Run multi-vector diff review.
 - [x] Run broader middleware verification and build.
-- [ ] PR, CI, merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge if green.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Evidence so far**
 - Current `origin/main`: `6025c49d794a00297f1caaf4b4d451a0994b55d1`.
@@ -81,6 +190,11 @@ NestJS readiness memory thresholds.
     => 148 suites / 3027 tests passing / 1 snapshot.
   - `npx nx build @vizora/middleware` => passing with existing webpack
     warnings.
+- PR #189 merged to `origin/main` at
+  `f524b6b0eb6a70a7fad7ea3241939a69709d02dc`; CI was green including e2e.
+- Post-merge production deploy gate remained blocked because `/opt/vizora/app`
+  is dirty/diverged from `origin/main`; no production pull, restart, or deploy
+  was performed.
 - Deferred follow-up candidates from parallel analysis:
   - Release-readiness gate drift: smoke script's realtime probe still uses a
     stale path and CI builds web without running web unit tests.
