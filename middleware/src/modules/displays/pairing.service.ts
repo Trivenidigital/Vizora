@@ -3,6 +3,8 @@ import {
   BadRequestException,
   NotFoundException,
   InternalServerErrorException,
+  ForbiddenException,
+  ConflictException,
   OnModuleDestroy,
   Logger,
 } from '@nestjs/common';
@@ -22,8 +24,8 @@ interface PairingRequest {
   deviceIdentifier: string;
   nickname: string;
   metadata: Record<string, unknown>;
-  createdAt: string;   // ISO string for JSON serialization
-  expiresAt: string;   // ISO string for JSON serialization
+  createdAt: string; // ISO string for JSON serialization
+  expiresAt: string; // ISO string for JSON serialization
   qrCode?: string;
   organizationId?: string;
   plaintextToken?: string;
@@ -53,6 +55,7 @@ const PAIRING_STATUS_SELECT = {
 const PAIRING_EXISTING_DISPLAY_SELECT = {
   id: true,
   location: true,
+  organizationId: true,
 } as const satisfies Prisma.DisplaySelect;
 
 const PAIRING_RESULT_SELECT = {
@@ -70,6 +73,9 @@ export class PairingService implements OnModuleDestroy {
   private readonly PAIRING_TTL_SECONDS = 300; // 5 minutes
   private readonly PAIRING_READ_BATCH_SIZE = 100;
   private readonly REDIS_KEY_PREFIX = 'pairing:';
+  private readonly REDIS_COMPLETION_CLAIM_PREFIX = 'pairing-complete-claim:';
+  private readonly REDIS_NEW_DISPLAY_CLAIM_PREFIX =
+    'pairing-new-display-claim:';
   private cleanupIntervalId: NodeJS.Timeout | null = null;
 
   constructor(
@@ -81,7 +87,10 @@ export class PairingService implements OnModuleDestroy {
   ) {
     // Cleanup interval as safety net — Redis TTL handles most expiration,
     // but this catches edge cases if Redis is temporarily unavailable.
-    this.cleanupIntervalId = setInterval(() => this.cleanupExpiredRequests(), 60000);
+    this.cleanupIntervalId = setInterval(
+      () => this.cleanupExpiredRequests(),
+      60000,
+    );
   }
 
   onModuleDestroy() {
@@ -97,32 +106,58 @@ export class PairingService implements OnModuleDestroy {
     return `${this.REDIS_KEY_PREFIX}${code}`;
   }
 
-  private async getPairingRequest(code: string): Promise<PairingRequest | null> {
+  private completionClaimKey(code: string): string {
+    return `${this.REDIS_COMPLETION_CLAIM_PREFIX}${code}`;
+  }
+
+  private newDisplayClaimKey(organizationId: string): string {
+    return `${this.REDIS_NEW_DISPLAY_CLAIM_PREFIX}${organizationId}`;
+  }
+
+  private async getPairingRequest(
+    code: string,
+  ): Promise<PairingRequest | null> {
     try {
       const data = await this.redisService.get(this.redisKey(code));
       if (!data) return null;
       return this.parsePairingRequest(data, code);
     } catch (error) {
-      this.logger.error(`Failed to get pairing request for code ${code}: ${error}`);
+      this.logger.error(
+        `Failed to get pairing request for code ${code}: ${error}`,
+      );
       return null;
     }
   }
 
-  private parsePairingRequest(data: string, code: string): PairingRequest | null {
+  private parsePairingRequest(
+    data: string,
+    code: string,
+  ): PairingRequest | null {
     try {
       return JSON.parse(data) as PairingRequest;
     } catch (error) {
-      this.logger.error(`Failed to parse pairing request for code ${code}: ${error}`);
+      this.logger.error(
+        `Failed to parse pairing request for code ${code}: ${error}`,
+      );
       return null;
     }
   }
 
-  private async setPairingRequest(code: string, request: PairingRequest): Promise<boolean> {
+  private async setPairingRequest(
+    code: string,
+    request: PairingRequest,
+  ): Promise<boolean> {
     try {
       const data = JSON.stringify(request);
-      return await this.redisService.set(this.redisKey(code), data, this.PAIRING_TTL_SECONDS);
+      return await this.redisService.set(
+        this.redisKey(code),
+        data,
+        this.PAIRING_TTL_SECONDS,
+      );
     } catch (error) {
-      this.logger.error(`Failed to set pairing request for code ${code}: ${error}`);
+      this.logger.error(
+        `Failed to set pairing request for code ${code}: ${error}`,
+      );
       return false;
     }
   }
@@ -131,8 +166,130 @@ export class PairingService implements OnModuleDestroy {
     try {
       return await this.redisService.del(this.redisKey(code));
     } catch (error) {
-      this.logger.error(`Failed to delete pairing request for code ${code}: ${error}`);
+      this.logger.error(
+        `Failed to delete pairing request for code ${code}: ${error}`,
+      );
       return false;
+    }
+  }
+
+  private async claimPairingCompletion(code: string): Promise<string> {
+    const client = this.redisService.getClient();
+    if (!client) {
+      throw new BadRequestException(
+        'Pairing service unavailable. Please try again.',
+      );
+    }
+
+    const claimToken = crypto.randomUUID();
+    try {
+      const result = await client.set(
+        this.completionClaimKey(code),
+        claimToken,
+        'EX',
+        this.PAIRING_TTL_SECONDS,
+        'NX',
+      );
+
+      if (result !== 'OK') {
+        throw new BadRequestException(
+          'Pairing code is already being completed',
+        );
+      }
+
+      return claimToken;
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      this.logger.error(
+        `Failed to claim pairing completion for code ${code}: ${error}`,
+      );
+      throw new BadRequestException(
+        'Pairing service unavailable. Please try again.',
+      );
+    }
+  }
+
+  private async releasePairingCompletionClaim(
+    code: string,
+    claimToken: string,
+  ): Promise<void> {
+    const client = this.redisService.getClient();
+    if (!client) return;
+
+    try {
+      await client.eval(
+        'if redis.call("GET", KEYS[1]) == ARGV[1] then return redis.call("DEL", KEYS[1]) else return 0 end',
+        1,
+        this.completionClaimKey(code),
+        claimToken,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to release pairing completion claim for code ${code}: ${error}`,
+      );
+    }
+  }
+
+  private async claimNewDisplayPairing(
+    organizationId: string,
+  ): Promise<string> {
+    const client = this.redisService.getClient();
+    if (!client) {
+      throw new BadRequestException(
+        'Pairing service unavailable. Please try again.',
+      );
+    }
+
+    const claimToken = crypto.randomUUID();
+    try {
+      const result = await client.set(
+        this.newDisplayClaimKey(organizationId),
+        claimToken,
+        'EX',
+        this.PAIRING_TTL_SECONDS,
+        'NX',
+      );
+
+      if (result !== 'OK') {
+        throw new ConflictException(
+          'Another display pairing is already being completed for this organization',
+        );
+      }
+
+      return claimToken;
+    } catch (error) {
+      if (error instanceof ConflictException) {
+        throw error;
+      }
+      this.logger.error(
+        `Failed to claim new display pairing for org ${organizationId}: ${error}`,
+      );
+      throw new BadRequestException(
+        'Pairing service unavailable. Please try again.',
+      );
+    }
+  }
+
+  private async releaseNewDisplayPairingClaim(
+    organizationId: string,
+    claimToken: string,
+  ): Promise<void> {
+    const client = this.redisService.getClient();
+    if (!client) return;
+
+    try {
+      await client.eval(
+        'if redis.call("GET", KEYS[1]) == ARGV[1] then return redis.call("DEL", KEYS[1]) else return 0 end',
+        1,
+        this.newDisplayClaimKey(organizationId),
+        claimToken,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to release new display pairing claim for org ${organizationId}: ${error}`,
+      );
     }
   }
 
@@ -140,7 +297,9 @@ export class PairingService implements OnModuleDestroy {
     try {
       return await this.redisService.exists(this.redisKey(code));
     } catch (error) {
-      this.logger.error(`Failed to check pairing request for code ${code}: ${error}`);
+      this.logger.error(
+        `Failed to check pairing request for code ${code}: ${error}`,
+      );
       return false;
     }
   }
@@ -165,7 +324,7 @@ export class PairingService implements OnModuleDestroy {
     let attempts = 0;
 
     // Ensure code is unique
-    while (await this.hasPairingRequest(code) && attempts < 10) {
+    while ((await this.hasPairingRequest(code)) && attempts < 10) {
       code = this.generatePairingCode();
       attempts++;
     }
@@ -208,10 +367,14 @@ export class PairingService implements OnModuleDestroy {
 
     const stored = await this.setPairingRequest(code, pairingRequest);
     if (!stored) {
-      throw new BadRequestException('Failed to store pairing request. Please try again.');
+      throw new BadRequestException(
+        'Failed to store pairing request. Please try again.',
+      );
     }
 
-    this.logger.log(`Pairing code generated: ${code} for device ${deviceIdentifier}`);
+    this.logger.log(
+      `Pairing code generated: ${code} for device ${deviceIdentifier}`,
+    );
 
     return {
       code,
@@ -274,6 +437,10 @@ export class PairingService implements OnModuleDestroy {
       throw new NotFoundException('Pairing code not found or expired');
     }
 
+    if (request.plaintextToken || request.organizationId) {
+      throw new BadRequestException('Pairing code has already been completed');
+    }
+
     // Check if expired (safety check — Redis TTL should handle this)
     if (new Date() > new Date(request.expiresAt)) {
       await this.deletePairingRequest(code);
@@ -284,120 +451,163 @@ export class PairingService implements OnModuleDestroy {
     // one. Cross-org guard lives inside resolveForPairing (throws NotFound
     // if the template belongs to another org). If unspecified, this resolves
     // to undefined and the Display falls back to Vizora-level defaults.
-    const provisioningDefaults = provisioningTemplateId
-      ? await this.provisioningTemplatesService.resolveForPairing(
-          organizationId,
-          provisioningTemplateId,
-        )
-      : undefined;
+    const completionClaimToken = await this.claimPairingCompletion(code);
+    let newDisplayClaimToken: string | null = null;
+    let releaseCompletionClaim = true;
 
-    // Check if device already exists
-    const existingDisplay = await this.db.display.findUnique({
-      where: { deviceIdentifier: request.deviceIdentifier },
-      select: PAIRING_EXISTING_DISPLAY_SELECT,
-    });
+    try {
+      const provisioningDefaults = provisioningTemplateId
+        ? await this.provisioningTemplatesService.resolveForPairing(
+            organizationId,
+            provisioningTemplateId,
+          )
+        : undefined;
 
-    // Generate device JWT token
-    const devicePayload = {
-      sub: existingDisplay?.id || crypto.randomUUID(),
-      deviceIdentifier: request.deviceIdentifier,
-      organizationId,
-      type: 'device',
-    };
+      // Check if device already exists
+      const existingDisplay = await this.db.display.findUnique({
+        where: { deviceIdentifier: request.deviceIdentifier },
+        select: PAIRING_EXISTING_DISPLAY_SELECT,
+      });
 
-    const deviceSecret = process.env.DEVICE_JWT_SECRET;
-    if (!deviceSecret || deviceSecret.length < 32) {
-      // Server-side misconfiguration — surface as 500 with a clear
-      // message so ops sees the cause in error tracking rather than
-      // an empty 500 from a swallowed generic Error.
-      throw new InternalServerErrorException(
-        'DEVICE_JWT_SECRET must be set and be at least 32 characters',
+      if (
+        existingDisplay &&
+        existingDisplay.organizationId !== organizationId
+      ) {
+        throw new NotFoundException('Pairing code not found or expired');
+      }
+
+      if (!existingDisplay) {
+        newDisplayClaimToken =
+          await this.claimNewDisplayPairing(organizationId);
+        await this.enforceScreenQuota(organizationId);
+      }
+
+      // Generate device JWT token
+      const devicePayload = {
+        sub: existingDisplay?.id || crypto.randomUUID(),
+        deviceIdentifier: request.deviceIdentifier,
+        organizationId,
+        type: 'device',
+      };
+
+      const deviceSecret = process.env.DEVICE_JWT_SECRET;
+      if (!deviceSecret || deviceSecret.length < 32) {
+        // Server-side misconfiguration — surface as 500 with a clear
+        // message so ops sees the cause in error tracking rather than
+        // an empty 500 from a swallowed generic Error.
+        throw new InternalServerErrorException(
+          'DEVICE_JWT_SECRET must be set and be at least 32 characters',
+        );
+      }
+
+      const jwtToken = this.jwtService.sign(devicePayload, {
+        expiresIn: '90d',
+        secret: deviceSecret,
+        algorithm: 'HS256',
+      });
+
+      // Hash the token before storing in database for security
+      // If database is compromised, attacker cannot use the hashed tokens
+      const hashedToken = this.hashToken(jwtToken);
+      let display: Prisma.DisplayGetPayload<{
+        select: typeof PAIRING_RESULT_SELECT;
+      }>;
+
+      if (existingDisplay) {
+        // Update existing display
+        // Set status to 'pairing' - the WebSocket gateway will update to 'online' when device connects
+        display = await this.db.display.update({
+          where: { id: existingDisplay.id },
+          data: {
+            nickname: nickname || request.nickname,
+            organizationId,
+            jwtToken: hashedToken, // Store hash, not plaintext
+            pairedAt: new Date(),
+            lastHeartbeat: new Date(),
+            status: 'pairing',
+            location: completeDto.location || existingDisplay.location,
+            // O6 — apply provisioning-template defaults. Spread last so they
+            // override the Vizora-level defaults but NOT explicit fields above.
+            ...(provisioningDefaults ?? {}),
+          },
+          select: PAIRING_RESULT_SELECT,
+        });
+      } else {
+        // Create new display
+        // Set status to 'pairing' - the WebSocket gateway will update to 'online' when device connects
+        display = await this.db.display.create({
+          data: {
+            id: devicePayload.sub,
+            deviceIdentifier: request.deviceIdentifier,
+            nickname: nickname || request.nickname,
+            organizationId,
+            jwtToken: hashedToken, // Store hash, not plaintext
+            pairedAt: new Date(),
+            lastHeartbeat: new Date(),
+            status: 'pairing',
+            location: request.metadata?.hostname || null,
+            metadata: request.metadata,
+            // O6 — apply provisioning-template defaults. Spread last so they
+            // override the Display model's Prisma defaults (orientation=
+            // 'landscape', timezone='UTC') with the operator's preference.
+            ...(provisioningDefaults ?? {}),
+          },
+          select: PAIRING_RESULT_SELECT,
+        });
+      }
+
+      this.logger.log(
+        `Device paired successfully: ${display.id} to org ${organizationId}`,
       );
-    }
 
-    const jwtToken = this.jwtService.sign(devicePayload, {
-      expiresIn: '90d',
-      secret: deviceSecret,
-      algorithm: 'HS256',
-    });
-
-    // Hash the token before storing in database for security
-    // If database is compromised, attacker cannot use the hashed tokens
-    const hashedToken = this.hashToken(jwtToken);
-    let display: Prisma.DisplayGetPayload<{ select: typeof PAIRING_RESULT_SELECT }>;
-
-    if (existingDisplay) {
-      // Update existing display
-      // Set status to 'pairing' - the WebSocket gateway will update to 'online' when device connects
-      display = await this.db.display.update({
-        where: { id: existingDisplay.id },
-        data: {
-          nickname: nickname || request.nickname,
-          organizationId,
-          jwtToken: hashedToken, // Store hash, not plaintext
-          pairedAt: new Date(),
-          lastHeartbeat: new Date(),
-          status: 'pairing',
-          location: completeDto.location || existingDisplay.location,
-          // O6 — apply provisioning-template defaults. Spread last so they
-          // override the Vizora-level defaults but NOT explicit fields above.
-          ...(provisioningDefaults ?? {}),
-        },
-        select: PAIRING_RESULT_SELECT,
+      // Emit domain event for onboarding tracking. Fire-and-forget; listener
+      // (OnboardingService.onDisplayPaired) has its own try/catch.
+      this.events.emit('display.paired', {
+        organizationId,
+        displayId: display.id,
       });
-    } else {
-      // Create new display
-      // Set status to 'pairing' - the WebSocket gateway will update to 'online' when device connects
-      display = await this.db.display.create({
-        data: {
-          id: devicePayload.sub,
-          deviceIdentifier: request.deviceIdentifier,
-          nickname: nickname || request.nickname,
-          organizationId,
-          jwtToken: hashedToken, // Store hash, not plaintext
-          pairedAt: new Date(),
-          lastHeartbeat: new Date(),
-          status: 'pairing',
-          location: request.metadata?.hostname || null,
-          metadata: request.metadata,
-          // O6 — apply provisioning-template defaults. Spread last so they
-          // override the Display model's Prisma defaults (orientation=
-          // 'landscape', timezone='UTC') with the operator's preference.
-          ...(provisioningDefaults ?? {}),
+
+      // Store the plaintext token in the Redis request so checkPairingStatus
+      // can return it to the device. The DB only has the hashed token.
+      // Don't delete the pairing request here - let checkPairingStatus delete it
+      // after the device retrieves its token (fixes race condition).
+      request.plaintextToken = jwtToken;
+      request.organizationId = organizationId;
+      const finalized = await this.setPairingRequest(code, request);
+      if (!finalized) {
+        releaseCompletionClaim = false;
+        throw new InternalServerErrorException(
+          'Failed to finalize pairing token handoff',
+        );
+      }
+
+      return {
+        success: true,
+        display: {
+          id: display.id,
+          nickname: display.nickname,
+          deviceIdentifier: display.deviceIdentifier,
+          status: display.status,
         },
-        select: PAIRING_RESULT_SELECT,
-      });
+      };
+    } finally {
+      if (newDisplayClaimToken) {
+        await this.releaseNewDisplayPairingClaim(
+          organizationId,
+          newDisplayClaimToken,
+        );
+      }
+      if (releaseCompletionClaim) {
+        await this.releasePairingCompletionClaim(code, completionClaimToken);
+      }
     }
-
-    this.logger.log(`Device paired successfully: ${display.id} to org ${organizationId}`);
-
-    // Emit domain event for onboarding tracking. Fire-and-forget; listener
-    // (OnboardingService.onDisplayPaired) has its own try/catch.
-    this.events.emit('display.paired', { organizationId, displayId: display.id });
-
-    // Store the plaintext token in the Redis request so checkPairingStatus
-    // can return it to the device. The DB only has the hashed token.
-    // Don't delete the pairing request here - let checkPairingStatus delete it
-    // after the device retrieves its token (fixes race condition).
-    request.plaintextToken = jwtToken;
-    request.organizationId = organizationId;
-    await this.setPairingRequest(code, request);
-
-    return {
-      success: true,
-      display: {
-        id: display.id,
-        nickname: display.nickname,
-        deviceIdentifier: display.deviceIdentifier,
-        status: display.status,
-      },
-    };
   }
 
-  async getActivePairings(organizationId: string): Promise<ActivePairingResponse[]> {
+  async getActivePairings(
+    organizationId: string,
+  ): Promise<ActivePairingResponse[]> {
     // Return active pairing requests filtered by organization
-    // Only show requests that have been completed for this org,
-    // or where the device already belongs to this org
+    // Only show pending requests for devices that already belong to this org.
     const activePairings: ActivePairingResponse[] = [];
 
     // Use SCAN to find all pairing keys in Redis
@@ -412,14 +622,9 @@ export class PairingService implements OnModuleDestroy {
         continue;
       }
 
-      // If pairing was completed for this org, show it
+      // Completed records temporarily hold a plaintext device token for the
+      // physical display. Do not expose their codes through dashboard list APIs.
       if (request.organizationId === organizationId) {
-        activePairings.push({
-          code,
-          nickname: request.nickname,
-          createdAt: request.createdAt,
-          expiresAt: request.expiresAt,
-        });
         continue;
       }
 
@@ -428,10 +633,13 @@ export class PairingService implements OnModuleDestroy {
       }
     }
 
-    const displayOrganizationsByDevice = await this.getDisplayOrganizationsByDevice(unclaimedRequests);
+    const displayOrganizationsByDevice =
+      await this.getDisplayOrganizationsByDevice(unclaimedRequests);
 
     for (const request of unclaimedRequests) {
-      const displayOrganizationId = displayOrganizationsByDevice.get(request.deviceIdentifier);
+      const displayOrganizationId = displayOrganizationsByDevice.get(
+        request.deviceIdentifier,
+      );
 
       // Show unclaimed requests only when the device is already owned by
       // this org. Brand-new unclaimed requests are visible only to the
@@ -449,7 +657,9 @@ export class PairingService implements OnModuleDestroy {
     return activePairings;
   }
 
-  private async getPairingRequestRecords(keys: string[]): Promise<PairingRequestRecord[]> {
+  private async getPairingRequestRecords(
+    keys: string[],
+  ): Promise<PairingRequestRecord[]> {
     if (keys.length === 0) return [];
 
     const client = this.redisService.getClient();
@@ -458,8 +668,15 @@ export class PairingService implements OnModuleDestroy {
       try {
         const records: PairingRequestRecord[] = [];
 
-        for (let index = 0; index < keys.length; index += this.PAIRING_READ_BATCH_SIZE) {
-          const batchKeys = keys.slice(index, index + this.PAIRING_READ_BATCH_SIZE);
+        for (
+          let index = 0;
+          index < keys.length;
+          index += this.PAIRING_READ_BATCH_SIZE
+        ) {
+          const batchKeys = keys.slice(
+            index,
+            index + this.PAIRING_READ_BATCH_SIZE,
+          );
           const values = await client.mget(...batchKeys);
 
           values.forEach((data, valueIndex) => {
@@ -497,9 +714,11 @@ export class PairingService implements OnModuleDestroy {
   private async getDisplayOrganizationsByDevice(
     requests: PairingRequest[],
   ): Promise<Map<string, string>> {
-    const deviceIdentifiers = Array.from(new Set(
-      requests.map(request => request.deviceIdentifier).filter(Boolean),
-    ));
+    const deviceIdentifiers = Array.from(
+      new Set(
+        requests.map((request) => request.deviceIdentifier).filter(Boolean),
+      ),
+    );
 
     if (deviceIdentifiers.length === 0) {
       return new Map();
@@ -515,8 +734,38 @@ export class PairingService implements OnModuleDestroy {
     });
 
     return new Map(
-      displays.map(display => [display.deviceIdentifier, display.organizationId]),
+      displays.map((display) => [
+        display.deviceIdentifier,
+        display.organizationId,
+      ]),
     );
+  }
+
+  private async enforceScreenQuota(organizationId: string): Promise<void> {
+    const org = await this.db.organization.findUnique({
+      where: { id: organizationId },
+      select: {
+        screenQuota: true,
+        _count: {
+          select: { displays: { where: { isDisabled: false } } },
+        },
+      },
+    });
+
+    if (!org) {
+      throw new ForbiddenException('Organization not found');
+    }
+
+    if (org.screenQuota === -1) {
+      return;
+    }
+
+    const currentCount = org._count.displays;
+    if (currentCount >= org.screenQuota) {
+      throw new ForbiddenException(
+        `Screen quota exceeded. You have ${currentCount}/${org.screenQuota} screens. Please upgrade your plan to add more screens.`,
+      );
+    }
   }
 
   /**

@@ -3,6 +3,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import request from 'supertest';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { AppModule } from '../src/app/app.module';
 import { DatabaseService } from '../src/modules/database/database.service';
 import { RedisService } from '../src/modules/redis/redis.service';
@@ -15,6 +16,11 @@ type RegisterData = {
     id: string;
     organizationId: string;
   };
+};
+
+type CsrfHeaders = {
+  Cookie: string;
+  'X-CSRF-Token': string;
 };
 
 type PairingRequestData = {
@@ -75,6 +81,22 @@ const dataOf = <T>(body: Envelope<T>): T => {
   return body.data;
 };
 
+const cookieHeaderFromSetCookie = (setCookie: string | string[] | undefined): string => {
+  const cookies = Array.isArray(setCookie)
+    ? setCookie
+    : setCookie
+      ? [setCookie]
+      : [];
+  return cookies.map((cookie) => cookie.split(';')[0]).join('; ');
+};
+
+const withoutCsrfCookie = (cookieHeader: string): string =>
+  cookieHeader
+    .split(';')
+    .map((cookie) => cookie.trim())
+    .filter((cookie) => cookie && !cookie.startsWith('vizora_csrf_token='))
+    .join('; ');
+
 describe('Customer critical path (e2e)', () => {
   let app: INestApplication;
   let db: DatabaseService;
@@ -91,6 +113,7 @@ describe('Customer critical path (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.use(cookieParser());
     app.use(
       helmet({
         contentSecurityPolicy: false,
@@ -133,7 +156,37 @@ describe('Customer critical path (e2e)', () => {
     await app.close();
   }, 60000);
 
-  const registerAccount = async (suffix: string) => {
+  const csrfHeaders = async (): Promise<CsrfHeaders> => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/health/live')
+      .expect(200);
+
+    const token = res.headers['x-csrf-token'];
+    const setCookie = res.headers['set-cookie'];
+    const cookieHeader = cookieHeaderFromSetCookie(setCookie);
+
+    expect(token).toBeTruthy();
+    expect(cookieHeader).toContain('vizora_csrf_token=');
+
+    return {
+      Cookie: cookieHeader,
+      'X-CSRF-Token': String(token),
+    };
+  };
+
+  const browserCsrfHeaders = async (authCookie: string) => {
+    const csrf = await csrfHeaders();
+
+    return {
+      Cookie: [withoutCsrfCookie(authCookie), csrf.Cookie].filter(Boolean).join('; '),
+      'X-CSRF-Token': csrf['X-CSRF-Token'],
+    };
+  };
+
+  const registerAccount = async (
+    suffix: string,
+    role: 'admin' | 'manager' | 'viewer' = 'admin',
+  ) => {
     const email = `customer-path-${suffix}-${timestamp}@example.com`;
     const password = 'SecureP@ssw0rd!';
     const registerRes = await request(app.getHttpServer())
@@ -151,6 +204,13 @@ describe('Customer critical path (e2e)', () => {
     userIds.push(registerData.user.id);
     organizationIds.push(registerData.user.organizationId);
 
+    if (role !== 'admin') {
+      await db.user.update({
+        where: { id: registerData.user.id },
+        data: { role },
+      });
+    }
+
     const loginRes = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
       .send({ email, password })
@@ -161,12 +221,13 @@ describe('Customer critical path (e2e)', () => {
 
     return {
       authToken: loginData.access_token,
+      authCookie: cookieHeaderFromSetCookie(loginRes.headers['set-cookie']),
       userId: registerData.user.id,
       organizationId: registerData.user.organizationId,
     };
   };
 
-  const pairDisplay = async (authToken: string, suffix: string) => {
+  const pairDisplay = async (authCookie: string, suffix: string) => {
     const deviceIdentifier = `customer-path-${suffix}-display-${timestamp}`;
     const pairingRequestRes = await request(app.getHttpServer())
       .post('/api/v1/devices/pairing/request')
@@ -182,7 +243,7 @@ describe('Customer critical path (e2e)', () => {
 
     const pairingCompleteRes = await request(app.getHttpServer())
       .post('/api/v1/devices/pairing/complete')
-      .set('Authorization', `Bearer ${authToken}`)
+      .set(await browserCsrfHeaders(authCookie))
       .send({
         code: pairingRequest.code,
         nickname: `Customer Path ${suffix} Display`,
@@ -209,14 +270,60 @@ describe('Customer critical path (e2e)', () => {
     };
   };
 
+  it('rejects protected dashboard mutations without a CSRF token', async () => {
+    const account = await registerAccount('missing-csrf');
+
+    await request(app.getHttpServer())
+      .post('/api/v1/content')
+      .set('Cookie', account.authCookie)
+      .send({
+        name: 'Missing CSRF Content',
+        type: 'url',
+        url: `https://example.com/vizora-missing-csrf-${timestamp}`,
+        duration: 10,
+      })
+      .expect(403);
+  });
+
+  it('rejects viewer pairing completion at the API boundary', async () => {
+    const viewerAccount = await registerAccount('viewer', 'viewer');
+    const deviceIdentifier = `customer-path-viewer-display-${timestamp}`;
+    const pairingRequestRes = await request(app.getHttpServer())
+      .post('/api/v1/devices/pairing/request')
+      .send({
+        deviceIdentifier,
+        nickname: 'Viewer Display',
+        metadata: { platform: 'e2e' },
+      })
+      .expect(201);
+    const pairingRequest = dataOf<PairingRequestData>(pairingRequestRes.body);
+    pairingCodes.push(pairingRequest.code);
+
+    await request(app.getHttpServer())
+      .post('/api/v1/devices/pairing/complete')
+      .set(await browserCsrfHeaders(viewerAccount.authCookie))
+      .send({
+        code: pairingRequest.code,
+        nickname: 'Viewer Display',
+        location: 'Customer Test Lab',
+      })
+      .expect(403);
+
+    const pairingStatusRes = await request(app.getHttpServer())
+      .get(`/api/v1/devices/pairing/status/${pairingRequest.code}`)
+      .expect(200);
+    const pairingStatus = dataOf<{ status: string }>(pairingStatusRes.body);
+    expect(pairingStatus.status).toBe('pending');
+  });
+
   it('delivers scheduled playlist content to a newly paired display', async () => {
     const primaryAccount = await registerAccount('primary');
-    const primaryDisplay = await pairDisplay(primaryAccount.authToken, 'primary');
+    const primaryDisplay = await pairDisplay(primaryAccount.authCookie, 'primary');
     expect(primaryDisplay.organizationId).toBe(primaryAccount.organizationId);
 
     const contentRes = await request(app.getHttpServer())
       .post('/api/v1/content')
-      .set('Authorization', `Bearer ${primaryAccount.authToken}`)
+      .set(await browserCsrfHeaders(primaryAccount.authCookie))
       .send({
         name: 'Customer Path Menu',
         type: 'url',
@@ -229,7 +336,7 @@ describe('Customer critical path (e2e)', () => {
 
     const playlistRes = await request(app.getHttpServer())
       .post('/api/v1/playlists')
-      .set('Authorization', `Bearer ${primaryAccount.authToken}`)
+      .set(await browserCsrfHeaders(primaryAccount.authCookie))
       .send({
         name: 'Customer Path Playlist',
         loop: true,
@@ -245,7 +352,7 @@ describe('Customer critical path (e2e)', () => {
     const allDays = [0, 1, 2, 3, 4, 5, 6];
     const scheduleRes = await request(app.getHttpServer())
       .post('/api/v1/schedules')
-      .set('Authorization', `Bearer ${primaryAccount.authToken}`)
+      .set(await browserCsrfHeaders(primaryAccount.authCookie))
       .send({
         name: 'Customer Path Schedule',
         startDate,
@@ -283,7 +390,7 @@ describe('Customer critical path (e2e)', () => {
       .expect(401);
 
     const otherAccount = await registerAccount('other');
-    const otherDisplay = await pairDisplay(otherAccount.authToken, 'other');
+    const otherDisplay = await pairDisplay(otherAccount.authCookie, 'other');
     expect(otherDisplay.organizationId).toBe(otherAccount.organizationId);
 
     await request(app.getHttpServer())
@@ -293,7 +400,7 @@ describe('Customer critical path (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/api/v1/playlists')
-      .set('Authorization', `Bearer ${otherAccount.authToken}`)
+      .set(await browserCsrfHeaders(otherAccount.authCookie))
       .send({
         name: 'Cross Org Playlist',
         loop: true,
@@ -303,7 +410,7 @@ describe('Customer critical path (e2e)', () => {
 
     const otherContentRes = await request(app.getHttpServer())
       .post('/api/v1/content')
-      .set('Authorization', `Bearer ${otherAccount.authToken}`)
+      .set(await browserCsrfHeaders(otherAccount.authCookie))
       .send({
         name: 'Other Org Menu',
         type: 'url',
@@ -315,7 +422,7 @@ describe('Customer critical path (e2e)', () => {
 
     const otherPlaylistRes = await request(app.getHttpServer())
       .post('/api/v1/playlists')
-      .set('Authorization', `Bearer ${otherAccount.authToken}`)
+      .set(await browserCsrfHeaders(otherAccount.authCookie))
       .send({
         name: 'Other Org Playlist',
         loop: true,
@@ -326,7 +433,7 @@ describe('Customer critical path (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/api/v1/schedules')
-      .set('Authorization', `Bearer ${otherAccount.authToken}`)
+      .set(await browserCsrfHeaders(otherAccount.authCookie))
       .send({
         name: 'Cross Org Schedule',
         startDate,

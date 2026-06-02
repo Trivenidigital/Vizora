@@ -4,11 +4,13 @@ import {
   Get,
   Body,
   Param,
-  BadRequestException,
-  NotFoundException,
+  UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../auth/decorators/public.decorator';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { RequiresSubscription } from '../billing/decorators/requires-subscription.decorator';
 import { SkipCsrf } from '../common/guards/csrf.guard';
 import { PairingService } from './pairing.service';
 import { RequestPairingDto } from './dto/request-pairing.dto';
@@ -45,6 +47,9 @@ export class PairingController {
    * User completes pairing from web dashboard (Authenticated)
    */
   @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @UseGuards(RolesGuard)
+  @Roles('admin', 'manager')
+  @RequiresSubscription()
   @Post('complete')
   async completePairing(
     @CurrentUser('organizationId') organizationId: string,
@@ -61,6 +66,8 @@ export class PairingController {
   /**
    * Get active pairing requests for organization (Authenticated)
    */
+  @UseGuards(RolesGuard)
+  @Roles('admin', 'manager')
   @Get('active')
   async getActivePairings(
     @CurrentUser('organizationId') organizationId: string,

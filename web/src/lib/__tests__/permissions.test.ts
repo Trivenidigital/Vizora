@@ -7,6 +7,7 @@ describe('getDashboardPermissions', () => {
       canDeleteContent: true,
       canReviewContent: true,
       canManageDevices: true,
+      canPairDevices: true,
       canDeleteDevices: true,
       canUseFleetCommands: true,
       canUseEmergencyOverride: true,
@@ -24,6 +25,7 @@ describe('getDashboardPermissions', () => {
       canDeleteContent: false,
       canReviewContent: true,
       canManageDevices: true,
+      canPairDevices: true,
       canDeleteDevices: false,
       canUseFleetCommands: true,
       canUseEmergencyOverride: false,
@@ -40,6 +42,7 @@ describe('getDashboardPermissions', () => {
       canManageContent: false,
       canDeleteContent: false,
       canManageDevices: false,
+      canPairDevices: false,
       canDeleteDevices: false,
       canManagePlaylists: false,
       canDeletePlaylists: false,
@@ -50,6 +53,7 @@ describe('getDashboardPermissions', () => {
     expect(getDashboardPermissions(null)).toMatchObject({
       canManageContent: false,
       canManageDevices: false,
+      canPairDevices: false,
       canManagePlaylists: false,
       canManageSchedules: false,
     });

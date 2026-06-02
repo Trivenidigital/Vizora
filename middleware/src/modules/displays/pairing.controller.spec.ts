@@ -1,10 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { Reflector } from '@nestjs/core';
 import { PairingController } from './pairing.controller';
 import { PairingService } from './pairing.service';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { SubscriptionActiveGuard } from '../billing/guards/subscription-active.guard';
+import { DatabaseService } from '../database/database.service';
 
 describe('PairingController', () => {
   let controller: PairingController;
   let mockPairingService: jest.Mocked<PairingService>;
+  let mockDatabaseService: jest.Mocked<DatabaseService>;
 
   beforeEach(async () => {
     mockPairingService = {
@@ -14,9 +20,25 @@ describe('PairingController', () => {
       getActivePairings: jest.fn(),
     } as any;
 
+    mockDatabaseService = {
+      organization: {
+        findUnique: jest.fn().mockResolvedValue({
+          subscriptionStatus: 'active',
+          subscriptionTier: 'pro',
+          trialEndsAt: null,
+          screenQuota: 100,
+          _count: { displays: 1 },
+        }),
+      },
+    } as any;
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [PairingController],
-      providers: [{ provide: PairingService, useValue: mockPairingService }],
+      providers: [
+        { provide: PairingService, useValue: mockPairingService },
+        { provide: DatabaseService, useValue: mockDatabaseService },
+        Reflector,
+      ],
     }).compile();
 
     controller = module.get<PairingController>(PairingController);
@@ -138,6 +160,20 @@ describe('PairingController', () => {
 
       expect(result).toHaveProperty('success', true);
     });
+
+    it('requires manager-or-admin role plus subscription guard', () => {
+      const reflector = new Reflector();
+      const handler = controller.completePairing;
+      const guards = Reflect.getMetadata(GUARDS_METADATA, handler) ?? [];
+
+      expect(reflector.get<string[]>('roles', handler)).toEqual(['admin', 'manager']);
+      expect(guards).toEqual(
+        expect.arrayContaining([
+          RolesGuard,
+          SubscriptionActiveGuard,
+        ]),
+      );
+    });
   });
 
   describe('getActivePairings', () => {
@@ -172,6 +208,15 @@ describe('PairingController', () => {
       const result = await controller.getActivePairings(organizationId);
 
       expect(result).toEqual([]);
+    });
+
+    it('requires manager-or-admin role for active pairing codes', () => {
+      const reflector = new Reflector();
+      const handler = controller.getActivePairings;
+      const guards = Reflect.getMetadata(GUARDS_METADATA, handler) ?? [];
+
+      expect(reflector.get<string[]>('roles', handler)).toEqual(['admin', 'manager']);
+      expect(guards).toEqual(expect.arrayContaining([RolesGuard]));
     });
   });
 });

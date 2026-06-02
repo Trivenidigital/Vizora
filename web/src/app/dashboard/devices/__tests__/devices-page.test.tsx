@@ -114,7 +114,15 @@ jest.mock('@/components/LoadingSpinner', () => {
 });
 
 jest.mock('@/components/EmptyState', () => {
-  return function MockEmpty({ title }: any) { return <div data-testid="empty-state">{title || 'No items'}</div>; };
+  return function MockEmpty({ title, description, action }: any) {
+    return (
+      <div data-testid="empty-state">
+        {title || 'No items'}
+        {description && <p>{description}</p>}
+        {action && <button onClick={action.onClick}>{action.label}</button>}
+      </div>
+    );
+  };
 });
 
 jest.mock('@/components/Modal', () => {
@@ -375,7 +383,7 @@ describe('DevicesClient', () => {
 
     expect(screen.queryByTestId('fleet-dropdown')).not.toBeInTheDocument();
     expect(screen.queryByText('Emergency Override')).not.toBeInTheDocument();
-    expect(screen.getByText('Pair New Device')).toBeInTheDocument();
+    expect(screen.queryByText('Pair New Device')).not.toBeInTheDocument();
     expect(screen.queryByText('Edit')).not.toBeInTheDocument();
     expect(screen.queryByText('Pair')).not.toBeInTheDocument();
     expect(screen.queryByText('Delete')).not.toBeInTheDocument();
@@ -386,6 +394,28 @@ describe('DevicesClient', () => {
 
     expect(screen.getByTestId('device-preview-modal')).toBeInTheDocument();
     expect(screen.queryByText('Refresh Screenshot')).not.toBeInTheDocument();
+  });
+
+  it('does not show an empty-state pairing action to viewers', async () => {
+    mockUser = { ...mockUser, role: 'viewer' };
+    mockGetDisplays.mockResolvedValue({ data: [], meta: { total: 0 } });
+
+    render(
+      <DevicesClient
+        initialDevices={[]}
+        initialPlaylists={samplePlaylists as any}
+        initialDevicesComplete
+        initialPlaylistsComplete
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('empty-state')).toHaveTextContent('No devices yet');
+    });
+
+    expect(screen.getByTestId('empty-state')).toHaveTextContent('A manager or admin can add the first screen');
+    expect(screen.queryByText('Get started by pairing your first display device')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pair Device')).not.toBeInTheDocument();
   });
 
   it('allows managers to pair and assign devices without exposing admin-only deletes or emergency override', async () => {
