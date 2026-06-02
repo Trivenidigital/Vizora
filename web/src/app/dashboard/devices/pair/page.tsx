@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { useToast } from '@/lib/hooks/useToast';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { getDashboardPermissions } from '@/lib/permissions';
 import { QRCodeSVG } from 'qrcode.react';
 import { Icon } from '@/theme/icons';
 
@@ -12,21 +14,31 @@ export default function PairDevicePage() {
  const router = useRouter();
  const searchParams = useSearchParams();
  const toast = useToast();
+ const { user, loading: authLoading } = useAuth();
+ const permissions = getDashboardPermissions(user);
  const [form, setForm] = useState({
  pairingCode: '',
  deviceName: '',
  location: '',
  });
  const [loading, setLoading] = useState(false);
+ const lastAutofilledCodeRef = useRef<string | null>(null);
 
  // Auto-fill code from QR scan
  useEffect(() => {
- const code = searchParams?.get('code');
- if (code && code.length === 6) {
- setForm(prev => ({ ...prev, pairingCode: code.toUpperCase() }));
+ const code = searchParams?.get('code')?.toUpperCase();
+ if (
+ !authLoading &&
+ permissions.canPairDevices &&
+ code &&
+ code.length === 6 &&
+ lastAutofilledCodeRef.current !== code
+ ) {
+ lastAutofilledCodeRef.current = code;
+ setForm(prev => ({ ...prev, pairingCode: code }));
  toast.success('Code autofilled from QR scan!');
  }
- }, [searchParams]);
+ }, [authLoading, permissions.canPairDevices, searchParams, toast]);
 
  const handlePairing = async () => {
  if (!form.pairingCode.trim() || form.pairingCode.length !== 6) {
@@ -71,6 +83,41 @@ export default function PairDevicePage() {
  setForm({ ...form, pairingCode: value });
  };
 
+ if (authLoading) {
+ return (
+ <div className="max-w-2xl mx-auto p-8 flex justify-center">
+ <LoadingSpinner size="lg" />
+ </div>
+ );
+ }
+
+ if (!permissions.canPairDevices) {
+ return (
+ <div className="max-w-2xl mx-auto space-y-6">
+ <toast.ToastContainer />
+ <div className="bg-[var(--surface)] rounded-lg shadow-md p-8 text-center space-y-4">
+ <div className="mx-auto h-12 w-12 rounded-full bg-yellow-500/10 flex items-center justify-center">
+ <Icon name="warning" size="xl" className="text-yellow-600 dark:text-yellow-400" />
+ </div>
+ <div>
+ <h2 className="text-2xl font-bold text-[var(--foreground)]">
+ Device pairing requires manager or admin access
+ </h2>
+ <p className="mt-2 text-[var(--foreground-secondary)]">
+ You can still view paired devices, but a manager or admin must add new screens.
+ </p>
+ </div>
+ <button
+ onClick={() => router.push('/dashboard/devices')}
+ className="px-6 py-3 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition"
+ >
+ Back to Devices
+ </button>
+ </div>
+ </div>
+ );
+ }
+
  return (
  <div className="max-w-2xl mx-auto space-y-6">
  <toast.ToastContainer />
@@ -114,11 +161,12 @@ export default function PairDevicePage() {
 
  {/* Pairing Code Input */}
  <div>
- <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
+ <label htmlFor="pairing-code" className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
  Pairing Code *
  <span className="text-xs text-[var(--foreground-tertiary)] ml-2">(6 characters from your display)</span>
  </label>
  <input
+ id="pairing-code"
  type="text"
  value={form.pairingCode}
  onChange={handleCodeChange}
@@ -155,10 +203,11 @@ export default function PairDevicePage() {
 
  {/* Device Name Input */}
  <div>
- <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
+ <label htmlFor="device-name" className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
  Device Name *
  </label>
  <input
+ id="device-name"
  type="text"
  value={form.deviceName}
  onChange={(e) => setForm({ ...form, deviceName: e.target.value })}
@@ -172,10 +221,11 @@ export default function PairDevicePage() {
 
  {/* Location Input */}
  <div>
- <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
+ <label htmlFor="device-location" className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
  Location (Optional)
  </label>
  <input
+ id="device-location"
  type="text"
  value={form.location}
  onChange={(e) => setForm({ ...form, location: e.target.value })}

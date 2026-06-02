@@ -476,6 +476,7 @@ export default function DevicesClient({
  <span>Emergency Override</span>
  </button>
  )}
+ {permissions.canPairDevices && (
  <button
  onClick={() => router.push('/dashboard/devices/pair')}
  className="eh-btn-neon rounded-xl px-6 py-3 flex items-center gap-2"
@@ -483,6 +484,7 @@ export default function DevicesClient({
  <Icon name="add" size="lg" className="text-white" />
  <span>Pair New Device</span>
  </button>
+ )}
  </div>
  </div>
 
@@ -543,11 +545,13 @@ export default function DevicesClient({
  <EmptyState
  icon="devices"
  title="No devices yet"
- description="Get started by pairing your first display device"
- action={{
+ description={permissions.canPairDevices
+ ? 'Get started by pairing your first display device'
+ : 'No displays are paired yet. A manager or admin can add the first screen.'}
+ action={permissions.canPairDevices ? {
  label: 'Pair Device',
  onClick: () => router.push('/dashboard/devices/pair'),
- }}
+ } : undefined}
  />
  ) : (
  <>
@@ -621,7 +625,7 @@ export default function DevicesClient({
  {permissions.canManageDevices && (
  <button onClick={() => handleEdit(device)} className="eh-icon-btn">Edit</button>
  )}
- {permissions.canManageDevices && (
+ {permissions.canPairDevices && (
  <button onClick={() => handleGeneratePairingCode(device)} className="eh-icon-btn">Pair</button>
  )}
  {permissions.canDeleteDevices && (
@@ -690,7 +694,7 @@ export default function DevicesClient({
  </div>
  </Modal>
 
- <Modal isOpen={isPairingModalOpen && permissions.canManageDevices} onClose={() => setIsPairingModalOpen(false)} title="Pairing Token">
+ <Modal isOpen={isPairingModalOpen && permissions.canPairDevices} onClose={() => setIsPairingModalOpen(false)} title="Pairing Token">
  <div className="text-center space-y-5">
  <p className="text-[var(--foreground-secondary)]">Use this token on your display device to pair it:</p>
  <div className="bg-[var(--background-secondary)] rounded-lg p-6">

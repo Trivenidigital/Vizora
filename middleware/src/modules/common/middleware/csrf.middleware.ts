@@ -75,6 +75,7 @@ export class CsrfMiddleware implements NestMiddleware {
     const csrfExemptExactPaths = new Set([
       '/api/v1/auth/login',
       '/api/v1/auth/register',
+      '/api/v1/auth/google',
       '/api/v1/auth/forgot-password',
       '/api/v1/auth/reset-password',
       '/api/v1/devices/pairing/request',
@@ -83,6 +84,7 @@ export class CsrfMiddleware implements NestMiddleware {
       '/api/v1/webhooks/razorpay', // Validates X-Razorpay-Signature
       '/api/auth/login',
       '/api/auth/register',
+      '/api/auth/google',
       '/api/auth/forgot-password',
       '/api/auth/reset-password',
       '/api/devices/pairing/request',
@@ -117,6 +119,19 @@ export class CsrfMiddleware implements NestMiddleware {
       || isInternalRoute;
 
     if (isExempt) {
+      return next();
+    }
+
+    // CSRF protects cookie-auth browser requests. Bearer-only clients
+    // (mobile, ops scripts, MCP-like service callers) provide an explicit
+    // Authorization header that browsers do not attach automatically
+    // cross-site, so they have no CSRF surface unless the Vizora auth cookie
+    // is also present.
+    const authorization = req.headers.authorization;
+    const hasBearerToken =
+      typeof authorization === 'string' && authorization.toLowerCase().startsWith('bearer ');
+    const hasAuthCookie = Boolean(req.cookies?.[AUTH_CONSTANTS.COOKIE_NAME]);
+    if (hasBearerToken && !hasAuthCookie) {
       return next();
     }
 

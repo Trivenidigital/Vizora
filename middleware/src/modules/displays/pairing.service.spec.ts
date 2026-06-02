@@ -14,7 +14,7 @@ describe('PairingService', () => {
   let mockDatabaseService: jest.Mocked<DatabaseService>;
   let mockJwtService: jest.Mocked<JwtService>;
   let mockRedisService: jest.Mocked<RedisService>;
-  let redisClient: { scan: jest.Mock; mget: jest.Mock };
+  let redisClient: { scan: jest.Mock; mget: jest.Mock; set: jest.Mock; eval: jest.Mock };
 
   const sensitiveDisplayFields = ['jwtToken', 'pairingCode', 'pairingCodeExpiresAt', 'socketId'];
   const pairingResultSelect = {
@@ -44,6 +44,12 @@ describe('PairingService', () => {
         findMany: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+      },
+      organization: {
+        findUnique: jest.fn().mockResolvedValue({
+          screenQuota: 100,
+          _count: { displays: 0 },
+        }),
       },
     } as any;
 
@@ -79,6 +85,26 @@ describe('PairingService', () => {
           return entry.value;
         });
       }),
+      set: jest.fn().mockImplementation(
+        async (key: string, value: string, _ex: string, ttlSeconds: number, nx: string) => {
+          if (nx === 'NX' && redisStore.has(key)) {
+            return null;
+          }
+          const expiresAt = ttlSeconds ? Date.now() + ttlSeconds * 1000 : 0;
+          redisStore.set(key, { value, ttl: ttlSeconds || 0, expiresAt });
+          return 'OK';
+        },
+      ),
+      eval: jest.fn().mockImplementation(
+        async (_script: string, _keyCount: number, key: string, claimToken: string) => {
+          const entry = redisStore.get(key);
+          if (entry?.value === claimToken) {
+            redisStore.delete(key);
+            return 1;
+          }
+          return 0;
+        },
+      ),
     };
 
     // Create a mock RedisService that uses an in-memory Map to simulate Redis
@@ -428,7 +454,7 @@ describe('PairingService', () => {
       });
       expect(mockDatabaseService.display.findUnique).toHaveBeenNthCalledWith(2, {
         where: { deviceIdentifier: 'new-device' },
-        select: { id: true, location: true },
+        select: { id: true, location: true, organizationId: true },
       });
       expect(mockDatabaseService.display.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -445,6 +471,7 @@ describe('PairingService', () => {
         .mockResolvedValueOnce({
           id: 'existing-display-id',
           location: 'Lobby',
+          organizationId,
         } as any); // completePairing check
 
       const pairingResult = await service.requestPairingCode({
@@ -468,7 +495,7 @@ describe('PairingService', () => {
       expect(result.success).toBe(true);
       expect(mockDatabaseService.display.findUnique).toHaveBeenNthCalledWith(2, {
         where: { deviceIdentifier: 'existing-device' },
-        select: { id: true, location: true },
+        select: { id: true, location: true, organizationId: true },
       });
       expect(mockDatabaseService.display.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -559,6 +586,130 @@ describe('PairingService', () => {
       const lastSetCall = mockRedisService.set.mock.calls[setCallsAfter - 1];
       const storedData = JSON.parse(lastSetCall[1]);
       expect(storedData.plaintextToken).toBe('mock-jwt-token');
+    });
+
+    it('rejects replay after a pairing code has already been completed', async () => {
+      mockDatabaseService.display.findUnique.mockResolvedValue(null);
+
+      const pairingResult = await service.requestPairingCode({
+        deviceIdentifier: 'replay-device',
+        nickname: 'Replay Test',
+        metadata: {},
+      });
+
+      mockDatabaseService.display.create.mockResolvedValue({
+        id: 'replay-display',
+        nickname: 'Replay Test',
+        deviceIdentifier: 'replay-device',
+        status: 'pairing',
+      } as any);
+
+      await service.completePairing(organizationId, userId, { code: pairingResult.code });
+      mockDatabaseService.display.create.mockClear();
+      mockDatabaseService.display.update.mockClear();
+
+      await expect(
+        service.completePairing('org-other', 'user-other', { code: pairingResult.code }),
+      ).rejects.toThrow('Pairing code has already been completed');
+      expect(mockDatabaseService.display.create).not.toHaveBeenCalled();
+      expect(mockDatabaseService.display.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a concurrent completion while another dashboard request owns the claim', async () => {
+      mockDatabaseService.display.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+
+      const pairingResult = await service.requestPairingCode({
+        deviceIdentifier: 'concurrent-device',
+        nickname: 'Concurrent Test',
+        metadata: {},
+      });
+      redisStore.set(`pairing-complete-claim:${pairingResult.code}`, {
+        value: 'other-claim-token',
+        ttl: 300,
+        expiresAt: Date.now() + 300_000,
+      });
+
+      await expect(
+        service.completePairing(organizationId, userId, { code: pairingResult.code }),
+      ).rejects.toThrow('Pairing code is already being completed');
+      expect(mockDatabaseService.display.create).not.toHaveBeenCalled();
+      expect(mockDatabaseService.display.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects pairing an existing display that belongs to another organization', async () => {
+      mockDatabaseService.display.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          id: 'display-other-org',
+          location: 'Lobby',
+          organizationId: 'org-other',
+        } as any);
+
+      const pairingResult = await service.requestPairingCode({
+        deviceIdentifier: 'other-org-device',
+        nickname: 'Other Org Display',
+        metadata: {},
+      });
+
+      await expect(
+        service.completePairing(organizationId, userId, { code: pairingResult.code }),
+      ).rejects.toThrow(NotFoundException);
+      expect(mockDatabaseService.display.update).not.toHaveBeenCalled();
+    });
+
+    it('enforces screen quota only when pairing creates a new display', async () => {
+      mockDatabaseService.display.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(null);
+      mockDatabaseService.organization.findUnique.mockResolvedValueOnce({
+        screenQuota: 1,
+        _count: { displays: 1 },
+      } as any);
+
+      const pairingResult = await service.requestPairingCode({
+        deviceIdentifier: 'over-quota-device',
+        nickname: 'Over Quota Display',
+        metadata: {},
+      });
+
+      await expect(
+        service.completePairing(organizationId, userId, { code: pairingResult.code }),
+      ).rejects.toThrow('Screen quota exceeded');
+      expect(mockDatabaseService.display.create).not.toHaveBeenCalled();
+    });
+
+    it('allows same-organization existing-display pairing while at screen quota', async () => {
+      mockDatabaseService.display.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({
+          id: 'existing-at-quota-display',
+          location: 'Lobby',
+          organizationId,
+        } as any);
+      mockDatabaseService.organization.findUnique.mockResolvedValueOnce({
+        screenQuota: 1,
+        _count: { displays: 1 },
+      } as any);
+
+      const pairingResult = await service.requestPairingCode({
+        deviceIdentifier: 'existing-at-quota-device',
+        nickname: 'Existing At Quota',
+        metadata: {},
+      });
+
+      mockDatabaseService.display.update.mockResolvedValue({
+        id: 'existing-at-quota-display',
+        nickname: 'Existing At Quota',
+        deviceIdentifier: 'existing-at-quota-device',
+        status: 'pairing',
+      } as any);
+
+      await service.completePairing(organizationId, userId, { code: pairingResult.code });
+
+      expect(mockDatabaseService.organization.findUnique).not.toHaveBeenCalled();
+      expect(mockDatabaseService.display.update).toHaveBeenCalled();
     });
 
     it('should clean up pairing request after device retrieves token', async () => {
@@ -762,7 +913,7 @@ describe('PairingService', () => {
       );
     });
 
-    it('should not query display ownership for already completed org pairings', async () => {
+    it('should not return or query display ownership for completed org pairings', async () => {
       const orgId = 'org-123';
       const userId = 'user-123';
       mockDatabaseService.display.findUnique.mockResolvedValue(null);
@@ -793,8 +944,7 @@ describe('PairingService', () => {
       expect(mockRedisService.get).not.toHaveBeenCalled();
       expect(mockDatabaseService.display.findMany).not.toHaveBeenCalled();
       expect(mockDatabaseService.display.findUnique).not.toHaveBeenCalled();
-      expect(result).toHaveLength(1);
-      expect(result[0]).toEqual(expect.objectContaining({ nickname: 'Completed Display' }));
+      expect(result).toEqual([]);
     });
   });
 

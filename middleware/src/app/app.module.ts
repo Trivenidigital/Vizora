@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -35,6 +35,7 @@ import { McpModule } from '../modules/mcp/mcp.module';
 import { WebhooksModule } from '../modules/webhooks/webhooks.module';
 import { TagRulesModule } from '../modules/tag-rules/tag-rules.module';
 import { ProvisioningTemplatesModule } from '../modules/provisioning-templates/provisioning-templates.module';
+import { CsrfMiddleware } from '../modules/common/middleware/csrf.middleware';
 
 @Module({
   imports: [
@@ -135,4 +136,8 @@ import { ProvisioningTemplatesModule } from '../modules/provisioning-templates/p
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(CsrfMiddleware).forRoutes('*');
+  }
+}

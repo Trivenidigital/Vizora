@@ -1,5 +1,112 @@
 # Vizora - Task Tracker
 
+## Active: CSRF + Pairing Authorization Pass 44 (2026-06-02)
+
+**Branch:** `feat/customer-dashboard-improvement-pass-44`
+
+**Why now:** Pass 44 customer/security/performance review found two high-value
+repo-side gaps that are buildable and testable without operator actions:
+existing CSRF middleware is not mounted in the Nest runtime, and device-pairing
+completion is not protected by the same role/subscription/quota path as normal
+display creation. The current dashboard also exposes the top-level pair flow to
+viewers.
+
+**New primitives introduced:** none. Reuse existing `CsrfMiddleware`,
+`RolesGuard`, `@Roles`, `@RequiresSubscription`, existing screen-quota
+semantics, dashboard permission helper, response envelope, and `/api/v1`
+routing.
+
+**Hermes-first analysis:** checked per project convention. These are local
+dashboard/API authorization and runtime middleware wiring concerns, not
+business-agent, MCP, provider-spend, or Hermes runtime tasks.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| CSRF runtime enforcement | none found | wire existing Nest middleware |
+| Device-pairing role/subscription/quota checks | none found | reuse existing Vizora guards/decorators and quota semantics |
+| Dashboard pairing UI gating | none found | reuse existing web permission helper |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+Nest CSRF middleware registration or local dashboard permission truth; proceed
+with Vizora-native code.
+
+**Plan/design:**
+`docs/plans/2026-06-02-csrf-pairing-authorization-pass-44.md`
+
+**Plan**
+- [x] Run multi-vector customer/security/performance review and select scoped
+  target.
+- [x] Reconcile stale Pass 43 note: device row actions were gated, but top-level
+  viewer pairing CTAs and backend complete-pairing guard gaps still exist.
+- [x] Add red coverage for CSRF runtime wiring and pairing authorization/UI.
+- [x] Implement CSRF middleware registration and pairing backend/frontend gates.
+- [x] Run focused tests.
+- [x] Run multi-vector code review.
+- [ ] Run broader verification, PR, CI, merge, and deployment gate.
+
+**Evidence so far**
+- Red verification:
+  `pnpm --filter @vizora/middleware test -- --runInBand src/app/app.module.spec.ts src/modules/displays/pairing.controller.spec.ts`
+  failed as expected because `AppModule.configure()` did not exist and
+  `completePairing` had no roles/quota metadata.
+- Red verification:
+  `pnpm --filter @vizora/web test -- --runInBand web/src/lib/__tests__/permissions.test.ts web/src/app/dashboard/devices/__tests__/devices-page.test.tsx web/src/app/dashboard/devices/pair/__tests__/pair-device-page.test.tsx`
+  failed as expected because the permission helper lacked `canPairDevices`,
+  viewers still saw pair CTAs/actions, and the direct pair page rendered the
+  pairing form for viewers.
+- Focused green verification:
+  `pnpm --filter @vizora/middleware test -- --runInBand src/app/app.module.spec.ts src/modules/displays/pairing.controller.spec.ts`
+  passed 2 suites / 12 tests after implementation.
+- Focused green verification:
+  `pnpm --filter @vizora/web test -- --runInBand web/src/lib/__tests__/permissions.test.ts web/src/app/dashboard/devices/__tests__/devices-page.test.tsx web/src/app/dashboard/devices/pair/__tests__/pair-device-page.test.tsx`
+  passed 3 suites / 25 tests after implementation.
+- Review findings fixed:
+  - CSRF now allows bearer-only service/mobile/API clients while still
+    requiring CSRF when the Vizora auth cookie is present.
+  - Pairing completion rejects Redis replay, rejects existing displays owned by
+    another tenant, and enforces screen quota only when creating a new display.
+  - Viewer pairing UI no longer exposes the direct form, QR deep-link success,
+    empty-state CTA, or existing-device pair action.
+- Focused review-fix verification:
+  `pnpm --filter @vizora/middleware test -- --runInBand src/modules/common/middleware/csrf.middleware.spec.ts src/app/app.module.spec.ts src/modules/displays/pairing.controller.spec.ts src/modules/displays/pairing.service.spec.ts`
+  passed 4 suites / 82 tests after adding concurrent pairing-claim coverage.
+- Review audit findings fixed:
+  - Pairing completion's Redis claim helpers were present but incomplete in the
+    dead-session state; the service now rejects concurrent completion claims
+    before display creation/update.
+  - Completed pairing records carry the plaintext device-token handoff and are
+    now suppressed from `getActivePairings()` dashboard list responses.
+  - E2E browser-CSRF helpers strip stale CSRF cookies from auth-cookie bundles so
+    duplicate CSRF cookies cannot make valid browser writes fail.
+- Runtime E2E verification:
+  `pnpm --filter @vizora/middleware test:e2e -- --runInBand --testPathPattern="customer-critical-path"`
+  passed 1 suite / 3 tests, including missing-CSRF rejection, viewer pairing
+  API rejection, and the scheduled playlist delivery path.
+- Focused web verification:
+  `pnpm --filter @vizora/web test -- --runInBand web/src/lib/__tests__/permissions.test.ts web/src/app/dashboard/devices/__tests__/devices-page.test.tsx web/src/app/dashboard/devices/pair/__tests__/pair-device-page.test.tsx`
+  passed 3 suites / 27 tests.
+- Broader verification:
+  - `npx nx build @vizora/middleware` passed with the existing webpack warning
+    class.
+  - `pnpm --filter @vizora/web exec tsc --noEmit` passed.
+  - `pnpm security:no-hardcoded-jwts` passed.
+  - `git diff --check` passed aside from existing CRLF conversion warnings.
+  - Plain `npx nx build @vizora/web` failed before compilation because
+    `NEXT_PUBLIC_SOCKET_URL` is intentionally required for production CSP.
+    Rerun with local production URLs
+    (`NEXT_PUBLIC_SOCKET_URL=http://localhost:3002`,
+    `NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1`,
+    `BACKEND_URL=http://localhost:3000`) passed.
+
+**Deferred from Pass 44**
+- Team/API-key admin-only UI truth.
+- Settings admin-email read-only/copy cleanup.
+- Content URL update SSRF validation.
+- Realtime public health detail hardening.
+- Dashboard duplicate refresh and `/analytics/summary` query consolidation.
+- Upload quota preflight, short content-search gating, and deferred device-group
+  fetch.
+
 ## Completed: Dashboard Role Truth Pass 43 (2026-06-02)
 
 **Branch:** `feat/dashboard-role-truth-pass-43`

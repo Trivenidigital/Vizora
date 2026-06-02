@@ -141,7 +141,12 @@ describe('CsrfMiddleware', () => {
   });
 
   describe('public paths', () => {
-    const publicPaths = ['/api/auth/login', '/api/auth/register'];
+    const publicPaths = [
+      '/api/auth/login',
+      '/api/auth/register',
+      '/api/auth/google',
+      '/api/v1/auth/google',
+    ];
 
     publicPaths.forEach((path) => {
       it(`should skip CSRF validation for ${path}`, () => {
@@ -288,6 +293,26 @@ describe('CsrfMiddleware', () => {
       middleware.use(mockRequest as Request, mockResponse as Response, mockNext);
 
       expect(mockNext).toHaveBeenCalled();
+    });
+
+    it('should allow bearer-only API requests without CSRF', () => {
+      mockRequest.cookies = {};
+      mockRequest.headers = { authorization: 'Bearer service-token' };
+
+      middleware.use(mockRequest as Request, mockResponse as Response, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(mockResponse.status).not.toHaveBeenCalled();
+    });
+
+    it('should still require CSRF when bearer auth is accompanied by the Vizora auth cookie', () => {
+      mockRequest.cookies = { [AUTH_CONSTANTS.COOKIE_NAME]: 'cookie-token' };
+      mockRequest.headers = { authorization: 'Bearer browser-token' };
+
+      middleware.use(mockRequest as Request, mockResponse as Response, mockNext);
+
+      expect(mockNext).not.toHaveBeenCalled();
+      expect(mockResponse.status).toHaveBeenCalledWith(403);
     });
 
     it('should reject requests when header token is missing', () => {

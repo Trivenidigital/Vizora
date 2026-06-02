@@ -7,6 +7,7 @@ export type DashboardPermissions = {
   canDeleteContent: boolean;
   canReviewContent: boolean;
   canManageDevices: boolean;
+  canPairDevices: boolean;
   canDeleteDevices: boolean;
   canUseFleetCommands: boolean;
   canUseEmergencyOverride: boolean;
@@ -31,6 +32,7 @@ export function getDashboardPermissions(user: RoleUser): DashboardPermissions {
     canDeleteContent: admin,
     canReviewContent: adminOrManager,
     canManageDevices: adminOrManager,
+    canPairDevices: adminOrManager,
     canDeleteDevices: admin,
     canUseFleetCommands: adminOrManager,
     canUseEmergencyOverride: admin,
