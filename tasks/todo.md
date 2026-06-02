@@ -1,8 +1,14 @@
 # Vizora - Task Tracker
 
-## Active: Dashboard Action Truth Pass 39 (2026-06-01)
+## Completed: Dashboard Action Truth Pass 39 (2026-06-01)
 
 **Branch:** `feat/dashboard-action-truth-pass-39`
+
+**PR:** #173
+
+**Commit:** `bd182c2`
+
+**Merge SHA:** `d92b88d02236f947cc9bdb09eda85a98eb0cd332`
 
 **Why now:** Pass 38 fixed a destructive confirmation gap. The next customer
 trust issue is dashboard action truthfulness: viewers and managers can still see
@@ -29,8 +35,8 @@ not a business-agent, MCP, Hermes, AI/provider, or spend-path change.
   and list-error panels.
 - [x] Run multi-vector subagent review before broader verification.
 - [x] Run focused and broader verification.
-- [ ] PR, CI, merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge if green.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Evidence so far:**
 - Drift-check: schedules already has `loadError` with an inline panel and
@@ -76,6 +82,16 @@ not a business-agent, MCP, Hermes, AI/provider, or spend-path change.
   `npx nx build @vizora/web --skip-nx-cache` passed with production env
   placeholders; `pnpm security:no-hardcoded-jwts` passed; `git diff --check`
   passed with Windows CRLF warnings only.
+- CI: PR #173 passed GitHub `audit`, `lint`, `test`, `build`, `security`, and
+  `e2e`, then merged.
+- Deploy gate: deploy NOT attempted. Prod `/opt/vizora/app` remains unsafe for
+  automated deploy: branch `main`, HEAD
+  `bb76aa1838740bff5b58623dfef7a906d44f46a6`,
+  `main...origin/main [ahead 17, behind 123]`, dirty tracked Hermes/template/
+  public frontend files present, and untracked production/template/public-doc
+  directories present. Remote main at probe:
+  `d92b88d02236f947cc9bdb09eda85a98eb0cd332`. Core prod services were online
+  for middleware/web/realtime, but ops/Hermes agent PM2 jobs remained stopped.
 
 ---
 
