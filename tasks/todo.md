@@ -1,8 +1,19 @@
 # Vizora - Task Tracker
 
-## Active: Dashboard Role Truth Pass 43 (2026-06-02)
+## Completed: Dashboard Role Truth Pass 43 (2026-06-02)
 
 **Branch:** `feat/dashboard-role-truth-pass-43`
+
+**PR:** #180
+
+**Commit:** `22982ea`
+
+**Merge SHA:** `b8d16aaa4c73297af8ea15a6b98443e196184f9c`
+
+**CI:** Green - audit, build, e2e, lint, security, and test.
+
+**Deploy:** Not deployed. Production checkout is dirty/diverged and unsafe for
+automation.
 
 **Why now:** Customer-dashboard review found high-trust UI gaps where read-only
 users can see write workflows and support messages can disappear after a send
@@ -38,8 +49,8 @@ Vizora-native code.
 - [x] Implement permission/helper and support state fixes.
 - [x] Run focused and broader web verification.
 - [x] Run multi-vector subagent review.
-- [ ] PR, CI, merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge if green.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Scoped fixes**
 - Schedules: viewers see read-only schedule information; create/edit/duplicate
@@ -116,6 +127,15 @@ Vizora-native code.
   - Release/Docker reviewer CLEAN after moving Prisma generation to the builder
     stage only and excluding nested workspace `node_modules` from Docker
     context.
+- PR/CI/merge: PR #180 merged at
+  `b8d16aaa4c73297af8ea15a6b98443e196184f9c`; audit, build, e2e, lint,
+  security, and test passed.
+- Deployment gate after merge: production remains on `main` at
+  `bb76aa1838740bff5b58623dfef7a906d44f46a6`, while `origin/main` is
+  `b8d16aaa4c73297af8ea15a6b98443e196184f9c` (`ahead 17, behind 150`) with
+  many tracked/untracked template, Hermes, public asset, and landing-page
+  changes. Middleware and web responded, realtime `/health` still returns
+  404. No deploy attempted.
 
 ## Completed: Customer Hot-Path Follow-up Pass 42 (2026-06-02)
 
