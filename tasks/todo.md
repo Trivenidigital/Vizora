@@ -1,6 +1,76 @@
 # Vizora - Task Tracker
 
-## Active Workstream: Release Readiness Gates Pass 50 (2026-06-02)
+## Active Workstream: Dashboard Settings Trust Pass 51 (2026-06-02)
+
+**Branch:** `fix/customer-dashboard-settings-pass-51`
+
+**Why now:** PR #190 merged with green CI, but production deployment remains
+blocked by dirty/diverged prod state. The next customer-visible dashboard gap is
+small, buildable, and testable: the main Settings page renders the signed-in
+admin email as an editable organization field even though neither the
+organization API nor the profile API persists email changes.
+
+**New primitives introduced:** none. This pass reuses the existing Settings page
+and existing organization/profile API clients. No new route, model, migration,
+module, env var, process, response shape, realtime event, MCP tool, Hermes
+skill, or AI/provider spend path.
+
+**Hermes-first analysis:** checked per project convention. This is local
+dashboard UI/API-truth alignment, not a business-agent, MCP, Hermes runtime, or
+provider-spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Dashboard settings UI | none applicable | update existing Settings page |
+| Account email mutation | none applicable | do not add without verification-email policy |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+React settings-form affordance alignment.
+
+**Plan**
+- [x] Add focused Settings page regression coverage for the admin email field.
+- [x] Prove the regression test fails on current main.
+- [x] Patch the field so it is honest/read-only and the save payload remains org-scoped.
+- [x] Run focused web verification.
+- [x] Run multi-vector diff review.
+- [x] Run broader verification.
+- [ ] PR, CI, and merge if green.
+- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+
+**Evidence so far**
+- Current `origin/main`: `b07f8e671d680aff389a4dc80c398963bc39773e`.
+- Red focused regression:
+  - `pnpm test --runInBand src/app/dashboard/settings/__tests__/settings-page-source.test.ts`
+    initially failed because the `Admin Email` block was editable, had no
+    `readOnly`, and carried an unsupported `onChange`.
+- Fix:
+  - Settings now renders the current signed-in account email as `Account Email`,
+    read-only, labeled with `htmlFor` / `id`, and described with
+    `aria-describedby`.
+  - Removed the fake `admin@vizora.com` fallback while the current user is still
+    loading or unavailable.
+  - Organization settings save remains scoped to organization fields and does
+    not send `email`.
+- Review:
+  - Customer UX/API-truth reviewer first found a medium accessibility labeling
+    issue plus low copy/fallback issues. Fixed all three; final re-review
+    returned CLEAN.
+  - Test/release reviewer first reported the new test was untracked and saw a
+    stale red guard while the label was being changed. Current re-review
+    returned CLEAN after the guard used `Account Email`.
+- Verification:
+  - Focused guard:
+    `pnpm test --runInBand src/app/dashboard/settings/__tests__/settings-page-source.test.ts`
+    => 1 suite / 2 tests passing.
+  - `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` => passing.
+  - Full web suite: `pnpm test --runInBand` from `web/`
+    => 105 suites / 1107 tests passing, with existing React `act(...)`
+    warnings.
+  - Production-like web build with public URLs set to `https://vizora.cloud`:
+    `npx nx build @vizora/web` => passing, with existing Nx/Next warnings.
+  - `git diff --check` => exit 0, with only LF/CRLF normalization warnings.
+
+## Completed Workstream: Release Readiness Gates Pass 50 (2026-06-02)
 
 **Branch:** `fix/release-readiness-gates-pass-50`
 
@@ -38,8 +108,8 @@ GitHub Actions coverage or shell smoke endpoint alignment.
 - [x] Run focused static/ops verification.
 - [x] Run multi-vector diff review.
 - [x] Run broader verification, including the newly gated web unit tests.
-- [ ] PR, CI, merge if green.
-- [ ] Re-check deployment gate; deploy only if prod checkout is safe.
+- [x] PR, CI, merge if green.
+- [x] Re-check deployment gate; deploy only if prod checkout is safe.
 
 **Evidence so far**
 - Current `origin/main`: `f524b6b0eb6a70a7fad7ea3241939a69709d02dc`.

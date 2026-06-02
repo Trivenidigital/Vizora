@@ -18,7 +18,7 @@ export default function SettingsPage() {
  const toast = useToast();
  const [settings, setSettings] = useState({
  organizationName: 'My Organization',
- email: 'admin@vizora.com',
+ email: '',
  timezone: 'America/New_York',
  defaultDuration: 30,
  notifications: true,
@@ -429,15 +429,25 @@ export default function SettingsPage() {
  />
  </div>
  <div>
- <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-2">
- Admin Email
+ <label
+ htmlFor="settings-account-email"
+ className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-2"
+ >
+ Account Email
  </label>
  <input
+ id="settings-account-email"
  type="email"
  value={settings.email}
- onChange={(e) => setSettings({ ...settings, email: e.target.value })}
- className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ readOnly
+ aria-readonly="true"
+ aria-describedby="settings-account-email-help"
+ placeholder="Not loaded yet"
+ className="eh-input w-full cursor-default px-4 py-2 border border-[var(--border)] bg-[var(--background)] text-[var(--foreground-secondary)] rounded-lg focus:ring-0 focus:border-[var(--border)]"
  />
+ <p id="settings-account-email-help" className="mt-2 text-xs text-[var(--foreground-tertiary)]">
+ Signed-in account email
+ </p>
  </div>
  <div>
    <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-2">
