@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useDropzone, type FileRejection } from 'react-dropzone';
 import { apiClient } from '@/lib/api';
 import type { ContentListParams } from '@/lib/api/content';
+import type { StorageInfo } from '@/lib/api/organizations';
 import { fetchAllPaginated } from '@/lib/api/pagination';
 import { Content, Display, PlaylistSummary, ContentFolder } from '@/lib/types';
 import FolderTree from '@/components/FolderTree';
@@ -93,6 +94,28 @@ const getUploadButtonLabel = (queue: UploadQueueItem[]): string => {
  return `Retry ${failedCount} Failed`;
  }
  return `Upload ${retryableCount} File${retryableCount === 1 ? '' : 's'}`;
+};
+
+const formatUploadBytes = (bytes: number): string => {
+ if (bytes < 1024) return `${bytes} B`;
+ const units = ['KB', 'MB', 'GB', 'TB'];
+ let value = bytes / 1024;
+ let unitIndex = 0;
+ while (value >= 1024 && unitIndex < units.length - 1) {
+ value /= 1024;
+ unitIndex += 1;
+ }
+ return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[unitIndex]}`;
+};
+
+const getStorageAvailableBytes = (storageInfo: StorageInfo): number => {
+ if (storageInfo.quotaBytes <= 0) {
+ return 0;
+ }
+ if (Number.isFinite(storageInfo.availableBytes)) {
+ return Math.max(0, storageInfo.availableBytes);
+ }
+ return Math.max(0, storageInfo.quotaBytes - storageInfo.usedBytes);
 };
 
 export default function ContentClient() {
@@ -510,28 +533,46 @@ export default function ContentClient() {
  await devicesLoadPromiseRef.current;
  };
 
- const ensurePlaylistsLoaded = async (forceRefresh = false) => {
+  const ensurePlaylistsLoaded = async (forceRefresh = false) => {
  if (!forceRefresh && playlistsLoadedRef.current) return;
  if (!playlistsLoadPromiseRef.current) {
  playlistsLoadPromiseRef.current = loadPlaylists().finally(() => {
  playlistsLoadPromiseRef.current = null;
  });
  }
- await playlistsLoadPromiseRef.current;
- };
+  await playlistsLoadPromiseRef.current;
+  };
 
- const handleBulkUpload = async () => {
- if (uploadQueue.length === 0) {
- toast.error('No files in queue');
- return;
- }
+  const hasUploadQuotaForBytes = async (bytes: number): Promise<boolean> => {
+  if (bytes <= 0) return true;
 
- setActionLoading(true);
- const uploadTargets = uploadQueue
- .map((item, index) => ({ item, index }))
- .filter(({ item }) => item.status !== 'success');
- const results: Array<'success' | 'error'> = [];
- let nextUploadIndex = 0;
+  try {
+  const storageInfo = await apiClient.getStorageInfo();
+  const availableBytes = getStorageAvailableBytes(storageInfo);
+  if (bytes <= availableBytes) return true;
+
+  toast.error(`Not enough storage for upload. Need ${formatUploadBytes(bytes)}, only ${formatUploadBytes(availableBytes)} available.`);
+  return false;
+  } catch (error) {
+  if (process.env.NODE_ENV === 'development') {
+  console.warn('Storage quota preflight failed; backend quota reservation will enforce the upload.', error);
+  }
+  return true;
+  }
+  };
+
+  const handleBulkUpload = async () => {
+  if (uploadQueue.length === 0) {
+  toast.error('No files in queue');
+  return;
+  }
+
+  setActionLoading(true);
+  const uploadTargets = uploadQueue
+  .map((item, index) => ({ item, index }))
+  .filter(({ item }) => item.status !== 'success');
+  const results: Array<'success' | 'error'> = [];
+  let nextUploadIndex = 0;
 
  const uploadOne = async (item: UploadQueueItem, index: number) => {
  setUploadQueue(prev => prev.map((q, idx) =>
@@ -568,12 +609,17 @@ export default function ContentClient() {
  nextUploadIndex += 1;
  await uploadOne(current.item, current.index);
  }
- };
+  };
 
- try {
- const workerCount = Math.min(
- getBulkUploadConcurrency(uploadTargets.map(({ item }) => item)),
- uploadTargets.length,
+  try {
+  const retryableBytes = uploadTargets.reduce((total, { item }) => total + item.file.size, 0);
+  if (!(await hasUploadQuotaForBytes(retryableBytes))) {
+  return;
+  }
+
+  const workerCount = Math.min(
+  getBulkUploadConcurrency(uploadTargets.map(({ item }) => item)),
+  uploadTargets.length,
  );
  await Promise.all(Array.from({ length: workerCount }, () => worker()));
  } finally {
@@ -637,16 +683,23 @@ export default function ContentClient() {
  const errors = validateForm(contentUploadSchema, uploadForm);
  setFormErrors(errors);
  
- if (Object.keys(errors).length > 0) {
- toast.error('Please fix the errors before submitting');
- return;
- }
+  if (Object.keys(errors).length > 0) {
+  toast.error('Please fix the errors before submitting');
+  return;
+  }
 
- try {
- setActionLoading(true);
- setUploadProgress(0);
+  try {
+  setActionLoading(true);
+  setUploadProgress(0);
 
- if (uploadForm.file && isFileUploadType(uploadForm.type)) {
+  if (uploadForm.file && isFileUploadType(uploadForm.type)) {
+  const hasQuota = await hasUploadQuotaForBytes(uploadForm.file.size);
+  if (!hasQuota) {
+  return;
+  }
+  }
+
+  if (uploadForm.file && isFileUploadType(uploadForm.type)) {
  // Use progress-tracking upload for file uploads
  await apiClient.uploadContentWithProgress(
  { title: uploadForm.title, type: uploadForm.type, file: uploadForm.file },

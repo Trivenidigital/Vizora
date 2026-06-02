@@ -217,19 +217,7 @@ describe('DashboardClient', () => {
     expect(screen.queryByText('Publish & Schedule')).not.toBeInTheDocument();
   });
 
-  it('does not refetch content and playlists on mount when server summary is present', async () => {
-    (apiClient.getAnalyticsSummary as jest.Mock).mockResolvedValueOnce({
-      totalDevices: 2,
-      onlineDevices: 1,
-      totalContent: 12,
-      processingContent: 3,
-      totalPlaylists: 4,
-      activePlaylists: 2,
-      totalImpressions: 0,
-      totalContentSize: 0,
-      uptimePercent: 0,
-    });
-
+  it('does not auto-refresh dashboard APIs on mount when the server snapshot is complete', async () => {
     await renderDashboardClient({
       initialContent: [{ id: 'c1' }],
       initialPlaylists: [{ id: 'p1', items: [{ id: 'item-1' }] }],
@@ -240,11 +228,20 @@ describe('DashboardClient', () => {
       },
       initialContentSampleReady: true,
       initialPlaylistsSampleReady: true,
+      initialStorageInfo: {
+        usedBytes: 512,
+        quotaBytes: 2048,
+        availableBytes: 1536,
+        usagePercent: 25,
+      },
+      initialSystemHealth: { status: 'ok' },
     });
 
-    expect(apiClient.getAnalyticsSummary).toHaveBeenCalledTimes(1);
+    expect(apiClient.getAnalyticsSummary).not.toHaveBeenCalled();
     expect(apiClient.getContent).not.toHaveBeenCalled();
     expect(apiClient.getPlaylists).not.toHaveBeenCalled();
+    expect(apiClient.getStorageInfo).not.toHaveBeenCalled();
+    expect(apiClient.get).not.toHaveBeenCalledWith('/health/ready');
     await waitFor(() => {
       expect(screen.getByText('Total Devices').parentElement?.parentElement).toHaveTextContent('2');
       expect(screen.getByText('Content Items').parentElement?.parentElement).toHaveTextContent('12');

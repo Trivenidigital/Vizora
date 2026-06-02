@@ -217,6 +217,11 @@ export default function DashboardClient({
  const activityPlaylistsRef = useRef(initialPlaylists);
  const deviceStatusesRef = useRef(deviceStatuses);
  const initialRefreshCompleteRef = useRef(false);
+ const skipInitialAutoRefreshRef = useRef(!!initialStats
+  && initialContentSampleReady
+  && initialPlaylistsSampleReady
+  && !!initialStorageInfo
+  && !!initialSystemHealth);
  deviceStatusesRef.current = deviceStatuses;
 
  // Initialize stats from server-fetched data
@@ -244,8 +249,12 @@ export default function DashboardClient({
  }, [initialSystemHealth]);
 
  useEffect(() => {
- loadStats(false);
- }, []);
+  if (skipInitialAutoRefreshRef.current) {
+  initialRefreshCompleteRef.current = true;
+  return;
+  }
+  loadStats(false);
+  }, []);
 
  // Update device stats from context (real-time)
  useEffect(() => {
