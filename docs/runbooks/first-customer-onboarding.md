@@ -107,22 +107,35 @@ Run in this order:
 
 Record everything in `docs/runbooks/customer-1-go-live-smoke-{DATE}.md` with timestamps.
 
-### 2. Optional: Playwright suite refresh
-Per `2026-05-09-playwright-results.md`, the suite has bit-rot. Most stale paths fixed in commit `<TBD>`; remaining work is per-test selector updates.
+### 2. Optional: Playwright customer-critical browser smoke
+GitHub's `e2e` check is a narrow middleware Jest gate, not this browser
+suite. Run the preflighted helper only after the local Vizora stack is already
+up; it requires middleware :3000, web :3001, and realtime :3002. The helper
+does not start Docker, reload PM2, SSH to prod, or mutate services.
 
 ```bash
-# Bring up local stack
+# Bring up local stack first, for example:
 docker compose -f docker/docker-compose.yml up -d postgres redis minio
 pnpm --filter @vizora/middleware dev > /tmp/mw.log 2>&1 &
 pnpm --filter @vizora/realtime dev > /tmp/rt.log 2>&1 &
 pnpm --filter @vizora/web dev > /tmp/web.log 2>&1 &
 # Wait for "Ready in X" lines in each log (60-90s for web)
 
-# Run Playwright with full reporter
-npx playwright test --reporter=list 2>&1 | tee /tmp/pw.log
+# Run the customer-critical browser subset
+pnpm e2e:customer-critical -- --reporter=list
 ```
 
-If pass rate >80%, declare Playwright restored. If <80%, accept as week-1 tech-debt and move on (`api-critical-path.sh` is the substitute regression net for launch).
+If this fails at preflight, the local services are not up; fix that before
+interpreting Playwright output. If specs fail, record the failing spec names in
+`docs/runbooks/customer-1-go-live-smoke-{DATE}.md` and use
+`api-critical-path.sh` plus the real-device walkthrough as the launch-critical
+substitute until the browser drift is fixed.
+
+### 3. Broader Playwright suite refresh
+Per `2026-05-09-playwright-results.md`, the broad suite still has localized
+selector drift. Billing-heavy failures stay post-customer-1 because customer-1
+launches on the free tier. Do not declare the full Playwright suite restored
+until all 24 specs run against a real stack and the result is recorded.
 
 ---
 

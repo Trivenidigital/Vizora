@@ -1,11 +1,11 @@
 # Vizora Backlog
 
-**Last updated:** 2026-06-03 (main at `3494e025`)
+**Last updated:** 2026-06-03 (main at `ab957a97`)
 **Production readiness:** repo-side foundation strongest on record; customer-1 launch remains operator-gated on C1-C4 below.
-**Tests:** Current merge evidence: PR #211 GitHub CI passed audit, build, e2e, lint, security, and test. Local #211 verification included focused middleware fleet tests (2 suites / 45 tests), realtime tests (13 suites / 287 tests), display focused tests (2 suites / 63 tests), display CI tests (8 suites / 145 tests), display typecheck/build, web tests (106 suites / 1115 tests), web/realtime/middleware builds, diff hygiene, and secret scan. Pass71 re-verified admin web tests (8 suites / 80 tests) for stale K5 closure. Historical aggregate test report remains in `docs/plans/2026-05-09-test-results.md`; verify fresh counts before relying on older totals.
+**Tests:** Current merge evidence: PR #214 GitHub CI passed audit, build, e2e, lint, security, and test. That CI `e2e` job is the narrow middleware Jest gate, not the full Playwright browser suite. Local #211 verification included focused middleware fleet tests (2 suites / 45 tests), realtime tests (13 suites / 287 tests), display focused tests (2 suites / 63 tests), display CI tests (8 suites / 145 tests), display typecheck/build, web tests (106 suites / 1115 tests), web/realtime/middleware builds, diff hygiene, and secret scan. Pass71 re-verified admin web tests (8 suites / 80 tests) for stale K5 closure. Pass72/73 re-verified focused agent/ops gates around Hermes cost and audit fallback. Historical aggregate test report remains in `docs/plans/2026-05-09-test-results.md`; verify fresh counts before relying on older totals.
 **Customer-1 launch date:** operator-confirmed - do not use historical target dates until the operator confirms the actual launch window.
 
-**Security/realtime/readiness wave (#107-#211, merged through 2026-06-03, main `3494e025`):** session invalidation now spans REST + WebSocket - password-change / account-deactivation force-logout across all devices (REST `#111`, WS connect-time `#112`, WS mid-session 60s sweep `#114`). Customer-1 smoke coverage is hardened (#116), M12 security alert emails are complete (#117), and the latest overnight readiness passes hardened health/readiness gates, validator reporting, admin readiness display, deploy verification, first-customer runbook truthfulness, public app URL precedence for email/reset/pairing/billing/lifecycle links (#209), and repo-side display auto-update command plumbing (#211). P1/P2 tables below reconciled to match.
+**Security/realtime/readiness wave (#107-#214, merged through 2026-06-03, main `ab957a97`):** session invalidation now spans REST + WebSocket - password-change / account-deactivation force-logout across all devices (REST `#111`, WS connect-time `#112`, WS mid-session 60s sweep `#114`). Customer-1 smoke coverage is hardened (#116), M12 security alert emails are complete (#117), and the latest overnight readiness passes hardened health/readiness gates, validator reporting, admin readiness display, deploy verification, first-customer runbook truthfulness, public app URL precedence for email/reset/pairing/billing/lifecycle links (#209), repo-side display auto-update command plumbing (#211), Hermes runner balance-delta cost attribution (#213), and Hermes audit outcome fallback (#214). P1/P2 tables below reconciled to match.
 
 ---
 
@@ -60,6 +60,7 @@ Triggered by 2026-05-06 OpenRouter credit drain. PR #62 (merged `801b517` on 202
 | R10 | agentRunId propagation investigation — Hermes config supports static headers only, no `--header` flag in 0.12.0 | `docs/plans/2026-05-09-agent-run-id-propagation-investigation.md` | 2026-05-09 |
 | R11 | support-triage cross-tenant token design call — recommended kept-disabled for customer-1, Option 2 (platform-scope `support:*` tools) for week-2 | `docs/plans/2026-05-09-support-triage-cross-tenant-design.md` | 2026-05-09 |
 | R12 | CLAUDE.md test baseline refreshed (1700+ → 2335; carve-outs resolved) | `e80939d` | 2026-05-09 |
+| R13 | Customer-critical Playwright helper preflights local services and runs the launch-relevant browser subset; full suite remains T1 | `scripts/smoke/playwright-customer-critical.mjs` | 2026-06-03 |
 
 ### Earlier (carried over from prior backlog state)
 
@@ -137,7 +138,7 @@ These are documented + non-blocking for customer-1. Investigations done; impleme
 
 | # | Item | Effort | Pointer | Why deferred |
 |---|------|--------|---------|--------------|
-| T1 | Playwright suite refresh — close remaining ~26 failures (heaviest: 16-billing×10) | 6-8h | `docs/plans/2026-05-09-playwright-results.md` | Critical-path flows verified (8/10); 16-billing is OUT of customer-1 scope |
+| T1 | PARTIAL - Playwright suite refresh — close remaining ~26 failures (heaviest: 16-billing×10) | 6-8h | `docs/plans/2026-05-09-playwright-results.md`, `scripts/smoke/playwright-customer-critical.mjs` | Customer-critical helper now preflights middleware/web/realtime local ports and runs 01/03/04/05/06/15/21; full browser suite still needs a running stack and fresh result. 16-billing is OUT of customer-1 scope |
 | T2 | ✅ DONE - Per-firing cost attribution (Path A: balance-delta pre/post each firing) | ~1h | `docs/plans/2026-05-09-hermes-insights-investigation.md` | Pass72: runner samples post-flight OpenRouter balance and stores nonnegative delta as `agent_runs.costMicrodollars`; live rows require normal deploy, no prod firing performed |
 | T3 | PARTIAL - agentRunId propagation runner→Hermes→MCP — Hermes 0.12.0 has no `--header` flag; needs upstream patch OR env-var config interpolation experiment | 2h-2d | `docs/plans/2026-05-09-agent-run-id-propagation-investigation.md` | Pass73: sidecar Path D fallback shipped (MCP audit `agentName` candidates + firing window when `agentRunId` rows are absent) and no longer false-refines empty audit evidence to `no_work`; precise per-run header propagation remains deferred |
 | T4 | support-triage cross-tenant token redesign — Option 2 (relax `support:*` tools to accept platform-scope) | 4-6h | `docs/plans/2026-05-09-support-triage-cross-tenant-design.md` | support-triage NOT enabled; operator handles tickets directly |

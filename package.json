@@ -12,6 +12,7 @@
     "test": "nx run-many --target=test --all",
     "test:ops": "node --import tsx --test \"scripts/ops/**/*.test.ts\"",
     "test:e2e": "pnpm --filter @vizora/middleware test:e2e",
+    "e2e:customer-critical": "node scripts/smoke/playwright-customer-critical.mjs",
     "security:no-hardcoded-jwts": "node scripts/security/check-no-hardcoded-jwts.js",
     "lint": "ESLINT_USE_FLAT_CONFIG=false eslint --ext .ts,.tsx middleware/src realtime/src",
     "lint:web": "pnpm --filter @vizora/web exec next lint"
