@@ -1,11 +1,11 @@
 # Vizora Backlog
 
-**Last updated:** 2026-06-03 (main at `5d15fff3`)
+**Last updated:** 2026-06-03 (main at `3494e025`)
 **Production readiness:** repo-side foundation strongest on record; customer-1 launch remains operator-gated on C1-C4 below.
-**Tests:** Current merge evidence: PR #209 GitHub CI passed audit, build, e2e, lint, security, and test. Local #209 verification included middleware unit tests (149 suites / 3055 tests), ops tests (40/40), release-readiness gates (21/21), middleware build, ESLint, and secret scan. Historical aggregate test report remains in `docs/plans/2026-05-09-test-results.md`; verify fresh counts before relying on older totals.
+**Tests:** Current merge evidence: PR #211 GitHub CI passed audit, build, e2e, lint, security, and test. Local #211 verification included focused middleware fleet tests (2 suites / 45 tests), realtime tests (13 suites / 287 tests), display focused tests (2 suites / 63 tests), display CI tests (8 suites / 145 tests), display typecheck/build, web tests (106 suites / 1115 tests), web/realtime/middleware builds, diff hygiene, and secret scan. Pass71 re-verified admin web tests (8 suites / 80 tests) for stale K5 closure. Historical aggregate test report remains in `docs/plans/2026-05-09-test-results.md`; verify fresh counts before relying on older totals.
 **Customer-1 launch date:** operator-confirmed - do not use historical target dates until the operator confirms the actual launch window.
 
-**Security/realtime/readiness wave (#107-#209, merged through 2026-06-03, main `5d15fff3`):** session invalidation now spans REST + WebSocket - password-change / account-deactivation force-logout across all devices (REST `#111`, WS connect-time `#112`, WS mid-session 60s sweep `#114`). Customer-1 smoke coverage is hardened (#116), M12 security alert emails are complete (#117), and the latest overnight readiness passes hardened health/readiness gates, validator reporting, admin readiness display, deploy verification, first-customer runbook truthfulness, and public app URL precedence for email/reset/pairing/billing/lifecycle links (#209). P1/P2 tables below reconciled to match.
+**Security/realtime/readiness wave (#107-#211, merged through 2026-06-03, main `3494e025`):** session invalidation now spans REST + WebSocket - password-change / account-deactivation force-logout across all devices (REST `#111`, WS connect-time `#112`, WS mid-session 60s sweep `#114`). Customer-1 smoke coverage is hardened (#116), M12 security alert emails are complete (#117), and the latest overnight readiness passes hardened health/readiness gates, validator reporting, admin readiness display, deploy verification, first-customer runbook truthfulness, public app URL precedence for email/reset/pairing/billing/lifecycle links (#209), and repo-side display auto-update command plumbing (#211). P1/P2 tables below reconciled to match.
 
 ---
 
@@ -258,9 +258,9 @@ Items the audit listed but we are NOT pursuing live (Engage/kiosk, live remote v
 | K2 | Electron powerSaveBlocker not enabled | Low | FIXED | Packaged display clients start `prevent-display-sleep` and stop it on quit |
 | K3 | Electron auto-update not configured | Low | REPO-FIXED / OPERATOR-GATED | Admin-only `update` fleet command now reaches packaged display clients through `electron-updater` with backend + client feed allowlist checks; live rollout still requires signed artifacts on an allowlisted HTTPS feed and target-specific signing verification |
 | K4 | Display client has 0 test coverage | Medium | FIXED | Electron display Jest suite, typecheck, and build are CI-gated; real-device walkthrough still required |
-| K5 | 3 pre-existing RSC admin test failures | Low | TODO | React Server Component edge cases |
+| K5 | 3 pre-existing RSC admin test failures | Low | FIXED | Historical RSC-admin failure is stale. Pass71 verified all current admin web tests: 8 suites / 80 tests passed; known React `act(...)` warning noise remains non-failing |
 | K6 | AI Designer returns "launching soon" stub | Info | TODO | Intentional — needs API budget |
-| K7 | Push-to-group iterates client-side | Low | TODO | No server-side batch endpoint |
+| K7 | Push-to-group iterates client-side | Low | FIXED | Generalized fleet command endpoint accepts `target.type = group`; `fleet.service` resolves display-group members server-side and fans out through the existing gateway broadcast path |
 | K8 | Playlist loop UI not fully wired | Low | FIXED | Fixed in unblocked tasks sprint |
 
 ---
