@@ -1,11 +1,11 @@
 # Vizora Backlog
 
-**Last updated:** 2026-06-03 (main at `5ddabb7a`)
+**Last updated:** 2026-06-03 (main at `5d15fff3`)
 **Production readiness:** repo-side foundation strongest on record; customer-1 launch remains operator-gated on C1-C4 below.
-**Tests:** 124 middleware suites / 2335 tests, 10 realtime suites / 212 tests, 79 web suites / 864 tests - ALL PASSING (zero failures). Playwright 24 specs at >90% pass post-2026-05-09 refresh. Verified by autonomous pass `docs/plans/2026-05-09-test-results.md`.
+**Tests:** Current merge evidence: PR #209 GitHub CI passed audit, build, e2e, lint, security, and test. Local #209 verification included middleware unit tests (149 suites / 3055 tests), ops tests (40/40), release-readiness gates (21/21), middleware build, ESLint, and secret scan. Historical aggregate test report remains in `docs/plans/2026-05-09-test-results.md`; verify fresh counts before relying on older totals.
 **Customer-1 launch date:** operator-confirmed - do not use historical target dates until the operator confirms the actual launch window.
 
-**Security/realtime/readiness wave (#107-#204, merged through 2026-06-03, main `5ddabb7a`):** session invalidation now spans REST + WebSocket - password-change / account-deactivation force-logout across all devices (REST `#111`, WS connect-time `#112`, WS mid-session 60s sweep `#114`). Customer-1 smoke coverage is hardened (#116), M12 security alert emails are complete (#117), and the latest overnight readiness passes hardened health/readiness gates, validator reporting, admin readiness display, deploy verification, and first-customer runbook truthfulness. P1/P2 tables below reconciled to match.
+**Security/realtime/readiness wave (#107-#209, merged through 2026-06-03, main `5d15fff3`):** session invalidation now spans REST + WebSocket - password-change / account-deactivation force-logout across all devices (REST `#111`, WS connect-time `#112`, WS mid-session 60s sweep `#114`). Customer-1 smoke coverage is hardened (#116), M12 security alert emails are complete (#117), and the latest overnight readiness passes hardened health/readiness gates, validator reporting, admin readiness display, deploy verification, first-customer runbook truthfulness, and public app URL precedence for email/reset/pairing/billing/lifecycle links (#209). P1/P2 tables below reconciled to match.
 
 ---
 
