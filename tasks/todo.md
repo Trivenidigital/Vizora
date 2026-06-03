@@ -1,6 +1,6 @@
 # Vizora - Task Tracker
 
-## Active Workstream: Email Env Example + App URL Readiness Pass 67 (2026-06-03)
+## Completed Workstream: Email Env Example + App URL Readiness Pass 67 (2026-06-03)
 
 **Branch:** `fix/email-env-example-readiness`
 
@@ -43,11 +43,18 @@ local env-example and operator runbook truthfulness updates.
       fallback with the documented app URL precedence.
 - [x] Run focused ops tests, broader ops tests, diff hygiene, and secret scan.
 - [x] Request Claude Code review and resolve findings.
-- [ ] Commit, PR, CI, and merge if green.
-- [ ] Do not deploy, send real emails, or touch production SMTP/env state.
+- [x] Commit, PR, CI, and merge if green.
+- [x] Do not deploy, send real emails, or touch production SMTP/env state.
 
 **Evidence so far**
 - Current `origin/main`: `9181ff57630d01ecafb7241fe75fed645ae33939`.
+- Branch/PR:
+  - Branch: `fix/email-env-example-readiness`.
+  - Commit: `ed6bc3d7` (`fix(auth): align email readiness URLs`).
+  - PR #207: `fix(auth): align email readiness URLs`.
+  - GitHub CI passed audit, build, e2e, lint, security, and test before merge.
+  - No deploy, production env change, SMTP/Resend setup, or real email send was
+    performed.
 - Drift-check:
   - `.env.example` has no `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`,
     `SMTP_FROM`, `SMTP_TO`, `OPS_ALERT_EMAIL`, `EMAIL_FROM`,
