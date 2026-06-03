@@ -1,6 +1,12 @@
 import { PlatformHealthService } from './platform-health.service';
 import { DatabaseService } from '../../database/database.service';
 import { RedisService } from '../../redis/redis.service';
+import * as http from 'http';
+import { EventEmitter } from 'events';
+
+jest.mock('http', () => ({
+  request: jest.fn(),
+}));
 
 describe('PlatformHealthService', () => {
   let service: PlatformHealthService;
@@ -24,6 +30,27 @@ describe('PlatformHealthService', () => {
       mockRedis as RedisService,
     );
   });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function mockHttpStatus(statusCode = 200) {
+    const request = new EventEmitter() as http.ClientRequest;
+    request.end = jest.fn();
+    request.destroy = jest.fn();
+
+    const requestSpy = http.request as jest.MockedFunction<typeof http.request>;
+    requestSpy.mockImplementation(((
+      _options: http.RequestOptions,
+      callback?: (res: http.IncomingMessage) => void,
+    ) => {
+      callback?.({ statusCode } as http.IncomingMessage);
+      return request;
+    }) as typeof http.request);
+
+    return { requestSpy };
+  }
 
   it('should be defined', () => {
     expect(service).toBeDefined();
@@ -142,6 +169,76 @@ describe('PlatformHealthService', () => {
       const result = await service.getServiceStatus();
 
       expect(result).toHaveLength(3);
+    });
+  });
+
+  describe('checkServicePort', () => {
+    it('probes middleware at the versioned health path', async () => {
+      const { requestSpy } = mockHttpStatus();
+
+      const result = await service.checkServicePort('middleware', 3000);
+
+      expect(result.status).toBe('healthy');
+      expect(requestSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          hostname: 'localhost',
+          port: 3000,
+          path: '/api/v1/health',
+          method: 'GET',
+        }),
+        expect.any(Function),
+      );
+    });
+
+    it('probes realtime at the prefixed gateway health path', async () => {
+      const { requestSpy } = mockHttpStatus();
+
+      const result = await service.checkServicePort('realtime', 3002);
+
+      expect(result.status).toBe('healthy');
+      expect(requestSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          hostname: 'localhost',
+          port: 3002,
+          path: '/api/health',
+          method: 'GET',
+        }),
+        expect.any(Function),
+      );
+    });
+
+    it('probes web at the root page used by its container healthcheck', async () => {
+      const { requestSpy } = mockHttpStatus();
+
+      const result = await service.checkServicePort('web', 3001);
+
+      expect(result.status).toBe('healthy');
+      expect(requestSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          hostname: 'localhost',
+          port: 3001,
+          path: '/',
+          method: 'GET',
+        }),
+        expect.any(Function),
+      );
+    });
+
+    it('keeps the legacy /health fallback for unknown service names', async () => {
+      const { requestSpy } = mockHttpStatus();
+
+      const result = await service.checkServicePort('custom-service', 3999);
+
+      expect(result.status).toBe('healthy');
+      expect(requestSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          hostname: 'localhost',
+          port: 3999,
+          path: '/health',
+          method: 'GET',
+        }),
+        expect.any(Function),
+      );
     });
   });
 
