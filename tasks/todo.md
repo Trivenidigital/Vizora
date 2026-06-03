@@ -1,6 +1,79 @@
 # Vizora - Task Tracker
 
-## Active Workstream: Readiness Backlog Reconciliation Pass 71 (2026-06-03)
+## Active Workstream: Hermes Runner Cost Attribution Pass 72 (2026-06-03)
+
+**Branch:** `fix/production-readiness-pass72`
+
+**Why now:** `backlog.md` still tracks T2 per-firing cost attribution as open.
+The OpenRouter credit-drain incident is already mitigated by hard cost guards,
+but current `agent_runs.costMicrodollars` rows remain null because Hermes `-z`
+does not persist sessions for the sidecar to parse. The existing investigation
+recommends Path A: measure pre/post OpenRouter credit balance around each
+runner firing and store the delta.
+
+**Drift-check:** existing code already has `AgentRun.costMicrodollars`,
+`AgentRunsService.getTodaySpendUsd()`, runner pre-flight OpenRouter balance
+checks, and internal `POST /api/v1/internal/agent-runs`. The residual gap is
+specific: the runner does not capture post-flight balance or send a measured
+cost, and the initial record schema/service rejects/omits that value.
+
+**New primitives introduced:** one optional internal wire field,
+`costMicrodollars`, on `RecordRunInput`, plus a small runner-side calculation
+that converts an observed USD balance delta to integer microdollars. No DB
+model/migration, public API, PM2 process, env var, MCP tool, Hermes skill,
+provider-spend path, production deploy, prod env edit, customer email send,
+payment setup, or hardware action is planned.
+
+**Hermes-first analysis:** checked per project convention. The official Hermes
+skills catalog and awesome-hermes-agent ecosystem contain general Hermes setup,
+skills, PR, and workflow helpers, but no Vizora-specific internal
+`agent_runs`/OpenRouter-balance attribution primitive.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Hermes runner cost attribution | none found | build in existing `run-hermes-skill.sh` runner |
+| OpenRouter balance delta accounting | none found | reuse existing `openrouter-balance.sh` helper |
+| Vizora agent-run persistence | none found | extend existing NestJS internal `AgentRunsService` path |
+
+Awesome-hermes-agent ecosystem check: no installable skill replaces this
+repo-local runner/accounting change.
+
+**Plan**
+- [x] Add failing schema/service/static ops tests for runner-supplied
+      `costMicrodollars`.
+- [x] Implement minimal middleware schema/service persistence for measured
+      runner cost.
+- [x] Implement post-flight OpenRouter balance delta in the existing Hermes
+      runner without changing cost guards or invoking providers in tests.
+- [x] Update backlog and investigation docs to close T2 repo-side.
+- [ ] Run focused middleware tests, ops gates, shell syntax check, diff hygiene,
+      secret scan, Claude Code review, commit, PR, CI, and merge if green.
+
+**Evidence**
+- Red tests:
+  - `pnpm --filter @vizora/middleware test -- --runTestsByPath src/modules/agents/agent-runs.schemas.spec.ts src/modules/agents/agent-runs.service.spec.ts --runInBand` failed because `RecordRunInput` stripped `costMicrodollars` and `AgentRunsService.recordRun()` omitted it.
+  - `pnpm test:ops -- scripts/ops/release-readiness-gates.test.ts` failed because `run-hermes-skill.sh` had no post-flight balance attribution wiring.
+- Implementation:
+  - `RecordRunInput` now accepts optional nonnegative integer `costMicrodollars`.
+  - `AgentRunsService.recordRun()` persists runner-measured `costMicrodollars` on the initial row.
+  - `AgentRunsService.enrichRun()` preserves runner-measured cost when the sidecar has no token-derived cost, and only replaces it when token/rate data can compute a cost.
+  - `run-hermes-skill.sh` samples post-flight OpenRouter balance, computes a nonnegative preflight-postflight delta in microdollars, and includes it in the internal agent-run POST when both balance probes are valid.
+  - `backlog.md` and `docs/plans/2026-05-09-hermes-insights-investigation.md` now mark T2 Path A repo-fixed while keeping live collection deploy-gated.
+- Green verification so far:
+  - `pnpm --filter @vizora/middleware test -- --runTestsByPath src/modules/agents/agent-runs.schemas.spec.ts src/modules/agents/agent-runs.service.spec.ts --runInBand`: 2 suites / 25 tests passed.
+  - `pnpm --filter @vizora/middleware test -- --runTestsByPath src/modules/agents/agent-runs.service.spec.ts --runInBand`: 1 suite / 24 tests passed after adding the cost-preservation regression.
+  - `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="modules/agents"`: 9 suites / 116 tests passed, with expected negative-path AgentState/Onboarding logs.
+  - `pnpm test:ops`: 41 tests passed.
+  - `C:\Program Files\Git\bin\bash.exe -n scripts/agents/hermes/run-hermes-skill.sh`: passed.
+  - `npx nx build @vizora/middleware`: passed with existing webpack warnings.
+  - `git diff --check`: passed with CRLF warnings only.
+  - `pnpm security:no-hardcoded-jwts`: passed.
+  - `bash -n scripts/agents/hermes/run-hermes-skill.sh` was not usable in this PowerShell environment because `bash` resolves to a broken WSL shim (`/bin/bash` missing); Git Bash was used explicitly instead.
+- Claude Code review:
+  - Local `claude.exe` review returned `CLEAN`, with no required edits.
+  - Reviewer explicitly checked cost-preservation on sidecar outcome-only enrichment, shell decimal validation, cost-guard preservation, secret exposure, and docs truthfulness.
+
+## Completed Workstream: Readiness Backlog Reconciliation Pass 71 (2026-06-03)
 
 **Branch:** `fix/production-readiness-pass71`
 
@@ -24,7 +97,7 @@ No business-agent or Hermes runtime behavior is being designed or changed.
 - [x] Drift-check K7 push-to-group against the fleet API/service path.
 - [x] Patch `tasks/todo.md`, `backlog.md`, and correction lessons with concrete
       evidence only.
-- [ ] Run docs diff hygiene, request Claude Code review, commit, PR, and merge
+- [x] Run docs diff hygiene, request Claude Code review, commit, PR, and merge
       if green.
 
 **Evidence**
@@ -47,6 +120,11 @@ No business-agent or Hermes runtime behavior is being designed or changed.
   - `pnpm security:no-hardcoded-jwts`: passed.
 - Claude Code review:
   - Local `claude` CLI reviewed the docs-only diff and returned `CLEAN`.
+- Commit/PR/CI:
+  - Commit `94f44371` (`docs: reconcile readiness backlog state`).
+  - PR #212 merged as `a2d0a96d`.
+  - GitHub checks passed before merge: audit, build, e2e, lint, security, and
+    test.
 
 ## Completed Workstream: Display Auto-Update Command Pass 70 (2026-06-03)
 

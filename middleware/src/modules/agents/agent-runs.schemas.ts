@@ -4,8 +4,9 @@
  * See: docs/plans/2026-05-08-agent-platform-redesign-design.md §3.1
  *
  * The runner script POSTs RecordRunInput synchronously on firing exit.
- * The insights-poller sidecar PATCHes EnrichRunInput ~5 min later with
- * cost / token data extracted from `hermes insights`.
+ * The runner may include balance-delta cost on the initial row. The
+ * insights-poller sidecar PATCHes EnrichRunInput ~5 min later with token
+ * data, rate snapshots, and outcome refinements when available.
  *
  * Outcome taxonomy follows ADL-3 (mutually exclusive). The runner emits
  * only the 4-value subset it can detect from Hermes-visible signals; the
@@ -58,6 +59,9 @@ export type RunnerOutcomeT = z.infer<typeof RunnerOutcome>;
 /**
  * Body of POST /api/v1/internal/agent-runs.
  * Dates are ISO-8601 strings on the wire; service-side they become Date.
+ * `costMicrodollars` is optional runner-measured spend from pre/post
+ * OpenRouter balance deltas. Token-derived sidecar enrichment may remain null
+ * when Hermes one-shot mode does not persist sessions.
  */
 export const RecordRunInput = z.object({
   skillName: z.string().min(1).max(128),
@@ -70,6 +74,7 @@ export const RecordRunInput = z.object({
   errorExcerpt: z.string().max(1024).optional(),
   preflightBalanceUsd: z.number().optional(),
   preflightTodaySpendUsd: z.number().optional(),
+  costMicrodollars: z.number().int().nonnegative().optional(),
 });
 export type RecordRunInputT = z.infer<typeof RecordRunInput>;
 

@@ -183,6 +183,15 @@ test('ops reporter summarizes active incidents instead of only open incidents', 
   assert.doesNotMatch(reporter, /filter\(i => i\.status === 'open'\)/);
 });
 
+test('Hermes runner records post-flight balance-delta cost attribution', () => {
+  const runner = readRepoFile('scripts/agents/hermes/run-hermes-skill.sh');
+
+  assert.match(runner, /POSTFLIGHT_BALANCE="\$\(openrouter_balance_usd/);
+  assert.match(runner, /COST_MICRODOLLARS=/);
+  assert.match(runner, /"costMicrodollars=\$COST_MICRODOLLARS"/);
+  assert.match(runner, /\$PREFLIGHT_BALANCE - \$POSTFLIGHT_BALANCE/);
+});
+
 test('ops alerting labels unresolved incident lists as active incidents', () => {
   const alerting = readRepoFile('scripts/ops/lib/alerting.ts');
 

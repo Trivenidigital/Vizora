@@ -18,7 +18,7 @@ import {
  * Two-stage write pattern (design ADL-2):
  *   1. recordRun()  — synchronous, called by the runner POST endpoint
  *   2. enrichRun()  — asynchronous, called by the insights-poller sidecar
- *                     ~5 min later with cost + token data
+ *                     ~5 min later with token/rate data and refinements
  *
  * Cost is FROZEN at write (ADL-7). When MODEL_RATES changes, historical
  * rows preserve their snapshotted rateInUsdPerMt / rateOutUsdPerMt.
@@ -61,6 +61,7 @@ export class AgentRunsService {
         errorExcerpt: input.errorExcerpt?.slice(0, 1024) ?? null,
         preflightBalanceUsd: input.preflightBalanceUsd ?? null,
         preflightTodaySpendUsd: input.preflightTodaySpendUsd ?? null,
+        costMicrodollars: input.costMicrodollars ?? null,
         callerType: callerType ?? null,
       },
       select: { id: true },
@@ -82,7 +83,7 @@ export class AgentRunsService {
     // a sidecar bug from a benign late-tick (Reviewer A+B design review).
     const existing = await this.db.agentRun.findUnique({
       where: { id },
-      select: { id: true, finishedAt: true, enrichedAt: true },
+      select: { id: true, finishedAt: true, enrichedAt: true, costMicrodollars: true },
     });
     if (!existing) {
       throw new NotFoundException(`agent_runs row '${id}' not found`);
@@ -121,12 +122,14 @@ export class AgentRunsService {
     const data: Record<string, unknown> = {
       tokensIn: input.tokensIn ?? null,
       tokensOut: input.tokensOut ?? null,
-      costMicrodollars,
       rateInUsdPerMt: rateIn ?? null,
       rateOutUsdPerMt: rateOut ?? null,
       model: input.model ?? null,
       enrichedAt: new Date(),
     };
+    if (costMicrodollars != null || existing.costMicrodollars == null) {
+      data.costMicrodollars = costMicrodollars;
+    }
     if (input.outcomeRefinement != null) {
       data.outcome = input.outcomeRefinement;
     }

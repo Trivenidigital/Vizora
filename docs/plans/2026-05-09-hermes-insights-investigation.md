@@ -44,7 +44,9 @@ The sidecar's design (`scripts/agents/hermes/poll-insights.ts`) assumes `hermes 
 - L3 (Hermes `model.max_tokens=4096`): per-call output cap
 - L4 (cross-firing breaker, planned P4): NOT YET IMPLEMENTED
 
-What we lose: **per-firing cost attribution.** The `agent_runs` table has `costMicrodollars=NULL` for every row written today. Grafana's "cost per firing" panel is empty.
+What we lose before Path A lands: **per-firing cost attribution.** Existing
+pre-Path-A `agent_runs` rows have `costMicrodollars=NULL`; Grafana's "cost per
+firing" panel stays empty for those historical rows.
 
 ## Three fix paths (ranked by cost / complexity)
 
@@ -98,5 +100,9 @@ The sidecar's role shrinks to: orphan-row sweep + outcome refinement (which stil
 
 - Finding documented: ✅ this file
 - Sidecar fix: minimal — change `level: 'error'` to `level: 'info'` for the "No sessions found" case so it doesn't trip the parser-failure alert
-- Runner fix (Path A): tracked in `tasks/feature-backlog.md` as P2
+- Runner fix (Path A): implemented in pass72. `run-hermes-skill.sh` samples
+  post-flight OpenRouter balance and sends nonnegative balance deltas as
+  `costMicrodollars` on the initial `agent_runs` POST; middleware validates and
+  persists that value. Production collection starts only after normal deploy; no
+  prod firing or provider call was performed by this repo-side change.
 - Long-term (Path B / C): backlog
