@@ -8,6 +8,7 @@ import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 import { StorageService } from '../storage/storage.service';
 import { getCleanupSafeMinioObjectKey, isMinioUrl } from '../storage/minio-object-key';
 import { RedisService } from '../redis/redis.service';
+import { resolvePublicAppUrl } from '../common/utils/public-app-url';
 
 @Injectable()
 export class OrganizationsService {
@@ -401,8 +402,7 @@ export class OrganizationsService {
       };
     }
 
-    const appUrl =
-      process.env.APP_URL || process.env.WEB_URL || 'https://vizora.cloud';
+    const appUrl = resolvePublicAppUrl('https://vizora.cloud');
     const body = `Hi,\n\n${subject}.\n\nOpen your dashboard: ${appUrl}/dashboard\n\n— Vizora`;
     const from = process.env.EMAIL_FROM || 'Vizora <noreply@mail.vizora.cloud>';
 

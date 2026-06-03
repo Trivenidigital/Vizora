@@ -1,5 +1,84 @@
 # Vizora - Task Tracker
 
+## Active Workstream: Shared Public App URL Resolver Pass 69 (2026-06-03)
+
+**Branch:** `fix/public-app-url-resolver`
+
+**Why now:** PR #208 intentionally scoped startup self-test validation to
+transactional email links, but review confirmed a pre-existing false-green risk:
+other absolute URL builders use different env precedence. Customer-1 relevant
+case: pairing QR URLs use `WEB_URL` only, so an operator following C1 guidance
+with `APP_URL` set could still generate localhost pairing links.
+
+**New primitives introduced:** one small middleware utility only:
+`resolvePublicAppUrl()`. No route, model, migration, env var, process, realtime
+event, MCP tool, Hermes skill, AI/provider spend path, customer email send,
+production env change, or deploy is expected.
+
+**Hermes-first analysis:** checked per project convention. This is deterministic
+NestJS URL/env resolution, not a business-agent, MCP, Hermes runtime, or
+provider-spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Public app URL env precedence | none applicable | extract tiny local utility |
+| Pairing QR URL coverage | none applicable | extend existing pairing tests |
+| Billing/organization/mail/auth URL drift | none applicable | reuse utility in existing services |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+local env-var URL resolution.
+
+**Plan**
+- [x] Add focused failing coverage showing pairing URLs honor `APP_URL` before
+      legacy fallbacks.
+- [x] Add `resolvePublicAppUrl()` and migrate middleware absolute URL builders
+      that currently read `APP_URL`/`FRONTEND_URL`/`WEB_URL` ad hoc.
+- [x] Run focused pairing/auth/mail/billing/organization/health tests, build,
+      diff hygiene, and secret scan.
+- [x] Request Claude Code review and resolve findings.
+- [ ] Commit, PR, CI, and merge if green.
+- [x] Do not deploy, send real emails, or touch production env state.
+
+**Evidence so far**
+- Current `origin/main`: `3aee89941fc851852acbc2060623efaa7a2d6358`.
+- Drift-check:
+  - `mail.service.ts` and `auth.service.ts` use
+    `APP_URL || FRONTEND_URL || WEB_URL || localhost`.
+  - `pairing.service.ts` uses `WEB_URL || localhost`.
+  - `billing.service.ts` uses `APP_URL || localhost`.
+  - `organizations.service.ts` uses `APP_URL || WEB_URL || https://vizora.cloud`.
+  - `StartupSelfTestService` validates only transactional email URL precedence,
+    so it cannot prove the pairing/billing/lifecycle URL builders are aligned.
+- Red test:
+  - `pnpm --filter @vizora/middleware test -- --runTestsByPath src/modules/displays/pairing.service.spec.ts`
+    failed as expected because pairing URLs still preferred `WEB_URL` over
+    `APP_URL`.
+- Implementation:
+  - Added `middleware/src/modules/common/utils/public-app-url.ts` with
+    precedence `APP_URL -> FRONTEND_URL -> WEB_URL -> fallback`.
+  - Migrated pairing QR URLs, password-reset links, mail template links,
+    billing checkout return URLs, lifecycle nudge dashboard links, and the
+    startup self-test URL source check to the shared resolver.
+  - Preserved the lifecycle nudge default fallback of `https://vizora.cloud`.
+- Verification:
+  - Focused middleware tests: 7 suites / 211 tests passed.
+  - Full middleware unit suite: 149 suites / 3055 tests passed.
+  - `pnpm test:ops`: 40/40 passed.
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`:
+    21/21 passed.
+  - Targeted ESLint exited 0 with one pre-existing auth warning at
+    `auth.service.ts:1225` (`_` unused).
+  - `pnpm build:middleware` passed with the existing webpack warning profile.
+  - `pnpm security:no-hardcoded-jwts` passed.
+  - `git diff --check` passed.
+- Claude Code review:
+  - CLEAN, no high/medium findings. Reviewer explicitly validated resolver
+    precedence, StartupSelfTestService/source alignment, billing `ConfigService`
+    removal safety, test isolation, and operator/deploy boundaries.
+- Runtime/operator boundary:
+  - No production deploy, production env edit, real email send, secret change,
+    payment setup, or hardware action was performed.
+
 ## Completed Workstream: Startup Email URL Self-Test Pass 68 (2026-06-03)
 
 **Branch:** `fix/startup-email-url-self-test`

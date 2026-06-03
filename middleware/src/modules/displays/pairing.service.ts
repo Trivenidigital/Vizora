@@ -13,6 +13,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
 import { ProvisioningTemplatesService } from '../provisioning-templates/provisioning-templates.service';
+import { resolvePublicAppUrl } from '../common/utils/public-app-url';
 import { RequestPairingDto } from './dto/request-pairing.dto';
 import { CompletePairingDto } from './dto/complete-pairing.dto';
 import type { Prisma } from '@vizora/database';
@@ -411,7 +412,7 @@ export class PairingService implements OnModuleDestroy {
     const expiresAt = new Date(now.getTime() + this.PAIRING_EXPIRY_MS);
 
     // Generate QR code
-    const pairingUrl = `${process.env.WEB_URL || 'http://localhost:3001'}/dashboard/devices/pair?code=${code}`;
+    const pairingUrl = `${resolvePublicAppUrl()}/dashboard/devices/pair?code=${code}`;
     let qrCodeDataUrl: string | undefined;
 
     try {
