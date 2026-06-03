@@ -1,5 +1,88 @@
 # Vizora - Task Tracker
 
+## Active Workstream: Admin Platform Health Routes Pass 59 (2026-06-03)
+
+**Branch:** `fix/admin-platform-health-routes`
+
+**Why now:** The admin health endpoint (`/api/v1/admin/health`) is another
+production-readiness surface operators use for launch checks. Its
+`PlatformHealthService` still probes all app services at `/health`, while repo
+and runtime truth now show middleware at `/api/v1/health`, realtime at
+`/api/health`, and web at `/`. That can make an otherwise healthy platform look
+degraded in the admin view.
+
+**New primitives introduced:** none planned. This pass should reuse the
+existing admin `PlatformHealthService`, response shape, controllers, and tests.
+No new route, model, migration, env var, process, realtime event, MCP tool,
+Hermes skill, AI/provider spend path, or production runtime change is expected.
+
+**Hermes-first analysis:** checked per project convention. This is
+deterministic service health probing inside the existing NestJS admin module,
+not a business-agent, MCP, Hermes runtime, or provider-spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Admin service health probe routing | none applicable | fix existing NestJS admin health service |
+| Health-route drift guard | none applicable | add local unit/static tests |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+local admin health probe route selection.
+
+**Plan**
+- [x] Add red tests proving each platform service is probed at its real health
+      path: middleware `/api/v1/health`, realtime `/api/health`, web `/`.
+- [x] Implement service-specific path selection without changing the public
+      admin health response shape.
+- [x] Decide no extra release-readiness guard is needed because the route map is
+      local to `PlatformHealthService.checkServicePort()` and covered by unit
+      tests.
+- [x] Run focused middleware tests, TypeScript check, diff hygiene, and secret
+      scan.
+- [x] Request Claude Code review and resolve findings.
+- [ ] Commit, PR, CI, and merge if green.
+- [ ] Do not deploy by default; hand off deploy/runtime status and remaining
+      operator-only blockers.
+
+**Evidence so far**
+- Current `origin/main`: `dbc8b915080cc15f715e5d1842c38fb37ce9b83b`.
+- Drift-check:
+  - `middleware/src/modules/admin/services/platform-health.service.ts`
+    `checkServicePort()` hardcodes `path: '/health'` for middleware, web, and
+    realtime.
+  - Middleware health is mounted under global `/api/v1` prefix at
+    `/api/v1/health`.
+  - Realtime health is mounted under global `/api` prefix at `/api/health`.
+  - Web Docker/readiness guidance probes the root page on port 3001.
+- Red focused run:
+  - `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/admin/services/platform-health.service.spec.ts`
+    failed as expected: all three new assertions received `path: '/health'`.
+- Fix:
+  - Added a service-specific health-path map in
+    `middleware/src/modules/admin/services/platform-health.service.ts`.
+  - Added `http.request` unit coverage for middleware `/api/v1/health`,
+    realtime `/api/health`, and web `/`.
+  - Added fallback coverage proving unknown service names still use the legacy
+    `/health` path.
+- Green focused/admin seam run:
+  - `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/admin/services/platform-health.service.spec.ts src/modules/admin/admin.controller.spec.ts`
+    => 51/51 tests passing.
+- Static/hygiene verification:
+  - `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false` =>
+    passing.
+  - `git diff --check -- middleware/src/modules/admin/services/platform-health.service.ts middleware/src/modules/admin/services/platform-health.service.spec.ts tasks/todo.md`
+    => exit 0, with LF/CRLF normalization warnings only.
+  - `pnpm security:no-hardcoded-jwts` => passing.
+- Claude Code review:
+  - Initial review returned `APPROVE` with no blocking findings. Reviewer
+    independently confirmed all three route truths and called the liveness
+    endpoint choice correct for `checkServicePort()`.
+  - Non-blocking optional fallback test was added.
+  - Non-blocking note about `docker/docker-compose.yml:142` was triaged as
+    Grafana's internal port 3000 healthcheck, not middleware drift.
+  - Final re-review returned `APPROVE`. Reviewer confirmed the map against
+    source and container healthchecks, noted no auth/security impact, and left
+    only future-maintenance observations.
+
 ## Active Workstream: Ops Escalated Incident Status Pass 58 (2026-06-03)
 
 **Branch:** `fix/ops-escalated-status`

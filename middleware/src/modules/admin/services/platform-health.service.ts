@@ -37,6 +37,12 @@ export interface UptimeHistory {
   downtime: number; // minutes
 }
 
+const SERVICE_HEALTH_PATHS: Record<string, string> = {
+  middleware: '/api/v1/health',
+  web: '/',
+  realtime: '/api/health',
+};
+
 @Injectable()
 export class PlatformHealthService {
   private readonly logger = new Logger(PlatformHealthService.name);
@@ -123,7 +129,7 @@ export class PlatformHealthService {
         {
           hostname: 'localhost',
           port,
-          path: '/health',
+          path: SERVICE_HEALTH_PATHS[name] ?? '/health',
           method: 'GET',
           timeout,
         },
