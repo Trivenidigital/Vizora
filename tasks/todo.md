@@ -1,6 +1,6 @@
 # Vizora - Task Tracker
 
-## Active Workstream: Startup Email URL Self-Test Pass 68 (2026-06-03)
+## Completed Workstream: Startup Email URL Self-Test Pass 68 (2026-06-03)
 
 **Branch:** `fix/startup-email-url-self-test`
 
@@ -38,11 +38,18 @@ local NestJS config-readiness validation.
 - [x] Run focused health tests, affected ops/static gates, middleware build,
       diff hygiene, and secret scan.
 - [x] Request Claude Code review and resolve findings.
-- [ ] Commit, PR, CI, and merge if green.
-- [ ] Do not deploy, send real emails, or touch production SMTP/env state.
+- [x] Commit, PR, CI, and merge if green.
+- [x] Do not deploy, send real emails, or touch production SMTP/env state.
 
 **Evidence so far**
 - Current `origin/main`: `58650b6bebe50d1fa55264384acb69d154314abd`.
+- Branch/PR:
+  - Branch: `fix/startup-email-url-self-test`.
+  - Commit: `6e49c9ac` (`fix(health): validate email app URLs in self-test`).
+  - PR #208: `fix(health): validate email app URLs in self-test`.
+  - GitHub CI passed audit, build, e2e, lint, security, and test before merge.
+  - No deploy, production env change, SMTP/Resend setup, or real email send was
+    performed.
 - Drift-check:
   - `StartupSelfTestService.checkEmail()` validates SMTP env presence and calls
     `transporter.verify()` when configured.
