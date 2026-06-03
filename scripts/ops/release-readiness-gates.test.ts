@@ -291,6 +291,38 @@ test('first-customer C1 runbook uses explicit email readiness helper for test se
   assert.doesNotMatch(runbook, /Then trigger a real welcome email/);
 });
 
+test('first-customer runbook points C4 evidence at reusable go-live smoke template', () => {
+  const runbook = readRepoFile('docs/runbooks/first-customer-onboarding.md');
+  const backlog = readRepoFile('backlog.md');
+
+  assert.match(runbook, /customer-1-go-live-smoke-template\.md/);
+  assert.match(runbook, /customer-1-go-live-smoke-\{DATE\}\.md/);
+  assert.match(backlog, /customer-1-go-live-smoke-template\.md/);
+});
+
+test('customer-1 go-live smoke template captures C1-C4 launch evidence safely', () => {
+  const template = readRepoFile('docs/runbooks/customer-1-go-live-smoke-template.md');
+
+  for (const label of ['C1', 'C2', 'C3', 'C4']) {
+    assert.match(template, new RegExp(`\\b${label}\\b`));
+  }
+
+  assert.match(template, /GO\/NO-GO/);
+  assert.match(template, /origin\/main SHA/);
+  assert.match(template, /production SHA/);
+  assert.match(template, /pnpm smoke:email-readiness --production/);
+  assert.match(template, /EMAIL_READINESS_ALLOW_SEND=true/);
+  assert.match(template, /api-critical-path\.sh/);
+  assert.match(template, /pnpm e2e:customer-critical/);
+  assert.match(template, /real-device walkthrough/i);
+  assert.match(template, /welcome email/i);
+  assert.match(template, /\.ssh_email_readiness_check\.txt/);
+  assert.match(template, /\.ssh_go_live_smoke\.txt/);
+  assert.match(template, /no production env changes/i);
+  assert.doesNotMatch(template, /^cat \.ssh_/m);
+  assert.doesNotMatch(template, /B16|2026-05-1[0-9]/);
+});
+
 test('first-customer runbook does not require nonexistent email verification flow', () => {
   const runbook = readRepoFile('docs/runbooks/first-customer-onboarding.md');
   const schema = readRepoFile('packages/database/prisma/schema.prisma');
