@@ -347,12 +347,30 @@ async function main(): Promise<void> {
       const memoryLimitMB = Math.round(svc.memoryLimitBytes / (1024 * 1024));
       const memoryPct = svc.memoryLimitBytes > 0 ? (memoryBytes / svc.memoryLimitBytes) * 100 : 0;
       const procLabel = `${svc.pm2Name}:${proc.pm_id}`;
+      const pm2ErroredIncidentId = makeIncidentId(AGENT, 'pm2-errored', procLabel);
+      const existingPm2ErroredIncident = state.incidents.find(
+        i => i.id === pm2ErroredIncidentId,
+      );
+
+      if (
+        status === 'online' &&
+        existingPm2ErroredIncident &&
+        existingPm2ErroredIncident.status !== 'resolved'
+      ) {
+        log(AGENT, `${procLabel}: recovered — resolving incident ${pm2ErroredIncidentId}`);
+        incidents.push({
+          ...existingPm2ErroredIncident,
+          status: 'resolved',
+          resolvedAt: new Date().toISOString(),
+        });
+        issuesFixed++;
+      }
 
       // Check for errored/stopped processes
       if (status === 'errored' || status === 'stopped') {
         issuesFound++;
-        const incidentId = makeIncidentId(AGENT, 'pm2-errored', procLabel);
-        const existingIncident = state.incidents.find(i => i.id === incidentId);
+        const incidentId = pm2ErroredIncidentId;
+        const existingIncident = existingPm2ErroredIncident;
         const previousAttempts = existingIncident?.attempts ?? 0;
 
         if (existingIncident?.status === 'escalated') {

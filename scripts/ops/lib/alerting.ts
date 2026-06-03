@@ -101,13 +101,13 @@ export async function pingHeartbeat(
  *
  * @param status         Current system status
  * @param previousStatus Previous system status (for transition context)
- * @param openIncidents  Currently open incidents (top 5 shown)
+ * @param activeIncidents Currently active incidents (top 5 shown)
  * @param fixedCount     Number of issues auto-fixed this cycle
  */
 export async function sendSlackAlert(
   status: SystemStatus,
   previousStatus: SystemStatus | 'unknown',
-  openIncidents: Incident[],
+  activeIncidents: Incident[],
   fixedCount: number,
 ): Promise<void> {
   const webhookUrl = process.env.SLACK_WEBHOOK_URL || '';
@@ -134,14 +134,14 @@ export async function sendSlackAlert(
         type: 'mrkdwn',
         text: [
           `*Previous:* ${previousStatus} *Current:* ${status}`,
-          `*Open incidents:* ${openIncidents.length} | *Auto-fixed:* ${fixedCount}`,
+          `*Active incidents:* ${activeIncidents.length} | *Auto-fixed:* ${fixedCount}`,
         ].join('\n'),
       },
     },
   ];
 
   // Critical incidents (top 5)
-  const criticals = openIncidents.filter(i => i.severity === 'critical');
+  const criticals = activeIncidents.filter(i => i.severity === 'critical');
   if (criticals.length > 0) {
     const list = criticals
       .slice(0, 5)
@@ -157,7 +157,7 @@ export async function sendSlackAlert(
   }
 
   // Warning incidents (top 3, only if no criticals)
-  const warnings = openIncidents.filter(i => i.severity === 'warning');
+  const warnings = activeIncidents.filter(i => i.severity === 'warning');
   if (warnings.length > 0 && criticals.length === 0) {
     const list = warnings
       .slice(0, 3)
@@ -211,12 +211,12 @@ export async function sendSlackAlert(
  * Uses dynamic import for nodemailer to avoid hard dependency.
  *
  * @param status        Current system status
- * @param openIncidents Currently open incidents
+ * @param activeIncidents Currently active incidents
  * @param fixedCount    Number of issues auto-fixed this cycle
  */
 export async function sendEmailAlert(
   status: SystemStatus,
-  openIncidents: Incident[],
+  activeIncidents: Incident[],
   fixedCount: number,
 ): Promise<void> {
   const host = process.env.SMTP_HOST || '';
@@ -237,15 +237,15 @@ export async function sendEmailAlert(
     return;
   }
 
-  const criticals = openIncidents.filter(i => i.severity === 'critical');
-  const warnings = openIncidents.filter(i => i.severity === 'warning');
+  const criticals = activeIncidents.filter(i => i.severity === 'critical');
+  const warnings = activeIncidents.filter(i => i.severity === 'warning');
 
   const statusColor =
     status === 'HEALTHY' ? '#2ecc71' :
     status === 'DEGRADED' ? '#f39c12' :
     '#e74c3c';
 
-  const incidentRows = openIncidents
+  const incidentRows = activeIncidents
     .slice(0, 20)
     .map(
       i =>
@@ -266,7 +266,7 @@ export async function sendEmailAlert(
       <div style="padding:16px;border:1px solid #ddd;border-top:none;border-radius:0 0 4px 4px;">
         <p><strong>Critical:</strong> ${criticals.length} | <strong>Warnings:</strong> ${warnings.length} | <strong>Auto-fixed:</strong> ${fixedCount}</p>
         ${
-          openIncidents.length > 0
+          activeIncidents.length > 0
             ? `<table style="border-collapse:collapse;width:100%;font-size:13px;">
                 <thead>
                   <tr style="background:#f5f5f5;">
@@ -278,8 +278,8 @@ export async function sendEmailAlert(
                 </thead>
                 <tbody>${incidentRows}</tbody>
               </table>
-              ${openIncidents.length > 20 ? `<p style="color:#888;">...and ${openIncidents.length - 20} more</p>` : ''}`
-            : '<p style="color:#2ecc71;">No open incidents.</p>'
+              ${activeIncidents.length > 20 ? `<p style="color:#888;">...and ${activeIncidents.length - 20} more</p>` : ''}`
+            : '<p style="color:#2ecc71;">No active incidents.</p>'
         }
         <hr style="border:none;border-top:1px solid #eee;margin:16px 0;">
         <p style="color:#888;font-size:12px;">Vizora Autonomous Operations | ${new Date().toISOString()}</p>

@@ -196,15 +196,23 @@ export function addRemediation(state: OpsState, action: RemediationAction): void
 // ─── Status Calculation ─────────────────────────────────────────────────────
 
 /**
- * Determine overall system status based on open incidents:
- * - CRITICAL: any open incident with severity 'critical'
- * - DEGRADED: any open incident with severity 'warning'
- * - HEALTHY: no open critical or warning incidents
+ * Return true for incidents that still require operator/system attention.
+ * Escalated incidents are active until an agent records a resolved copy.
+ */
+export function isActiveIncident(incident: Pick<Incident, 'status'>): boolean {
+  return incident.status !== 'resolved';
+}
+
+/**
+ * Determine overall system status based on active incidents:
+ * - CRITICAL: any active incident with severity 'critical'
+ * - DEGRADED: any active incident with severity 'warning'
+ * - HEALTHY: no active critical or warning incidents
  */
 export function determineSystemStatus(state: OpsState): SystemStatus {
-  const open = state.incidents.filter(i => i.status === 'open');
-  if (open.some(i => i.severity === 'critical')) return 'CRITICAL';
-  if (open.some(i => i.severity === 'warning')) return 'DEGRADED';
+  const active = state.incidents.filter(isActiveIncident);
+  if (active.some(i => i.severity === 'critical')) return 'CRITICAL';
+  if (active.some(i => i.severity === 'warning')) return 'DEGRADED';
   return 'HEALTHY';
 }
 

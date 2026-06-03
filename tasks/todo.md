@@ -1,5 +1,88 @@
 # Vizora - Task Tracker
 
+## Active Workstream: Ops Escalated Incident Status Pass 58 (2026-06-03)
+
+**Branch:** `fix/ops-escalated-status`
+
+**Why now:** The ops dashboard treats any incident with `status !== 'resolved'`
+as active, but the shared ops status calculation and reporter summaries only
+count `status === 'open'`. That means an unresolved `escalated` critical
+incident can be dropped from `systemStatus` and alert details, hiding precisely
+the incidents that need operator attention.
+
+**New primitives introduced:** none planned. This pass should reuse the
+existing ops-state model, `IncidentStatus` union, ops reporter, and
+release-readiness guard tests. No new route, model, migration, env var,
+process, response shape, realtime event, MCP tool, Hermes skill, AI/provider
+spend path, or runtime change is expected.
+
+**Hermes-first analysis:** checked per project convention. This is
+deterministic ops-state severity calculation and reporting, not a
+business-agent, MCP, Hermes runtime, or provider-spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Ops incident severity rollup | none applicable | fix existing deterministic ops-state helper |
+| Ops reporter alert incident selection | none applicable | reuse existing reporter path and active-incident semantics |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+local ops-state severity rollup.
+
+**Plan**
+- [x] Add focused red tests proving escalated critical/warning incidents affect
+      `systemStatus` until resolved.
+- [x] Add a release-readiness guard proving ops reporter summarizes active
+      non-resolved incidents, not only `open` incidents.
+- [x] Implement the smallest shared helper in the existing ops-state path and
+      update ops reporter/alerting to use active-incident wording.
+- [x] Run focused ops tests and TypeScript checks.
+- [x] Request Claude Code review and resolve findings.
+- [ ] Commit, PR, CI, and merge if green.
+- [ ] Do not deploy by default; hand off deploy/runtime status and remaining
+      operator-only blockers.
+
+**Evidence so far**
+- Current `origin/main`: `a0f136fb3ea426d7d58744926b7c8f6ec5b543da`.
+- Drift-check:
+  - `scripts/ops/lib/state.ts` `determineSystemStatus` filtered only
+    `status === 'open'`.
+  - `scripts/ops/ops-reporter.ts` used the same open-only filter for alert
+    incident lists and summary counts.
+  - `web/src/app/dashboard/ops/page.tsx` already treats incidents with
+    `status !== 'resolved'` as active, so shared state/reporter semantics were
+    narrower than dashboard semantics.
+- Red focused run:
+  - `pnpm test:ops` failed as expected: escalated critical returned `HEALTHY`
+    instead of `CRITICAL`, escalated warning returned `HEALTHY` instead of
+    `DEGRADED`, and the ops reporter static guard found open-only filtering.
+- Fix:
+  - Added shared `isActiveIncident` helper in `scripts/ops/lib/state.ts`.
+  - `determineSystemStatus` and `ops-reporter` now count unresolved incidents
+    (`status !== 'resolved'`) consistently.
+  - `scripts/ops/lib/alerting.ts` now labels those alert lists as "active
+    incidents" instead of "open incidents."
+  - Addressed Claude Code's HIGH finding by adding a health-guardian recovery
+    branch for escalated `pm2-errored` incidents when the PM2 process is back
+    online.
+  - Added `.gitignore` coverage for `.tmp-health-guardian-*/`, matching the
+    existing ops-watchdog temp-dir pattern.
+- Green focused run:
+  - `pnpm test:ops` => 24/24 ops tests passing after adding the alerting label
+    guard and PM2 recovery-resolution regression test.
+- Static/hygiene verification:
+  - `pnpm exec tsc --noEmit --pretty false --module esnext --moduleResolution bundler --target es2022 --lib es2022 --strict --types node scripts/ops/lib/state.ts scripts/ops/lib/state.test.ts scripts/ops/ops-reporter.ts scripts/ops/lib/alerting.ts scripts/ops/health-guardian.ts scripts/ops/health-guardian.test.ts scripts/ops/release-readiness-gates.test.ts`
+    => passing.
+  - `git diff --check -- .gitignore scripts/ops/lib/state.ts scripts/ops/lib/state.test.ts scripts/ops/ops-reporter.ts scripts/ops/lib/alerting.ts scripts/ops/health-guardian.ts scripts/ops/health-guardian.test.ts scripts/ops/release-readiness-gates.test.ts tasks/todo.md`
+    => exit 0, with LF/CRLF normalization warnings only.
+  - `pnpm security:no-hardcoded-jwts` => passing.
+- Claude Code review:
+  - First review approved the active-incident semantics but surfaced one HIGH
+    finding: escalated `pm2-errored` incidents could pin `CRITICAL` forever
+    after process recovery because health-guardian had no PM2 recovery branch.
+  - Final review returned `APPROVE` after the PM2 recovery-resolution test/fix
+    and active-incident alert wording guard. Reviewer independently verified
+    24/24 ops tests passing and cross-platform fake-PM2 test reliability.
+
 ## Active Workstream: Middleware Container Healthcheck Truth Pass 57 (2026-06-03)
 
 **Branch:** `fix/overnight-healthchecks`

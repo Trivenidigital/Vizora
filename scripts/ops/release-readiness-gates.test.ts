@@ -91,6 +91,22 @@ test('health guardian resolves escalated service-down incidents after recovery',
   assert.doesNotMatch(guardian, /existingIncident\.status === 'open'/);
 });
 
+test('ops reporter summarizes active incidents instead of only open incidents', () => {
+  const reporter = readRepoFile('scripts/ops/ops-reporter.ts');
+
+  assert.match(reporter, /isActiveIncident/);
+  assert.doesNotMatch(reporter, /filter\(i => i\.status === 'open'\)/);
+});
+
+test('ops alerting labels unresolved incident lists as active incidents', () => {
+  const alerting = readRepoFile('scripts/ops/lib/alerting.ts');
+
+  assert.match(alerting, /Active incidents/);
+  assert.match(alerting, /No active incidents/);
+  assert.doesNotMatch(alerting, /Open incidents/);
+  assert.doesNotMatch(alerting, /No open incidents/);
+});
+
 test('CI test job runs web unit tests before build-only gates', () => {
   const ciWorkflow = readRepoFile('.github/workflows/ci.yml');
   const testJob = readCiJobBlock(ciWorkflow, 'test');

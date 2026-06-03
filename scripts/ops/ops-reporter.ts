@@ -24,11 +24,12 @@
  */
 
 import 'dotenv/config';
-import type { SystemStatus, Incident } from './lib/types.js';
+import type { SystemStatus, Incident, RemediationAction } from './lib/types.js';
 import {
   readOpsState,
   writeOpsState,
   determineSystemStatus,
+  isActiveIncident,
 } from './lib/state.js';
 import {
   log,
@@ -184,10 +185,10 @@ function pruneOldIncidents(incidents: Incident[]): { pruned: number; remaining: 
  * Returns the number of remediations pruned.
  */
 function pruneOldRemediations(
-  remediations: { timestamp: string }[],
-): { pruned: number; remaining: typeof remediations } {
+  remediations: RemediationAction[],
+): { pruned: number; remaining: RemediationAction[] } {
   const cutoff = Date.now() - PRUNE_AGE_MS;
-  const remaining: typeof remediations = [];
+  const remaining: RemediationAction[] = [];
   let pruned = 0;
 
   for (const r of remediations) {
@@ -236,7 +237,7 @@ async function main(): Promise<void> {
 
   // ─── 5. Send Alerts ───────────────────────────────────────────────────────
 
-  const openIncidents = state.incidents.filter(i => i.status === 'open');
+  const activeIncidents = state.incidents.filter(isActiveIncident);
   const fixedCount = Object.values(state.agentResults).reduce(
     (sum, r) => sum + r.issuesFixed,
     0,
@@ -246,12 +247,12 @@ async function main(): Promise<void> {
     if (decision.isRecovery) {
       // Recovery — Slack only (good news)
       log(AGENT, 'Sending recovery alert (Slack only)');
-      await sendSlackAlert(currentStatus, previousStatus, openIncidents, fixedCount);
+      await sendSlackAlert(currentStatus, previousStatus, activeIncidents, fixedCount);
     } else {
       // Degraded or Critical — both channels
       log(AGENT, 'Sending alerts (Slack + Email)');
-      await sendSlackAlert(currentStatus, previousStatus, openIncidents, fixedCount);
-      await sendEmailAlert(currentStatus, openIncidents, fixedCount);
+      await sendSlackAlert(currentStatus, previousStatus, activeIncidents, fixedCount);
+      await sendEmailAlert(currentStatus, activeIncidents, fixedCount);
     }
 
     // Record alert timestamp for suppression tracking
@@ -307,17 +308,17 @@ async function main(): Promise<void> {
   // ─── Summary ──────────────────────────────────────────────────────────────
 
   const durationMs = Date.now() - startTime;
-  const openCount = state.incidents.filter(i => i.status === 'open').length;
+  const activeCount = state.incidents.filter(isActiveIncident).length;
   const criticalCount = state.incidents.filter(
-    i => i.status === 'open' && i.severity === 'critical',
+    i => isActiveIncident(i) && i.severity === 'critical',
   ).length;
   const warningCount = state.incidents.filter(
-    i => i.status === 'open' && i.severity === 'warning',
+    i => isActiveIncident(i) && i.severity === 'warning',
   ).length;
 
   log(
     AGENT,
-    `Cycle complete in ${durationMs}ms — status: ${currentStatus}, open: ${openCount} (${criticalCount} critical, ${warningCount} warning), alerted: ${decision.shouldAlert}`,
+    `Cycle complete in ${durationMs}ms — status: ${currentStatus}, active: ${activeCount} (${criticalCount} critical, ${warningCount} warning), alerted: ${decision.shouldAlert}`,
   );
 
   // ─── Exit Code ────────────────────────────────────────────────────────────
