@@ -125,6 +125,7 @@ describe('AuthService', () => {
         deleteMany: jest.fn(),
       },
       passwordResetToken: {
+        create: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
         deleteMany: jest.fn(),
@@ -1388,6 +1389,64 @@ describe('AuthService', () => {
   });
 
   describe('resetPassword', () => {
+    it.each([
+      [
+        'APP_URL before legacy URL fallbacks',
+        {
+          APP_URL: 'https://app.vizora.test',
+          FRONTEND_URL: 'https://legacy.vizora.test',
+          WEB_URL: 'https://web.vizora.test',
+        },
+        'https://app.vizora.test',
+      ],
+      [
+        'FRONTEND_URL when APP_URL is unset',
+        {
+          FRONTEND_URL: 'https://legacy.vizora.test',
+          WEB_URL: 'https://web.vizora.test',
+        },
+        'https://legacy.vizora.test',
+      ],
+      [
+        'WEB_URL when APP_URL and FRONTEND_URL are unset',
+        {
+          WEB_URL: 'https://web.vizora.test',
+        },
+        'https://web.vizora.test',
+      ],
+    ])('uses %s for password-reset email links', async (_label, env, expectedBaseUrl) => {
+      const originalAppUrl = process.env.APP_URL;
+      const originalFrontendUrl = process.env.FRONTEND_URL;
+      const originalWebUrl = process.env.WEB_URL;
+
+      try {
+        delete process.env.APP_URL;
+        delete process.env.FRONTEND_URL;
+        delete process.env.WEB_URL;
+        Object.assign(process.env, env);
+
+        mockDatabaseService.user.findUnique.mockResolvedValue(mockUser);
+        mockDatabaseService.passwordResetToken.create.mockResolvedValue({ id: 'reset-1' });
+
+        await service.forgotPassword(mockUser.email);
+
+        const [email, firstName, resetUrl] = mockMailService.sendPasswordResetEmail.mock.calls[0];
+        expect(email).toBe(mockUser.email);
+        expect(firstName).toBe(mockUser.firstName);
+        expect(resetUrl.startsWith(`${expectedBaseUrl}/reset-password?token=`)).toBe(true);
+        expect(new URL(resetUrl).searchParams.get('token')).toMatch(/^[a-f0-9]{64}$/);
+      } finally {
+        if (originalAppUrl === undefined) delete process.env.APP_URL;
+        else process.env.APP_URL = originalAppUrl;
+
+        if (originalFrontendUrl === undefined) delete process.env.FRONTEND_URL;
+        else process.env.FRONTEND_URL = originalFrontendUrl;
+
+        if (originalWebUrl === undefined) delete process.env.WEB_URL;
+        else process.env.WEB_URL = originalWebUrl;
+      }
+    });
+
     it('writes the pwd_changed marker so the reset kills pre-reset sessions (takeover defense)', async () => {
       // forgot-password reset is the primary account-takeover case: an attacker
       // who resets a stolen-email account must invalidate the legit user's

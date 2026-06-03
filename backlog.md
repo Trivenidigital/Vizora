@@ -111,7 +111,7 @@ Per current readiness reconciliation: the four operator-driven items below are t
 
 | # | Item | Owner | Effort | Status | Notes |
 |---|------|-------|--------|--------|-------|
-| **C1** | **SMTP / Resend on prod — domain `mail.vizora.cloud` verified (DKIM/SPF/DMARC), `SMTP_*`/`EMAIL_FROM` env set, test send works end-to-end** | Sri | 2h | TODO | Without this, customer registration emails + password resets don't send |
+| **C1** | **SMTP / Resend on prod — domain `mail.vizora.cloud` verified (DKIM/SPF/DMARC), `SMTP_*`/`EMAIL_FROM` and public `APP_URL` or `WEB_URL` env set, test send works end-to-end** | Sri | 2h | TODO | Without this, customer registration emails + password resets don't send or link to the wrong host |
 | **C2** | **Customer-1 organization provisioned on prod** (skeleton, admin user invite, plan, quota) | Sri | 1h | TODO | Skip if customer self-registers |
 | **C3** | **Real-device walkthrough on customer hardware** (pair, push playlist, reboot, network-flap) | Sri + customer IT | 2h | TODO | Electron has 0% functional test coverage; this IS the test |
 | **C4** | **Final go-live smoke test on prod** | Claude Code (driven by Sri) | 3h | BLOCKED on C1-C3 | Operator-driven; document in `docs/runbooks/customer-1-go-live-smoke-{DATE}.md` |
@@ -279,7 +279,7 @@ Items the audit listed but we are NOT pursuing live (Engage/kiosk, live remote v
 | Health check layers | 2 | 5 | 5 |
 | Production readiness | 78% | Repo-side ready; operator-gated | C1-C4 cleared |
 
-*Customer-1 remaining gates: C1 SMTP/Resend verification/test send, C2 customer-1 org provisioning, C3 real-device walkthrough, C4 final go-live smoke. Stripe/Razorpay live keys are deferred past customer-1 because customer-1 launches on the free tier.
+*Customer-1 remaining gates: C1 SMTP/Resend verification/test send plus public email-link URL (`APP_URL` or `WEB_URL`), C2 customer-1 org provisioning, C3 real-device walkthrough, C4 final go-live smoke. Stripe/Razorpay live keys are deferred past customer-1 because customer-1 launches on the free tier.
 
 ---
 
@@ -311,7 +311,7 @@ Items the audit listed but we are NOT pursuing live (Engage/kiosk, live remote v
 
 ```
 CUSTOMER-1 LAUNCH:  C1-C4 operator gates
-                     |-- C1: SMTP/Resend prod verification + operator-approved test send
+                     |-- C1: SMTP/Resend prod verification + public email-link URL + operator-approved test send
                      |-- C2: Customer-1 org provisioning
                      |-- C3: Real-device customer hardware walkthrough
                      +-- C4: Final go-live smoke test + report

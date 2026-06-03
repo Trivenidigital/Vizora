@@ -173,9 +173,11 @@ METRICS_TOKEN           # Optional — Bearer token for /internal/metrics from n
 
 ```
 SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM, SMTP_TO
+SMTP_PASSWORD           # Legacy alias accepted by middleware; prefer SMTP_PASS
 SLACK_WEBHOOK_URL       # Slack incoming webhook for ops status changes
 HEALTHCHECKS_HEALTH_GUARDIAN_URL  # External heartbeat for the ops dead-man (see "Autonomous Operations")
 EMAIL_FROM              # Default sender for transactional mail
+APP_URL, WEB_URL        # Public web URL for backend-generated email links; must not point at localhost in prod
 ```
 
 ### MCP Server (see also `docs/agents-mcp-server-design.md`)
