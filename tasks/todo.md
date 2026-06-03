@@ -1,5 +1,106 @@
 # Vizora - Task Tracker
 
+## Active Workstream: Ops State Incident Resolution Pass 55 (2026-06-03)
+
+**Branch:** `fix/ops-state-incident-resolution-20260603`
+
+**Why now:** Weekend production-readiness validation found core prod services,
+health endpoints, CI, deploy SHA, and API smoke checks green, but
+`/api/v1/health/ops-status` still reported `systemStatus: CRITICAL`.
+Runtime evidence showed recent `lastRun` values for the ops cron agents while
+older `ops-watchdog:agent-silent:*` incidents remained open. That makes the
+readiness report noisy and can hide real launch blockers behind stale recovered
+conditions.
+
+**New primitives introduced:** none planned. This pass should reuse the
+existing `scripts/ops` state file, incident IDs, `recordAgentRun`,
+`determineSystemStatus`, and ops-watchdog PM2 cron path. No new route, model,
+migration, env var, process, response shape, realtime event, MCP tool, Hermes
+skill, or AI/provider spend path is expected.
+
+**Hermes-first analysis:** checked per project convention. This is deterministic
+ops-state reconciliation in the existing PM2 cron watchdog, not a business-agent
+decision task, MCP tool, Hermes runtime task, or provider-spend path.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Ops watchdog stale incident closure | none applicable | fix in existing deterministic ops watchdog/state path |
+| Production readiness status calculation | none applicable | reuse existing ops-state status functions |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+local `ops-state.json` incident lifecycle reconciliation.
+
+**Plan**
+- [x] Drift-check existing ops watchdog/state incident lifecycle and capture
+      file/line evidence before proposing code.
+- [x] Add a focused red test proving recovered ops agents close their own stale
+      `agent-silent` incidents and recalculate `systemStatus`.
+- [x] Implement the smallest Vizora-native fix in the existing ops watchdog/state
+      path.
+- [x] Run focused tests for the watchdog/state lifecycle.
+- [x] Run relevant broader verification for ops scripts and static checks.
+- [x] Request Claude Code review for plan/diff/test evidence and resolve
+      findings.
+- [x] Commit with conventional message and update this section with evidence.
+- [x] Do not deploy by default; hand off deploy/runbook evidence unless explicit
+      deployment approval is given.
+
+**Evidence so far**
+- Current `origin/main`: `2c92b1f8e82c2f05a295e6a90d41167b68a46272`.
+- Current local `HEAD`: `2c92b1f8e82c2f05a295e6a90d41167b68a46272`.
+- Production-runtime evidence from the weekend state check: core PM2 services
+  online, health/readiness endpoints 200, API critical-path smoke 27/27 passing,
+  SMTP startup self-test passing, but ops-state still `CRITICAL` with recovered
+  cron agents and open stale `agent-silent` incidents.
+- Dirty worktree note: pre-existing local modification `web/next-env.d.ts` and
+  many untracked scratch/evidence files remain untouched.
+- Drift-check:
+  - `scripts/ops/lib/state.ts` `recordAgentRun` upserts only incidents present
+    in the current agent result, then recalculates status.
+  - `scripts/ops/fleet-manager.ts` already resolves stale incidents by pushing
+    resolved incident copies before `recordAgentRun`.
+  - `scripts/ops/ops-watchdog.ts` records open `agent-silent` incidents when
+    stale agents exist, but records no resolved incidents when the watched agent
+    becomes fresh again.
+- Red focused run:
+  - `pnpm test:ops` failed as expected in
+    `scripts/ops/ops-watchdog.test.ts`: recovered
+    `ops-watchdog:agent-silent:fleet-manager` remained `open` instead of
+    `resolved`.
+- Fix:
+  - `scripts/ops/ops-watchdog.ts` now tracks agents with valid fresh `lastRun`
+    values and records resolved copies of watchdog-owned `agent-silent`
+    incidents for those recovered agents.
+  - Missing or malformed `lastRun` values are still skipped and do not resolve
+    prior incidents, because they are not proof of recovery.
+- Green verification:
+  - `pnpm test:ops` => 11/11 ops tests passing.
+  - Initial ad-hoc `tsc` check with CommonJS output failed on existing
+    `import.meta` usage in ops scripts; rerun with ESM-compatible flags passed:
+    `pnpm exec tsc --noEmit --pretty false --module esnext --moduleResolution bundler --target es2022 --lib es2022 --strict --types node scripts/ops/ops-watchdog.ts scripts/ops/ops-watchdog.test.ts`
+  - `git diff --check -- .gitignore scripts/ops/ops-watchdog.ts scripts/ops/ops-watchdog.test.ts tasks/todo.md`
+    => exit 0, with LF/CRLF normalization warnings only.
+  - `pnpm security:no-hardcoded-jwts` => passing.
+- Claude Code review:
+  - First review returned `CLEAN` with one low-severity request for mixed
+    guard-path coverage.
+  - Added `ops-watchdog does not resolve stale, missing, or malformed agent
+    records`, proving only positively fresh agents resolve while real stale or
+    unverified records remain open.
+  - Second review returned `CLEAN`; only residual risks were non-blocking:
+    dashboard Redis cache may lag source-of-truth `ops-state.json` until the
+    next `ops-reporter` cycle, and any future removal from
+    `SLA_MINUTES_BY_AGENT` should explicitly resolve/decommission old
+    `agent-silent` incidents.
+- Deploy status:
+  - Not deployed by default. This change is safe for the next reviewed deploy;
+    after deploy, the next `ops-watchdog` firing should update source-of-truth
+    `logs/ops-state.json`, and dashboard-visible status may lag until the next
+    `ops-reporter` sync.
+- Commit:
+  - `fix: resolve recovered ops watchdog incidents` (final hash recorded in
+    handoff; self-referential commit hashes are not embedded in the commit).
+
 ## Active Workstream: Schedule Target Names Pass 54 (2026-06-02)
 
 **Branch:** `fix/schedule-target-names-pass-54`

@@ -38,6 +38,8 @@ import { log, sendSlackAlert } from './lib/alerting.js';
 
 const AGENT = 'ops-watchdog';
 
+type StaleAgent = { agent: string; minsSinceRun: number; slaMinutes: number };
+
 /**
  * Per-agent SLA: how long after its last successful run before we
  * consider it silent. Set ~3× the agent's cron interval so we tolerate
@@ -57,6 +59,41 @@ const SLA_MINUTES_BY_AGENT: Record<string, number> = {
   'schedule-doctor':   45,
   'ops-reporter':      90,
 };
+
+function makeAgentSilentIncident(staleAgent: StaleAgent, detected: string): Incident {
+  return {
+    id: `ops-watchdog:agent-silent:${staleAgent.agent}`,
+    agent: AGENT,
+    type: 'agent-silent',
+    severity: 'critical' as const,
+    target: 'agent',
+    targetId: staleAgent.agent,
+    detected,
+    message: `${staleAgent.agent} has not run in ${staleAgent.minsSinceRun} min (sla=${staleAgent.slaMinutes}m)`,
+    remediation: `pm2 restart ops-${staleAgent.agent}; check pm2 logs ops-${staleAgent.agent}`,
+    status: 'open' as const,
+    attempts: 0,
+  };
+}
+
+function resolveRecoveredAgentSilentIncidents(
+  incidents: Incident[],
+  healthyAgents: Set<string>,
+  resolvedAt: string,
+): Incident[] {
+  return incidents
+    .filter((incident) => (
+      incident.agent === AGENT &&
+      incident.type === 'agent-silent' &&
+      incident.status === 'open' &&
+      healthyAgents.has(incident.targetId)
+    ))
+    .map((incident) => ({
+      ...incident,
+      status: 'resolved' as const,
+      resolvedAt,
+    }));
+}
 
 /**
  * Re-alert behaviour: this watchdog runs every 15 min and DOES NOT
@@ -92,7 +129,8 @@ async function main(): Promise<void> {
     return;
   }
 
-  let stale: Array<{ agent: string; minsSinceRun: number; slaMinutes: number }> = [];
+  let stale: StaleAgent[] = [];
+  const healthyAgents = new Set<string>();
   let durationMs = 0;
   let alertSent = false;
 
@@ -120,6 +158,8 @@ async function main(): Promise<void> {
       const minsSinceRun = Math.floor((now - ranAt) / 60_000);
       if (minsSinceRun > slaMinutes) {
         stale.push({ agent, minsSinceRun, slaMinutes });
+      } else {
+        healthyAgents.add(agent);
       }
     }
 
@@ -134,19 +174,7 @@ async function main(): Promise<void> {
         .join(', ');
       log(AGENT, `STALE: ${summary}`);
 
-      const incidents: Incident[] = stale.map((s) => ({
-        id: `ops-watchdog:agent-silent:${s.agent}`,
-        agent: AGENT,
-        type: 'agent-silent',
-        severity: 'critical' as const,
-        target: 'agent',
-        targetId: s.agent,
-        detected: new Date(now).toISOString(),
-        message: `${s.agent} has not run in ${s.minsSinceRun} min (sla=${s.slaMinutes}m)`,
-        remediation: `pm2 restart ops-${s.agent}; check pm2 logs ops-${s.agent}`,
-        status: 'open' as const,
-        attempts: 0,
-      }));
+      const incidents = stale.map((s) => makeAgentSilentIncident(s, new Date(now).toISOString()));
 
       await sendSlackAlert(
         'CRITICAL',
@@ -165,31 +193,27 @@ async function main(): Promise<void> {
     //      via the dashboard / GET /api/v1/health/ops-status).
     //   2. The lock acquired by readOpsState() is released — writeOpsState
     //      always runs in a finally{} inside lib/state.ts.
-    // Mutations are limited to lastRun + agentResults + (when stale)
-    // incidents — all driven through recordAgentRun for consistency.
+    // Mutations are limited to lastRun + agentResults + watchdog-owned
+    // incident updates, all driven through recordAgentRun for consistency.
+    const timestamp = new Date(startTime).toISOString();
+    const resolvedIncidents = resolveRecoveredAgentSilentIncidents(
+      state.incidents,
+      healthyAgents,
+      timestamp,
+    );
     const result: AgentResult = {
       agent: AGENT,
-      timestamp: new Date(startTime).toISOString(),
+      timestamp,
       durationMs: durationMs || (Date.now() - startTime),
       issuesFound: stale.length,
-      // The watchdog doesn't auto-fix anything; an alert is detection,
-      // not fix. Counting stale agents as "escalated" matches the
-      // health-guardian convention for issues that needed human attention.
-      issuesFixed: 0,
+      // The watchdog doesn't remediate stale agents; resolved incidents
+      // mean watched agents recovered on a later run.
+      issuesFixed: resolvedIncidents.length,
       issuesEscalated: alertSent ? stale.length : 0,
-      incidents: stale.map((s) => ({
-        id: `ops-watchdog:agent-silent:${s.agent}`,
-        agent: AGENT,
-        type: 'agent-silent',
-        severity: 'critical' as const,
-        target: 'agent',
-        targetId: s.agent,
-        detected: new Date(startTime).toISOString(),
-        message: `${s.agent} has not run in ${s.minsSinceRun} min (sla=${s.slaMinutes}m)`,
-        remediation: `pm2 restart ops-${s.agent}; check pm2 logs ops-${s.agent}`,
-        status: 'open' as const,
-        attempts: 0,
-      })),
+      incidents: [
+        ...stale.map((s) => makeAgentSilentIncident(s, timestamp)),
+        ...resolvedIncidents,
+      ],
     };
     try {
       recordAgentRun(state, result);
