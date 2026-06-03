@@ -19,7 +19,8 @@
 #   3. Pre-flight check on Hermes version (refuse if HERMES_VERSION env
 #      is set and `hermes --version` returns a different value).
 #   4. Optional per-skill toolset filter via -t (P1.2).
-#   5. Post-flight POST /internal/agent-runs with run metadata.
+#   5. Post-flight OpenRouter balance-delta cost attribution.
+#   6. Post-flight POST /internal/agent-runs with run metadata.
 #
 # NOTE on max_tokens (PR-review R3 C1):
 #   `--max-tokens` is NOT a Hermes 0.12.0 CLI flag — argparse interprets
@@ -128,10 +129,12 @@ for arg in sys.argv[1:]:
     if v == "": continue
     # Numeric coercion for known number fields. Validate strictly so a
     # tampered env var cannot inject non-numeric content.
-    if k in ("exitCode", "pid"):
+    if k in ("exitCode", "pid", "costMicrodollars"):
         try:
             fields[k] = int(v)
         except ValueError:
+            sys.exit(1)
+        if fields[k] < 0:
             sys.exit(1)
     elif k in ("preflightBalanceUsd", "preflightTodaySpendUsd"):
         if not re.fullmatch(r"-?\d+(\.\d+)?", v):
@@ -231,6 +234,30 @@ RC=$?
 
 END=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
 
+# Path A cost attribution: sample OpenRouter balance after Hermes exits and
+# store the observed preflight-postflight delta on the initial agent_runs row.
+# Omit the value if either balance probe fails or a concurrent top-up/refund
+# makes the delta negative.
+POSTFLIGHT_BALANCE="$(openrouter_balance_usd 2>/dev/null || echo "")"
+COST_MICRODOLLARS=""
+if [[ -n "$PREFLIGHT_BALANCE" && -n "$POSTFLIGHT_BALANCE" ]] \
+    && [[ "$PREFLIGHT_BALANCE" =~ ^-?[0-9]+(\.[0-9]+)?$ ]] \
+    && [[ "$POSTFLIGHT_BALANCE" =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then
+  COST_DELTA_USD="$(echo "$PREFLIGHT_BALANCE - $POSTFLIGHT_BALANCE" | bc -l)"
+  if [[ "$COST_DELTA_USD" =~ ^-?([0-9]+(\.[0-9]+)?|\.[0-9]+)$ ]] \
+      && (( $(echo "$COST_DELTA_USD >= 0" | bc -l) )); then
+    COST_MICRODOLLARS="$(python3 -c '
+from decimal import Decimal, ROUND_HALF_UP
+import sys
+delta = Decimal(sys.argv[1])
+micros = int((delta * Decimal("1000000")).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+if micros < 0 or micros > 2147483647:
+    sys.exit(1)
+print(micros)
+' "$COST_DELTA_USD" 2>/dev/null || echo "")"
+  fi
+fi
+
 # Classify outcome from RC + stdout markers ONLY (Reviewer A I2 +
 # design ADL-3). FORBIDDEN/INVALID_INPUT live in mcp_audit_log, not
 # Hermes stdout — sidecar refines later.
@@ -271,6 +298,7 @@ POST_BODY="$(build_run_body \
   "outcome=$OUTCOME" \
   "preflightBalanceUsd=$PREFLIGHT_BALANCE" \
   "preflightTodaySpendUsd=$PREFLIGHT_TODAY_SPEND" \
+  "costMicrodollars=$COST_MICRODOLLARS" \
   "$EXCERPT_ARG")"
 
 RUN_ID="$(post_agent_run "$POST_BODY" \

@@ -84,7 +84,7 @@ describe('AgentRunsService', () => {
       // Sanity: cost columns are absent from the create payload.
       const createArgs = db.agentRun.create.mock.calls[0][0].data;
       expect(createArgs.tokensIn).toBeUndefined();
-      expect(createArgs.costMicrodollars).toBeUndefined();
+      expect(createArgs.costMicrodollars).toBeNull();
     });
 
     it('truncates errorExcerpt to 1024 chars', async () => {
@@ -115,6 +115,27 @@ describe('AgentRunsService', () => {
         data: expect.objectContaining({
           outcome: 'budget_aborted',
           preflightBalanceUsd: 0.05,
+        }),
+        select: { id: true },
+      });
+    });
+
+    it('persists runner-measured costMicrodollars when supplied at record time', async () => {
+      db.agentRun.create.mockResolvedValue({ id: 'cuid_cost' });
+      await service.recordRun({
+        skillName: 'vizora-costed',
+        startedAt: new Date().toISOString(),
+        finishedAt: new Date().toISOString(),
+        exitCode: 0,
+        outcome: 'success',
+        preflightBalanceUsd: 1.23456789,
+        costMicrodollars: 1800,
+      });
+
+      expect(db.agentRun.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          costMicrodollars: 1800,
+          preflightBalanceUsd: 1.23456789,
         }),
         select: { id: true },
       });
@@ -269,6 +290,23 @@ describe('AgentRunsService', () => {
       await service.enrichRun('r8', { tokensIn: 100, tokensOut: 50 });
       const dataArg = db.agentRun.updateMany.mock.calls[0][0].data;
       expect('outcome' in dataArg).toBe(false);
+    });
+
+    it('preserves runner-measured cost when sidecar has no token-derived cost', async () => {
+      const recent = new Date(Date.now() - 30 * 1000);
+      db.agentRun.findUnique.mockResolvedValue({
+        id: 'r-cost',
+        finishedAt: recent,
+        enrichedAt: null,
+        costMicrodollars: 1800,
+      });
+      db.agentRun.updateMany.mockResolvedValue({ count: 1 });
+
+      await service.enrichRun('r-cost', { outcomeRefinement: 'no_work' });
+
+      const dataArg = db.agentRun.updateMany.mock.calls[0][0].data;
+      expect('costMicrodollars' in dataArg).toBe(false);
+      expect(dataArg).toEqual(expect.objectContaining({ outcome: 'no_work' }));
     });
   });
 

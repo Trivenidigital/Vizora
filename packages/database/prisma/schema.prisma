@@ -962,13 +962,14 @@ model McpAuditLog {
 
 /// Per-firing record for Hermes-driven agent invocations. Written in
 /// two stages: the runner script POSTs metadata synchronously on firing
-/// exit; the insights-poller sidecar PATCHes cost/token data ~5 min
-/// later by joining `hermes insights` output back to the row.
+/// exit, including optional balance-delta cost; the insights-poller sidecar
+/// PATCHes token/rate data and outcome refinements ~5 min later when
+/// `hermes insights` output is available.
 ///
 /// Cost columns are FROZEN at write — see ADL-7 in the design doc.
-/// `rateInUsdPerMt` and `rateOutUsdPerMt` capture the model rate USED
-/// at the moment of enrichment so historical queries stay accurate
-/// when MODEL_RATES changes.
+/// `rateInUsdPerMt` and `rateOutUsdPerMt` capture the model rate USED at
+/// the moment of sidecar enrichment so token-derived historical queries
+/// stay accurate when MODEL_RATES changes.
 ///
 /// Retention: 90 days (enforced by db-maintainer cron).
 model AgentRun {
@@ -993,8 +994,9 @@ model AgentRun {
   // Token usage from `hermes insights`. Null until sidecar enriches.
   tokensIn               Int?
   tokensOut              Int?
-  // Cost in microdollars (USD * 1e6) for integer arithmetic. Computed
-  // ONCE at enrichment time; never recomputed (ADL-7).
+  // Cost in microdollars (USD * 1e6) for integer arithmetic. Either
+  // runner-measured from pre/post balance delta or sidecar-computed from
+  // token usage; never recomputed after write (ADL-7).
   costMicrodollars       Int?
   // Rate used at enrichment time. Snapshotting these keeps historical
   // analyses correct when OpenRouter rates change.

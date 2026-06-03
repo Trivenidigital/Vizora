@@ -133,12 +133,12 @@ Per current readiness reconciliation: the four operator-driven items below are t
 
 ## Tech-debt from 2026-05-09 readiness pass (post-launch sprint)
 
-These are documented + non-blocking for customer-1. Investigations done; implementations deferred.
+These are documented + non-blocking for customer-1. Investigations done; implementations deferred unless marked done.
 
 | # | Item | Effort | Pointer | Why deferred |
 |---|------|--------|---------|--------------|
 | T1 | Playwright suite refresh — close remaining ~26 failures (heaviest: 16-billing×10) | 6-8h | `docs/plans/2026-05-09-playwright-results.md` | Critical-path flows verified (8/10); 16-billing is OUT of customer-1 scope |
-| T2 | Per-firing cost attribution (Path A: balance-delta pre/post each firing) | ~1h | `docs/plans/2026-05-09-hermes-insights-investigation.md` | Cost defense intact (4 layers); attribution is monitoring-quality |
+| T2 | ✅ DONE - Per-firing cost attribution (Path A: balance-delta pre/post each firing) | ~1h | `docs/plans/2026-05-09-hermes-insights-investigation.md` | Pass72: runner samples post-flight OpenRouter balance and stores nonnegative delta as `agent_runs.costMicrodollars`; live rows require normal deploy, no prod firing performed |
 | T3 | agentRunId propagation runner→Hermes→MCP — Hermes 0.12.0 has no `--header` flag; needs upstream patch OR env-var config interpolation experiment | 2h-2d | `docs/plans/2026-05-09-agent-run-id-propagation-investigation.md` | Sidecar's audit-row join falls back to time-range; minor refinement degradation |
 | T4 | support-triage cross-tenant token redesign — Option 2 (relax `support:*` tools to accept platform-scope) | 4-6h | `docs/plans/2026-05-09-support-triage-cross-tenant-design.md` | support-triage NOT enabled; operator handles tickets directly |
 
