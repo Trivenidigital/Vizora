@@ -71,6 +71,18 @@ const mockHealth = {
   errorRate: { last1h: 0.1, last24h: 0.5 },
 };
 
+const backendPlatformHealth = {
+  overall: 'degraded' as const,
+  services: {
+    database: { healthy: true, responseTime: 5 },
+    redis: { healthy: false, responseTime: 100, error: 'Redis down' },
+    middleware: { name: 'middleware', port: 3000, status: 'healthy' as const, responseTime: 12 },
+    web: { name: 'web', port: 3001, status: 'unhealthy' as const, responseTime: 20, error: 'Connection refused' },
+    realtime: { name: 'realtime', port: 3002, status: 'healthy' as const, responseTime: 8 },
+  },
+  timestamp: '2026-06-03T04:00:00.000Z',
+};
+
 describe('AdminHealthClient', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -83,6 +95,8 @@ describe('AdminHealthClient', () => {
   });
 
   it('renders loading state when no initial health data', () => {
+    (apiClient.getPlatformHealth as jest.Mock).mockReturnValue(new Promise(() => {}));
+
     render(<AdminHealthClient initialHealth={null} />);
     expect(screen.getByTestId('loading-spinner')).toBeInTheDocument();
   });
@@ -96,6 +110,30 @@ describe('AdminHealthClient', () => {
   it('renders overall system status', () => {
     render(<AdminHealthClient initialHealth={mockHealth} />);
     expect(screen.getByText('System healthy')).toBeInTheDocument();
+  });
+
+  it('normalizes the backend platform health response shape', () => {
+    render(<AdminHealthClient initialHealth={backendPlatformHealth as any} />);
+
+    expect(screen.getByText('System degraded')).toBeInTheDocument();
+    expect(screen.getByText('Middleware')).toBeInTheDocument();
+    expect(screen.getByText('Web')).toBeInTheDocument();
+    expect(screen.getByText('Realtime')).toBeInTheDocument();
+    expect(screen.getByText('20ms')).toBeInTheDocument();
+  });
+
+  it('renders an unavailable state for malformed backend health data', () => {
+    render(<AdminHealthClient initialHealth={{ overall: 'healthy' } as any} />);
+
+    expect(screen.getByText('System down')).toBeInTheDocument();
+    expect(screen.getByText('Admin health API')).toBeInTheDocument();
+  });
+
+  it('renders an unavailable state for partial backend service data', () => {
+    render(<AdminHealthClient initialHealth={{ overall: 'degraded', services: {} } as any} />);
+
+    expect(screen.getByText('System down')).toBeInTheDocument();
+    expect(screen.getByText('Admin health API')).toBeInTheDocument();
   });
 
   it('renders stat cards', () => {
@@ -144,6 +182,8 @@ describe('AdminHealthClient', () => {
 
     await waitFor(() => {
       expect(mockToast.error).toHaveBeenCalledWith('Server error');
+      expect(screen.getByText('System down')).toBeInTheDocument();
+      expect(screen.getByText('Admin health API')).toBeInTheDocument();
     });
   });
 

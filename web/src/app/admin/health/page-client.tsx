@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api';
 import { useToast } from '@/lib/hooks/useToast';
+import type { PlatformHealth, PlatformServiceStatus } from '@/lib/types';
 import { StatCard } from '../components/StatCard';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import {
@@ -40,7 +41,7 @@ interface HealthStatus {
     latency: number;
   };
   storage: {
-    status: 'up' | 'down';
+    status: 'up' | 'down' | 'unknown';
     used: number;
     total: number;
   };
@@ -51,13 +52,111 @@ interface HealthStatus {
   };
 }
 
+type HealthInput = HealthStatus | PlatformHealth;
+
 interface AdminHealthClientProps {
-  initialHealth: HealthStatus | null;
+  initialHealth: HealthInput | null;
+}
+
+const UNAVAILABLE_HEALTH: HealthStatus = {
+  status: 'down',
+  services: [
+    {
+      name: 'Admin health API',
+      status: 'down',
+      details: 'Health status unavailable',
+    },
+  ],
+  database: { status: 'down', connections: 0, maxConnections: 0, latency: 0 },
+  redis: { status: 'down', memory: 0, maxMemory: 0, latency: 0 },
+  storage: { status: 'unknown', used: 0, total: 0 },
+  uptime: 0,
+  errorRate: { last1h: 0, last24h: 0 },
+};
+
+function hasPlatformHealthShape(health: HealthInput): health is PlatformHealth {
+  const maybeHealth = health as Partial<PlatformHealth>;
+  const services = maybeHealth.services as Partial<PlatformHealth['services']> | undefined;
+
+  return (
+    typeof maybeHealth.overall === 'string' &&
+    typeof services === 'object' &&
+    services !== null &&
+    !Array.isArray(services) &&
+    Boolean(services.database) &&
+    Boolean(services.redis) &&
+    Boolean(services.middleware) &&
+    Boolean(services.web) &&
+    Boolean(services.realtime)
+  );
+}
+
+function mapOverallStatus(overall: PlatformHealth['overall']): HealthStatus['status'] {
+  return overall === 'unhealthy' ? 'down' : overall;
+}
+
+function mapServiceStatus(status: PlatformServiceStatus['status']): HealthStatus['services'][number]['status'] {
+  if (status === 'healthy') return 'up';
+  if (status === 'unknown') return 'degraded';
+  return 'down';
+}
+
+function formatServiceName(name: string): string {
+  const labels: Record<string, string> = {
+    middleware: 'Middleware',
+    web: 'Web',
+    realtime: 'Realtime',
+  };
+
+  return labels[name] ?? name;
+}
+
+function normalizeHealthStatus(health: HealthInput | null): HealthStatus | null {
+  if (!health) return null;
+
+  if (!('overall' in health)) {
+    return health;
+  }
+
+  if (!hasPlatformHealthShape(health)) {
+    return UNAVAILABLE_HEALTH;
+  }
+
+  const { services } = health;
+
+  return {
+    status: mapOverallStatus(health.overall),
+    services: [services.middleware, services.web, services.realtime].map((service) => ({
+      name: formatServiceName(service.name),
+      status: mapServiceStatus(service.status),
+      latency: service.responseTime,
+      details: service.error,
+    })),
+    database: {
+      status: services.database.healthy ? 'up' : 'down',
+      connections: 0,
+      maxConnections: 0,
+      latency: services.database.responseTime,
+    },
+    redis: {
+      status: services.redis.healthy ? 'up' : 'down',
+      memory: 0,
+      maxMemory: 0,
+      latency: services.redis.responseTime,
+    },
+    storage: {
+      status: 'unknown',
+      used: 0,
+      total: 0,
+    },
+    uptime: 0,
+    errorRate: { last1h: 0, last24h: 0 },
+  };
 }
 
 export default function AdminHealthClient({ initialHealth }: AdminHealthClientProps) {
   const toast = useToast();
-  const [health, setHealth] = useState<HealthStatus | null>(initialHealth);
+  const [health, setHealth] = useState<HealthInput | null>(initialHealth);
   const [loading, setLoading] = useState(!initialHealth);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -69,7 +168,7 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
         setLoading(true);
       }
       const data = await apiClient.getPlatformHealth();
-      setHealth(data as unknown as HealthStatus);
+      setHealth(data);
     } catch (error: any) {
       toast.error(error.message || 'Failed to load health status');
     } finally {
@@ -88,6 +187,7 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
   }, []);
 
   const formatUptime = (seconds: number) => {
+    if (seconds <= 0) return 'Not reported';
     const days = Math.floor(seconds / 86400);
     const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -103,6 +203,56 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
     return `${mb.toFixed(0)} MB`;
   };
 
+  const formatLatency = (value: number | undefined) => {
+    return typeof value === 'number' && Number.isFinite(value) ? `${value}ms latency` : 'Latency not reported';
+  };
+
+  const formatDbConnections = () => {
+    if (healthData.database.maxConnections <= 0) return 'Not reported';
+    return `${healthData.database.connections}/${healthData.database.maxConnections}`;
+  };
+
+  const formatStorageUsed = () => {
+    if (healthData.storage.total <= 0) return 'Not reported';
+    return formatBytes(healthData.storage.used);
+  };
+
+  const formatStorageSubtitle = () => {
+    if (healthData.storage.total <= 0) return 'Usage not reported';
+    return `of ${formatBytes(healthData.storage.total)}`;
+  };
+
+  const formatStorageDetail = () => {
+    if (healthData.storage.total <= 0) return 'Storage metrics not reported';
+    return `${formatBytes(healthData.storage.used)} / ${formatBytes(healthData.storage.total)}`;
+  };
+
+  const formatMemoryUsage = () => {
+    if (healthData.redis.maxMemory <= 0) return 'Not reported';
+    return `${formatBytes(healthData.redis.memory)} / ${formatBytes(healthData.redis.maxMemory)}`;
+  };
+
+  const formatPercentUsed = (used: number, total: number) => {
+    if (total <= 0) return 'Unknown';
+    return `${((used / total) * 100).toFixed(1)}% used`;
+  };
+
+  const getBarWidth = (used: number, total: number) => {
+    if (total <= 0) return '0%';
+    return `${Math.min(100, Math.max(0, (used / total) * 100))}%`;
+  };
+
+  const getOverallMessage = () => {
+    const uptimeSuffix = healthData.uptime > 0 ? ` - Uptime: ${formatUptime(healthData.uptime)}` : '';
+    if (healthData.status === 'healthy') {
+      return `All services operational${uptimeSuffix}`;
+    }
+    if (healthData.status === 'degraded') {
+      return `Some services need attention${uptimeSuffix}`;
+    }
+    return 'Health status unavailable or critical';
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'up':
@@ -110,6 +260,8 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
         return <CheckCircle className="w-5 h-5 text-green-500" />;
       case 'degraded':
         return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
+      case 'unknown':
+        return <AlertTriangle className="w-5 h-5 text-gray-500" />;
       default:
         return <AlertTriangle className="w-5 h-5 text-red-500" />;
     }
@@ -122,6 +274,8 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
         return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400';
       case 'degraded':
         return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400';
+      case 'unknown':
+        return 'bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-400';
       default:
         return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400';
     }
@@ -135,20 +289,7 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
     );
   }
 
-  // Fallback mock data if API returns null
-  const healthData = health || {
-    status: 'healthy' as const,
-    services: [
-      { name: 'API Server', status: 'up' as const, latency: 12 },
-      { name: 'WebSocket Gateway', status: 'up' as const, latency: 8 },
-      { name: 'Background Workers', status: 'up' as const },
-    ],
-    database: { status: 'up' as const, connections: 15, maxConnections: 100, latency: 5 },
-    redis: { status: 'up' as const, memory: 256 * 1024 * 1024, maxMemory: 1024 * 1024 * 1024, latency: 1 },
-    storage: { status: 'up' as const, used: 50 * 1024 * 1024 * 1024, total: 500 * 1024 * 1024 * 1024 },
-    uptime: 864000,
-    errorRate: { last1h: 0.1, last24h: 0.5 },
-  };
+  const healthData = normalizeHealthStatus(health) ?? UNAVAILABLE_HEALTH;
 
   return (
     <div className="space-y-6">
@@ -189,7 +330,7 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
               System {healthData.status}
             </h2>
             <p className="text-sm text-[var(--foreground-secondary)]">
-              All services operational - Uptime: {formatUptime(healthData.uptime)}
+              {getOverallMessage()}
             </p>
           </div>
         </div>
@@ -207,15 +348,15 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
         />
         <StatCard
           title="DB Connections"
-          value={`${healthData.database.connections}/${healthData.database.maxConnections}`}
-          subtitle={`${healthData.database.latency}ms latency`}
+          value={formatDbConnections()}
+          subtitle={formatLatency(healthData.database.latency)}
           icon={<Database className="w-6 h-6" />}
           color="blue"
         />
         <StatCard
           title="Storage Used"
-          value={formatBytes(healthData.storage.used)}
-          subtitle={`of ${formatBytes(healthData.storage.total)}`}
+          value={formatStorageUsed()}
+          subtitle={formatStorageSubtitle()}
           icon={<HardDrive className="w-6 h-6" />}
           color="purple"
         />
@@ -268,13 +409,17 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm text-[var(--foreground-tertiary)]">
-                <span>{healthData.database.connections} / {healthData.database.maxConnections} connections</span>
-                <span>{healthData.database.latency}ms</span>
+                <span>
+                  {healthData.database.maxConnections > 0
+                    ? `${healthData.database.connections} / ${healthData.database.maxConnections} connections`
+                    : 'Connections not reported'}
+                </span>
+                <span>{formatLatency(healthData.database.latency)}</span>
               </div>
               <div className="mt-2 h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-[#00E5A0] rounded-full transition-all"
-                  style={{ width: `${(healthData.database.connections / healthData.database.maxConnections) * 100}%` }}
+                  style={{ width: getBarWidth(healthData.database.connections, healthData.database.maxConnections) }}
                 />
               </div>
             </div>
@@ -291,13 +436,13 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm text-[var(--foreground-tertiary)]">
-                <span>{formatBytes(healthData.redis.memory)} / {formatBytes(healthData.redis.maxMemory)}</span>
-                <span>{healthData.redis.latency}ms</span>
+                <span>{formatMemoryUsage()}</span>
+                <span>{formatLatency(healthData.redis.latency)}</span>
               </div>
               <div className="mt-2 h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-red-500 rounded-full transition-all"
-                  style={{ width: `${(healthData.redis.memory / healthData.redis.maxMemory) * 100}%` }}
+                  style={{ width: getBarWidth(healthData.redis.memory, healthData.redis.maxMemory) }}
                 />
               </div>
             </div>
@@ -314,13 +459,13 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm text-[var(--foreground-tertiary)]">
-                <span>{formatBytes(healthData.storage.used)} / {formatBytes(healthData.storage.total)}</span>
-                <span>{((healthData.storage.used / healthData.storage.total) * 100).toFixed(1)}% used</span>
+                <span>{formatStorageDetail()}</span>
+                <span>{formatPercentUsed(healthData.storage.used, healthData.storage.total)}</span>
               </div>
               <div className="mt-2 h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-purple-500 rounded-full transition-all"
-                  style={{ width: `${(healthData.storage.used / healthData.storage.total) * 100}%` }}
+                  style={{ width: getBarWidth(healthData.storage.used, healthData.storage.total) }}
                 />
               </div>
             </div>

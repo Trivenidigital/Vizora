@@ -570,10 +570,23 @@ export interface QrOverlayConfig {
 }
 
 // Platform Health
+export interface PlatformServiceStatus {
+  name: string;
+  port: number;
+  status: 'healthy' | 'unhealthy' | 'unknown';
+  responseTime?: number;
+  error?: string;
+}
+
 export interface PlatformHealth {
-  status: string;
-  services: Record<string, { status: string; latency?: number }>;
-  uptime: number;
+  overall: 'healthy' | 'degraded' | 'unhealthy';
+  services: {
+    database: { healthy: boolean; responseTime: number; error?: string };
+    redis: { healthy: boolean; responseTime: number; error?: string };
+    middleware: PlatformServiceStatus;
+    web: PlatformServiceStatus;
+    realtime: PlatformServiceStatus;
+  };
   timestamp: string;
 }
 

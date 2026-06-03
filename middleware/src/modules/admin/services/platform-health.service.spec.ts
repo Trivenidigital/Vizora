@@ -155,6 +155,68 @@ describe('PlatformHealthService', () => {
 
       expect(result.overall).toBe('degraded');
     });
+
+    it('should return degraded when web is down', async () => {
+      mockDb.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
+      mockRedis.healthCheck.mockResolvedValue({ healthy: true, responseTime: 5 });
+
+      jest.spyOn(service, 'checkServicePort')
+        .mockResolvedValueOnce({
+          name: 'middleware',
+          port: 3000,
+          status: 'healthy',
+          responseTime: 10,
+        })
+        .mockResolvedValueOnce({
+          name: 'web',
+          port: 3001,
+          status: 'unhealthy',
+          responseTime: 10,
+          error: 'Connection refused',
+        })
+        .mockResolvedValueOnce({
+          name: 'realtime',
+          port: 3002,
+          status: 'healthy',
+          responseTime: 10,
+        });
+
+      const result = await service.getOverallHealth();
+
+      expect(result.overall).toBe('degraded');
+      expect(result.services.web.status).toBe('unhealthy');
+    });
+
+    it('should return degraded when realtime is down', async () => {
+      mockDb.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
+      mockRedis.healthCheck.mockResolvedValue({ healthy: true, responseTime: 5 });
+
+      jest.spyOn(service, 'checkServicePort')
+        .mockResolvedValueOnce({
+          name: 'middleware',
+          port: 3000,
+          status: 'healthy',
+          responseTime: 10,
+        })
+        .mockResolvedValueOnce({
+          name: 'web',
+          port: 3001,
+          status: 'healthy',
+          responseTime: 10,
+        })
+        .mockResolvedValueOnce({
+          name: 'realtime',
+          port: 3002,
+          status: 'unhealthy',
+          responseTime: 10,
+          error: 'Connection refused',
+        });
+
+      const result = await service.getOverallHealth();
+
+      expect(result.overall).toBe('degraded');
+      expect(result.services.realtime.status).toBe('unhealthy');
+    });
   });
 
   describe('getServiceStatus', () => {

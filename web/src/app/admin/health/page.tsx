@@ -7,7 +7,7 @@ export default async function AdminHealthPage() {
   try {
     initialHealth = await serverFetch('/admin/health');
   } catch {
-    // Client has fallback mock data
+    // Client renders a conservative unavailable state.
   }
 
   return <AdminHealthClient initialHealth={initialHealth} />;

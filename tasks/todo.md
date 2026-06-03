@@ -1,5 +1,105 @@
 # Vizora - Task Tracker
 
+## Active Workstream: Admin Health Overall Status Pass 60 (2026-06-03)
+
+**Branch:** `fix/admin-health-overall-status`
+
+**Why now:** Pass 59 fixed the routes used by `/api/v1/admin/health`, but
+`PlatformHealthService.getOverallHealth()` still only degrades on Redis or
+middleware failure. If web or realtime is unhealthy, the aggregate can still
+return `overall: "healthy"`, which is false readiness evidence for operators.
+
+**New primitives introduced:** none planned. This pass should reuse the
+existing admin health response shape and `ServiceStatus` model. No new route,
+model, migration, env var, process, realtime event, MCP tool, Hermes skill,
+AI/provider spend path, or production runtime change is expected.
+
+**Hermes-first analysis:** checked per project convention. This is
+deterministic aggregate status calculation inside the existing NestJS admin
+module, not a business-agent, MCP, Hermes runtime, or provider-spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Admin aggregate health rollup | none applicable | fix existing NestJS admin health service |
+| App service health status classification | none applicable | reuse existing `ServiceStatus` values |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+local admin health aggregate calculation.
+
+**Plan**
+- [x] Add red tests proving web and realtime unhealthy statuses degrade the
+      admin aggregate.
+- [x] Preserve database-down as `unhealthy` and Redis/middleware failures as
+      `degraded`.
+- [x] Implement the smallest aggregate predicate without changing response
+      shape or route selection.
+- [x] Fix the admin Health page consumer so it renders the real backend
+      response shape instead of a frontend-only mock shape.
+- [x] Run focused middleware/web tests, TypeScript checks, diff hygiene,
+      production-style web build, and secret scan.
+- [ ] Request Claude Code review and resolve findings.
+- [ ] Commit, PR, CI, and merge if green.
+- [ ] Do not deploy by default; hand off deploy/runtime status and remaining
+      operator-only blockers.
+
+**Evidence so far**
+- Current `origin/main`: `b641953bd2288c7dd07a6a82552378585de9b129`.
+- Drift-check:
+  - `middleware/src/modules/admin/services/platform-health.service.ts`
+    computes `overall: "degraded"` only when Redis is unhealthy or middleware
+    is not healthy.
+  - `webStatus` and `realtimeStatus` are included in the response but ignored
+    by aggregate status calculation.
+  - Claude Code review surfaced a second real consumer gap:
+    `web/src/app/admin/health/page-client.tsx` expected top-level `status` and
+    `services[]`, but `/api/v1/admin/health` returns `overall` and a keyed
+    `services` object.
+- Red focused run:
+  - `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/admin/services/platform-health.service.spec.ts`
+    failed as expected: web-down and realtime-down cases returned
+    `overall: "healthy"` instead of `degraded`.
+- Fix:
+  - Added a small `hasUnhealthyAppService` predicate over middleware, web, and
+    realtime statuses before the existing database/Redis rollup.
+  - Database-down remains `unhealthy`; Redis or any app-service unhealthy
+    status now returns `degraded`.
+  - Updated the shared `PlatformHealth` type to match the backend response.
+  - Added an admin Health page normalizer that maps backend `overall`/service
+    objects into the existing page view model.
+  - Replaced the old healthy mock fallback on load failure with a conservative
+    `System down` unavailable state.
+  - Addressed Claude Code's minor UI hardening notes: malformed backend shape
+    now falls back to unavailable, partial backend service data also falls
+    back to unavailable, zero/unknown uptime and storage metrics no longer
+    render confusing duplicate text, and the server page comment no longer says
+    fallback mock data.
+- Green focused/admin seam run:
+  - `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/admin/services/platform-health.service.spec.ts src/modules/admin/admin.controller.spec.ts`
+    => 53/53 tests passing.
+- Green web run:
+  - `pnpm --filter @vizora/web test -- --runInBand --runTestsByPath src/app/admin/health/__tests__/health-page.test.tsx`
+    => 15/15 tests passing, including backend-shape normalization,
+    malformed/partial-shape fallback, and load-failure fallback.
+- Static/hygiene verification:
+  - `pnpm --filter @vizora/middleware exec tsc --noEmit --pretty false` =>
+    passing.
+  - `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` => passing.
+  - `git diff --check -- middleware/src/modules/admin/services/platform-health.service.ts middleware/src/modules/admin/services/platform-health.service.spec.ts web/src/app/admin/health/page-client.tsx web/src/app/admin/health/page.tsx web/src/app/admin/health/__tests__/health-page.test.tsx web/src/lib/types.ts tasks/todo.md`
+    => exit 0, with LF/CRLF normalization warnings only.
+  - `pnpm security:no-hardcoded-jwts` => passing.
+  - First web build attempt with localhost `NEXT_PUBLIC_*` values failed as
+    expected under the production-origin guard.
+  - `$env:NODE_OPTIONS='--max-old-space-size=4096'; $env:NEXT_PUBLIC_API_URL='https://vizora.cloud/api/v1'; $env:NEXT_PUBLIC_SOCKET_URL='https://vizora.cloud'; $env:BACKEND_URL='http://localhost:3000'; pnpm --filter @vizora/web build`
+    => passing, with existing Next.js middleware/proxy and TypeScript project
+    reference warnings only.
+- Claude Code review:
+  - Backend-only review returned `APPROVE` and surfaced the admin Health page
+    shape mismatch as an operator-relevant caveat.
+  - Full backend+web review returned `APPROVE` with four non-blocking notes;
+    those low-cost notes were addressed before commit.
+  - Final residual note about shallow backend-shape guarding was also fixed and
+    covered by a partial-service-data regression test.
+
 ## Active Workstream: Admin Platform Health Routes Pass 59 (2026-06-03)
 
 **Branch:** `fix/admin-platform-health-routes`
