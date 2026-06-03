@@ -1,6 +1,62 @@
 # Vizora - Task Tracker
 
-## Active Workstream: External Heartbeat Docs Pass 76 (2026-06-03)
+## Active Workstream: First-Customer Email Verification Truth Pass 77 (2026-06-03)
+
+**Branch:** `fix/readiness-pass77`
+
+**Why now:** The live first-customer go-live runbook still instructed the
+operator to click an email verification link, but repo truth shows registration
+sends a welcome email and signs the user in; the email verification flow remains
+deferred as backlog B5. A launch runbook must not require a nonexistent flow
+during C4 smoke.
+
+**Drift-check:** `middleware/src/modules/auth/auth.service.ts` calls
+`MailService.sendWelcomeEmail()` after password and Google registration. Current
+`packages/database/prisma/schema.prisma` has no `emailVerified`,
+`emailVerifiedAt`, or verification-token field. `backlog.md` still records B5
+email verification as untouched/deferred.
+
+**New primitives introduced:** one static readiness-gate assertion. No runtime
+code, DB model/migration, public API, PM2 process, env var, MCP tool, Hermes
+skill, provider-spend path, production deploy, prod env edit, customer email
+send, payment setup, or hardware action is planned.
+
+**Hermes-first analysis:** not applicable. This is launch runbook truth and a
+static regression gate, not a business-agent, MCP, Hermes runtime, or
+AI/provider-spend path.
+
+**Plan**
+- [x] Add a failing readiness-gate test proving the first-customer runbook does
+      not require a nonexistent email verification flow.
+- [x] Update the runbook to require signup dashboard access + welcome email
+      delivery, while explicitly noting email verification is deferred.
+- [ ] Run focused ops test, broader ops tests, diff/secret checks, Claude Code
+      review, commit, PR, CI, and merge if green.
+
+**Evidence**
+- Red test:
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`
+    failed 1/28 because the runbook still lacked "Email verification flow
+    remains deferred" and contained stale email verification instructions.
+- Green verification so far:
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`:
+    28/28 tests passed.
+  - `pnpm test:ops`: 53/53 tests passed.
+  - `git diff --check`: passed with CRLF normalization warnings only.
+  - `pnpm security:no-hardcoded-jwts`: passed.
+- Claude Code review:
+  - CLEAN. Reviewer verified registration signs the user into a dashboard
+    session and sends a welcome email, the welcome email has no verification
+    link, the schema lacks email-verification fields, and B5 remains deferred.
+  - Applied reviewer-suggested low-risk robustness hardening: broadened the
+    stale-link guard to catch `verification link` wording and added a comment
+    that the schema assertion should trip when B5 eventually lands. Re-ran the
+    focused readiness-gate test (28/28), `pnpm test:ops` (53/53),
+    `git diff --check`, and `pnpm security:no-hardcoded-jwts` afterward.
+
+---
+
+## Completed Workstream: External Heartbeat Docs Pass 76 (2026-06-03)
 
 **Branch:** `fix/readiness-pass76`
 
@@ -28,7 +84,7 @@ AI/provider-spend path.
       external heartbeat `/fail` semantics.
 - [x] Update `.env.example` to explain success vs fail pings.
 - [x] Update the deferred review-polish backlog entry.
-- [ ] Run focused ops test, broader ops tests, diff/secret checks, Claude Code
+- [x] Run focused ops test, broader ops tests, diff/secret checks, Claude Code
       review, commit, PR, CI, and merge if green.
 
 **Evidence**
@@ -46,6 +102,11 @@ AI/provider-spend path.
     `scripts/ops/lib/alerting.ts` and `scripts/ops/health-guardian.ts`, the
     test guards the intended documentation contract, and operator setup remains
     explicitly not performed.
+- PR/CI/merge:
+  - Commit `39b46a3c` (`docs(ops): document healthchecks fail heartbeat`).
+  - PR #217 merged as `d5a1e45a`.
+  - GitHub checks passed before merge: audit, build, e2e, lint, security, and
+    test.
 
 ---
 

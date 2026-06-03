@@ -100,8 +100,8 @@ Run in this order:
 4. `bash scripts/smoke/api-critical-path.sh` (against localhost first; creates smoke-test rows)
 5. `ssh root@vizora.cloud 'cd /opt/vizora/app && API_BASE=https://vizora.cloud WEB_BASE=https://vizora.cloud bash scripts/smoke/api-critical-path.sh' > .ssh_go_live_smoke.txt 2>&1` (against prod API/web ingress from the VPS; creates smoke-test rows; realtime health remains local `RT_BASE=http://localhost:3002` and probes `/api/health`; read `.ssh_go_live_smoke.txt` as a separate step)
 6. Open `https://vizora.cloud` in a fresh incognito browser → verify landing page renders, all CTAs work
-7. Sign up with a NEW disposable email → verify welcome email lands within 60s
-8. Click email verify link → verify landed in dashboard
+7. Sign up with a NEW disposable email → verify dashboard access and welcome email delivery within 60s
+8. Email verification flow remains deferred (backlog B5); do not look for an email-confirmation link in the welcome email
 9. Generate pairing code, pair the SAME display from T-3 walkthrough → verify still online
 10. Push a NEW image → verify display swaps within 30s
 
@@ -276,7 +276,7 @@ If any tip → escalate to design review.
 ## Customer-1 scope (what's IN, what's OUT for launch day)
 
 ### IN scope
-- Sign up + email verify
+- Sign up + welcome email delivery
 - Login + 2FA NOT required (deferred)
 - Display pairing (single device)
 - Content upload (image, video, URL, HTML)
