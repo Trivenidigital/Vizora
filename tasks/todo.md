@@ -1,5 +1,111 @@
 # Vizora - Task Tracker
 
+## Active Workstream: Realtime Health Smoke Truth Pass 56 (2026-06-03)
+
+**Branch:** `fix/realtime-health-smoke-truth-20260603`
+
+**Why now:** After PR #195 merged, a read-only production snapshot showed
+middleware and web healthy, but realtime returns `404` at
+`http://127.0.0.1:3002/health` and `200` at
+`http://127.0.0.1:3002/api/health`. Repo code matches prod runtime:
+`realtime/src/main.ts` applies global prefix `api`, and
+`realtime/src/app/app.controller.ts` exposes `@Get('health')`, making the
+actual route `/api/health`. The smoke script and first-customer runbook drifted
+to `/health`, which would make a go-live smoke fail for the wrong reason.
+
+**New primitives introduced:** none planned. This pass should reconcile smoke
+and runbook expectations to the existing realtime route. No new route, model,
+migration, env var, process, response shape, realtime event, MCP tool, Hermes
+skill, AI/provider spend path, or runtime change is expected.
+
+**Hermes-first analysis:** checked per project convention. This is deterministic
+smoke/runbook route reconciliation, not a business-agent, MCP, Hermes runtime,
+or provider-spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Realtime health smoke route | none applicable | reconcile smoke/runbook to repo/runtime truth |
+| First-customer runbook health checks | none applicable | update existing runbook text only |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+local smoke-script endpoint reconciliation.
+
+**Plan**
+- [x] Add a focused red release-readiness test proving smoke/runbook expect
+      realtime `/api/health`.
+- [x] Update `scripts/smoke/api-critical-path.sh` and
+      `docs/runbooks/first-customer-onboarding.md` to match repo/runtime truth.
+- [x] Run focused ops/release-readiness tests.
+- [x] Run relevant hygiene/security checks.
+- [x] Request Claude Code review and resolve findings.
+- [ ] PR, CI, and merge if green.
+- [ ] Do not deploy by default; hand off deploy/runtime status.
+
+**Evidence so far**
+- Current `origin/main`: `72314d3f74de093077a133bf63ad799ded0d0c00`.
+- Production read-only endpoint matrix:
+  - realtime `/health` => `404`
+  - realtime `/api/health` => `200`
+  - realtime `/api/v1/health` => `404`
+  - middleware `/api/v1/health` => `200`
+  - middleware `/api/v1/health/ready` => `200`
+  - web `/` => `200`
+- Local code evidence:
+  - `realtime/src/main.ts` calls `app.setGlobalPrefix('api')`.
+  - `realtime/src/app/app.controller.ts` exposes `@Get('health')`, so the
+    actual route is `/api/health`.
+- Red focused run:
+  - `pnpm test:ops` failed as expected after updating the release-readiness
+    assertions: `scripts/smoke/api-critical-path.sh` and
+    `docs/runbooks/first-customer-onboarding.md` still referenced realtime
+    `/health`.
+- Fix:
+  - `scripts/smoke/api-critical-path.sh` now probes realtime health at
+    `$RT_BASE/api/health`.
+  - `docs/runbooks/first-customer-onboarding.md` now documents the same
+    local-VPS realtime health path in the smoke and pre-flight sections.
+  - `docker/Dockerfile.realtime` now probes the same `/api/health` route in its
+    latent container healthcheck.
+  - `scripts/ops/health-guardian.ts` now probes realtime at `/api/health` and
+    resolves recovered `service-down` incidents even when the old incident had
+    escalated after exhausted restart attempts.
+  - `.gitattributes` now keeps `*.sh` checked out with LF line endings.
+  - `docs/plans/2026-06-02-release-readiness-gates-pass-50.md` now notes that
+    pass 56 supersedes the earlier `/health` assumption.
+- Green verification:
+  - `pnpm test:ops` => 14/14 ops/release-readiness tests passing.
+  - `pnpm exec tsc --noEmit --pretty false --module esnext --moduleResolution bundler --target es2022 --lib es2022 --strict --types node scripts/ops/health-guardian.ts scripts/ops/release-readiness-gates.test.ts`
+    => passing.
+  - `C:\Program Files\Git\bin\bash.exe -n scripts/smoke/api-critical-path.sh`
+    => passing.
+  - `git diff --check -- .gitattributes docker/Dockerfile.realtime docs/plans/2026-06-02-release-readiness-gates-pass-50.md docs/runbooks/first-customer-onboarding.md scripts/smoke/api-critical-path.sh scripts/ops/health-guardian.ts scripts/ops/release-readiness-gates.test.ts tasks/todo.md`
+    => exit 0, with LF/CRLF normalization warnings only.
+  - `pnpm security:no-hardcoded-jwts` => passing.
+  - Generic `bash -n` failed on this Windows host because the WSL relay points
+    at missing `/bin/bash`; Git Bash was used explicitly for Bash syntax.
+- Claude Code review:
+  - First review returned `CLEAN` on the scoped diff and requested folding in
+    the same stale `/health` route in `docker/Dockerfile.realtime`.
+  - Addressed that Dockerfile healthcheck, tightened the runbook negative
+    assertion, added static Dockerfile coverage, added shell LF normalization,
+    and marked the stale pass-50 plan assumption as superseded.
+  - Second review found the active `health-guardian` consumer still probing
+    realtime `/health`; added a red static assertion proving the drift before
+    changing the script.
+- Production runtime attribution:
+  - Read-only grep of `/opt/vizora/app/logs/ops-state.json` found
+    `health-guardian:service-down:realtime` with `status: "escalated"`,
+    `attempts: 2`, and `error: "HTTP 404"`; prod `systemStatus` is still
+    `CRITICAL`.
+  - After this code is deployed, a successful health-guardian run should probe
+    `/api/health` and resolve that existing escalated false incident. Dashboard
+    visibility may still lag until the next ops-reporter sync.
+  - Final Claude Code review returned `CLEAN`. Residual risks are non-blocking:
+    prod still needs a reviewed deploy before the fix runs; realtime `/api/health`
+    is process-health only while `/api/health/ready` dependency parity is a
+    future pass; the old resolved incident may retain its stale `HTTP 404`
+    error text after status changes to `resolved`.
+
 ## Active Workstream: Ops State Incident Resolution Pass 55 (2026-06-03)
 
 **Branch:** `fix/ops-state-incident-resolution-20260603`

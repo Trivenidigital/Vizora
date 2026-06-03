@@ -19,21 +19,42 @@ function readCiJobBlock(workflow: string, jobName: string): string {
   return match[0];
 }
 
-test('critical-path smoke probes the realtime gateway native health endpoint', () => {
+test('critical-path smoke probes the realtime gateway prefixed health endpoint', () => {
   const smokeScript = readRepoFile('scripts/smoke/api-critical-path.sh');
 
   assert.match(
     smokeScript,
-    /probe_status "Realtime health" "200" "\$RT_BASE\/health"/,
+    /probe_status "Realtime health" "200" "\$RT_BASE\/api\/health"/,
   );
-  assert.doesNotMatch(smokeScript, /\$RT_BASE\/api\/health/);
+  assert.doesNotMatch(smokeScript, /\$RT_BASE\/health"/);
 });
 
-test('first-customer runbook documents the realtime native health endpoint', () => {
+test('first-customer runbook documents the realtime prefixed health endpoint', () => {
   const runbook = readRepoFile('docs/runbooks/first-customer-onboarding.md');
 
-  assert.match(runbook, /http:\/\/localhost:3002\/health/);
-  assert.doesNotMatch(runbook, /localhost:3002\/api\/health/);
+  assert.match(runbook, /http:\/\/localhost:3002\/api\/health/);
+  assert.doesNotMatch(runbook, /localhost:3002\/health/);
+});
+
+test('realtime Docker healthcheck probes the prefixed health endpoint', () => {
+  const dockerfile = readRepoFile('docker/Dockerfile.realtime');
+
+  assert.match(dockerfile, /http:\/\/localhost:3002\/api\/health/);
+  assert.doesNotMatch(dockerfile, /localhost:3002\/health['"]/);
+});
+
+test('health guardian probes realtime at the prefixed health endpoint', () => {
+  const guardian = readRepoFile('scripts/ops/health-guardian.ts');
+
+  assert.match(guardian, /healthUrl:\s*`\$\{realtimeUrl\}\/api\/health`/);
+  assert.doesNotMatch(guardian, /healthUrl:\s*`\$\{realtimeUrl\}\/health`/);
+});
+
+test('health guardian resolves escalated service-down incidents after recovery', () => {
+  const guardian = readRepoFile('scripts/ops/health-guardian.ts');
+
+  assert.match(guardian, /existingIncident\.status !== 'resolved'/);
+  assert.doesNotMatch(guardian, /existingIncident\.status === 'open'/);
 });
 
 test('CI test job runs web unit tests before build-only gates', () => {

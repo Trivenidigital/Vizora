@@ -61,7 +61,7 @@ function getServiceDefs(): ServiceDef[] {
     },
     {
       name: 'realtime',
-      healthUrl: `${realtimeUrl}/health`,
+      healthUrl: `${realtimeUrl}/api/health`,
       pm2Name: 'vizora-realtime',
       memoryLimitBytes: 512 * 1024 * 1024, // 512 MB
     },
@@ -195,8 +195,9 @@ async function main(): Promise<void> {
     if (result.ok) {
       log(AGENT, `${svc.name}: healthy (status ${result.status})`);
 
-      // Resolve existing incident if service recovered
-      if (existingIncident && existingIncident.status === 'open') {
+      // Resolve existing incident if service recovered, including incidents
+      // that were previously escalated after exhausted restart attempts.
+      if (existingIncident && existingIncident.status !== 'resolved') {
         log(AGENT, `${svc.name}: recovered — resolving incident ${incidentId}`);
         incidents.push({
           ...existingIncident,
