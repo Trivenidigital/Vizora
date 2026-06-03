@@ -10,6 +10,29 @@ describe('StartupSelfTestService', () => {
   let mockRedis: Partial<RedisService>;
   let mockStorage: Partial<StorageService>;
 
+  const withEnv = async (
+    overrides: Record<string, string | undefined>,
+    fn: () => Promise<void>,
+  ) => {
+    const originals = new Map<string, string | undefined>();
+    for (const key of Object.keys(overrides)) {
+      originals.set(key, process.env[key]);
+    }
+
+    try {
+      for (const [key, value] of Object.entries(overrides)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+      await fn();
+    } finally {
+      for (const [key, value] of originals.entries()) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  };
+
   beforeEach(async () => {
     mockDb = {
       $queryRaw: jest.fn().mockResolvedValue([{ count: 1n }]),
@@ -125,6 +148,118 @@ describe('StartupSelfTestService', () => {
     it('should include configured flag in email result', async () => {
       const result = await service.runSelfTest();
       expect(typeof result.results.email.configured).toBe('boolean');
+    });
+
+    it('fails production email self-test when SMTP is configured without a public app URL', async () => {
+      await withEnv(
+        {
+          NODE_ENV: 'production',
+          SMTP_HOST: 'smtp.example.test',
+          SMTP_USER: 'apikey',
+          SMTP_PASS: 'secret',
+          SMTP_PASSWORD: undefined,
+          APP_URL: undefined,
+          FRONTEND_URL: undefined,
+          WEB_URL: undefined,
+        },
+        async () => {
+          const result = await service.runSelfTest();
+
+          expect(result.results.email.passed).toBe(false);
+          expect(result.results.email.configured).toBe(true);
+          expect(result.results.email.message).toContain('APP_URL');
+          expect(result.results.email.message).toContain('WEB_URL');
+          expect(result.results.email.message).toContain('public');
+        },
+      );
+    });
+
+    it('fails production email self-test when the configured app URL is localhost', async () => {
+      await withEnv(
+        {
+          NODE_ENV: 'production',
+          SMTP_HOST: 'smtp.example.test',
+          SMTP_USER: 'apikey',
+          SMTP_PASS: 'secret',
+          SMTP_PASSWORD: undefined,
+          APP_URL: 'http://localhost:3001',
+          FRONTEND_URL: undefined,
+          WEB_URL: undefined,
+        },
+        async () => {
+          const result = await service.runSelfTest();
+
+          expect(result.results.email.passed).toBe(false);
+          expect(result.results.email.configured).toBe(true);
+          expect(result.results.email.message).toContain('must be a public HTTPS URL');
+        },
+      );
+    });
+
+    it('fails production email self-test when the configured app URL is not HTTPS', async () => {
+      await withEnv(
+        {
+          NODE_ENV: 'production',
+          SMTP_HOST: 'smtp.example.test',
+          SMTP_USER: 'apikey',
+          SMTP_PASS: 'secret',
+          SMTP_PASSWORD: undefined,
+          APP_URL: 'http://vizora.cloud',
+          FRONTEND_URL: undefined,
+          WEB_URL: undefined,
+        },
+        async () => {
+          const result = await service.runSelfTest();
+
+          expect(result.results.email.passed).toBe(false);
+          expect(result.results.email.configured).toBe(true);
+          expect(result.results.email.message).toContain('must be a public HTTPS URL');
+        },
+      );
+    });
+
+    it('fails production email self-test when the configured app URL is an HTTPS loopback host', async () => {
+      await withEnv(
+        {
+          NODE_ENV: 'production',
+          SMTP_HOST: 'smtp.example.test',
+          SMTP_USER: 'apikey',
+          SMTP_PASS: 'secret',
+          SMTP_PASSWORD: undefined,
+          APP_URL: 'https://[::1]',
+          FRONTEND_URL: undefined,
+          WEB_URL: undefined,
+        },
+        async () => {
+          const result = await service.runSelfTest();
+
+          expect(result.results.email.passed).toBe(false);
+          expect(result.results.email.configured).toBe(true);
+          expect(result.results.email.message).toContain('must be a public HTTPS URL');
+        },
+      );
+    });
+
+    it('fails production email self-test when the configured app URL is malformed', async () => {
+      await withEnv(
+        {
+          NODE_ENV: 'production',
+          SMTP_HOST: 'smtp.example.test',
+          SMTP_USER: 'apikey',
+          SMTP_PASS: 'secret',
+          SMTP_PASSWORD: undefined,
+          APP_URL: 'not-a-url',
+          FRONTEND_URL: undefined,
+          WEB_URL: undefined,
+        },
+        async () => {
+          const result = await service.runSelfTest();
+
+          expect(result.results.email.passed).toBe(false);
+          expect(result.results.email.configured).toBe(true);
+          expect(result.results.email.message).toContain('must be a public HTTPS URL');
+        },
+      );
     });
 
     it('should include stripe and razorpay flags in billing result', async () => {

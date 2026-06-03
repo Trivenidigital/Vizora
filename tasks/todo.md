@@ -1,5 +1,101 @@
 # Vizora - Task Tracker
 
+## Completed Workstream: Startup Email URL Self-Test Pass 68 (2026-06-03)
+
+**Branch:** `fix/startup-email-url-self-test`
+
+**Why now:** PR #207 made the C1 operator runbook require a public `APP_URL` or
+`WEB_URL` for backend-generated email links, and aligned password-reset links
+with that precedence. The admin-only startup self-test already surfaces SMTP
+configuration/connectivity, but it still cannot warn the operator if SMTP is
+configured while the email-link host is absent or points at localhost in
+production.
+
+**New primitives introduced:** none planned. This pass should extend the
+existing `StartupSelfTestService.checkEmail()` result only. No route, model,
+migration, env var, process, realtime event, MCP tool, Hermes skill,
+AI/provider spend path, customer email send, production env change, or deploy is
+expected.
+
+**Hermes-first analysis:** checked per project convention. This is deterministic
+NestJS health/self-test validation, not a business-agent, MCP, Hermes runtime,
+or provider-spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Email-link URL readiness validation | none applicable | extend existing startup self-test |
+| Admin-only health result coverage | none applicable | extend existing Jest spec |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+local NestJS config-readiness validation.
+
+**Plan**
+- [ ] Add failing startup self-test coverage for production SMTP configured with
+      missing/localhost email-link URL.
+- [ ] Extend `checkEmail()` so production self-test fails closed for SMTP
+      configured without a public `APP_URL`/`FRONTEND_URL`/`WEB_URL`, while
+      preserving dev behavior and not sending email.
+- [x] Run focused health tests, affected ops/static gates, middleware build,
+      diff hygiene, and secret scan.
+- [x] Request Claude Code review and resolve findings.
+- [x] Commit, PR, CI, and merge if green.
+- [x] Do not deploy, send real emails, or touch production SMTP/env state.
+
+**Evidence so far**
+- Current `origin/main`: `58650b6bebe50d1fa55264384acb69d154314abd`.
+- Branch/PR:
+  - Branch: `fix/startup-email-url-self-test`.
+  - Commit: `6e49c9ac` (`fix(health): validate email app URLs in self-test`).
+  - PR #208: `fix(health): validate email app URLs in self-test`.
+  - GitHub CI passed audit, build, e2e, lint, security, and test before merge.
+  - No deploy, production env change, SMTP/Resend setup, or real email send was
+    performed.
+- Drift-check:
+  - `StartupSelfTestService.checkEmail()` validates SMTP env presence and calls
+    `transporter.verify()` when configured.
+  - It currently has no awareness of `APP_URL`, `FRONTEND_URL`, or `WEB_URL`.
+  - Public readiness endpoint hides self-test details; admin-only
+    `/api/v1/health/self-test` exposes them.
+- Red focused run:
+  - `pnpm --filter @vizora/middleware test -- --runTestsByPath src/modules/health/startup-self-test.service.spec.ts`
+    failed as expected: production SMTP-configured self-test reported SMTP DNS
+    failure instead of missing/localhost public app URL.
+- Fix:
+  - `checkEmail()` now validates production email-link URL readiness only after
+    SMTP is configured. It accepts `APP_URL || FRONTEND_URL || WEB_URL` and
+    requires the resolved URL to be public HTTPS in production.
+  - Non-production behavior and the no-SMTP warning-only behavior are preserved.
+  - The check verifies configuration only; it does not send email or change
+    production state.
+  - Claude review found a broader pre-existing URL-precedence inconsistency
+    outside transactional email (`billing.service.ts`, `pairing.service.ts`,
+    `organizations.service.ts`). This pass narrows self-test wording to
+    transactional email links and leaves a follow-up candidate to extract a
+    shared public-app-URL resolver for all absolute URL builders.
+  - Review follow-up also added non-HTTPS and malformed URL branch coverage and
+    corrected IPv6 loopback detection for `https://[::1]/`.
+  - Final review follow-up added an HTTPS loopback test so the loopback branch
+    is covered independently of the non-HTTPS branch.
+- Green verification:
+  - `pnpm --filter @vizora/middleware test -- --runTestsByPath src/modules/health/startup-self-test.service.spec.ts`
+    => 21/21 tests passing.
+  - `$env:ESLINT_USE_FLAT_CONFIG='false'; npx eslint middleware/src/modules/health/startup-self-test.service.ts middleware/src/modules/health/startup-self-test.service.spec.ts`
+    => exit 0.
+  - `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/health/startup-self-test.service.spec.ts src/modules/health/health.controller.spec.ts src/modules/health/health.service.spec.ts src/modules/health/continuous-health-monitor.service.spec.ts src/modules/health/regression-guards.spec.ts`
+    => 97/97 tests passing.
+  - `pnpm test:ops` => 40/40 ops tests passing.
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`
+    => 21/21 tests passing.
+  - `npx nx build @vizora/middleware` => passing; existing webpack warnings
+    remain for dynamic/optional dependencies.
+  - `pnpm security:no-hardcoded-jwts` => passing.
+- Claude Code review:
+  - Initial review returned `APPROVE` and recommended adding non-HTTPS and
+    malformed URL tests plus narrowing wording to transactional email links.
+  - Re-review returned `APPROVE` and requested one more HTTPS loopback test to
+    isolate the `isLocalhost` branch.
+  - Final re-review returned `APPROVE` with no high/medium actionable issues.
+
 ## Completed Workstream: Email Env Example + App URL Readiness Pass 67 (2026-06-03)
 
 **Branch:** `fix/email-env-example-readiness`
