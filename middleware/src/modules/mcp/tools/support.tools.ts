@@ -2,7 +2,7 @@ import { ForbiddenException } from '@nestjs/common';
 import { SupportService } from '../../support/support.service';
 import {
   hasScope,
-  requireOrgScope,
+  requirePlatformOrOrgScope,
   type McpRequestContext,
 } from '../auth/mcp-context';
 import {
@@ -27,7 +27,8 @@ import {
 /**
  * MCP tool: `list_open_support_requests`
  *
- * Returns triage candidates for the calling token's organization as
+ * Returns triage candidates for the calling token's organization, or all
+ * organizations for platform-scope tokens, as
  * STRUCTURAL SIGNALS ONLY — word count, has-attachment, message count,
  * age, org tier. No description body, no user PII. The LLM-driven
  * agent on the other side of this tool can safely consume the output
@@ -48,7 +49,7 @@ export async function listOpenSupportRequestsTool(
   if (!hasScope(context, 'support:read')) {
     throw new ForbiddenException("Token lacks scope 'support:read'");
   }
-  const orgId = requireOrgScope(context);
+  const orgId = requirePlatformOrOrgScope(context);
   const input = ListOpenSupportRequestsInput.parse(
     rawInput,
   ) as ListOpenSupportRequestsInputT;
@@ -103,7 +104,7 @@ function toTriageShape(r: Record<string, unknown>) {
 export const LIST_OPEN_SUPPORT_REQUESTS_TOOL = {
   name: 'list_open_support_requests',
   description:
-    "List open support requests for the calling token's organization as triage candidates. Returns structural signals ONLY (word_count, has_attachment, message_count, age_minutes, priority, category, ai_category, org_tier) — NEVER the description body or any user PII. By default excludes already-triaged requests (those with an agent-authored message). Read-only. Paginated.",
+    "List open support requests for the calling token's organization, or all organizations for platform-scope tokens, as triage candidates. Returns structural signals ONLY (word_count, has_attachment, message_count, age_minutes, priority, category, ai_category, org_tier) - NEVER the description body or any user PII. By default excludes already-triaged requests (those with an agent-authored message). Read-only. Paginated.",
   scope: 'support:read' as const,
   inputSchema: ListOpenSupportRequestsInput,
   outputSchema: ListOpenSupportRequestsOutput,
@@ -130,7 +131,7 @@ export async function updateSupportRequestPriorityTool(
   if (!hasScope(context, 'support:write')) {
     throw new ForbiddenException("Token lacks scope 'support:write'");
   }
-  const orgId = requireOrgScope(context);
+  const orgId = requirePlatformOrOrgScope(context);
   const input = UpdateSupportRequestPriorityInput.parse(
     rawInput,
   ) as UpdateSupportRequestPriorityInputT;
@@ -148,7 +149,7 @@ export async function updateSupportRequestPriorityTool(
 export const UPDATE_SUPPORT_REQUEST_PRIORITY_TOOL = {
   name: 'update_support_request_priority',
   description:
-    "Set the priority of one support request belonging to the calling token's organization. Returns { updated: false } if no row matched (cross-org guard or deleted) — DO NOT retry on false. Priority must be one of urgent | high | normal | low.",
+    "Set the priority of one support request. Per-org tokens are constrained to their organization; platform-scope tokens may update by globally unique request id. Returns { updated: false } if no row matched (cross-org guard or deleted) - DO NOT retry on false. Priority must be one of urgent | high | normal | low.",
   scope: 'support:write' as const,
   inputSchema: UpdateSupportRequestPriorityInput,
   outputSchema: UpdateSupportRequestResult,
@@ -170,7 +171,7 @@ export async function updateSupportRequestAiCategoryTool(
   if (!hasScope(context, 'support:write')) {
     throw new ForbiddenException("Token lacks scope 'support:write'");
   }
-  const orgId = requireOrgScope(context);
+  const orgId = requirePlatformOrOrgScope(context);
   const input = UpdateSupportRequestAiCategoryInput.parse(
     rawInput,
   ) as UpdateSupportRequestAiCategoryInputT;
@@ -188,7 +189,7 @@ export async function updateSupportRequestAiCategoryTool(
 export const UPDATE_SUPPORT_REQUEST_AI_CATEGORY_TOOL = {
   name: 'update_support_request_ai_category',
   description:
-    'Set the V2-taxonomy aiCategory slug on one support request. The slug is constrained to the V2 enum — unknown values are rejected at the wire. Returns { updated: false } if no row matched. Idempotent for the same value.',
+    'Set the V2-taxonomy aiCategory slug on one support request. Per-org tokens are constrained to their organization; platform-scope tokens may update by globally unique request id. The slug is constrained to the V2 enum - unknown values are rejected at the wire. Returns { updated: false } if no row matched. Idempotent for the same value.',
   scope: 'support:write' as const,
   inputSchema: UpdateSupportRequestAiCategoryInput,
   outputSchema: UpdateSupportRequestResult,
@@ -215,7 +216,7 @@ export async function createSupportMessageTool(
   if (!hasScope(context, 'support:write')) {
     throw new ForbiddenException("Token lacks scope 'support:write'");
   }
-  const orgId = requireOrgScope(context);
+  const orgId = requirePlatformOrOrgScope(context);
   const input = CreateSupportMessageInput.parse(
     rawInput,
   ) as CreateSupportMessageInputT;
@@ -235,7 +236,7 @@ export async function createSupportMessageTool(
 export const CREATE_SUPPORT_MESSAGE_TOOL = {
   name: 'create_support_message',
   description:
-    "Append an agent-authored message to one support request's thread. The author identity is taken from the bearer-token context (NOT user-controlled). Returns { created: false } if the request doesn't exist or belongs to another org. Content is capped at 2000 chars; callers SHOULD send pre-templated text, not raw LLM output.",
+    "Append an agent-authored message to one support request's thread. The author identity is taken from the bearer-token context (NOT user-controlled). Per-org tokens are constrained to their organization; platform-scope tokens may write by globally unique request id. Returns { created: false } if the request doesn't exist or belongs to another org. Content is capped at 2000 chars; callers SHOULD send pre-templated text, not raw LLM output.",
   scope: 'support:write' as const,
   inputSchema: CreateSupportMessageInput,
   outputSchema: CreateSupportMessageResult,

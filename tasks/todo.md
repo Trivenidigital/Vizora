@@ -1,6 +1,100 @@
 # Vizora - Task Tracker
 
-## Active Workstream: Playwright Readiness Truth Pass 74 (2026-06-03)
+## Active Workstream: Support MCP Platform-Scope Pass 75 (2026-06-03)
+
+**Branch:** `fix/readiness-pass75`
+
+**Why now:** After PR #215, the remaining customer-1 P0 blockers are
+operator-gated. The next buildable repo-side readiness item is T4:
+support-triage cannot use a single platform-scope token because
+`support:*` MCP tools still require per-org context while `log_shadow_row`
+already supports platform-scope writes. This keeps the Hermes support-triage
+shadow agent disabled beyond the launch gate.
+
+**Drift-check:** `middleware/src/modules/mcp/tools/support.tools.ts` still uses
+`requireOrgScope(context)` in all support read/write handlers. The service
+layer also accepts only `organizationId: string` for triage candidate reads and
+agent writes. Existing tests prove per-org scoping but do not cover platform
+tokens. The residual gap matches
+`docs/plans/2026-05-09-support-triage-cross-tenant-design.md` Option 2.
+
+**New primitives introduced:** one small MCP context helper to intentionally
+allow either platform or org scope, plus support-service/tool handling for
+`organizationId: null`. No DB model/migration, public dashboard route, PM2
+process, env var, MCP server process, Hermes skill, provider-spend path,
+production deploy, prod env edit, customer email send, payment setup, or
+hardware action is planned.
+
+**Hermes-first analysis:** checked against Hermes docs and awesome-Hermes
+ecosystem. Hermes already provides native MCP client support and per-server
+tool filtering; there is no external Hermes skill that can change Vizora's
+tenant filter semantics inside the Vizora MCP server.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| MCP client/runtime | yes — native MCP client (`https://hermes-agent.nousresearch.com/docs/user-guide/skills/bundled/mcp/mcp-native-mcp`) | already in use; keep using Vizora MCP |
+| Support-ticket triage token scope | none found | implement in Vizora MCP support tools |
+| Cross-tenant support write safety | none found | preserve per-org compound guards; only platform tokens omit org filter |
+
+Awesome-hermes-agent ecosystem check: search found no installable skill that
+replaces this repo-local MCP authorization change.
+
+**Plan**
+- [x] Add failing tests proving platform-scope `support:read` can list all-org
+      structural tickets while per-org tokens remain org-filtered.
+- [x] Add failing tests proving platform-scope `support:write` can update or
+      comment by globally unique support request id, while per-org token writes
+      retain the existing org guard.
+- [x] Implement the smallest context/service/tool changes to pass those tests.
+- [x] Update backlog/design docs to mark T4 repo-side complete while token
+      issuance/cutover remains operator-gated.
+- [ ] Run focused support/MCP tests, broader relevant tests/build, diff/secret
+      checks, Claude Code review, commit, PR, CI, and merge if green.
+
+**Evidence**
+- Red tests:
+  - `pnpm --filter @vizora/middleware test -- --runTestsByPath src/modules/mcp/tools/support.tools.spec.ts src/modules/support/support.service.spec.ts --runInBand`
+    failed with 8 expected failures: platform tokens hit `requireOrgScope()`,
+    and service methods passed `organizationId: null` instead of omitting the
+    Prisma org filter.
+- Implementation:
+  - Added `requirePlatformOrOrgScope()` in MCP context to make platform-or-org
+    support explicit at tool boundaries.
+  - `support.tools.ts` now passes `string | null` scope through to support
+    service methods for list/update/category/message tools.
+  - `SupportService.listTriageCandidates()` omits org filters only when the MCP
+    token scope is platform (`organizationId=null`).
+  - `setRequestPriority()` and `setRequestAiCategory()` preserve per-org
+    `id + organizationId` guards, but platform tokens update by globally unique
+    support request id.
+  - `createAgentMessage()` preserves per-org guard for org tokens; platform
+    tokens fetch by id and write the message under the request row's
+    organization.
+  - `backlog.md` and the support-triage design doc mark T4 repo-side complete
+    while token issuance, Hermes config/secrets, and cutover remain operator
+    work.
+- Green verification so far:
+  - `pnpm --filter @vizora/middleware test -- --runTestsByPath src/modules/mcp/tools/support.tools.spec.ts src/modules/support/support.service.spec.ts --runInBand`:
+    2 suites / 86 tests passed.
+  - `pnpm --filter @vizora/middleware test -- --runInBand --testPathPattern="modules/(mcp|support)"`:
+    18 suites / 276 tests passed.
+  - `npx nx build @vizora/middleware`: passed with existing webpack warnings
+    only (OpenTelemetry/express/handlebars/jsdom/require-in-the-middle dynamic
+    optional dependency warnings).
+  - `git diff --check`: passed with CRLF normalization warnings only.
+  - `pnpm security:no-hardcoded-jwts`: passed.
+- Claude Code review:
+  - CLEAN. Reviewer confirmed per-org guards are preserved, platform-scope
+    writes derive organization from the support request row, triage outputs stay
+    structural-only, and docs keep token issuance/config/cutover operator-gated.
+  - Non-blocking cutover note applied in the design doc: the support-triage
+    platform token should not include or rely on `displays:read` unless display
+    MCP tools are separately changed and reviewed, because `list_displays`
+    remains per-org-only.
+
+---
+
+## Completed Workstream: Playwright Readiness Truth Pass 74 (2026-06-03)
 
 **Branch:** `fix/playwright-readiness-pass74`
 
@@ -37,7 +131,7 @@ AI/provider-spend path.
       full Playwright pending, with the exact local runtime blocker.
 - [x] Run focused tests, shell syntax/diff/secret checks, and Claude Code
       review.
-- [ ] Commit, PR, CI, and merge if green.
+- [x] Commit, PR, CI, and merge if green.
 
 **Evidence**
 - Local runtime preflight:
@@ -91,6 +185,11 @@ AI/provider-spend path.
   - Fix added an importable command builder and a behavioral test that spawns
     the resolved Playwright CLI through `process.execPath --version`.
   - Follow-up review returned `CLEAN`.
+- PR/CI/merge:
+  - Commit `bdfa2191` (`test(playwright): add customer critical readiness helper`).
+  - PR #215 merged as `95a4515d`.
+  - GitHub checks passed before merge: audit, build, e2e, lint, security, and
+    test.
 
 ---
 

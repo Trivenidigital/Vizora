@@ -70,3 +70,14 @@ export function requireOrgScope(context: McpRequestContext): string {
   }
   return context.organizationId;
 }
+
+/**
+ * Explicit helper for tools that intentionally support both per-org and
+ * platform-scope tokens. Returning null is meaningful: downstream services
+ * must omit organization filters only for platform-scope callers.
+ */
+export function requirePlatformOrOrgScope(
+  context: McpRequestContext,
+): string | null {
+  return context.organizationId ?? null;
+}

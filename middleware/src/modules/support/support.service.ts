@@ -25,6 +25,8 @@ interface SupportFilters {
   limit?: number;
 }
 
+type SupportMcpScope = string | null;
+
 interface UserInfo {
   id: string;
   organizationId: string;
@@ -246,8 +248,8 @@ export class SupportService {
    * types.ts for the original constraint).
    *
    * Different from `findAll`:
-   *  - Always scoped to one orgId (no super-admin escape; MCP tokens are
-   *    per-org-scoped at issuance, this method matches that contract).
+   *  - Per-org MCP tokens are scoped to one orgId (no super-admin escape);
+   *    platform-scope tokens pass null and intentionally omit the org filter.
    *  - Default WHERE excludes any request that already has an
    *    `authorType='agent'` message (D7 reply-loop prevention) — the
    *    same exclusion the existing `support-triage` cron uses.
@@ -255,7 +257,7 @@ export class SupportService {
    *  - Word count + has_attachment computed server-side.
    */
   async listTriageCandidates(
-    organizationId: string,
+    organizationId: SupportMcpScope,
     options: {
       page?: number;
       limit?: number;
@@ -265,10 +267,10 @@ export class SupportService {
     const { page = 1, limit = 20, includeAlreadyTriaged = false } = options;
     const skip = (page - 1) * limit;
 
-    const where: Prisma.SupportRequestWhereInput = {
-      organizationId,
-      status: 'open',
-    };
+    const where: Prisma.SupportRequestWhereInput = { status: 'open' };
+    if (organizationId != null) {
+      where.organizationId = organizationId;
+    }
     if (!includeAlreadyTriaged) {
       where.messages = { none: { authorType: 'agent' } };
     }
@@ -340,12 +342,17 @@ export class SupportService {
    * matched (deleted, wrong org, etc).
    */
   async setRequestPriority(
-    organizationId: string,
+    organizationId: SupportMcpScope,
     requestId: string,
     priority: 'urgent' | 'high' | 'normal' | 'low',
   ): Promise<boolean> {
+    const where: Prisma.SupportRequestWhereInput = { id: requestId };
+    if (organizationId != null) {
+      where.organizationId = organizationId;
+    }
+
     const res = await this.db.supportRequest.updateMany({
-      where: { id: requestId, organizationId },
+      where,
       data: { priority },
     });
     return res.count === 1;
@@ -357,12 +364,17 @@ export class SupportService {
    * as 1-row updates. This matches the existing PM2 cron's behavior.
    */
   async setRequestAiCategory(
-    organizationId: string,
+    organizationId: SupportMcpScope,
     requestId: string,
     aiCategory: string,
   ): Promise<boolean> {
+    const where: Prisma.SupportRequestWhereInput = { id: requestId };
+    if (organizationId != null) {
+      where.organizationId = organizationId;
+    }
+
     const res = await this.db.supportRequest.updateMany({
-      where: { id: requestId, organizationId },
+      where,
       data: { aiCategory },
     });
     return res.count === 1;
@@ -381,20 +393,25 @@ export class SupportService {
    * (cross-org guard).
    */
   async createAgentMessage(
-    organizationId: string,
+    organizationId: SupportMcpScope,
     requestId: string,
     content: string,
   ): Promise<{ id: string; createdAt: Date } | null> {
+    const where: Prisma.SupportRequestWhereInput = { id: requestId };
+    if (organizationId != null) {
+      where.organizationId = organizationId;
+    }
+
     const req = await this.db.supportRequest.findFirst({
-      where: { id: requestId, organizationId },
-      select: { id: true, userId: true },
+      where,
+      select: { id: true, organizationId: true, userId: true },
     });
     if (!req) return null;
 
     const created = await this.db.supportMessage.create({
       data: {
         requestId: req.id,
-        organizationId,
+        organizationId: req.organizationId ?? organizationId,
         userId: req.userId,
         role: 'assistant',
         authorType: 'agent',
