@@ -142,6 +142,12 @@ NEXT_PUBLIC_SOCKET_URL  # Realtime gateway URL for web frontend
 BACKEND_URL             # Server-side API URL (used by next.config proxy)
 ```
 
+### Display client
+
+```
+DISPLAY_UPDATE_FEED_ALLOWLIST  # Comma-separated hosts allowed for Electron display auto-update feeds. Bare hostnames or URLs are accepted; only the host is used. Default code allowlist is updates.vizora.cloud. Packaged display clients reject loopback feeds; packaged update testing and production rollout require an allowlisted HTTPS host with signed releases.
+```
+
 ### Storage / S3 / MinIO
 
 ```
@@ -254,7 +260,7 @@ backlog.md                 # P0-P4 active backlog with status + effort estimates
 
 ## Display Clients
 
-**Electron** (`display/`): Desktop app for Windows/macOS/Linux. Webpack + TypeScript. Packages via electron-builder. Packaged display clients configure OS auto-start and use Electron `powerSaveBlocker` to prevent display sleep.
+**Electron** (`display/`): Desktop app for Windows/macOS/Linux. Webpack + TypeScript. Packages via electron-builder. Packaged display clients configure OS auto-start, use Electron `powerSaveBlocker` to prevent display sleep, and can run an admin-triggered `update` fleet command through `electron-updater` when the feed host is in `DISPLAY_UPDATE_FEED_ALLOWLIST`. Production update rollout still requires signed display artifacts on the allowlisted HTTPS feed before operators send the update command; verify the signing/verification story for each target, especially Linux/AppImage, before enabling a live rollout.
 
 **Android TV**: Extracted to standalone repo (`vizora-tv`). Capacitor 6 + Vite + TypeScript. See [github.com/Trivenidigital/vizora-tv](https://github.com/Trivenidigital/vizora-tv).
 

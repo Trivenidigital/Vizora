@@ -256,7 +256,7 @@ Items the audit listed but we are NOT pursuing live (Engage/kiosk, live remote v
 |---|-------|----------|--------|-------|
 | K1 | Electron auto-start on boot not configured | Low | FIXED | Packaged display clients configure OS auto-start (Windows/macOS login item, Linux autostart desktop file with AppImage path support) |
 | K2 | Electron powerSaveBlocker not enabled | Low | FIXED | Packaged display clients start `prevent-display-sleep` and stop it on quit |
-| K3 | Electron auto-update not configured | Low | TODO | electron-updater referenced but not wired |
+| K3 | Electron auto-update not configured | Low | REPO-FIXED / OPERATOR-GATED | Admin-only `update` fleet command now reaches packaged display clients through `electron-updater` with backend + client feed allowlist checks; live rollout still requires signed artifacts on an allowlisted HTTPS feed and target-specific signing verification |
 | K4 | Display client has 0 test coverage | Medium | FIXED | Electron display Jest suite, typecheck, and build are CI-gated; real-device walkthrough still required |
 | K5 | 3 pre-existing RSC admin test failures | Low | TODO | React Server Component edge cases |
 | K6 | AI Designer returns "launching soon" stub | Info | TODO | Intentional — needs API budget |

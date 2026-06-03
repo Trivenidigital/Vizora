@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
@@ -35,6 +36,8 @@ interface GatewayBroadcastResult {
 }
 
 const REALTIME_HTTP_TIMEOUT_MS = 15000;
+const DEFAULT_DISPLAY_UPDATE_FEED_HOST = 'updates.vizora.cloud';
+const LOCAL_UPDATE_FEED_HOSTS = new Set(['localhost', '127.0.0.1', '::1']);
 
 interface OverrideRecord {
   commandId: string;
@@ -69,6 +72,13 @@ export class FleetService {
     userRole: string,
     dto: SendCommandDto,
   ) {
+    if (dto.command === 'update' && userRole !== 'admin') {
+      throw new ForbiddenException('Display app updates require admin role');
+    }
+
+    const updatePayload =
+      dto.command === 'update' ? this.buildUpdatePayload(dto.payload) : null;
+
     // Check rate limit
     await this.checkRateLimit(orgId);
 
@@ -115,6 +125,9 @@ export class FleetService {
         duration,
         priority: dto.payload.priority || 'normal',
       };
+    }
+    if (dto.command === 'update') {
+      gatewayPayload = updatePayload;
     }
 
     // Call gateway broadcast — command shape: { type, payload, commandId }
@@ -294,6 +307,90 @@ export class FleetService {
       queued: result?.queued,
       failed: result?.failed,
     };
+  }
+
+  private buildUpdatePayload(
+    payload?: { feedUrl?: string },
+  ): { feedUrl: string } {
+    return {
+      feedUrl: this.normalizeUpdateFeedUrl(payload?.feedUrl),
+    };
+  }
+
+  private normalizeUpdateFeedUrl(rawFeedUrl?: string): string {
+    if (!rawFeedUrl || typeof rawFeedUrl !== 'string') {
+      throw new BadRequestException('feedUrl required for update');
+    }
+
+    let parsed: URL;
+    try {
+      parsed = new URL(rawFeedUrl.trim());
+    } catch {
+      throw new BadRequestException('feedUrl must be a valid URL');
+    }
+
+    if (!['https:', 'http:'].includes(parsed.protocol)) {
+      throw new BadRequestException('feedUrl must use HTTP or HTTPS');
+    }
+
+    if (parsed.username || parsed.password) {
+      throw new BadRequestException('feedUrl must not include credentials');
+    }
+
+    if (parsed.search) {
+      throw new BadRequestException('feedUrl must not include a query string');
+    }
+
+    const host = this.normalizeUpdateFeedHost(parsed.hostname);
+    const isLocal = LOCAL_UPDATE_FEED_HOSTS.has(host);
+    if (isLocal && !this.isLoopbackUpdateFeedAllowed()) {
+      throw new BadRequestException('feedUrl loopback hosts are not allowed in production');
+    }
+    if (parsed.protocol === 'http:' && !isLocal) {
+      throw new BadRequestException('feedUrl must use HTTPS');
+    }
+    if (parsed.port && !isLocal) {
+      throw new BadRequestException('feedUrl must not include a port');
+    }
+
+    if (!isLocal && !this.getAllowedUpdateFeedHosts().has(host)) {
+      throw new BadRequestException(`feedUrl host is not allowlisted: ${host}`);
+    }
+
+    parsed.hash = '';
+    return parsed.toString().replace(/\/+$/, '');
+  }
+
+  private getAllowedUpdateFeedHosts(): Set<string> {
+    const configured =
+      process.env.DISPLAY_UPDATE_FEED_ALLOWLIST ||
+      DEFAULT_DISPLAY_UPDATE_FEED_HOST;
+
+    return new Set(
+      configured
+        .split(',')
+        .map((host) => this.normalizeAllowedUpdateFeedHost(host.trim()))
+        .filter(Boolean),
+    );
+  }
+
+  private normalizeUpdateFeedHost(host: string): string {
+    return host.toLowerCase().replace(/^\[/, '').replace(/\]$/, '');
+  }
+
+  private normalizeAllowedUpdateFeedHost(host: string): string {
+    if (host.includes('://')) {
+      try {
+        return this.normalizeUpdateFeedHost(new URL(host).hostname);
+      } catch {
+        return this.normalizeUpdateFeedHost(host);
+      }
+    }
+    return this.normalizeUpdateFeedHost(host);
+  }
+
+  private isLoopbackUpdateFeedAllowed(): boolean {
+    return process.env.NODE_ENV !== 'production';
   }
 
   async createOverride(

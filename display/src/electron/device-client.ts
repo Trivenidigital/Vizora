@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import * as os from 'os';
+import { triggerDisplayAutoUpdate } from './display-auto-updater';
 import * as http from 'http';
 
 interface DeviceClientConfig {
@@ -514,7 +515,7 @@ export class DeviceClient {
   }
 
   private isMainProcessOwnedCommand(command: any): boolean {
-    return ['push_content', 'clear_override', 'clear_cache'].includes(command?.type);
+    return ['push_content', 'clear_override', 'clear_cache', 'update'].includes(command?.type);
   }
 
   private async waitForSelfTerminatingCommandAckFlush(): Promise<void> {
@@ -763,11 +764,7 @@ export class DeviceClient {
         break;
       case 'update':
         console.log('[DeviceClient] Update command received');
-        // Stub for autoUpdater integration
-        // In production, this would trigger electron-updater:
-        // const { autoUpdater } = require('electron-updater');
-        // autoUpdater.checkForUpdatesAndNotify();
-        console.log('[DeviceClient] Auto-update not yet configured. Update payload:', command.payload);
+        triggerDisplayAutoUpdate(command.payload?.feedUrl);
         break;
       default:
         console.warn('Unknown command type:', command.type);

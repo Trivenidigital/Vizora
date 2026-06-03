@@ -6,6 +6,7 @@ import {
   ValidateNested,
   IsIn,
   IsNumber,
+  IsUrl,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -34,10 +35,19 @@ class CommandPayloadDto {
   @IsOptional()
   @IsEnum(['normal', 'emergency'])
   priority?: 'normal' | 'emergency';
+
+  @IsOptional()
+  @IsString()
+  @IsUrl({
+    require_protocol: true,
+    require_tld: false,
+    protocols: ['http', 'https'],
+  })
+  feedUrl?: string;
 }
 
 export class SendCommandDto {
-  @IsEnum(['reload', 'restart', 'reboot', 'clear_cache', 'push_content'])
+  @IsEnum(['reload', 'restart', 'reboot', 'clear_cache', 'push_content', 'update'])
   command!: string;
 
   @ValidateNested()

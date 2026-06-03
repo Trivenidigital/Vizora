@@ -32,20 +32,80 @@ Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
 Electron update delivery.
 
 **Plan**
-- [ ] Add failing backend tests for admin-only `update`, required `feedUrl`,
+- [x] Add failing backend tests for admin-only `update`, required `feedUrl`,
       allowlisted safe URL validation, and gateway payload shape.
-- [ ] Add failing display tests for updater helper URL safety and
+- [x] Add failing display tests for updater helper URL safety and
       packaged-only `DeviceClient` update command execution.
-- [ ] Implement backend/realtime command support without bypassing auth,
+- [x] Implement backend/realtime command support without bypassing auth,
       tenant, audit, update-feed allowlist, or existing fleet command paths.
-- [ ] Add `electron-updater` and replace the display update stub with a
+- [x] Add `electron-updater` and replace the display update stub with a
       generic-feed updater trigger that refuses non-allowlisted hosts.
-- [ ] Run focused middleware/display tests, display typecheck/build,
+- [x] Run focused middleware/display tests, display typecheck/build,
       relevant realtime checks, diff hygiene, and secret scan.
-- [ ] Request Claude Code review and resolve findings.
+- [x] Request Claude Code review and resolve findings.
 - [ ] Commit, PR, CI, and merge if green.
-- [ ] Do not publish display releases, deploy, edit production env, send real
+- [x] Do not publish display releases, deploy, edit production env, send real
       emails, touch payment setup, or run hardware commands.
+
+**Evidence**
+- Branch: `fix/production-readiness-pass70`.
+- Plan commit: `bb32194e` (`docs: plan display auto-update command`).
+- Red tests:
+  - Middleware focused fleet tests failed before implementation because manager
+    update was not forbidden and update `feedUrl` validation/payload sanitizing
+    did not exist.
+  - Realtime DTO spec failed before implementation because `DeviceCommandType`
+    did not include `update`.
+  - Display focused tests failed before implementation because
+    `display-auto-updater.ts` did not exist and the display `update` command
+    was still a stub.
+- Implementation:
+  - Added `electron-updater@6.8.3` to `@vizora/display`.
+  - Added `display/src/electron/display-auto-updater.ts` with packaged-only
+    execution, HTTPS constraints, host allowlist, no credentials, no query
+    strings, no non-loopback explicit ports, packaged-client loopback rejection,
+    generic provider setup, one-time install listener, and async update check
+    trigger.
+  - Wired the existing display `update` command branch to the helper and kept
+    failed update triggers on the existing negative-ack path.
+  - Extended middleware fleet command validation with `update`, required
+    `payload.feedUrl`, admin-only controller and service checks, early feed URL
+    normalization, and sanitized gateway payload forwarding.
+  - Extended realtime command typing/DTO coverage for `update`.
+  - Documented `DISPLAY_UPDATE_FEED_ALLOWLIST` in tracked env examples and
+    `CLAUDE.md`.
+- Green verification:
+  - `pnpm --filter @vizora/middleware test -- --runTestsByPath src/modules/fleet/fleet.service.spec.ts src/modules/fleet/fleet.controller.spec.ts`: 2 suites / 45 tests passed.
+  - `pnpm --filter @vizora/realtime test -- --runInBand`: 13 suites / 287 tests passed.
+  - `pnpm --filter @vizora/display test -- --runInBand display-auto-updater device-client`: 2 suites / 63 tests passed.
+  - `pnpm --filter @vizora/display test:ci`: 8 suites / 145 tests passed.
+  - `pnpm --filter @vizora/display typecheck`: passed.
+  - `pnpm --filter @vizora/display build`: passed.
+  - `pnpm --filter @vizora/web test -- --runInBand`: 106 suites / 1115 tests passed with pre-existing React `act(...)` warnings.
+  - `npx nx build @vizora/web`: passed after setting non-loopback production placeholder origins for `NEXT_PUBLIC_SOCKET_URL`, `NEXT_PUBLIC_API_URL`, and `BACKEND_URL`. Earlier attempts without those envs, or with localhost values, failed on the existing production security guard as expected.
+  - `npx nx build @vizora/realtime`: passed with existing webpack warnings.
+  - `npx nx build @vizora/middleware`: passed with existing webpack warnings.
+  - `git diff --check`: passed with CRLF warnings only.
+  - `pnpm security:no-hardcoded-jwts`: passed.
+  - `$env:NODE_OPTIONS='--use-system-ca'; pnpm audit --prod --json`: completed and exited nonzero due existing workspace production dependency advisories, including axios/Next-related advisories. This scoped PR does not claim to resolve global dependency audit.
+- Claude Code review:
+  - Local `claude` CLI first review was `NOT CLEAN` because the prompt omitted untracked new files and requested additional URL invariant tests.
+  - Second review, with untracked files and added invariant tests, returned `CLEAN`.
+  - Final narrow review after packaged-client loopback hardening returned `CLEAN`.
+- Build note:
+  - One parallel `npx nx build @vizora/middleware` run failed while
+    `@vizora/realtime` was also building because both builds copied the shared
+    `@vizora/database` generated output at the same time (`EPIPE`, file in use).
+    Rerunning middleware by itself passed.
+- Operator-gated remainder:
+  - No display release was published, no production env was changed, no deploy
+    was performed, no customer email was sent, no payment setup was touched,
+    and no hardware command was run.
+  - Production auto-update rollout still requires signed display artifacts on
+    an allowlisted HTTPS feed host, then an approved admin update command.
+- Documentation caveat:
+  - This isolated worktree does not contain tracked `AGENTS.md`; the primary
+    checkout has an untracked/dirty `AGENTS.md`, so it was not modified.
 
 ## Completed Workstream: Shared Public App URL Resolver Pass 69 (2026-06-03)
 

@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
 import { of } from 'rxjs';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { FleetService, TooManyRequestsException } from './fleet.service';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
@@ -19,6 +19,7 @@ describe('FleetService', () => {
   const mockUserId = 'user-456';
   const mockDeviceId = 'device-789';
   const mockGroupId = 'group-001';
+  const originalNodeEnv = process.env.NODE_ENV;
 
   beforeEach(async () => {
     process.env.INTERNAL_API_SECRET = 'test-secret';
@@ -96,6 +97,12 @@ describe('FleetService', () => {
 
   afterEach(() => {
     delete process.env.INTERNAL_API_SECRET;
+    delete process.env.DISPLAY_UPDATE_FEED_ALLOWLIST;
+    if (originalNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
   });
 
   describe('resolveTargetDevices', () => {
@@ -438,6 +445,220 @@ describe('FleetService', () => {
       expect(body.command.payload.content.thumbnail).toBe('/static/thumbnails/content-2.jpg');
       expect(body.command.payload.content.title).toBeUndefined();
       expect(body.command.payload.content.thumbnailUrl).toBeUndefined();
+    });
+
+    it('should throw BadRequestException for update without feedUrl', async () => {
+      db.display.findFirst.mockResolvedValue({
+        id: mockDeviceId,
+        nickname: 'Test',
+        organizationId: mockOrgId,
+      });
+
+      const dto = {
+        command: 'update' as const,
+        target: { type: 'device' as const, id: mockDeviceId },
+        payload: {},
+      } as any;
+
+      await expect(
+        service.sendCommand(mockOrgId, mockUserId, 'admin', dto),
+      ).rejects.toThrow(BadRequestException);
+      expect(httpService.post).not.toHaveBeenCalled();
+    });
+
+    it('should reject update commands for non-admin service callers', async () => {
+      const dto = {
+        command: 'update' as const,
+        target: { type: 'device' as const, id: mockDeviceId },
+        payload: { feedUrl: 'https://updates.vizora.cloud/display' },
+      } as any;
+
+      await expect(
+        service.sendCommand(mockOrgId, mockUserId, 'manager', dto),
+      ).rejects.toThrow(ForbiddenException);
+      expect(db.display.findFirst).not.toHaveBeenCalled();
+      expect(httpService.post).not.toHaveBeenCalled();
+    });
+
+    it('should validate update feed before resolving targets', async () => {
+      const dto = {
+        command: 'update' as const,
+        target: { type: 'device' as const, id: mockDeviceId },
+        payload: { feedUrl: 'https://attacker.example/display' },
+      } as any;
+
+      await expect(
+        service.sendCommand(mockOrgId, mockUserId, 'admin', dto),
+      ).rejects.toThrow(BadRequestException);
+      expect(db.display.findFirst).not.toHaveBeenCalled();
+      expect(httpService.post).not.toHaveBeenCalled();
+    });
+
+    it('should reject update feed URLs that use http for non-loopback hosts', async () => {
+      db.display.findFirst.mockResolvedValue({
+        id: mockDeviceId,
+        nickname: 'Test',
+        organizationId: mockOrgId,
+      });
+
+      const dto = {
+        command: 'update' as const,
+        target: { type: 'device' as const, id: mockDeviceId },
+        payload: { feedUrl: 'http://updates.vizora.cloud/display' },
+      } as any;
+
+      await expect(
+        service.sendCommand(mockOrgId, mockUserId, 'admin', dto),
+      ).rejects.toThrow(BadRequestException);
+      expect(httpService.post).not.toHaveBeenCalled();
+    });
+
+    it('should reject update feed URLs with non-HTTP protocols', async () => {
+      const dto = {
+        command: 'update' as const,
+        target: { type: 'device' as const, id: mockDeviceId },
+        payload: { feedUrl: 'file:///tmp/display-update' },
+      } as any;
+
+      await expect(
+        service.sendCommand(mockOrgId, mockUserId, 'admin', dto),
+      ).rejects.toThrow(BadRequestException);
+      expect(db.display.findFirst).not.toHaveBeenCalled();
+      expect(httpService.post).not.toHaveBeenCalled();
+    });
+
+    it('should reject update feed URLs with credentials or query strings', async () => {
+      await expect(
+        service.sendCommand(mockOrgId, mockUserId, 'admin', {
+          command: 'update' as const,
+          target: { type: 'device' as const, id: mockDeviceId },
+          payload: { feedUrl: 'https://user:pass@updates.vizora.cloud/display' },
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+
+      await expect(
+        service.sendCommand(mockOrgId, mockUserId, 'admin', {
+          command: 'update' as const,
+          target: { type: 'device' as const, id: mockDeviceId },
+          payload: { feedUrl: 'https://updates.vizora.cloud/display?token=abc' },
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(db.display.findFirst).not.toHaveBeenCalled();
+      expect(httpService.post).not.toHaveBeenCalled();
+    });
+
+    it('should reject non-loopback update feed URLs with explicit ports', async () => {
+      const dto = {
+        command: 'update' as const,
+        target: { type: 'device' as const, id: mockDeviceId },
+        payload: { feedUrl: 'https://updates.vizora.cloud:8443/display' },
+      } as any;
+
+      await expect(
+        service.sendCommand(mockOrgId, mockUserId, 'admin', dto),
+      ).rejects.toThrow(BadRequestException);
+      expect(db.display.findFirst).not.toHaveBeenCalled();
+      expect(httpService.post).not.toHaveBeenCalled();
+    });
+
+    it('should allow loopback HTTP update feeds only outside production', async () => {
+      db.display.findFirst.mockResolvedValue({
+        id: mockDeviceId,
+        nickname: 'Test',
+        organizationId: mockOrgId,
+      });
+
+      process.env.NODE_ENV = 'test';
+      await service.sendCommand(mockOrgId, mockUserId, 'admin', {
+        command: 'update' as const,
+        target: { type: 'device' as const, id: mockDeviceId },
+        payload: { feedUrl: 'http://localhost:4876/display/' },
+      } as any);
+      expect(httpService.post.mock.calls[0][1].command.payload).toEqual({
+        feedUrl: 'http://localhost:4876/display',
+      });
+
+      jest.clearAllMocks();
+      process.env.NODE_ENV = 'production';
+      await expect(
+        service.sendCommand(mockOrgId, mockUserId, 'admin', {
+          command: 'update' as const,
+          target: { type: 'device' as const, id: mockDeviceId },
+          payload: { feedUrl: 'http://localhost:4876/display' },
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+      expect(db.display.findFirst).not.toHaveBeenCalled();
+      expect(httpService.post).not.toHaveBeenCalled();
+    });
+
+    it('should normalize URL-shaped update feed allowlist entries', async () => {
+      process.env.DISPLAY_UPDATE_FEED_ALLOWLIST = 'https://updates.vizora.cloud';
+      db.display.findFirst.mockResolvedValue({
+        id: mockDeviceId,
+        nickname: 'Test',
+        organizationId: mockOrgId,
+      });
+
+      await service.sendCommand(mockOrgId, mockUserId, 'admin', {
+        command: 'update' as const,
+        target: { type: 'device' as const, id: mockDeviceId },
+        payload: { feedUrl: 'https://updates.vizora.cloud/display/' },
+      } as any);
+
+      expect(httpService.post.mock.calls[0][1].command.payload).toEqual({
+        feedUrl: 'https://updates.vizora.cloud/display',
+      });
+    });
+
+    it('should reject update feed URLs outside the allowlist', async () => {
+      process.env.DISPLAY_UPDATE_FEED_ALLOWLIST = 'updates.vizora.cloud';
+      db.display.findFirst.mockResolvedValue({
+        id: mockDeviceId,
+        nickname: 'Test',
+        organizationId: mockOrgId,
+      });
+
+      const dto = {
+        command: 'update' as const,
+        target: { type: 'device' as const, id: mockDeviceId },
+        payload: { feedUrl: 'https://updates.attacker.example/display' },
+      } as any;
+
+      await expect(
+        service.sendCommand(mockOrgId, mockUserId, 'admin', dto),
+      ).rejects.toThrow(BadRequestException);
+      expect(httpService.post).not.toHaveBeenCalled();
+    });
+
+    it('should forward update with only a normalized allowlisted feedUrl', async () => {
+      process.env.DISPLAY_UPDATE_FEED_ALLOWLIST = 'updates.vizora.cloud';
+      db.display.findFirst.mockResolvedValue({
+        id: mockDeviceId,
+        nickname: 'Test',
+        organizationId: mockOrgId,
+      });
+
+      const dto = {
+        command: 'update' as const,
+        target: { type: 'device' as const, id: mockDeviceId },
+        payload: {
+          feedUrl: 'https://updates.vizora.cloud/display/',
+          contentId: 'must-not-forward',
+          duration: 60,
+          priority: 'normal',
+        },
+      } as any;
+
+      await service.sendCommand(mockOrgId, mockUserId, 'admin', dto);
+
+      const postCall = httpService.post.mock.calls[0];
+      const body = postCall[1];
+      expect(body.command).toEqual({
+        type: 'update',
+        payload: { feedUrl: 'https://updates.vizora.cloud/display' },
+        commandId: expect.any(String),
+      });
     });
   });
 
