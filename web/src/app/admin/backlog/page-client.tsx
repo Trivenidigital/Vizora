@@ -26,7 +26,7 @@ interface BacklogItem {
   title: string;
   owner?: string;
   effort?: string;
-  status: 'TODO' | 'FIXED' | 'IN_PROGRESS';
+  status: 'TODO' | 'FIXED' | 'IN_PROGRESS' | 'BLOCKED' | 'DEFERRED';
   deps?: string;
   notes?: string;
 }
@@ -90,27 +90,15 @@ const completed: BacklogItem[] = [
 const sections: Section[] = [
   {
     id: 'p0',
-    title: 'P0 — Launch Blockers',
+    title: 'P0 - Customer-1 Launch Gates',
     icon: Zap,
     color: 'red',
-    description: 'Cannot accept paying customers until these are done',
+    description: 'Operator-gated; not solvable by repo changes alone',
     items: [
-      { id: 'B1', title: 'Configure SMTP on production (SendGrid)', owner: 'YOU', effort: '2h', status: 'TODO', deps: 'SendGrid account, DNS access' },
-      { id: 'B2', title: 'Set SPF/DKIM/DMARC DNS records for vizora.cloud', owner: 'YOU', effort: '1h', status: 'TODO', deps: 'DNS access' },
-      { id: 'B3', title: 'Set SMTP env vars on production server', owner: 'YOU', effort: '30m', status: 'TODO', deps: 'B1 complete' },
-      { id: 'B4', title: 'Test all 8 existing email types end-to-end', owner: 'Claude Code', effort: '2h', status: 'TODO', deps: 'B3 complete' },
-      { id: 'B5', title: 'Build email verification flow (token, endpoint, template, soft enforcement)', owner: 'Claude Code', effort: '4h', status: 'TODO', deps: 'B3 complete' },
-      { id: 'B6', title: 'Wire team invite email to mail service', owner: 'Claude Code', effort: '1h', status: 'TODO', deps: 'B3 complete' },
-      { id: 'B7', title: 'Add unsubscribe link to non-transactional emails', owner: 'Claude Code', effort: '1h', status: 'TODO', deps: 'B3 complete' },
-      { id: 'B8', title: 'Create Stripe account + products + prices (4 tiers x 2 intervals)', owner: 'YOU', effort: '2h', status: 'TODO', deps: 'Business bank account' },
-      { id: 'B9', title: 'Create Razorpay account + plans (4 tiers x 2 intervals, INR)', owner: 'YOU', effort: '2h', status: 'TODO', deps: 'Indian business entity or partner' },
-      { id: 'B10', title: 'Configure Stripe webhook endpoint', owner: 'YOU', effort: '30m', status: 'TODO', deps: 'B8 complete' },
-      { id: 'B11', title: 'Configure Razorpay webhook endpoint', owner: 'YOU', effort: '30m', status: 'TODO', deps: 'B9 complete' },
-      { id: 'B12', title: 'Set billing env vars on production', owner: 'YOU', effort: '30m', status: 'TODO', deps: 'B8 + B9 complete' },
-      { id: 'B13', title: 'Update plans.ts with real Stripe/Razorpay price IDs', owner: 'Claude Code', effort: '1h', status: 'TODO', deps: 'B8 + B9 complete' },
-      { id: 'B14', title: 'End-to-end billing test (register -> checkout -> subscription -> invoice)', owner: 'Claude Code', effort: '4h', status: 'TODO', deps: 'B12 + B13 complete' },
-      { id: 'B15', title: 'Test billing failure scenarios (declined card, cancel, webhook retry)', owner: 'Claude Code', effort: '2h', status: 'TODO', deps: 'B14 complete' },
-      { id: 'B16', title: 'Full go-live smoke test (60-step user journey)', owner: 'Claude Code', effort: '3h', status: 'TODO', deps: 'All above complete' },
+      { id: 'C1', title: 'SMTP / Resend production verification', owner: 'Operator', effort: '2h', status: 'TODO', deps: 'DNS, SMTP env vars, EMAIL_FROM, approved test send' },
+      { id: 'C2', title: 'Customer-1 organization provisioning', owner: 'Operator', effort: '1h', status: 'TODO', deps: 'Customer admin/account decisions' },
+      { id: 'C3', title: 'Real-device walkthrough', owner: 'Operator + customer IT', effort: '2h', status: 'TODO', deps: 'Customer hardware and network access' },
+      { id: 'C4', title: '60-step go-live smoke', owner: 'Operator + reviewer', effort: '3h', status: 'BLOCKED', deps: 'C1-C3', notes: 'Run on prod only with operator approval' },
     ],
   },
   {
@@ -121,7 +109,7 @@ const sections: Section[] = [
     description: 'Should have within first week of launch',
     totalEffort: '~7 dev-days',
     items: [
-      { id: 'L1', title: 'Device offline email notification to customers', effort: '4h', status: 'TODO', notes: 'Ops agent detects offline but doesn\'t email customer' },
+      { id: 'L1', title: 'Device offline email notification to customers', effort: '4h', status: 'FIXED', notes: 'Superseded by O7 alert rules with in-app/email/slack dispatch' },
       { id: 'L2', title: 'Set up UptimeRobot monitoring for health endpoints', effort: '1h', status: 'TODO' },
       { id: 'L3', title: 'Custom error pages (branded 404, 500)', effort: '4h', status: 'FIXED', notes: 'Already built — branded 404, error boundary, global-error' },
       { id: 'L4', title: 'Basic knowledge base / help docs page', effort: '1d', status: 'FIXED', notes: 'feat/p1-cleanup — 2026-03-20' },
@@ -149,9 +137,9 @@ const sections: Section[] = [
       { id: 'M7', title: 'Push-to-group endpoint (single API call)', effort: '4h', status: 'FIXED', notes: 'feat/fleet-control' },
       { id: 'M8', title: 'Data retention policy (auto-purge audit logs > 90 days)', effort: '4h', status: 'FIXED', notes: '2026-03-20' },
       { id: 'M9', title: 'Profile editing: avatar upload', effort: '4h', status: 'FIXED', notes: '2026-03-20' },
-      { id: 'M10', title: 'Fix Loki volume mount (logs lost on restart)', effort: '1h', status: 'TODO' },
+      { id: 'M10', title: 'Fix Loki volume mount (logs lost on restart)', effort: '1h', status: 'FIXED', notes: 'Named loki_data volume is declared and mounted' },
       { id: 'M11', title: 'GDPR data export endpoint', effort: '1d', status: 'FIXED', notes: '2026-03-20' },
-      { id: 'M12', title: 'Security alert emails (new login, password changed)', effort: '4h', status: 'TODO' },
+      { id: 'M12', title: 'Security alert emails (new login, password changed)', effort: '4h', status: 'FIXED', notes: 'Password-changed and new-login alerts shipped through #117' },
     ],
   },
   {
@@ -195,7 +183,7 @@ const sections: Section[] = [
 ];
 
 const knownIssues: BacklogItem[] = [
-  { id: 'K4', title: 'Display client has 0 test coverage', status: 'TODO', notes: 'Applies to vizora-tv repo — assign to Android app developer' },
+  { id: 'K4', title: 'Display client has 0 test coverage', status: 'FIXED', notes: 'Electron display Jest suite, typecheck, and build are CI-gated; real-device walkthrough still required' },
   { id: 'K5', title: '3 pre-existing RSC admin test failures', status: 'TODO', notes: 'React Server Component edge cases' },
   { id: 'K6', title: 'AI Designer returns "launching soon" stub', status: 'TODO', notes: 'Intentional — needs API budget' },
   { id: 'K7', title: 'Push-to-group iterates client-side', status: 'FIXED', notes: 'Fleet control — unified command endpoint' },
@@ -203,14 +191,14 @@ const knownIssues: BacklogItem[] = [
 ];
 
 const metrics: Array<{ label: string; start: string; current: string; target: string }> = [
-  { label: 'Test suites', start: '~89', current: '186', target: '175+' },
-  { label: 'Total tests', start: '1,734', current: '3,060+', target: '2,000+' },
+  { label: 'Test suites', start: '~89', current: '200+', target: 'keep green' },
+  { label: 'Total tests', start: '1,734', current: '3,400+', target: 'keep green' },
   { label: 'Test pass rate', start: '99.9%', current: '100%', target: '100%' },
-  { label: 'P0 blockers', start: '8', current: '0*', target: '0' },
+  { label: 'P0 gates', start: '8', current: '3 + smoke', target: '0' },
   { label: 'API 400 errors', start: '4', current: '0', target: '0' },
   { label: 'Template 404s', start: '100+', current: '0', target: '0' },
   { label: 'Health layers', start: '2', current: '5', target: '5' },
-  { label: 'Prod readiness', start: '78%', current: '~95%', target: '95%+' },
+  { label: 'Repo readiness', start: '78%', current: 'operator-gated', target: 'customer-ready' },
 ];
 
 // ---------------------------------------------------------------------------
@@ -253,6 +241,8 @@ const colorMap: Record<string, { bg: string; border: string; text: string; badge
 function StatusIcon({ status }: { status: string }) {
   if (status === 'FIXED') return <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />;
   if (status === 'IN_PROGRESS') return <Clock className="w-4 h-4 text-blue-500 flex-shrink-0 animate-pulse" />;
+  if (status === 'BLOCKED') return <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />;
+  if (status === 'DEFERRED') return <Clock className="w-4 h-4 text-[var(--foreground-tertiary)] flex-shrink-0" />;
   return <Circle className="w-4 h-4 text-[var(--foreground-tertiary)] flex-shrink-0" />;
 }
 
@@ -264,7 +254,7 @@ function CollapsibleSection({ section }: { section: Section }) {
   const [open, setOpen] = useState(section.id === 'p0');
   const c = colorMap[section.color];
   const Icon = section.icon;
-  const todoCount = section.items.filter((i) => i.status === 'TODO').length;
+  const todoCount = section.items.filter((i) => i.status === 'TODO' || i.status === 'BLOCKED').length;
   const doneCount = section.items.filter((i) => i.status === 'FIXED').length;
 
   return (
@@ -284,7 +274,7 @@ function CollapsibleSection({ section }: { section: Section }) {
             <span className="text-xs text-[var(--foreground-tertiary)]">{section.totalEffort}</span>
           )}
           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${c.badge}`}>
-            {todoCount} todo
+            {todoCount} open
           </span>
           {doneCount > 0 && (
             <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
@@ -338,7 +328,10 @@ function CollapsibleSection({ section }: { section: Section }) {
 
 export default function BacklogClient() {
   const [showCompleted, setShowCompleted] = useState(false);
-  const totalTodo = sections.reduce((acc, s) => acc + s.items.filter((i) => i.status === 'TODO').length, 0);
+  const totalTodo = sections.reduce(
+    (acc, s) => acc + s.items.filter((i) => i.status === 'TODO' || i.status === 'BLOCKED').length,
+    0,
+  );
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -346,7 +339,7 @@ export default function BacklogClient() {
       <div>
         <h1 className="text-3xl font-bold text-[var(--foreground)]">Project Backlog</h1>
         <p className="mt-1 text-[var(--foreground-secondary)]">
-          Last updated: 2026-03-21 &middot; Production readiness: ~96% &middot; Deployed
+          Last updated: 2026-06-03 &middot; Customer-1 launch status: blocked on operator gates &middot; Repo-only fixes in progress
         </p>
       </div>
 
@@ -367,7 +360,7 @@ export default function BacklogClient() {
           ))}
         </div>
         <p className="text-xs text-[var(--foreground-tertiary)] mt-2">
-          *Remaining P0s are config-only: SMTP setup, Stripe/Razorpay keys, final smoke test
+          Remaining P0s are operator-only: SMTP/Resend verification, customer org provisioning, real-device walkthrough, and production smoke. Billing/live payments deferred past customer-1. Customer-1 launches on free tier.
         </p>
       </div>
 
@@ -375,7 +368,7 @@ export default function BacklogClient() {
       <div className="flex items-center gap-4 text-sm">
         <span className="text-[var(--foreground-secondary)]">{totalTodo} items remaining</span>
         <span className="text-[var(--foreground-tertiary)]">&middot;</span>
-        <span className="text-green-600 dark:text-green-400">{completed.length} completed this sprint</span>
+        <span className="text-green-600 dark:text-green-400">{completed.length} historical completed items</span>
       </div>
 
       {/* Priority sections */}
@@ -413,7 +406,7 @@ export default function BacklogClient() {
           <div className="flex items-center gap-3">
             {showCompleted ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
             <CheckCircle className="w-5 h-5 text-green-500" />
-            <h3 className="text-base font-semibold text-[var(--foreground)]">Completed This Sprint</h3>
+            <h3 className="text-base font-semibold text-[var(--foreground)]">Completed Historical Items</h3>
           </div>
           <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
             {completed.length} items
@@ -439,12 +432,12 @@ export default function BacklogClient() {
         </h3>
         <div className="space-y-3">
           {[
-            { phase: 'Week 1 (Now)', desc: 'P0 Blockers — SMTP, Billing, Smoke Test', color: 'bg-red-500' },
-            { phase: 'Soft Launch', desc: 'After P0 cleared — invite 5-10 beta users', color: 'bg-orange-500' },
-            { phase: 'Weeks 2-3', desc: 'P1 — Offline alerts, monitoring, error pages, help docs', color: 'bg-yellow-500' },
-            { phase: 'Month 1', desc: 'P2 — Weather widget, Google Sheets, CDN, templates, GDPR', color: 'bg-blue-500' },
-            { phase: 'Quarter 1', desc: 'P3 — OAuth, AI Designer, RSS, social feeds, approvals', color: 'bg-indigo-500' },
-            { phase: 'Future', desc: 'P4 — 2FA, SSO, Fire TV, Chromecast, kiosk, video wall', color: 'bg-gray-500' },
+            { phase: 'Customer-1 launch gates', desc: 'C1-C4: SMTP verification, org provisioning, real hardware walkthrough, prod smoke', color: 'bg-red-500' },
+            { phase: 'Soft launch', desc: 'After operator gates clear, invite 5-10 beta users', color: 'bg-orange-500' },
+            { phase: 'Launch week', desc: 'Manual uptime monitoring setup and customer-1 follow-through', color: 'bg-yellow-500' },
+            { phase: 'Month 1', desc: 'CDN, template expansion, and post-launch backlog hardening', color: 'bg-blue-500' },
+            { phase: 'Quarter 1', desc: 'Per-user flags, AI designer when budgeted, and deeper template work', color: 'bg-indigo-500' },
+            { phase: 'Future', desc: '2FA, SSO, Fire TV, Chromecast, kiosk, video wall', color: 'bg-gray-500' },
           ].map((r, i) => (
             <div key={i} className="flex items-start gap-3">
               <div className={`w-3 h-3 rounded-full ${r.color} mt-1 flex-shrink-0`} />

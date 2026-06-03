@@ -1,5 +1,84 @@
 # Vizora - Task Tracker
 
+## Active Workstream: Backlog Readiness Truth Pass 61 (2026-06-03)
+
+**Branch:** `fix/overnight-readiness-followup`
+
+**Why now:** The public `/backlog` page and admin backlog page reuse a static
+client component that still reports March-era state: production readiness near
+96%, `Deployed`, billing/payment setup as launch-blocking, and several items as
+TODO that `backlog.md` now marks shipped or deferred. That is false readiness
+evidence for operators and any public viewer checking launch status.
+
+**New primitives introduced:** none planned. This is a data/copy/test update
+for an existing Next.js page component. No new route, model, migration, env var,
+process, realtime event, MCP tool, Hermes skill, AI/provider spend path, or
+production runtime change is expected.
+
+**Hermes-first analysis:** checked per project convention. This is deterministic
+UI backlog/readiness copy, not a business-agent, MCP, Hermes runtime, or
+provider-spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Backlog/readiness display copy | none applicable | update existing Next.js page data |
+| Static regression guard | none applicable | add local web component tests |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+static backlog/readiness UI truthfulness.
+
+**Plan**
+- [x] Add a failing web test proving the backlog page reports the current
+      customer-1 gates, deferred billing state, and no stale deployed/96% claim.
+- [x] Update `web/src/app/admin/backlog/page-client.tsx` to match the current
+      reconciled `backlog.md` launch status.
+- [x] Update Pass 60 evidence/checklist now that PR #200 merged green.
+- [x] Run focused web tests, TypeScript, diff hygiene, and secret scan.
+- [x] Request Claude Code review and resolve findings.
+- [ ] Commit, PR, CI, and merge if green.
+- [ ] Do not deploy by default; hand off deploy/runtime status and remaining
+      operator-only blockers.
+
+**Evidence so far**
+- Current `origin/main`: `ab2df0e359f1668e24be0ae8829406bb03499256`.
+- Drift-check:
+  - `backlog.md` now identifies C1-C4 as the customer-1 launch gates, with
+    Stripe/Razorpay live setup deferred past customer-1.
+  - `web/src/app/admin/backlog/page-client.tsx` still rendered March-era B1-B16
+    launch blockers, `Production readiness: ~96%`, and `Deployed`.
+  - `/backlog` publicly imports the same stale admin backlog component.
+- Red focused run:
+  - `pnpm --filter @vizora/web test -- --runInBand --runTestsByPath src/app/admin/backlog/__tests__/backlog-page.test.tsx`
+    failed as expected: current C1-C4/deferred-billing assertions were missing,
+    while the stale March readiness text rendered.
+- Fix:
+  - Replaced P0 B-series launch blockers with C1-C4 operator gates.
+  - Marked customer-1 billing/live payments as deferred and free-tier launch as
+    the current path.
+  - Removed stale `~96%`/`Deployed` readiness wording from the public/admin
+    backlog surface.
+  - Added explicit blocked-state rendering and open-gate counting for C4.
+  - Reconciled stale L1/M10/M12/K4 statuses against the current backlog.
+- Green focused run:
+  - `pnpm --filter @vizora/web test -- --runInBand --runTestsByPath src/app/admin/backlog/__tests__/backlog-page.test.tsx`
+    => 2/2 tests passing.
+- Static/hygiene verification:
+  - `pnpm --filter @vizora/web exec tsc --noEmit --pretty false` => passing.
+  - `git diff --check -- web/src/app/admin/backlog/page-client.tsx web/src/app/admin/backlog/__tests__/backlog-page.test.tsx tasks/todo.md`
+    => exit 0, with LF/CRLF normalization warnings only.
+  - `pnpm security:no-hardcoded-jwts` => passing.
+  - `$env:NODE_OPTIONS='--max-old-space-size=4096'; $env:NEXT_PUBLIC_API_URL='https://vizora.cloud/api/v1'; $env:NEXT_PUBLIC_SOCKET_URL='https://vizora.cloud'; $env:BACKEND_URL='http://localhost:3000'; pnpm --filter @vizora/web build`
+    => passing, with existing Next.js middleware/proxy and TypeScript project
+    reference warnings only.
+- Claude Code review:
+  - Initial review returned `COMMENT` with a medium public-exposure finding:
+    the public `/backlog` route shares the admin backlog component and would
+    expose named owner labels.
+  - Fixed by genericizing C1-C4 owner labels to `Operator`, `Operator +
+    customer IT`, and `Operator + reviewer`, then added a negative regression
+    assertion for the personal name.
+  - Final re-review returned `APPROVE`.
+
 ## Active Workstream: Admin Health Overall Status Pass 60 (2026-06-03)
 
 **Branch:** `fix/admin-health-overall-status`
@@ -37,8 +116,8 @@ local admin health aggregate calculation.
       response shape instead of a frontend-only mock shape.
 - [x] Run focused middleware/web tests, TypeScript checks, diff hygiene,
       production-style web build, and secret scan.
-- [ ] Request Claude Code review and resolve findings.
-- [ ] Commit, PR, CI, and merge if green.
+- [x] Request Claude Code review and resolve findings.
+- [x] Commit, PR, CI, and merge if green.
 - [ ] Do not deploy by default; hand off deploy/runtime status and remaining
       operator-only blockers.
 
@@ -99,6 +178,9 @@ local admin health aggregate calculation.
     those low-cost notes were addressed before commit.
   - Final residual note about shallow backend-shape guarding was also fixed and
     covered by a partial-service-data regression test.
+- PR/CI:
+  - PR #200 merged at `ab2df0e359f1668e24be0ae8829406bb03499256`.
+  - GitHub CI passed: audit, build, lint, security, test, and e2e.
 
 ## Active Workstream: Admin Platform Health Routes Pass 59 (2026-06-03)
 
