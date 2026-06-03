@@ -63,6 +63,31 @@ test('gitignore protects SSH output files captured by operator runbooks', () => 
   assert.match(gitignore, /^\.ssh_\*\.txt$/m);
 });
 
+test('backlog uses current customer-1 C-series launch gate truth', () => {
+  const backlog = readRepoFile('backlog.md');
+
+  assert.match(backlog, /Customer-1 launch date:\*\* operator-confirmed/i);
+  assert.match(backlog, /## P0 .*customer-1 \(operator-gated launch\)/i);
+  assert.match(
+    backlog,
+    /\|\s*\*\*C4\*\*\s*\|\s*\*\*Final go-live smoke test on prod\*\*/,
+  );
+  assert.doesNotMatch(backlog, /Customer-1 launch target:\*\* 2026-05-13/);
+  assert.doesNotMatch(backlog, /\|\s*\*\*C4\*\*\s*\|\s*B16/);
+  assert.doesNotMatch(
+    backlog,
+    /Remaining P0s are config-only: SMTP setup, Stripe\/Razorpay keys, final smoke test/,
+  );
+  assert.doesNotMatch(
+    backlog,
+    /WEEK 1 \(NOW\):\s+P0 Blockers .*SMTP, Billing, Smoke Test/,
+  );
+  assert.match(
+    backlog,
+    /Customer-1 remaining gates: C1 SMTP\/Resend verification\/test send, C2 customer-1 org provisioning, C3 real-device walkthrough, C4 final go-live smoke\./,
+  );
+});
+
 test('realtime Docker healthcheck probes the prefixed health endpoint', () => {
   const dockerfile = readRepoFile('docker/Dockerfile.realtime');
 
