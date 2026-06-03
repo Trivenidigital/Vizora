@@ -5,7 +5,7 @@ declare module './client' {
     sendFleetCommand(data: {
       command: string;
       target: { type: string; id: string };
-      payload?: { contentId?: string; duration?: number; priority?: string };
+      payload?: { contentId?: string; duration?: number; priority?: string; feedUrl?: string };
     }): Promise<{
       commandId: string;
       command: string;

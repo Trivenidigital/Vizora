@@ -40,6 +40,7 @@ export interface Playlist {
 export enum DeviceCommandType {
   RELOAD = 'reload',
   RESTART = 'restart',
+  UPDATE = 'update',
   UPDATE_CONFIG = 'update_config',
   CLEAR_CACHE = 'clear_cache',
   SCREENSHOT = 'screenshot',

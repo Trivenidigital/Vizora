@@ -36,6 +36,11 @@ jest.mock('http', () => {
   };
 });
 
+const mockTriggerDisplayAutoUpdate = jest.fn();
+jest.mock('./display-auto-updater', () => ({
+  triggerDisplayAutoUpdate: (...args: any[]) => mockTriggerDisplayAutoUpdate(...args),
+}));
+
 jest.mock('electron', () => ({
   BrowserWindow: {
     getAllWindows: jest.fn().mockReturnValue([]),
@@ -75,6 +80,10 @@ describe('DeviceClient', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    mockTriggerDisplayAutoUpdate.mockReturnValue({
+      status: 'started',
+      feedUrl: 'https://updates.vizora.cloud/display',
+    });
 
     mockConfig = {
       onPairingRequired: jest.fn(),
@@ -705,6 +714,48 @@ describe('DeviceClient', () => {
       expect(mockConfig.onCommand).not.toHaveBeenCalled();
       expect(mockWindow.loadURL).toHaveBeenCalledWith('file:///display/index.html');
       expect(ack).toHaveBeenCalledWith({ ok: true });
+    });
+
+    it('should trigger display auto-update in the main process', async () => {
+      client.connect('test-token');
+
+      const commandCall = mockSocket.on.mock.calls.find(
+        (call: any[]) => call[0] === 'command',
+      );
+      const ack = jest.fn();
+
+      await commandCall![1]({
+        type: 'update',
+        payload: { feedUrl: 'https://updates.vizora.cloud/display' },
+      }, ack);
+
+      expect(mockConfig.onCommand).not.toHaveBeenCalled();
+      expect(mockTriggerDisplayAutoUpdate).toHaveBeenCalledWith(
+        'https://updates.vizora.cloud/display',
+      );
+      expect(ack).toHaveBeenCalledWith({ ok: true });
+    });
+
+    it('should negative-ack update when the updater helper rejects the feed', async () => {
+      mockTriggerDisplayAutoUpdate.mockImplementation(() => {
+        throw new Error('display update feed host is not allowlisted');
+      });
+      client.connect('test-token');
+
+      const commandCall = mockSocket.on.mock.calls.find(
+        (call: any[]) => call[0] === 'command',
+      );
+      const ack = jest.fn();
+
+      await commandCall![1]({
+        type: 'update',
+        payload: { feedUrl: 'https://updates.attacker.example/display' },
+      }, ack);
+
+      expect(ack).toHaveBeenCalledWith({
+        ok: false,
+        error: 'display update feed host is not allowlisted',
+      });
     });
 
     it('should start heartbeat on connect event', () => {

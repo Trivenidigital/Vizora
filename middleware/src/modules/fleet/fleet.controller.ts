@@ -33,6 +33,9 @@ export class FleetController {
     if (dto.payload?.priority === 'emergency' && user.role !== 'admin') {
       throw new ForbiddenException('Emergency override requires admin role');
     }
+    if (dto.command === 'update' && user.role !== 'admin') {
+      throw new ForbiddenException('Display app updates require admin role');
+    }
     return this.fleetService.sendCommand(orgId, user.id, user.role, dto);
   }
 

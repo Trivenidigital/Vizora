@@ -86,6 +86,39 @@ describe('FleetController', () => {
 
       expect(fleetService.sendCommand).toHaveBeenCalled();
     });
+
+    it('should throw ForbiddenException for display update with non-admin', async () => {
+      const user = { id: 'user-1', role: 'manager', organizationId: mockOrgId };
+      const dto = {
+        command: 'update' as const,
+        target: { type: 'device' as const, id: 'dev-1' },
+        payload: { feedUrl: 'https://updates.vizora.cloud/display' },
+      } as any;
+
+      await expect(
+        controller.sendCommand(user, mockOrgId, dto),
+      ).rejects.toThrow(ForbiddenException);
+
+      expect(fleetService.sendCommand).not.toHaveBeenCalled();
+    });
+
+    it('should allow display update for admin', async () => {
+      const user = { id: 'user-1', role: 'admin', organizationId: mockOrgId };
+      const dto = {
+        command: 'update' as const,
+        target: { type: 'device' as const, id: 'dev-1' },
+        payload: { feedUrl: 'https://updates.vizora.cloud/display' },
+      } as any;
+
+      await controller.sendCommand(user, mockOrgId, dto);
+
+      expect(fleetService.sendCommand).toHaveBeenCalledWith(
+        mockOrgId,
+        user.id,
+        user.role,
+        dto,
+      );
+    });
   });
 
   describe('getActiveOverrides', () => {
