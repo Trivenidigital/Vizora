@@ -43,6 +43,40 @@ test('realtime Docker healthcheck probes the prefixed health endpoint', () => {
   assert.doesNotMatch(dockerfile, /localhost:3002\/health['"]/);
 });
 
+test('middleware Docker healthcheck probes the versioned health endpoint', () => {
+  const dockerfile = readRepoFile('docker/Dockerfile.middleware');
+
+  assert.match(dockerfile, /http:\/\/localhost:3000\/api\/v1\/health/);
+  assert.doesNotMatch(dockerfile, /localhost:3000\/api\/health['"]/);
+});
+
+test('Docker README documents current app service health endpoints', () => {
+  const readme = readRepoFile('docker/README.md');
+
+  assert.match(readme, /curl http:\/\/localhost:3000\/api\/v1\/health/);
+  assert.match(readme, /curl http:\/\/localhost:3002\/api\/health/);
+  assert.match(readme, /curl http:\/\/localhost:3001\r?\n/);
+  assert.doesNotMatch(readme, /localhost:3000\/api\/health/);
+  assert.doesNotMatch(readme, /localhost:3001\/api\/health/);
+});
+
+test('Docker README preserves realtime single-instance guidance', () => {
+  const readme = readRepoFile('docker/README.md');
+
+  assert.match(readme, /Realtime gateway[^\r\n]+MUST stay single-instance/i);
+  assert.doesNotMatch(readme, /--scale realtime=2/);
+});
+
+test('Docker README does not present PM2 app services as compose services', () => {
+  const readme = readRepoFile('docker/README.md');
+
+  assert.match(readme, /docker-compose\.yml starts infrastructure/i);
+  assert.match(readme, /application services run under PM2/i);
+  assert.doesNotMatch(readme, /docker exec vizora-middleware/);
+  assert.doesNotMatch(readme, /docker-compose logs -f middleware/);
+  assert.doesNotMatch(readme, /--scale middleware=3/);
+});
+
 test('health guardian probes realtime at the prefixed health endpoint', () => {
   const guardian = readRepoFile('scripts/ops/health-guardian.ts');
 
