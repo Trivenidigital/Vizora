@@ -94,7 +94,7 @@ fi
 
 Pass `costMicrodollars=$(round_to_microdollars $COST_DELTA)` to the POST body. Middleware writes it directly into the `agent_runs` row alongside the metadata.
 
-The sidecar's role shrinks to: orphan-row sweep + outcome refinement (which still works via `mcp_audit_log` join — assuming Path B for `agentRunId` propagation also lands).
+The sidecar's role shrinks to: orphan-row sweep + outcome refinement. Pass73 keeps outcome refinement useful before precise `agentRunId` propagation lands by falling back to MCP audit `agentName` candidates for the skill plus the firing window when exact `agentRunId` rows are absent.
 
 ## Status
 
@@ -105,4 +105,8 @@ The sidecar's role shrinks to: orphan-row sweep + outcome refinement (which stil
   `costMicrodollars` on the initial `agent_runs` POST; middleware validates and
   persists that value. Production collection starts only after normal deploy; no
   prod firing or provider call was performed by this repo-side change.
+- Outcome fallback (Path D): implemented in pass73. Empty audit evidence no
+  longer false-refines successful firings to `no_work`; fallback audit rows are
+  grouped by MCP audit `agentName` candidates and firing window until precise
+  per-run MCP headers are available.
 - Long-term (Path B / C): backlog

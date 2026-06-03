@@ -83,15 +83,27 @@ Path A (upstream Hermes contribution) tracked in `tasks/feature-backlog.md` for 
 
 ## Implementation: enable the time-range fallback in the sidecar
 
-The sidecar at `scripts/agents/hermes/poll-insights.ts` currently joins `mcp_audit_log` ONLY by `agentRunId`. When that's NULL on every row (today's reality), the join finds 0 rows and the outcome refinement marks every successful firing as `no_work` — incorrect.
+The sidecar at `scripts/agents/hermes/poll-insights.ts` used to join `mcp_audit_log` ONLY by `agentRunId`. When that's NULL on every row (today's reality), the join found 0 rows and the outcome refinement marked every successful firing as `no_work` — incorrect.
 
-Add a fallback path: if `agentRunId` is consistently NULL for the firing's time window, fall back to a time-range + agentName join with a `confidence: 'low'` flag.
+Pass73 implemented Path D repo-side:
 
-(Implementation deferred — minor monitoring fix, not customer-blocking.)
+- `scripts/agents/hermes/outcome-refinement.ts` classifies audit status groups.
+- `poll-insights.ts` queries exact `agentRunId` groups first.
+- If exact groups are absent, it falls back to `agentRunId: null` + MCP audit
+  `agentName` candidates for the skill (for example
+  `vizora-customer-lifecycle` also checks `hermes-customer-lifecycle`) + the
+  firing's `startedAt`/`finishedAt` window with a small boundary pad.
+- Concrete audit-derived outcomes, including confirmed `success`, are PATCHed
+  through the existing internal endpoint so `enrichedAt` is set and valid runs
+  are not later orphan-swept as `runner_crash`.
+- If neither exact nor fallback rows exist, it leaves the provisional `success` row unrefined instead of writing `no_work`.
+
+There is no schema column for an explicit fallback confidence flag today, so the lower-confidence fallback is documented and covered by ops tests rather than persisted on the row.
 
 ## Status
 
 - Finding documented: ✅ this file
-- Sidecar Path D fallback: tracked in `tasks/feature-backlog.md` as P2
+- Sidecar Path D fallback: implemented repo-side in pass73
 - Path A upstream contribution: tracked as long-term feedback to Hermes maintainers
-- Customer #1 impact: NONE (cost defense intact, monitoring slightly degraded)
+- Remaining precise `agentRunId` propagation: deferred to Hermes upstream `--header` support or a verified env-var interpolation path
+- Customer #1 impact: NONE (cost defense intact, monitoring gracefully degrades when precise headers are unavailable)

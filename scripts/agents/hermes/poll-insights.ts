@@ -33,8 +33,13 @@
 // pattern used by scripts/ops/*.ts).
 import 'dotenv/config';
 import { execFileSync } from 'node:child_process';
-import { PrismaClient } from '@vizora/database';
+import { Prisma, PrismaClient } from '@vizora/database';
 import { parseHermesInsightsTable, type InsightsRow } from './insights-parser';
+import {
+  classifyAuditOutcome,
+  mcpAuditAgentNamesForSkill,
+  type AuditStatusGroup,
+} from './outcome-refinement';
 // Single source of truth for model rates (PR-review R1 I2: was duplicated).
 // The sidecar imports from middleware's schemas module by relative path —
 // tsx resolves it via the standard node module algorithm at runtime.
@@ -43,6 +48,7 @@ import { MODEL_RATES } from '../../../middleware/src/modules/agents/agent-runs.s
 const PRISMA = new PrismaClient();
 const MIDDLEWARE_URL = process.env.MIDDLEWARE_URL ?? 'http://localhost:3000';
 const INTERNAL_API_KEY = process.env.INTERNAL_API_SECRET ?? '';
+const AUDIT_FALLBACK_WINDOW_PADDING_MS = 5 * 1000;
 
 async function main(): Promise<void> {
   const insightsOutput = runHermesInsights();
@@ -246,14 +252,17 @@ async function sweepOrphans(): Promise<number> {
 }
 
 /**
- * Joins agent_runs to mcp_audit_log via agentRunId. Refines `success`
- * outcomes to `tool_error` / `partial` / `no_work` per ADL-3.
+ * Joins agent_runs to mcp_audit_log. Exact `agentRunId` rows win. Hermes
+ * 0.12.0 cannot yet propagate per-run headers, so current MCP audit rows can
+ * have null `agentRunId`; in that case we fall back to agentName + firing
+ * window and only refine when audit evidence exists.
  *
  * Mutually exclusive (Reviewer A D10):
  *   - success      = all calls succeeded
  *   - partial      = ≥1 success AND ≥1 failure
  *   - tool_error   = 0 successes AND ≥1 failure
- *   - no_work      = 0 calls at all (skill made no MCP calls)
+ *   - no_work      = not inferred from absent audit rows until precise
+ *                    per-run MCP headers exist.
  */
 async function refineOutcomesFromAuditLog(): Promise<number> {
   // Look at agent_runs with provisional `success` from the last hour
@@ -261,31 +270,74 @@ async function refineOutcomesFromAuditLog(): Promise<number> {
   // non-success state — outcome is otherwise immutable).
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
   const candidates = await PRISMA.agentRun.findMany({
-    where: { outcome: 'success', startedAt: { gte: oneHourAgo } },
-    select: { id: true },
+    where: {
+      outcome: 'success',
+      enrichedAt: null,
+      startedAt: { gte: oneHourAgo },
+    },
+    select: { id: true, skillName: true, startedAt: true, finishedAt: true },
   });
   let refined = 0;
-  for (const { id } of candidates) {
-    const groups = await PRISMA.mcpAuditLog.groupBy({
-      by: ['status'],
-      where: { agentRunId: id },
-      _count: { _all: true },
-    });
-    const successes = groups.find((g) => g.status === 'success')?._count._all ?? 0;
-    const failures = groups
-      .filter((g) => g.status !== 'success')
-      .reduce((sum, g) => sum + g._count._all, 0);
-    let next: 'success' | 'partial' | 'tool_error' | 'no_work' = 'success';
-    if (successes === 0 && failures === 0) next = 'no_work';
-    else if (successes === 0 && failures > 0) next = 'tool_error';
-    else if (successes > 0 && failures > 0) next = 'partial';
-    else next = 'success';
-    if (next !== 'success') {
-      const ok = await patchRun(id, { outcomeRefinement: next });
+  for (const row of candidates) {
+    const { groups } = await loadAuditStatusGroupsForRun(row);
+    const { outcome } = classifyAuditOutcome(groups);
+
+    // Patch confirmed `success` too: the middleware sets enrichedAt on PATCH,
+    // which prevents the orphan sweep from later misclassifying valid runs.
+    if (outcome) {
+      const ok = await patchRun(row.id, { outcomeRefinement: outcome });
       if (ok) refined++;
     }
   }
   return refined;
+}
+
+async function loadAuditStatusGroupsForRun(row: {
+  id: string;
+  skillName: string;
+  startedAt: Date;
+  finishedAt: Date | null;
+}): Promise<{
+  groups: AuditStatusGroup[];
+  source: 'agentRunId' | 'timeRange' | 'none';
+}> {
+  const exactGroups = await groupAuditStatuses({ agentRunId: row.id });
+  if (exactGroups.length > 0) {
+    return { groups: exactGroups, source: 'agentRunId' };
+  }
+
+  const fallbackStart = new Date(
+    row.startedAt.getTime() - AUDIT_FALLBACK_WINDOW_PADDING_MS,
+  );
+  const fallbackEndBase = row.finishedAt ?? row.startedAt;
+  const fallbackEnd = new Date(
+    fallbackEndBase.getTime() + AUDIT_FALLBACK_WINDOW_PADDING_MS,
+  );
+  const fallbackGroups = await groupAuditStatuses({
+    agentRunId: null,
+    agentName: { in: mcpAuditAgentNamesForSkill(row.skillName) },
+    createdAt: { gte: fallbackStart, lte: fallbackEnd },
+  });
+
+  if (fallbackGroups.length > 0) {
+    return { groups: fallbackGroups, source: 'timeRange' };
+  }
+  return { groups: [], source: 'none' };
+}
+
+async function groupAuditStatuses(
+  where: Prisma.McpAuditLogWhereInput,
+): Promise<AuditStatusGroup[]> {
+  const groups = await PRISMA.mcpAuditLog.groupBy({
+    by: ['status'],
+    where,
+    _count: { _all: true },
+  });
+
+  return groups.map((g) => ({
+    status: g.status,
+    count: g._count._all,
+  }));
 }
 
 main()
