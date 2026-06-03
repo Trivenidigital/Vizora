@@ -333,6 +333,21 @@ export class StartupSelfTestService implements OnApplicationBootstrap {
       };
     }
 
+    const appUrlCheck = this.checkProductionEmailAppUrl();
+    if (!appUrlCheck.passed) {
+      return {
+        passed: false,
+        message: appUrlCheck.message,
+        duration_ms: Date.now() - start,
+        configured,
+        details: {
+          APP_URL: !!process.env.APP_URL,
+          FRONTEND_URL: !!process.env.FRONTEND_URL,
+          WEB_URL: !!process.env.WEB_URL,
+        },
+      };
+    }
+
     // Verify SMTP connectivity (connect only, don't send)
     try {
       const nodemailer = await import('nodemailer');
@@ -359,6 +374,52 @@ export class StartupSelfTestService implements OnApplicationBootstrap {
         message: `SMTP configured but connection failed: ${error instanceof Error ? error.message : String(error)}`,
         duration_ms: Date.now() - start,
         configured,
+      };
+    }
+  }
+
+  private checkProductionEmailAppUrl(): { passed: boolean; message: string } {
+    if (process.env.NODE_ENV !== 'production') {
+      return { passed: true, message: 'Email app URL check skipped outside production' };
+    }
+
+    const source = process.env.APP_URL
+      ? 'APP_URL'
+      : process.env.FRONTEND_URL
+        ? 'FRONTEND_URL'
+        : process.env.WEB_URL
+          ? 'WEB_URL'
+          : null;
+    const appUrl = source ? process.env[source] : undefined;
+
+    if (!appUrl) {
+      return {
+        passed: false,
+        message: 'SMTP configured in production but APP_URL, FRONTEND_URL, or WEB_URL is missing; transactional email links need a public app URL',
+      };
+    }
+
+    try {
+      const parsed = new URL(appUrl);
+      const hostname = parsed.hostname.toLowerCase();
+      const isLocalhost =
+        hostname === 'localhost' ||
+        hostname === '0.0.0.0' ||
+        hostname === '[::1]' ||
+        hostname.startsWith('127.');
+
+      if (parsed.protocol !== 'https:' || isLocalhost) {
+        return {
+          passed: false,
+          message: `${source} must be a public HTTPS URL for production transactional email links`,
+        };
+      }
+
+      return { passed: true, message: `${source} is a public transactional email-link URL` };
+    } catch {
+      return {
+        passed: false,
+        message: `${source} must be a public HTTPS URL for production transactional email links`,
       };
     }
   }
