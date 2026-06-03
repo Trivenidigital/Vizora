@@ -1,6 +1,6 @@
 # Vizora - Task Tracker
 
-## Active Workstream: Shared Public App URL Resolver Pass 69 (2026-06-03)
+## Completed Workstream: Shared Public App URL Resolver Pass 69 (2026-06-03)
 
 **Branch:** `fix/public-app-url-resolver`
 
@@ -36,11 +36,17 @@ local env-var URL resolution.
 - [x] Run focused pairing/auth/mail/billing/organization/health tests, build,
       diff hygiene, and secret scan.
 - [x] Request Claude Code review and resolve findings.
-- [ ] Commit, PR, CI, and merge if green.
+- [x] Commit, PR, CI, and merge if green.
 - [x] Do not deploy, send real emails, or touch production env state.
 
-**Evidence so far**
-- Current `origin/main`: `3aee89941fc851852acbc2060623efaa7a2d6358`.
+**Evidence**
+- Branch/PR:
+  - Branch: `fix/public-app-url-resolver`.
+  - Commit: `88ecf1bf` (`fix(middleware): unify public app URL resolution`).
+  - PR #209: `fix(middleware): unify public app URL resolution`.
+  - Merge commit: `5d15fff380edd8fef4bf8fe48e15c1f15bdd391b`.
+  - GitHub CI passed audit, build, e2e, lint, security, and test before merge.
+- Starting `origin/main`: `3aee89941fc851852acbc2060623efaa7a2d6358`.
 - Drift-check:
   - `mail.service.ts` and `auth.service.ts` use
     `APP_URL || FRONTEND_URL || WEB_URL || localhost`.
