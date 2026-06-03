@@ -111,7 +111,9 @@ Run in this order:
 9. Generate pairing code, pair the SAME display from T-3 walkthrough → verify still online
 10. Push a NEW image → verify display swaps within 30s
 
-Record everything in `docs/runbooks/customer-1-go-live-smoke-{DATE}.md` with timestamps.
+Copy `docs/runbooks/customer-1-go-live-smoke-template.md` to
+`docs/runbooks/customer-1-go-live-smoke-{DATE}.md` before starting, then record
+every C1-C4 result there with timestamps.
 
 ### 2. Optional: Playwright customer-critical browser smoke
 GitHub's `e2e` check is a narrow middleware Jest gate, not this browser
@@ -133,7 +135,8 @@ pnpm e2e:customer-critical -- --reporter=list
 
 If this fails at preflight, the local services are not up; fix that before
 interpreting Playwright output. If specs fail, record the failing spec names in
-`docs/runbooks/customer-1-go-live-smoke-{DATE}.md` and use
+`docs/runbooks/customer-1-go-live-smoke-{DATE}.md` from the
+`docs/runbooks/customer-1-go-live-smoke-template.md` template and use
 `api-critical-path.sh` plus the real-device walkthrough as the launch-critical
 substitute until the browser drift is fixed.
 

@@ -1,6 +1,63 @@
 # Vizora - Task Tracker
 
-## Active Workstream: Email Readiness Smoke Helper Pass 78 (2026-06-03)
+## Active Workstream: C4 Go-Live Smoke Template Pass 79 (2026-06-03)
+
+**Branch:** `fix/readiness-pass79`
+
+**Why now:** PR #219 closed the repo-side C1 email readiness helper gap, but
+C4 still told the operator to create `customer-1-go-live-smoke-{DATE}.md`
+without a reusable evidence template. That leaves the final GO/NO-GO report
+operator-dependent in structure, making it easy to omit C1-C4 evidence, CI
+state, production SHA, or SSH output artifacts during launch pressure.
+
+**Drift-check:** `docs/runbooks/first-customer-onboarding.md` references
+`docs/runbooks/customer-1-go-live-smoke-{DATE}.md`, but no
+`customer-1-go-live-smoke-template.md` exists under `docs/runbooks/`.
+`backlog.md` C4 points at the dated report only.
+
+**New primitives introduced:** one Markdown runbook template plus static
+release-readiness assertions. No runtime code, DB model/migration, public API,
+PM2 process, env var, MCP tool, Hermes skill, provider-spend path, production
+deploy, prod env edit, customer email send, payment setup, or hardware action
+is planned.
+
+**Hermes-first analysis:** not applicable. This is launch evidence/runbook
+structure, not a business-agent, MCP, Hermes runtime, or AI/provider-spend
+path.
+
+**Plan**
+- [x] Add failing readiness-gate assertions requiring a reusable C4 smoke
+      template and runbook/backlog references to it.
+- [x] Add `docs/runbooks/customer-1-go-live-smoke-template.md` covering C1-C4,
+      origin/main SHA, production SHA, GO/NO-GO, SSH artifacts, email readiness,
+      API smoke, Playwright, real-device evidence, and residual risks.
+- [x] Update first-customer runbook and backlog C4 to use the template.
+- [ ] Run focused ops test, broader ops tests, diff/secret checks, Claude Code
+      review, commit, PR, CI, and merge if green.
+
+**Evidence so far**
+- Red test:
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`
+    failed 2/33 because the first-customer runbook/backlog did not reference
+    `customer-1-go-live-smoke-template.md`, and the template file did not exist.
+- Green verification so far:
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`:
+    33/33 tests passed.
+  - `pnpm test:ops`: 58/58 tests passed.
+  - `git diff --check`: passed with CRLF normalization warnings only.
+  - `pnpm security:no-hardcoded-jwts`: passed.
+- Claude Code review:
+  - CLEAN. Reviewer verified C1-C4 evidence coverage, origin/main and
+    production SHA capture, GO/NO-GO fields, SSH output-capture discipline,
+    stale B16/date guards, operator boundary, and CI/deploy safety.
+- Operator boundary:
+  - No production env change, SMTP/Resend setup, network SMTP verify, real
+    email send, customer registration, deploy, or service restart was
+    performed.
+
+---
+
+## Completed Workstream: Email Readiness Smoke Helper Pass 78 (2026-06-03)
 
 **Branch:** `fix/readiness-pass78`
 
@@ -36,7 +93,7 @@ path.
       default, gated SMTP network verify, and gated neutral test-send.
 - [x] Update first-customer C1 runbook to use the helper instead of triggering
       a real welcome email.
-- [ ] Run focused ops test, broader ops tests, diff/secret checks, Claude Code
+- [x] Run focused ops test, broader ops tests, diff/secret checks, Claude Code
       review, commit, PR, CI, and merge if green.
 
 **Evidence so far**
@@ -71,6 +128,11 @@ path.
     runbook drift.
   - Third pass: CLEAN. Reviewer verified the dotenv, pnpm command, and
     prod-SSH-wrapping findings are closed; no high/medium findings remain.
+- PR/CI/merge:
+  - Commit `b28aa32f` (`feat(smoke): add email readiness helper`).
+  - PR #219 merged as `e5ecac7a`.
+  - GitHub checks passed before merge: audit, build, e2e, lint, security, and
+    test.
 - Operator boundary:
   - No production env change, SMTP/Resend setup, network SMTP verify, real
     email send, customer registration, deploy, or service restart was
