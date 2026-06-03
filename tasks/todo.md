@@ -1,6 +1,86 @@
 # Vizora - Task Tracker
 
-## Active Workstream: First-Customer Runbook Reconciliation Pass 64 (2026-06-03)
+## Active Workstream: Backlog Launch Gate Truth Pass 65 (2026-06-03)
+
+**Branch:** `fix/backlog-launch-gate-truth`
+
+**Why now:** `backlog.md` is one of the first files the weekend prompt names as
+source-of-truth material, but it still carried the historical 2026-05-13 launch
+target, "three" launch blockers, and a B16-labeled go-live smoke row. The
+operator-facing runbook is now reconciled, so the backlog needs the same
+C1-C4 launch-gate truth to avoid future sessions re-opening stale work.
+
+**New primitives introduced:** none planned. This pass should reuse the
+existing backlog file and release-readiness static gate tests. No new route,
+model, migration, env var, process, realtime event, MCP tool, Hermes skill,
+AI/provider spend path, or production runtime change is expected.
+
+**Hermes-first analysis:** checked per project convention. This is
+deterministic backlog reconciliation, not a business-agent, MCP, Hermes
+runtime, or provider-spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Backlog launch-gate truthfulness | none applicable | update existing backlog |
+| Static release-readiness regression guard | none applicable | extend existing ops test |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+local backlog truthfulness/static guard updates.
+
+**Plan**
+- [x] Add a failing release-readiness gate proving `backlog.md` uses the
+      current C1-C4 launch gate truth.
+- [x] Update `backlog.md` to remove the fixed May target, use
+      operator-confirmed launch timing, and label C4 as the final go-live smoke.
+- [x] Run focused ops tests, broader ops tests, TypeScript/static checks, diff
+      hygiene, and secret scan.
+- [x] Request Claude Code review and resolve findings.
+- [ ] Commit, PR, CI, and merge if green.
+- [ ] Do not deploy by default; hand off deploy/runtime status and remaining
+      operator-only blockers.
+
+**Evidence so far**
+- Current `origin/main`: `5ddabb7aa5611c85082a2a7729269637c98d0026`.
+- Drift-check:
+  - `backlog.md` top matter still used `Customer-1 launch target:
+    2026-05-13`.
+  - P0 heading still used `(2026-05-13 target)`.
+  - P0 narrative said "three operator-driven items" despite the current C1-C4
+    gate table.
+  - C4 still read `B16 60-step go-live smoke test on prod`.
+  - Lower-page metrics/roadmap still said three remaining P0s and included
+    billing/payment live setup in the customer-1 launch path.
+- Red focused run:
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`
+    failed as expected on the new backlog launch-gate test.
+  - Expanded the same gate for lower-page stale summary text; it failed as
+    expected on the remaining P0/billing roadmap wording.
+- Fix:
+  - Updated backlog top matter to `Customer-1 launch date:
+    operator-confirmed`.
+  - Updated P0 heading and narrative to the current four C1-C4 operator gates.
+  - Replaced the B16 C4 row label with `Final go-live smoke test on prod`.
+  - Updated metrics, prompt dependencies, and roadmap text so customer-1
+    remaining gates are C1 SMTP/Resend, C2 provisioning, C3 real-device
+    walkthrough, and C4 go-live smoke; Stripe/Razorpay live keys stay deferred
+    past customer-1.
+- Green focused run:
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`
+    => 19/19 tests passing.
+- Broader/static verification:
+  - `pnpm test:ops` => 38/38 tests passing.
+  - `pnpm exec tsc --noEmit --pretty false --module ESNext --moduleResolution Bundler --target ES2022 --types node --skipLibCheck scripts/ops/release-readiness-gates.test.ts`
+    => passing.
+  - `rg -n "Customer-1 launch target:\*\* 2026-05-13|\|\s*\*\*C4\*\*\s*\|\s*B16|Remaining P0s are config-only|WEEK 1 \(NOW\):\s+P0 Blockers|SMTP, Billing, Smoke Test|three operator-driven items" backlog.md`
+    => no matches.
+  - `git diff --check -- backlog.md scripts/ops/release-readiness-gates.test.ts tasks/todo.md`
+    => exit 0, with LF/CRLF normalization warnings only.
+  - `pnpm security:no-hardcoded-jwts` => passing.
+- Claude Code review:
+  - Review returned `APPROVE` with no high/medium findings.
+  - Low non-blocking notes only: `backlog.md` wave wording is broad/dense.
+
+## Completed Workstream: First-Customer Runbook Reconciliation Pass 64 (2026-06-03)
 
 **Branch:** `fix/overnight-readiness-next`
 
@@ -36,12 +116,16 @@ local runbook truthfulness/static guard updates.
 - [x] Run focused ops tests, broader ops tests, TypeScript/static checks, diff
       hygiene, and secret scan.
 - [x] Request Claude Code review and resolve findings.
-- [ ] Commit, PR, CI, and merge if green.
-- [ ] Do not deploy by default; hand off deploy/runtime status and remaining
+- [x] Commit, PR, CI, and merge if green.
+- [x] Do not deploy by default; hand off deploy/runtime status and remaining
       operator-only blockers.
 
 **Evidence so far**
 - Current `origin/main`: `21497ed05d190b00f5b238e4d9696d200ac894b4`.
+- PR/CI/merge:
+  - PR #204 merged at `5ddabb7aa5611c85082a2a7729269637c98d0026`; GitHub CI
+    passed audit, build, e2e, lint, security, and test.
+  - No deploy or production runtime change was performed.
 - Drift-check:
   - `docs/runbooks/first-customer-onboarding.md` used the historical May launch
     window in section headings and audience text.

@@ -1,11 +1,11 @@
 # Vizora Backlog
 
-**Last updated:** 2026-05-31 (main at `1b28608`)
-**Production readiness:** ~75% — three operator-driven launch blockers open (see P0 below); technical foundation strongest on record
-**Tests:** 124 middleware suites / 2335 tests, 10 realtime suites / 212 tests, 79 web suites / 864 tests — ALL PASSING (zero failures). Playwright 24 specs at >90% pass post-2026-05-09 refresh. Verified by autonomous pass `docs/plans/2026-05-09-test-results.md`.
-**Customer-1 launch target:** 2026-05-13 (T-2 from today) — **status unconfirmed**; operator must confirm before T-2 prep work continues.
+**Last updated:** 2026-06-03 (main at `5ddabb7a`)
+**Production readiness:** repo-side foundation strongest on record; customer-1 launch remains operator-gated on C1-C4 below.
+**Tests:** 124 middleware suites / 2335 tests, 10 realtime suites / 212 tests, 79 web suites / 864 tests - ALL PASSING (zero failures). Playwright 24 specs at >90% pass post-2026-05-09 refresh. Verified by autonomous pass `docs/plans/2026-05-09-test-results.md`.
+**Customer-1 launch date:** operator-confirmed - do not use historical target dates until the operator confirms the actual launch window.
 
-**Security/realtime/readiness wave (#107–#117, merged through 2026-05-31, main `1b28608`):** session invalidation now spans REST + WebSocket — password-change / account-deactivation force-logout across all devices (REST `#111`, WS connect-time `#112`, WS mid-session 60s sweep `#114`). Customer-1 smoke coverage is hardened (#116), and M12 security alert emails are complete (#117). P1/P2 tables below reconciled to match.
+**Security/realtime/readiness wave (#107-#204, merged through 2026-06-03, main `5ddabb7a`):** session invalidation now spans REST + WebSocket - password-change / account-deactivation force-logout across all devices (REST `#111`, WS connect-time `#112`, WS mid-session 60s sweep `#114`). Customer-1 smoke coverage is hardened (#116), M12 security alert emails are complete (#117), and the latest overnight readiness passes hardened health/readiness gates, validator reporting, admin readiness display, deploy verification, and first-customer runbook truthfulness. P1/P2 tables below reconciled to match.
 
 ---
 
@@ -105,16 +105,16 @@ Triggered by 2026-05-06 OpenRouter credit drain. PR #62 (merged `801b517` on 202
 
 ---
 
-## P0 — LAUNCH BLOCKERS for customer-1 (2026-05-13 target)
+## P0 — LAUNCH BLOCKERS for customer-1 (operator-gated launch)
 
-Per 2026-05-09 readiness pass: the three operator-driven items below are the GO/NO-GO gates. Technical foundation is sound — these are unblockable by code.
+Per current readiness reconciliation: the four operator-driven items below are the GO/NO-GO gates. Technical foundation is sound - these are unblockable by code.
 
 | # | Item | Owner | Effort | Status | Notes |
 |---|------|-------|--------|--------|-------|
 | **C1** | **SMTP / Resend on prod — domain `mail.vizora.cloud` verified (DKIM/SPF/DMARC), `SMTP_*`/`EMAIL_FROM` env set, test send works end-to-end** | Sri | 2h | TODO | Without this, customer registration emails + password resets don't send |
 | **C2** | **Customer-1 organization provisioned on prod** (skeleton, admin user invite, plan, quota) | Sri | 1h | TODO | Skip if customer self-registers |
 | **C3** | **Real-device walkthrough on customer hardware** (pair, push playlist, reboot, network-flap) | Sri + customer IT | 2h | TODO | Electron has 0% functional test coverage; this IS the test |
-| **C4** | B16 60-step go-live smoke test on prod | Claude Code (driven by Sri) | 3h | BLOCKED on C1-C3 | Operator-driven; document in `docs/runbooks/customer-1-go-live-smoke-{DATE}.md` |
+| **C4** | **Final go-live smoke test on prod** | Claude Code (driven by Sri) | 3h | BLOCKED on C1-C3 | Operator-driven; document in `docs/runbooks/customer-1-go-live-smoke-{DATE}.md` |
 
 **Stripe/Razorpay live keys (formerly B8-B15):** DEFERRED past customer-1. Customer-1 launches on free tier. Backlog items kept open for the first paid customer:
 
@@ -269,17 +269,17 @@ Items the audit listed but we are NOT pursuing live (Engage/kiosk, live remote v
 
 | Metric | Start of Week | Current | Target (Launch) |
 |--------|--------------|---------|-----------------|
-| Test suites | ~89 | 93 | 95+ |
-| Total tests | 1,734 | 1,917 | 2,000+ |
+| Test suites | ~89 | 213 service suites verified 2026-05-09 | 213+ and green |
+| Total tests | 1,734 | 3,411 service tests verified 2026-05-09 | No regressions |
 | Test pass rate | 99.9% | 100% | 100% |
-| P0 blockers | 8 | 3* | 0 |
+| P0 customer-1 operator gates | 8 | 4* | 0 |
 | Console errors (dashboard) | Multiple | ~0 | 0 |
 | API endpoints returning 400 | 4 | 0 | 0 |
 | Template thumbnails 404 | 100+ | 0 | 0 |
 | Health check layers | 2 | 5 | 5 |
-| Production readiness | 78% | ~85% | 95%+ |
+| Production readiness | 78% | Repo-side ready; operator-gated | C1-C4 cleared |
 
-*Remaining P0s are config-only: SMTP setup, Stripe/Razorpay keys, final smoke test
+*Customer-1 remaining gates: C1 SMTP/Resend verification/test send, C2 customer-1 org provisioning, C3 real-device walkthrough, C4 final go-live smoke. Stripe/Razorpay live keys are deferred past customer-1 because customer-1 launches on the free tier.
 
 ---
 
@@ -287,9 +287,9 @@ Items the audit listed but we are NOT pursuing live (Engage/kiosk, live remote v
 
 | File | Purpose | Dependencies |
 |------|---------|-------------|
-| `week1-day1-2-email-task.md` | Email verification, invite emails, unsubscribe | SendGrid configured |
-| `week1-day3-4-billing-task.md` | Billing checkout, subscriptions, webhooks | Stripe/Razorpay configured |
-| `week1-day7-8-smoke-test-task.md` | Full go-live smoke test (60 steps) | Day 1-4 complete |
+| `week1-day1-2-email-task.md` | Email verification, invite emails, unsubscribe | SMTP/Resend configured and verified |
+| `week1-day3-4-billing-task.md` | Billing checkout, subscriptions, webhooks | Post-customer-1 payment provider setup |
+| `week1-day7-8-smoke-test-task.md` | Full go-live smoke test (60 steps) | C1-C3 complete |
 | `vizora-comprehensive-e2e-test.md` | Full E2E test (76 tests, 12 suites) | App running |
 | `overnight-hardening-loop-task.md` | Backend hardening (12 areas) | None |
 | `overnight-ui-hardening-task.md` | UI hardening (15 areas) | Dev server running |
@@ -310,15 +310,17 @@ Items the audit listed but we are NOT pursuing live (Engage/kiosk, live remote v
 ## ROADMAP
 
 ```
-WEEK 1 (NOW):       P0 Blockers — SMTP, Billing, Smoke Test
-                     |-- Day 1-2: Email (you: SendGrid, Claude: verification flow)
-                     |-- Day 3-4: Billing (you: Stripe/Razorpay, Claude: test checkout)
-                     +-- Day 7-8: Smoke test + go-live report
+CUSTOMER-1 LAUNCH:  C1-C4 operator gates
+                     |-- C1: SMTP/Resend prod verification + operator-approved test send
+                     |-- C2: Customer-1 org provisioning
+                     |-- C3: Real-device customer hardware walkthrough
+                     +-- C4: Final go-live smoke test + report
 
-SOFT LAUNCH:         After P0 cleared
+SOFT LAUNCH:         After C1-C4 cleared
                      +-- Invite 5-10 beta users (restaurants, small businesses)
 
-WEEKS 2-3:          Remaining P1
+WEEKS 2-3:          Payment live setup + remaining P1
+                     |-- Stripe/Razorpay live keys for first paid customer
                      +-- UptimeRobot setup only (operator/manual)
 
 MONTH 1:            P2 items
