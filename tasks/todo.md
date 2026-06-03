@@ -1,5 +1,52 @@
 # Vizora - Task Tracker
 
+## Active Workstream: Display Auto-Update Command Pass 70 (2026-06-03)
+
+**Branch:** `fix/production-readiness-pass70`
+
+**Plan:** `docs/plans/2026-06-03-display-auto-update-pass70.md`
+
+**Why now:** `backlog.md` still tracks K3 Electron auto-update as TODO.
+Drift-check shows the display client has an `update` command branch, but it
+only logs a stub, `electron-updater` is not installed, middleware does not
+allow the `update` command through `POST /fleet/commands`, and realtime's
+typed command enum does not include it.
+
+**New primitives introduced:** one focused Electron helper:
+`display/src/electron/display-auto-updater.ts`. No database model, migration,
+route, PM2 process, MCP tool, Hermes skill, AI/provider spend path, production
+env change, release publish, customer email send, payment setup, or deploy is
+planned.
+
+**Hermes-first analysis:** checked per project convention. This is deterministic
+Electron updater plumbing through the existing fleet/realtime command path, not
+a business-agent, MCP, Hermes runtime, or provider-spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Electron app auto-update | none applicable | use `electron-updater` in the existing Electron client |
+| Fleet command authorization | none applicable | reuse existing NestJS fleet controller/service path |
+| Realtime command fanout | none applicable | reuse existing Socket.IO command delivery and queued-command path |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+Electron update delivery.
+
+**Plan**
+- [ ] Add failing backend tests for admin-only `update`, required `feedUrl`,
+      allowlisted safe URL validation, and gateway payload shape.
+- [ ] Add failing display tests for updater helper URL safety and
+      packaged-only `DeviceClient` update command execution.
+- [ ] Implement backend/realtime command support without bypassing auth,
+      tenant, audit, update-feed allowlist, or existing fleet command paths.
+- [ ] Add `electron-updater` and replace the display update stub with a
+      generic-feed updater trigger that refuses non-allowlisted hosts.
+- [ ] Run focused middleware/display tests, display typecheck/build,
+      relevant realtime checks, diff hygiene, and secret scan.
+- [ ] Request Claude Code review and resolve findings.
+- [ ] Commit, PR, CI, and merge if green.
+- [ ] Do not publish display releases, deploy, edit production env, send real
+      emails, touch payment setup, or run hardware commands.
+
 ## Completed Workstream: Shared Public App URL Resolver Pass 69 (2026-06-03)
 
 **Branch:** `fix/public-app-url-resolver`
