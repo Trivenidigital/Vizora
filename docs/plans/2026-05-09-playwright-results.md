@@ -2,6 +2,15 @@
 
 > **TL;DR — post-fix improvement:** initial run 0/332 pass (100% bit-rot cascade). After mechanical refresh (mass `/api/` → `/api/v1/` + 4 h1 copy regexes in 01-auth), the re-run shows **only 26 failures across 9 of 19 specs that ran** (suite was killed at ~22 min before specs 20-24 completed) — estimated >90% pass rate on the new baseline. The two structural bugs the sub-agent identified ARE the dominant cause; remaining failures are per-test selector drift that needs targeted fixes.
 
+> **2026-06-03 update:** GitHub's `e2e` check is a narrow middleware Jest gate,
+> not this Playwright browser suite. Pass 74 added
+> `pnpm e2e:customer-critical`, which preflights middleware `:3000`, web
+> `:3001`, and realtime `:3002`, then runs the customer-critical browser subset
+> (01/03/04/05/06/15/21). No fresh full Playwright result was produced in pass
+> 74 because Docker Desktop was unavailable and local ports
+> 3000/3001/3002/5432/6379/9000 were closed. Treat the full-suite T1 refresh as
+> still pending until a real-stack run is recorded.
+
 ## Run 2 — Post-fix re-run (2026-05-09 20:09–20:31 UTC, killed before completion)
 
 | Spec | Failures | Pass status |
@@ -71,7 +80,8 @@ The 2 not verified (1 register flake, 21-notifications cut by suite kill) are ad
 
 **Playwright is now usable as a regression net for customer #1 launch.** The 26 remaining failures are localized + non-blocking; the critical path is verified. Operator can:
 
-- Run `npx playwright test e2e-tests/04-content.spec.ts e2e-tests/05-playlists.spec.ts e2e-tests/15-comprehensive-integration.spec.ts` to verify the most-critical 3 specs in <3 min before any deploy.
+- Run `pnpm e2e:customer-critical -- --reporter=list` to verify the
+  launch-relevant browser subset after the local stack is already listening.
 - Defer fixing 16-billing (10 failures) as week-1 tech-debt — billing is OUT of scope for customer #1 (free-tier launch).
 - Fix the singletons (06, 09, 18, 01, 03×2, 08×2) opportunistically.
 

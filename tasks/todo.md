@@ -1,6 +1,100 @@
 # Vizora - Task Tracker
 
-## Active Workstream: Hermes Audit Outcome Fallback Pass 73 (2026-06-03)
+## Active Workstream: Playwright Readiness Truth Pass 74 (2026-06-03)
+
+**Branch:** `fix/playwright-readiness-pass74`
+
+**Why now:** PR #214 merged and GitHub CI is green, but the CI job named
+`e2e` is a narrow middleware Jest gate, not the full browser suite under
+`e2e-tests/`. `backlog.md` T1 still tracks Playwright suite refresh as a
+remaining production-readiness item. Local runtime truth matters here:
+Docker Desktop is not reachable, and ports 3000/3001/3002/5432/6379/9000 are
+closed in this environment, so a full real-stack Playwright proof cannot be
+honestly claimed from this worktree.
+
+**Drift-check:** `.github/workflows/ci.yml` explicitly says only
+`(agents|customer-critical-path)` middleware E2E suites are gated. The
+Playwright config has no `webServer` bootstrapping and expects already-running
+services at web `:3001` plus middleware `:3000`. The old Playwright report is
+stale, but T1 remains real until a fresh full browser run is executed against a
+running stack.
+
+**New primitives introduced:** a small repo-side Playwright readiness helper
+and tests/docs around it only. No DB model/migration, public API, PM2 process,
+env var, MCP tool, Hermes skill, provider-spend path, production deploy, prod
+env edit, customer email send, payment setup, or hardware action is planned.
+
+**Hermes-first analysis:** not applicable. This pass is browser-test readiness
+and local/operator runbook truth, not a business-agent, MCP, Hermes runtime, or
+AI/provider-spend path.
+
+**Plan**
+- [x] Add a failing ops/static test proving the customer-critical Playwright
+      command is documented and guarded by an explicit service preflight.
+- [x] Implement the minimal helper using existing Playwright specs and ports,
+      without starting or modifying production services.
+- [x] Update backlog/readiness docs to distinguish GitHub narrow E2E green from
+      full Playwright pending, with the exact local runtime blocker.
+- [x] Run focused tests, shell syntax/diff/secret checks, and Claude Code
+      review.
+- [ ] Commit, PR, CI, and merge if green.
+
+**Evidence**
+- Local runtime preflight:
+  - `docker info --format '{{.ServerVersion}}'` failed because Docker Desktop's
+    Linux engine pipe was unavailable.
+  - Ports 3000, 3001, 3002, 5432, 6379, and 9000 were not listening.
+- Red tests:
+  - `pnpm test:ops -- scripts/ops/release-readiness-gates.test.ts` failed
+    because `scripts/smoke/playwright-customer-critical.sh` did not exist,
+    `package.json` had no `e2e:customer-critical`, and the runbook still used an
+    ad hoc full-suite command.
+  - After testing the package command, `pnpm e2e:customer-critical --
+    --reporter=list` failed before preflight because Windows resolved `bash` to
+    the broken WSL shim (`/bin/bash` missing). The test contract was tightened
+    to require a Node runner, then failed until the Node runner and package
+    script existed.
+- Implementation:
+  - Added `scripts/smoke/playwright-customer-critical.mjs`, a cross-platform
+    Node preflight that checks middleware `:3000`, web `:3001`, realtime
+    `:3002`, then runs existing specs 01/03/04/05/06/15/21 via Playwright.
+    After Claude review, the Playwright invocation was changed to
+    `process.execPath` + resolved `@playwright/test/cli` instead of `npx.cmd`,
+    avoiding the Windows `.cmd` spawn failure class.
+  - Added `pnpm e2e:customer-critical`.
+  - Updated the first-customer runbook and Playwright results doc so browser
+    smoke uses the preflighted customer-critical subset and full Playwright
+    remains pending until a real-stack run is recorded.
+  - Updated `backlog.md` to current main `ab957a97`, PR #214 CI truth, and T1
+    partial state.
+- Verification:
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`: 26
+    tests passed.
+  - `pnpm test:ops -- scripts/ops/release-readiness-gates.test.ts`: 51 tests
+    passed because the package script still globs all ops tests; retained as
+    an additional pre-review run, not the focused command.
+  - `pnpm test:ops`: 51 tests
+    passed.
+  - `node --check scripts/smoke/playwright-customer-critical.mjs`: passed.
+  - `pnpm e2e:customer-critical -- --reporter=list`: failed as expected at the
+    middleware `localhost:3000` preflight because local services are down; this
+    proves the package command reaches the helper instead of the broken Bash
+    path.
+  - `git diff --check`: passed with CRLF warnings only.
+  - `pnpm security:no-hardcoded-jwts`: passed.
+  - `rg -n "npx\.cmd|bash scripts/smoke/playwright-customer-critical|playwright-customer-critical\.sh" scripts\smoke scripts\ops package.json docs backlog.md`
+    returned no active source/doc/package matches.
+- Claude Code review:
+  - Initial review returned `NOT CLEAN`: high finding that Windows Node can
+    throw when spawning `npx.cmd` without shell, plus medium finding that tests
+    were only static and did not exercise the Playwright invocation path.
+  - Fix added an importable command builder and a behavioral test that spawns
+    the resolved Playwright CLI through `process.execPath --version`.
+  - Follow-up review returned `CLEAN`.
+
+---
+
+## Completed Workstream: Hermes Audit Outcome Fallback Pass 73 (2026-06-03)
 
 **Branch:** `fix/production-readiness-pass73`
 
@@ -47,7 +141,7 @@ repo-local monitoring refinement.
       while precise `agentRunId` propagation remains upstream/operator-gated.
 - [x] Run focused ops tests, full ops tests, type/build/diff/secret checks,
       and Claude Code review.
-- [ ] Commit, PR, CI, and merge if green.
+- [x] Commit, PR, CI, and merge if green.
 
 **Evidence**
 - Red tests:
@@ -84,6 +178,11 @@ repo-local monitoring refinement.
   - Follow-up review returned `CLEAN`; remaining notes were low/non-blocking
     around future dormant `hermes insights` enrichment coupling and regex
     fallback tests.
+- PR/CI/merge:
+  - Commit `2d3b5abb` (`fix(agents): add Hermes audit outcome fallback`).
+  - PR #214 merged as `ab957a97`.
+  - GitHub checks passed before merge: audit, build, e2e, lint, security, and
+    test.
 
 ---
 

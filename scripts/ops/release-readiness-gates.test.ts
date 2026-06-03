@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -27,6 +28,73 @@ test('critical-path smoke probes the realtime gateway prefixed health endpoint',
     /probe_status "Realtime health" "200" "\$RT_BASE\/api\/health"/,
   );
   assert.doesNotMatch(smokeScript, /\$RT_BASE\/health"/);
+});
+
+test('customer-critical Playwright helper preflights required local services', () => {
+  const helper = readRepoFile('scripts/smoke/playwright-customer-critical.mjs');
+
+  for (const port of [3000, 3001, 3002]) {
+    assert.match(helper, new RegExp(`requirePort\\([^\\)]*${port}`));
+  }
+
+  assert.match(helper, /e2e-tests\/01-auth\.spec\.ts/);
+  assert.match(helper, /e2e-tests\/03-displays\.spec\.ts/);
+  assert.match(helper, /e2e-tests\/04-content\.spec\.ts/);
+  assert.match(helper, /e2e-tests\/05-playlists\.spec\.ts/);
+  assert.match(helper, /e2e-tests\/06-schedules\.spec\.ts/);
+  assert.match(helper, /e2e-tests\/15-comprehensive-integration\.spec\.ts/);
+  assert.match(helper, /e2e-tests\/21-notifications\.spec\.ts/);
+  assert.doesNotMatch(helper, /e2e-tests\/16-billing\.spec\.ts/);
+  assert.doesNotMatch(helper, /docker compose|docker-compose|pm2 reload|ssh root@/);
+});
+
+test('customer-critical Playwright helper invokes Playwright without shell shims', async () => {
+  const helper = (await import(
+    pathToFileURL(join(repoRoot, 'scripts/smoke/playwright-customer-critical.mjs')).href
+  )) as {
+    buildPlaywrightCommand: (args: string[]) => {
+      executable: string;
+      args: string[];
+    };
+  };
+
+  const command = helper.buildPlaywrightCommand(['--reporter=list']);
+
+  assert.equal(command.executable, process.execPath);
+  assert.match(command.args[0], /@playwright[\\/]test[\\/]cli\.js$/);
+  assert.deepEqual(command.args.slice(1, 4), [
+    'test',
+    'e2e-tests/01-auth.spec.ts',
+    'e2e-tests/03-displays.spec.ts',
+  ]);
+  assert.equal(command.args.at(-1), '--reporter=list');
+  assert.doesNotMatch(command.executable, /bash|npx/i);
+  assert.doesNotMatch(command.args.join(' '), /npx\.cmd|bash scripts/);
+
+  const version = spawnSync(command.executable, [command.args[0], '--version'], {
+    encoding: 'utf8',
+  });
+  assert.equal(version.status, 0, version.stderr);
+  assert.match(version.stdout, /Version \d+\.\d+\.\d+/);
+});
+
+test('package.json exposes the customer-critical Playwright helper', () => {
+  const pkg = JSON.parse(readRepoFile('package.json')) as {
+    scripts?: Record<string, string>;
+  };
+
+  assert.equal(
+    pkg.scripts?.['e2e:customer-critical'],
+    'node scripts/smoke/playwright-customer-critical.mjs',
+  );
+});
+
+test('first-customer runbook points browser smoke at the preflighted Playwright helper', () => {
+  const runbook = readRepoFile('docs/runbooks/first-customer-onboarding.md');
+
+  assert.match(runbook, /pnpm e2e:customer-critical/);
+  assert.doesNotMatch(runbook, /npx playwright test --reporter=list/);
+  assert.match(runbook, /requires middleware :3000, web :3001, and realtime :3002/i);
 });
 
 test('first-customer runbook documents the realtime prefixed health endpoint', () => {
