@@ -1,5 +1,91 @@
 # Vizora - Task Tracker
 
+## Active Workstream: Middleware Container Healthcheck Truth Pass 57 (2026-06-03)
+
+**Branch:** `fix/overnight-healthchecks`
+
+**Why now:** After PR #196 aligned realtime health probes, the next repo-side
+runtime drift is the middleware container healthcheck path. Middleware is served
+under `/api/v1`, and direct container/compose probes do not pass through the
+public nginx backwards-compat rewrite from `/api/` to `/api/v1/`. A stale
+container probe at `/api/health` can make a healthy middleware container look
+unhealthy in Docker/runtime orchestration.
+
+**New primitives introduced:** none planned. This pass should reconcile
+Dockerfile/docs healthcheck references to the existing middleware health
+routes and align Docker docs with the PM2 app-service topology. No new route,
+model, migration, env var, process, response shape,
+realtime event, MCP tool, Hermes skill, AI/provider spend path, or runtime
+change is expected.
+
+**Hermes-first analysis:** checked per project convention. This is
+deterministic Docker/runtime healthcheck route reconciliation, not a
+business-agent, MCP, Hermes runtime, or provider-spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Middleware container healthcheck route | none applicable | reconcile Docker healthchecks to existing `/api/v1/health` route |
+| Local Docker healthcheck commands | none applicable | update existing docs only |
+| Docker/PM2 deployment topology docs | none applicable | document existing topology, no new process |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+local Docker healthcheck endpoint reconciliation.
+
+**Plan**
+- [x] Create isolated worktree from current `origin/main` to avoid the dirty
+      primary checkout.
+- [x] Add focused red release-readiness tests proving middleware Dockerfile and
+      Docker README health references use `/api/v1/health`.
+- [x] Update Dockerfile/docs references to match middleware route truth.
+- [x] Run focused ops/release-readiness tests.
+- [x] Run relevant hygiene/static checks.
+- [x] Request Claude Code review and resolve findings.
+- [ ] Commit, PR, CI, and merge if green.
+- [ ] Do not deploy by default; hand off deploy/runtime status and remaining
+      operator-only blockers.
+
+**Evidence so far**
+- Current `origin/main`: `7f6a16f37a481d5cb274e6fb67cc7b3cbe25d13d`.
+- Drift-check:
+  - Middleware sets global prefix `api/v1` in `middleware/src/main.ts`.
+  - `HealthController` is mounted at `@Controller('health')`, so the direct
+    middleware health route is `/api/v1/health`.
+  - `docker/Dockerfile.middleware` still probed `/api/health`.
+  - `docker/docker-compose.yml` has a `/api/health` reference under Grafana,
+    not middleware; it is Grafana's own API health route and remains untouched.
+  - `docker/README.md` had stale app ports, presented PM2 app services as
+    docker-compose services, and told operators to scale realtime to 2
+    instances, conflicting with the single-instance Socket.IO rule.
+- Red focused run:
+  - `pnpm test:ops` failed as expected on the new middleware Dockerfile,
+    Docker README health endpoint, Docker/PM2 topology, and realtime
+    single-instance README guards.
+- Fix:
+  - `docker/Dockerfile.middleware` now probes
+    `http://localhost:3000/api/v1/health`.
+  - `docker/README.md` now documents compose-managed infrastructure separately
+    from PM2/local app services, middleware `3000`, web `3001`, realtime
+    `3002`, the current health endpoints, and the realtime single-instance
+    rule.
+- Green focused run:
+  - `pnpm test:ops` => 18/18 ops/readiness tests passing.
+- Static/hygiene verification:
+  - `pnpm exec tsc --noEmit --pretty false --module esnext --moduleResolution bundler --target es2022 --lib es2022 --strict --types node scripts/ops/release-readiness-gates.test.ts`
+    => passing.
+  - `git diff --check -- docker/Dockerfile.middleware docker/README.md scripts/ops/release-readiness-gates.test.ts tasks/todo.md`
+    => exit 0, with LF/CRLF normalization warnings only.
+  - `pnpm security:no-hardcoded-jwts` => passing.
+- Claude Code review:
+  - Review returned `CLEAN`.
+  - Reviewer independently verified middleware route truth (`api/v1` global
+    prefix + `@Controller('health')`), Docker README PM2/compose topology, port
+    assignments, realtime single-instance guidance, and that the new guards
+    cannot false-positive on Grafana's valid `/api/health` route.
+- PR / CI:
+  - PR #197: `https://github.com/Trivenidigital/Vizora/pull/197`.
+  - Initial CI was green before this evidence update: audit 32s, lint 32s,
+    security 25s, build 1m31s, test 4m26s, e2e 8m41s.
+
 ## Active Workstream: Realtime Health Smoke Truth Pass 56 (2026-06-03)
 
 **Branch:** `fix/realtime-health-smoke-truth-20260603`
@@ -38,7 +124,8 @@ local smoke-script endpoint reconciliation.
 - [x] Run focused ops/release-readiness tests.
 - [x] Run relevant hygiene/security checks.
 - [x] Request Claude Code review and resolve findings.
-- [ ] PR, CI, and merge if green.
+- [x] PR, CI, and merge if green. PR #196 merged at
+      `7f6a16f37a481d5cb274e6fb67cc7b3cbe25d13d`.
 - [ ] Do not deploy by default; hand off deploy/runtime status.
 
 **Evidence so far**
