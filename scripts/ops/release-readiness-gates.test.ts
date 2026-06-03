@@ -156,6 +156,16 @@ test('.env.example documents customer-1 email readiness variables', () => {
   assert.match(envExample, /EMAIL_FROM=.*noreply@mail\.vizora\.cloud/);
 });
 
+test('.env.example documents external heartbeat fail pings', () => {
+  const envExample = readRepoFile('.env.example');
+  const alerting = readRepoFile('scripts/ops/lib/alerting.ts');
+
+  assert.match(envExample, /^HEALTHCHECKS_HEALTH_GUARDIAN_URL=/m);
+  assert.match(envExample, /\/fail/);
+  assert.match(envExample, /ran but issues remain/i);
+  assert.match(alerting, /\$\{pingUrl\}\/fail/);
+});
+
 test('first-customer C1 runbook verifies email app URL env', () => {
   const runbook = readRepoFile('docs/runbooks/first-customer-onboarding.md');
 

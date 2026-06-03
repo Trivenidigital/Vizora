@@ -132,7 +132,7 @@ The PR #38 multi-agent review surfaced a few items that scored below the 80-conf
 
 | Score | Item | Disposition |
 |---|---|---|
-| 73 | `.env.example` and JSDoc for `pingHeartbeat` don't explicitly document the `/fail` URL variant | Worth a one-line clarification in the JSDoc + `.env.example` comment when convenient |
+| 73 | `.env.example` and JSDoc for `pingHeartbeat` don't explicitly document the `/fail` URL variant | `.env.example` clarified in pass76 with a static readiness-gate test. `pingHeartbeat` JSDoc already documented the `${pingUrl}/fail` contract. |
 | 62 | `slaOverride` NaN diagnostic gap in `ops-watchdog.ts` — invalid values fall through to `slaDefault` silently | Today this is intended behavior (log + ignore). Revisit only if alert fatigue from misconfigured envs becomes a real problem |
 
 ### Why deferred

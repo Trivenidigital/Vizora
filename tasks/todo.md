@@ -1,6 +1,55 @@
 # Vizora - Task Tracker
 
-## Active Workstream: Support MCP Platform-Scope Pass 75 (2026-06-03)
+## Active Workstream: External Heartbeat Docs Pass 76 (2026-06-03)
+
+**Branch:** `fix/readiness-pass76`
+
+**Why now:** Customer-1 launch still depends on operator-owned external
+monitoring setup, but a deferred review-polish item in `tasks/feature-backlog.md`
+said `.env.example` did not document the healthchecks.io `/fail` heartbeat
+variant. The runtime code already sends `/fail`; this pass closes the repo-side
+documentation/regression gap without touching prod env, services, or accounts.
+
+**Drift-check:** `scripts/ops/lib/alerting.ts` and `scripts/ops/health-guardian.ts`
+already document and implement `/fail` pings for failed health-guardian runs.
+`.env.example` documented only success pings and missed-ping alerts.
+
+**New primitives introduced:** one static readiness-gate assertion. No runtime
+code, DB model/migration, public API, PM2 process, env var, MCP tool, Hermes
+skill, provider-spend path, production deploy, prod env edit, customer email
+send, payment setup, or hardware action is planned.
+
+**Hermes-first analysis:** not applicable. This is ops/env documentation and a
+static regression gate, not a business-agent, MCP, Hermes runtime, or
+AI/provider-spend path.
+
+**Plan**
+- [x] Add a failing readiness-gate test proving `.env.example` documents
+      external heartbeat `/fail` semantics.
+- [x] Update `.env.example` to explain success vs fail pings.
+- [x] Update the deferred review-polish backlog entry.
+- [ ] Run focused ops test, broader ops tests, diff/secret checks, Claude Code
+      review, commit, PR, CI, and merge if green.
+
+**Evidence**
+- Red test:
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`
+    failed 1/27 because `.env.example` did not match `/\/fail/`.
+- Green verification so far:
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`:
+    27/27 tests passed.
+  - `pnpm test:ops`: 52/52 tests passed.
+  - `git diff --check`: passed with CRLF normalization warnings only.
+  - `pnpm security:no-hardcoded-jwts`: passed.
+- Claude Code review:
+  - CLEAN. Reviewer verified the `.env.example` `/fail` documentation matches
+    `scripts/ops/lib/alerting.ts` and `scripts/ops/health-guardian.ts`, the
+    test guards the intended documentation contract, and operator setup remains
+    explicitly not performed.
+
+---
+
+## Completed Workstream: Support MCP Platform-Scope Pass 75 (2026-06-03)
 
 **Branch:** `fix/readiness-pass75`
 
@@ -48,7 +97,7 @@ replaces this repo-local MCP authorization change.
 - [x] Implement the smallest context/service/tool changes to pass those tests.
 - [x] Update backlog/design docs to mark T4 repo-side complete while token
       issuance/cutover remains operator-gated.
-- [ ] Run focused support/MCP tests, broader relevant tests/build, diff/secret
+- [x] Run focused support/MCP tests, broader relevant tests/build, diff/secret
       checks, Claude Code review, commit, PR, CI, and merge if green.
 
 **Evidence**
@@ -91,6 +140,11 @@ replaces this repo-local MCP authorization change.
     platform token should not include or rely on `displays:read` unless display
     MCP tools are separately changed and reviewed, because `list_displays`
     remains per-org-only.
+- PR/CI/merge:
+  - Commit `5a4a0f10` (`fix(mcp): allow platform scoped support triage`).
+  - PR #216 merged as `4f9d90f7`.
+  - GitHub checks passed before merge: audit, build, e2e, lint, security, and
+    test.
 
 ---
 
