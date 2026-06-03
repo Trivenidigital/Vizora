@@ -36,6 +36,33 @@ test('first-customer runbook documents the realtime prefixed health endpoint', (
   assert.doesNotMatch(runbook, /localhost:3002\/health/);
 });
 
+test('first-customer runbook uses current C-series launch gates without stale May target dates', () => {
+  const runbook = readRepoFile('docs/runbooks/first-customer-onboarding.md');
+
+  assert.match(runbook, /^### .*C1 .* SMTP \/ Resend/m);
+  assert.match(runbook, /^### .*C2 .* organization provisioned/m);
+  assert.match(runbook, /^### .*C3 .* Real-device walkthrough/m);
+  assert.match(runbook, /^### .*C4 .* go-live smoke/m);
+  assert.match(runbook, /Launch date: operator-confirmed/);
+  assert.doesNotMatch(runbook, /2026-05-1[0-9]/);
+  assert.doesNotMatch(runbook, /B5\/B6\/B7/);
+  assert.doesNotMatch(runbook, /B16/);
+});
+
+test('first-customer runbook avoids inline SSH output reads on Windows/Codex path', () => {
+  const runbook = readRepoFile('docs/runbooks/first-customer-onboarding.md');
+
+  assert.match(runbook, /redirect SSH output to a local \.ssh_.*\.txt file/i);
+  assert.match(runbook, /read that file as a separate step/i);
+  assert.doesNotMatch(runbook, /^cat \.ssh_/m);
+});
+
+test('gitignore protects SSH output files captured by operator runbooks', () => {
+  const gitignore = readRepoFile('.gitignore');
+
+  assert.match(gitignore, /^\.ssh_\*\.txt$/m);
+});
+
 test('realtime Docker healthcheck probes the prefixed health endpoint', () => {
   const dockerfile = readRepoFile('docker/Dockerfile.realtime');
 

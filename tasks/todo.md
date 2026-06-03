@@ -1,6 +1,95 @@
 # Vizora - Task Tracker
 
-## Active Workstream: Deploy Verify Readiness Status Pass 63 (2026-06-03)
+## Active Workstream: First-Customer Runbook Reconciliation Pass 64 (2026-06-03)
+
+**Branch:** `fix/overnight-readiness-next`
+
+**Why now:** `docs/runbooks/first-customer-onboarding.md` is the operator-facing
+go-live guide, but it still carried the historical May launch window, B-series
+blocker labels, and inline SSH output reads that conflict with the current
+Windows/Codex SSH capture rule. That can mislead the operator during C1-C4
+go-live prep even though the underlying blocker state is now documented
+elsewhere.
+
+**New primitives introduced:** none planned. This pass should reuse the
+existing first-customer runbook and release-readiness static gate tests. No new
+route, model, migration, env var, process, realtime event, MCP tool, Hermes
+skill, AI/provider spend path, or production runtime change is expected.
+
+**Hermes-first analysis:** checked per project convention. This is deterministic
+operator runbook reconciliation, not a business-agent, MCP, Hermes runtime, or
+provider-spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Operator runbook wording and launch-gate labels | none applicable | update existing runbook |
+| Static release-readiness regression guard | none applicable | extend existing ops test |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+local runbook truthfulness/static guard updates.
+
+**Plan**
+- [x] Add failing release-readiness gates for stale May launch dates, stale
+      B-series blocker labels, and inline `.ssh_*` output reads.
+- [x] Update the runbook to relative launch timing, C1-C4 labels, and
+      redirect-then-read SSH capture guidance.
+- [x] Run focused ops tests, broader ops tests, TypeScript/static checks, diff
+      hygiene, and secret scan.
+- [x] Request Claude Code review and resolve findings.
+- [ ] Commit, PR, CI, and merge if green.
+- [ ] Do not deploy by default; hand off deploy/runtime status and remaining
+      operator-only blockers.
+
+**Evidence so far**
+- Current `origin/main`: `21497ed05d190b00f5b238e4d9696d200ac894b4`.
+- Drift-check:
+  - `docs/runbooks/first-customer-onboarding.md` used the historical May launch
+    window in section headings and audience text.
+  - The same runbook still referenced B-series blocker labels (`B5/B6/B7`,
+    `B16`) instead of current C1/C4 gates.
+  - The pre-flight section used `cat .ssh_*.txt` after redirected SSH commands,
+    conflicting with the project SSH-output rule for Windows/Codex.
+- Red focused run:
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`
+    failed as expected on the new stale-date/C-series and SSH-output gates.
+- Fix:
+  - Replaced specific launch dates with `Launch date: operator-confirmed` and
+    relative T-3/T-2/T-1/T-0 headings.
+  - Replaced B-series launch references with current C1 SMTP/Resend and C4
+    final go-live smoke labels; after Claude review, also labeled C2
+    organization provisioning and C3 real-device walkthrough.
+  - Added a Windows/Codex SSH note and converted `.ssh_*` result checks to
+    read-as-separate-step comments instead of inline `cat`.
+  - Broadened `.gitignore` to ignore `.ssh_*.txt` so operator SSH captures,
+    including SMTP env and healthchecks output, cannot be staged accidentally.
+  - Tightened the release-readiness guard to line-anchored C1-C4 runbook
+    headings plus the `.ssh_*.txt` ignore rule.
+- Green focused run:
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`
+    => 18/18 tests passing.
+- Broader/static verification:
+  - `pnpm test:ops` => 37/37 tests passing.
+  - `pnpm exec tsc --noEmit --pretty false --module ESNext --moduleResolution Bundler --target ES2022 --types node --skipLibCheck scripts/ops/release-readiness-gates.test.ts`
+    => passing.
+  - `rg -n "2026-05-1[0-9]|B5/B6/B7|B16|^cat \\.ssh_" docs/runbooks/first-customer-onboarding.md`
+    => no matches.
+  - `git check-ignore .ssh_smtp_env.txt .ssh_pmstat.txt .ssh_health_https_vizora_cloud_.txt .ssh_healthchecks.txt`
+    => all ignored.
+  - `git diff --check -- .gitignore docs/runbooks/first-customer-onboarding.md scripts/ops/release-readiness-gates.test.ts tasks/todo.md`
+    => exit 0, with LF/CRLF normalization warnings only.
+  - `pnpm security:no-hardcoded-jwts` => passing.
+- Claude Code review:
+  - Initial review returned `COMMENT` with one medium completeness finding:
+    C2/C3 sections existed but lacked C-series labels. Fixed by adding C2/C3
+    headings and tightening the static gate.
+  - Follow-up review returned `COMMENT` with one medium operational finding:
+    new `.ssh_*.txt` capture files were not ignored. Fixed by broadening
+    `.gitignore` and adding a release-readiness gate.
+  - Final re-review returned `APPROVE` with no high/medium findings. Optional
+    low notes remain for future local capture cleanup wording, redundant
+    `.ssh_out*.txt`, and broader `cat .ssh_` guard coverage.
+
+## Completed Workstream: Deploy Verify Readiness Status Pass 63 (2026-06-03)
 
 **Branch:** `fix/deploy-verify-readiness-status`
 
@@ -36,12 +125,15 @@ local deploy verifier response parsing.
       require `status: "ok"` for a deploy-verification pass.
 - [x] Run focused ops tests, Bash syntax check, diff hygiene, and secret scan.
 - [x] Request Claude Code review and resolve findings.
-- [ ] Commit, PR, CI, and merge if green.
-- [ ] Do not deploy by default; hand off deploy/runtime status and remaining
+- [x] Commit, PR, CI, and merge if green.
+- [x] Do not deploy by default; hand off deploy/runtime status and remaining
       operator-only blockers.
 
 **Evidence so far**
 - Current `origin/main`: `982b2825770e6bc1e2b6ff05d57262be574b7309`.
+- PR/CI/merge:
+  - PR #203 merged at `21497ed05d190b00f5b238e4d9696d200ac894b4`; GitHub CI
+    passed audit, build, e2e, lint, security, and test.
 - Drift-check:
   - `scripts/deploy-verify.sh` accepted `/api/v1/health/ready` on HTTP 200
     alone.

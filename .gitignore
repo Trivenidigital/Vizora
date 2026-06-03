@@ -115,6 +115,7 @@ vizora/
 
 # Debug artifacts
 .logcat_out.txt
+.ssh_*.txt
 .ssh_out*.txt
 emulator-*.png
 
