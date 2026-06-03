@@ -1,6 +1,84 @@
 # Vizora - Task Tracker
 
-## Active Workstream: First-Customer Email Verification Truth Pass 77 (2026-06-03)
+## Active Workstream: Email Readiness Smoke Helper Pass 78 (2026-06-03)
+
+**Branch:** `fix/readiness-pass78`
+
+**Why now:** C1 SMTP/Resend remains operator-gated, but the first-customer
+runbook still told the operator to create a real registration user just to
+prove email delivery. That sends customer-visible lifecycle mail and muddies
+the smoke result. A launch readiness check needs a safe repo-side helper:
+offline validation by default, optional SMTP credential verification only with
+an explicit network flag, and optional test-send only with an explicit send
+flag.
+
+**Drift-check:** `MailService` already sends welcome/reset/password/security
+emails through Nodemailer, and `StartupSelfTestService.checkEmail()` can verify
+SMTP when middleware starts. The residual C1 gap is operator ergonomics and
+safe evidence collection: runbook/test-send instructions should validate
+`SMTP_*`, `EMAIL_FROM`, and public `APP_URL`/`WEB_URL` without creating a
+real account or sending mail by default.
+
+**New primitives introduced:** one smoke helper script and static
+release-readiness assertions. No DB model/migration, public API, PM2 process,
+env var, MCP tool, Hermes skill, provider-spend path, production deploy, prod
+env edit, real customer registration, customer email send, payment setup, or
+hardware action is planned.
+
+**Hermes-first analysis:** not applicable. This is SMTP/runbook readiness
+validation, not a business-agent, MCP, Hermes runtime, or AI/provider-spend
+path.
+
+**Plan**
+- [x] Add failing release-readiness assertions for a no-send-by-default email
+      helper, package script exposure, and C1 runbook usage.
+- [x] Implement `scripts/smoke/email-readiness.mjs` with offline checks by
+      default, gated SMTP network verify, and gated neutral test-send.
+- [x] Update first-customer C1 runbook to use the helper instead of triggering
+      a real welcome email.
+- [ ] Run focused ops test, broader ops tests, diff/secret checks, Claude Code
+      review, commit, PR, CI, and merge if green.
+
+**Evidence so far**
+- Red test:
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`
+    failed 3/31 because the helper file/package script did not exist and the
+    runbook still instructed "Then trigger a real welcome email".
+- Green verification so far:
+  - `node --check scripts/smoke/email-readiness.mjs`: passed.
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`:
+    31/31 tests passed.
+  - `pnpm test:ops`: 56/56 tests passed.
+  - `git diff --check`: passed with CRLF normalization warnings only.
+  - `pnpm security:no-hardcoded-jwts`: passed.
+  - Synthetic production offline helper run:
+    `node scripts/smoke/email-readiness.mjs --production` printed
+    "offline config check passed; no SMTP connection and no email sent".
+  - `pnpm smoke:email-readiness --production` with synthetic production env:
+    passed and printed no SMTP/no email.
+  - `pnpm smoke:email-readiness -- --production --json` with synthetic
+    production env: passed, returned `ok: true`, and did not send or verify SMTP.
+- Claude Code review:
+  - First pass: NOT CLEAN. Medium finding that the helper did not load `.env`,
+    so a prod runbook invocation could miss `/opt/vizora/app/.env`. Fixed by
+    adding `import 'dotenv/config'` and a static regression assertion.
+  - Second pass: NOT CLEAN. Medium findings that documented pnpm commands used
+    the wrong `--` separator form and were not SSH-wrapped for prod execution.
+    Fixed by making the parser tolerate a bare `--`, documenting
+    `pnpm smoke:email-readiness --production`, wrapping C1 helper commands in
+    `ssh root@vizora.cloud 'cd /opt/vizora/app && ...'`, and adding static
+    assertions for the SSH output files and no `smoke:email-readiness -- --`
+    runbook drift.
+  - Third pass: CLEAN. Reviewer verified the dotenv, pnpm command, and
+    prod-SSH-wrapping findings are closed; no high/medium findings remain.
+- Operator boundary:
+  - No production env change, SMTP/Resend setup, network SMTP verify, real
+    email send, customer registration, deploy, or service restart was
+    performed.
+
+---
+
+## Completed Workstream: First-Customer Email Verification Truth Pass 77 (2026-06-03)
 
 **Branch:** `fix/readiness-pass77`
 
@@ -30,7 +108,7 @@ AI/provider-spend path.
       not require a nonexistent email verification flow.
 - [x] Update the runbook to require signup dashboard access + welcome email
       delivery, while explicitly noting email verification is deferred.
-- [ ] Run focused ops test, broader ops tests, diff/secret checks, Claude Code
+- [x] Run focused ops test, broader ops tests, diff/secret checks, Claude Code
       review, commit, PR, CI, and merge if green.
 
 **Evidence**
@@ -53,6 +131,11 @@ AI/provider-spend path.
     that the schema assertion should trip when B5 eventually lands. Re-ran the
     focused readiness-gate test (28/28), `pnpm test:ops` (53/53),
     `git diff --check`, and `pnpm security:no-hardcoded-jwts` afterward.
+- PR/CI/merge:
+  - Commit `a9fc2f83` (`docs(runbook): align signup smoke with welcome email flow`).
+  - PR #218 merged as `517ae30e`.
+  - GitHub checks passed before merge: audit, build, e2e, lint, security, and
+    test.
 
 ---
 

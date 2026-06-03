@@ -1,11 +1,11 @@
 # Vizora Backlog
 
-**Last updated:** 2026-06-03 (main at `ab957a97`)
+**Last updated:** 2026-06-03 (main at `517ae30e`)
 **Production readiness:** repo-side foundation strongest on record; customer-1 launch remains operator-gated on C1-C4 below.
-**Tests:** Current merge evidence: PR #214 GitHub CI passed audit, build, e2e, lint, security, and test. That CI `e2e` job is the narrow middleware Jest gate, not the full Playwright browser suite. Local #211 verification included focused middleware fleet tests (2 suites / 45 tests), realtime tests (13 suites / 287 tests), display focused tests (2 suites / 63 tests), display CI tests (8 suites / 145 tests), display typecheck/build, web tests (106 suites / 1115 tests), web/realtime/middleware builds, diff hygiene, and secret scan. Pass71 re-verified admin web tests (8 suites / 80 tests) for stale K5 closure. Pass72/73 re-verified focused agent/ops gates around Hermes cost and audit fallback. Historical aggregate test report remains in `docs/plans/2026-05-09-test-results.md`; verify fresh counts before relying on older totals.
+**Tests:** Current merge evidence: PR #218 GitHub CI passed audit, build, e2e, lint, security, and test. That CI `e2e` job is the narrow middleware Jest gate, not the full Playwright browser suite. Local #211 verification included focused middleware fleet tests (2 suites / 45 tests), realtime tests (13 suites / 287 tests), display focused tests (2 suites / 63 tests), display CI tests (8 suites / 145 tests), display typecheck/build, web tests (106 suites / 1115 tests), web/realtime/middleware builds, diff hygiene, and secret scan. Pass71 re-verified admin web tests (8 suites / 80 tests) for stale K5 closure. Pass72/73 re-verified focused agent/ops gates around Hermes cost and audit fallback. Pass78 adds a repo-side no-send-by-default C1 email readiness helper; operator SMTP/Resend setup and any real test-send remain pending. Historical aggregate test report remains in `docs/plans/2026-05-09-test-results.md`; verify fresh counts before relying on older totals.
 **Customer-1 launch date:** operator-confirmed - do not use historical target dates until the operator confirms the actual launch window.
 
-**Security/realtime/readiness wave (#107-#214, merged through 2026-06-03, main `ab957a97`):** session invalidation now spans REST + WebSocket - password-change / account-deactivation force-logout across all devices (REST `#111`, WS connect-time `#112`, WS mid-session 60s sweep `#114`). Customer-1 smoke coverage is hardened (#116), M12 security alert emails are complete (#117), and the latest overnight readiness passes hardened health/readiness gates, validator reporting, admin readiness display, deploy verification, first-customer runbook truthfulness, public app URL precedence for email/reset/pairing/billing/lifecycle links (#209), repo-side display auto-update command plumbing (#211), Hermes runner balance-delta cost attribution (#213), and Hermes audit outcome fallback (#214). P1/P2 tables below reconciled to match.
+**Security/realtime/readiness wave (#107-#218, merged through 2026-06-03, main `517ae30e`):** session invalidation now spans REST + WebSocket - password-change / account-deactivation force-logout across all devices (REST `#111`, WS connect-time `#112`, WS mid-session 60s sweep `#114`). Customer-1 smoke coverage is hardened (#116), M12 security alert emails are complete (#117), and the latest overnight readiness passes hardened health/readiness gates, validator reporting, admin readiness display, deploy verification, first-customer runbook truthfulness (#218), public app URL precedence for email/reset/pairing/billing/lifecycle links (#209), repo-side display auto-update command plumbing (#211), Hermes runner balance-delta cost attribution (#213), Hermes audit outcome fallback (#214), and a no-send-by-default C1 email readiness helper (pass78). P1/P2 tables below reconciled to match.
 
 ---
 
@@ -61,6 +61,7 @@ Triggered by 2026-05-06 OpenRouter credit drain. PR #62 (merged `801b517` on 202
 | R11 | support-triage cross-tenant token design call — recommended kept-disabled for customer-1, Option 2 (platform-scope `support:*` tools) for week-2 | `docs/plans/2026-05-09-support-triage-cross-tenant-design.md` | 2026-05-09 |
 | R12 | CLAUDE.md test baseline refreshed (1700+ → 2335; carve-outs resolved) | `e80939d` | 2026-05-09 |
 | R13 | Customer-critical Playwright helper preflights local services and runs the launch-relevant browser subset; full suite remains T1 | `scripts/smoke/playwright-customer-critical.mjs` | 2026-06-03 |
+| R14 | C1 email readiness helper validates SMTP/app URL env offline by default; SMTP network verify and neutral test-send are separately flag-gated | `scripts/smoke/email-readiness.mjs` | 2026-06-03 |
 
 ### Earlier (carried over from prior backlog state)
 
@@ -112,7 +113,7 @@ Per current readiness reconciliation: the four operator-driven items below are t
 
 | # | Item | Owner | Effort | Status | Notes |
 |---|------|-------|--------|--------|-------|
-| **C1** | **SMTP / Resend on prod — domain `mail.vizora.cloud` verified (DKIM/SPF/DMARC), `SMTP_*`/`EMAIL_FROM` and public `APP_URL` or `WEB_URL` env set, test send works end-to-end** | Sri | 2h | TODO | Without this, customer registration emails + password resets don't send or link to the wrong host |
+| **C1** | **SMTP / Resend on prod — domain `mail.vizora.cloud` verified (DKIM/SPF/DMARC), `SMTP_*`/`EMAIL_FROM` and public `APP_URL` or `WEB_URL` env set, test send works end-to-end** | Sri | 2h | TODO | Repo-side helper: `pnpm smoke:email-readiness --production` checks config offline; `--verify-smtp` and `--send` require explicit operator flags. Operator still owns DNS/env/test-send. |
 | **C2** | **Customer-1 organization provisioned on prod** (skeleton, admin user invite, plan, quota) | Sri | 1h | TODO | Skip if customer self-registers |
 | **C3** | **Real-device walkthrough on customer hardware** (pair, push playlist, reboot, network-flap) | Sri + customer IT | 2h | TODO | Electron has 0% functional test coverage; this IS the test |
 | **C4** | **Final go-live smoke test on prod** | Claude Code (driven by Sri) | 3h | BLOCKED on C1-C3 | Operator-driven; document in `docs/runbooks/customer-1-go-live-smoke-{DATE}.md` |
