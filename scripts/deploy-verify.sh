@@ -9,6 +9,8 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
@@ -28,6 +30,20 @@ TOTAL=0
 # Use a function to avoid quoting issues with curl options
 http_status() {
   curl -s -o /dev/null -w '%{http_code}' --max-time 10 --connect-timeout 5 "$1" 2>/dev/null || echo "000"
+}
+
+parse_readiness_status() {
+  if ! command -v node >/dev/null 2>&1; then
+    echo "node_missing"
+    return 0
+  fi
+
+  if [[ ! -f "$SCRIPT_DIR/ops/readiness-status-parser.mjs" ]]; then
+    echo "parser_missing"
+    return 0
+  fi
+
+  node "$SCRIPT_DIR/ops/readiness-status-parser.mjs" 2>/dev/null || echo "invalid"
 }
 
 # Colors (skip if not a terminal)
@@ -59,8 +75,18 @@ STATUS=$(http_status "$BASE_URL/api/v1/health")
 if [[ "$STATUS" == "200" ]]; then pass "GET /api/v1/health -> $STATUS"; else fail "GET /api/v1/health -> $STATUS (expected 200)"; fi
 
 check
-STATUS=$(http_status "$BASE_URL/api/v1/health/ready")
-if [[ "$STATUS" == "200" ]]; then pass "GET /api/v1/health/ready -> $STATUS"; else fail "GET /api/v1/health/ready -> $STATUS (expected 200)"; fi
+READY_BODY_FILE=$(mktemp)
+STATUS=$(curl -s -o "$READY_BODY_FILE" -w '%{http_code}' --max-time 10 --connect-timeout 5 "$BASE_URL/api/v1/health/ready" 2>/dev/null || echo "000")
+if [[ ! "$STATUS" =~ ^[0-9]{3}$ ]]; then STATUS="000"; fi
+READY_STATUS=$(parse_readiness_status < "$READY_BODY_FILE")
+rm -f "$READY_BODY_FILE"
+if [[ "$STATUS" == "200" && "$READY_STATUS" == "ok" ]]; then
+  pass "GET /api/v1/health/ready -> $STATUS status=ok"
+elif [[ "$STATUS" == "200" && "$READY_STATUS" == "degraded" ]]; then
+  fail "GET /api/v1/health/ready -> $STATUS status=degraded (expected status=ok)"
+else
+  fail "GET /api/v1/health/ready -> $STATUS status=$READY_STATUS (expected 200 status=ok)"
+fi
 
 check
 STATUS=$(http_status "$BASE_URL/api/v1/health/live")

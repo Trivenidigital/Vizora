@@ -118,6 +118,18 @@ test('validate monitor parses readiness body status instead of only HTTP 200', (
   assert.doesNotMatch(monitor, /services\['readiness'\] = res\.ok \? 'healthy'/);
 });
 
+test('deploy verify requires readiness body status ok instead of only HTTP 200', () => {
+  const deployVerify = readRepoFile('scripts/deploy-verify.sh');
+
+  assert.match(deployVerify, /parse_readiness_status\(\)/);
+  assert.match(deployVerify, /status=ok/);
+  assert.match(deployVerify, /status=degraded/);
+  assert.doesNotMatch(
+    deployVerify,
+    /STATUS=\$\(http_status "\$BASE_URL\/api\/v1\/health\/ready"\)\r?\nif \[\[ "\$STATUS" == "200" \]\]; then pass "GET \/api\/v1\/health\/ready -> \$STATUS"/,
+  );
+});
+
 test('CI test job runs web unit tests before build-only gates', () => {
   const ciWorkflow = readRepoFile('.github/workflows/ci.yml');
   const testJob = readCiJobBlock(ciWorkflow, 'test');

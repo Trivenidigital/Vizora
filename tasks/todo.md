@@ -1,6 +1,82 @@
 # Vizora - Task Tracker
 
-## Active Workstream: Validator Readiness Status Pass 62 (2026-06-03)
+## Active Workstream: Deploy Verify Readiness Status Pass 63 (2026-06-03)
+
+**Branch:** `fix/deploy-verify-readiness-status`
+
+**Why now:** `scripts/deploy-verify.sh` is the post-deploy operator gate. It
+still checks `/api/v1/health/ready` by HTTP status only. The middleware
+readiness endpoint can return HTTP 200 with body `status: "degraded"`, so the
+deploy verifier can report a deployment as verified while infrastructure is
+known degraded.
+
+**New primitives introduced:** none planned. This pass should reuse the
+existing deploy verifier, readiness endpoint, response envelope convention, and
+ops release-readiness gate tests. No new route, model, migration, env var,
+process, realtime event, MCP tool, Hermes skill, AI/provider spend path, or
+production runtime change is expected.
+
+**Hermes-first analysis:** checked per project convention. This is
+deterministic Bash/Node readiness response parsing inside an existing deploy
+verification script, not a business-agent, MCP, Hermes runtime, or provider
+spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Deploy readiness JSON status parsing | none applicable | fix existing deploy verifier |
+| Static release-readiness regression guard | none applicable | extend existing ops test |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+local deploy verifier response parsing.
+
+**Plan**
+- [x] Add a failing ops gate proving `deploy-verify.sh` inspects the readiness
+      JSON status instead of only HTTP 200.
+- [x] Parse the readiness body, unwrapping the global response envelope, and
+      require `status: "ok"` for a deploy-verification pass.
+- [x] Run focused ops tests, Bash syntax check, diff hygiene, and secret scan.
+- [x] Request Claude Code review and resolve findings.
+- [ ] Commit, PR, CI, and merge if green.
+- [ ] Do not deploy by default; hand off deploy/runtime status and remaining
+      operator-only blockers.
+
+**Evidence so far**
+- Current `origin/main`: `982b2825770e6bc1e2b6ff05d57262be574b7309`.
+- Drift-check:
+  - `scripts/deploy-verify.sh` accepted `/api/v1/health/ready` on HTTP 200
+    alone.
+  - `middleware/src/modules/health/health.controller.ts` returns HTTP 200 for
+    degraded readiness and only throws 503 for unhealthy readiness.
+- Red focused run:
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`
+    failed as expected on the new deploy-verifier body-status parsing gate.
+- Fix:
+  - Added `parse_readiness_status()` using the existing Node deployment runtime
+    and a shared `scripts/ops/readiness-status-parser.mjs` helper.
+  - Unwraps `{ success, data }` response envelopes before reading `status`.
+  - Requires readiness `status=ok`; treats `degraded`, `unhealthy`, invalid,
+    unknown, and missing parser dependencies as deploy-verification failures.
+- Green focused run:
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`
+    => 15/15 tests passing.
+  - `node --import tsx --test scripts/ops/deploy-verify-readiness-parser.test.ts`
+    => 3/3 tests passing after the red missing-parser run.
+- Broader/static verification:
+  - `pnpm test:ops` => 34/34 tests passing.
+  - `C:\Program Files\Git\bin\bash.exe -n scripts/deploy-verify.sh` => exit 0.
+  - `pnpm exec tsc --noEmit --pretty false --module ESNext --moduleResolution Bundler --target ES2022 --types node --skipLibCheck scripts/ops/release-readiness-gates.test.ts scripts/ops/deploy-verify-readiness-parser.test.ts`
+    => passing.
+  - `git diff --check -- scripts/deploy-verify.sh scripts/ops/release-readiness-gates.test.ts scripts/ops/deploy-verify-readiness-parser.test.ts scripts/ops/readiness-status-parser.mjs tasks/todo.md`
+    => exit 0, with LF/CRLF normalization warnings only.
+  - `pnpm security:no-hardcoded-jwts` => passing.
+- Claude Code review:
+  - Initial review returned `APPROVE` with one medium non-blocking test-strength
+    recommendation. Added executable parser coverage before PR.
+  - Follow-up re-review returned `APPROVE` with no high/medium findings. One
+    optional low note remains for future Bash-glue executable coverage; the
+    false-green path is fail-closed by construction.
+
+## Completed Workstream: Validator Readiness Status Pass 62 (2026-06-03)
 
 **Branch:** `fix/readiness-monitor-status`
 
@@ -38,12 +114,15 @@ local readiness response parsing.
 - [x] Run focused ops tests, TypeScript/script checks, diff hygiene, and secret
       scan.
 - [x] Request Claude Code review and resolve findings.
-- [ ] Commit, PR, CI, and merge if green.
-- [ ] Do not deploy by default; hand off deploy/runtime status and remaining
+- [x] Commit, PR, CI, and merge if green.
+- [x] Do not deploy by default; hand off deploy/runtime status and remaining
       operator-only blockers.
 
 **Evidence so far**
-- Current `origin/main`: `45611bb2b2490065f5021efa3621641357d17c40`.
+- Current `origin/main`: `982b2825770e6bc1e2b6ff05d57262be574b7309`.
+- PR/CI/merge:
+  - PR #202 merged at `982b2825770e6bc1e2b6ff05d57262be574b7309`; GitHub CI
+    passed audit, build, e2e, lint, security, and test.
 - Drift-check:
   - `middleware/src/modules/health/health.controller.ts` returns HTTP 200 for
     degraded readiness and only throws 503 for unhealthy readiness.
