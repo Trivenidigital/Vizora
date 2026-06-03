@@ -107,6 +107,17 @@ test('ops alerting labels unresolved incident lists as active incidents', () => 
   assert.doesNotMatch(alerting, /No open incidents/);
 });
 
+test('validate monitor parses readiness body status instead of only HTTP 200', () => {
+  const monitor = readRepoFile('scripts/validate-monitor.ts');
+
+  assert.match(monitor, /function normalizeReadinessStatus/);
+  assert.match(monitor, /const readinessBody = await readJsonBody/);
+  assert.match(monitor, /services\['readiness'\] = readinessStatus/);
+  assert.match(monitor, /health\.degraded/);
+  assert.match(monitor, /INFRA-DEGRADED/);
+  assert.doesNotMatch(monitor, /services\['readiness'\] = res\.ok \? 'healthy'/);
+});
+
 test('CI test job runs web unit tests before build-only gates', () => {
   const ciWorkflow = readRepoFile('.github/workflows/ci.yml');
   const testJob = readCiJobBlock(ciWorkflow, 'test');

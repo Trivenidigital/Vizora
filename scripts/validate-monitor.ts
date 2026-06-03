@@ -18,7 +18,8 @@
  */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -30,7 +31,8 @@ const TIMEOUT_MS = 30_000;
 const MAX_ENTITIES = 500;
 
 // Path to last-known state file (relative to project root)
-const STATE_FILE = join(dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1')), '..', 'logs', 'validator-latest.json');
+const SCRIPT_FILE = fileURLToPath(import.meta.url);
+const STATE_FILE = join(dirname(SCRIPT_FILE), '..', 'logs', 'validator-latest.json');
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -65,6 +67,14 @@ interface MonitorState {
   categories: string[];
   durationMs: number;
   issues: ValidationIssue[];
+}
+
+type InfrastructureHealthStatus = 'healthy' | 'degraded' | 'unhealthy';
+
+interface HealthCheckResult {
+  healthy: boolean;
+  degraded: boolean;
+  services: Record<string, string>;
 }
 
 // ─── API Client ──────────────────────────────────────────────────────────────
@@ -128,7 +138,53 @@ async function login(): Promise<string> {
 
 // ─── Health Check ────────────────────────────────────────────────────────────
 
-async function checkHealth(): Promise<{ healthy: boolean; services: Record<string, string> }> {
+async function readJsonBody(res: Response): Promise<Record<string, unknown> | null> {
+  try {
+    return await res.json() as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+export function unwrapResponseEnvelope(body: Record<string, unknown> | null): Record<string, unknown> | null {
+  const payload = body?.success !== undefined && body.data !== undefined
+    ? body.data
+    : body;
+
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null;
+  }
+
+  return payload as Record<string, unknown>;
+}
+
+export function normalizeReadinessStatus(
+  body: Record<string, unknown> | null,
+  httpOk: boolean,
+): InfrastructureHealthStatus {
+  if (!httpOk) return 'unhealthy';
+
+  if (body?.status === 'ok') return 'healthy';
+  if (body?.status === 'degraded') return 'degraded';
+  if (body?.status === 'unhealthy') return 'unhealthy';
+
+  // Unknown successful readiness shapes are contract drift. Fail closed so
+  // operators never see READY from a response we cannot interpret.
+  return 'unhealthy';
+}
+
+function isUnhealthyServiceStatus(status: string): boolean {
+  return status === 'unhealthy' ||
+    status.startsWith('unhealthy ') ||
+    status.startsWith('unhealthy:') ||
+    status.startsWith('unreachable:');
+}
+
+function isDegradedServiceStatus(status: string): boolean {
+  return status === 'degraded';
+}
+
+async function checkHealth(): Promise<HealthCheckResult> {
   const services: Record<string, string> = {};
   try {
     const controller = new AbortController();
@@ -136,10 +192,10 @@ async function checkHealth(): Promise<{ healthy: boolean; services: Record<strin
     const res = await fetch(`${BASE_URL}/api/v1/health`, { signal: controller.signal });
     clearTimeout(timer);
     services['api'] = res.ok ? 'healthy' : `unhealthy (${res.status})`;
-    if (!res.ok) return { healthy: false, services };
+    if (!res.ok) return { healthy: false, degraded: false, services };
   } catch (err) {
     services['api'] = `unreachable: ${err instanceof Error ? err.message : err}`;
-    return { healthy: false, services };
+    return { healthy: false, degraded: false, services };
   }
 
   try {
@@ -147,13 +203,17 @@ async function checkHealth(): Promise<{ healthy: boolean; services: Record<strin
     const timer = setTimeout(() => controller.abort(), 15_000);
     const res = await fetch(`${BASE_URL}/api/v1/health/ready`, { signal: controller.signal });
     clearTimeout(timer);
-    services['readiness'] = res.ok ? 'healthy' : `unhealthy (${res.status})`;
+    const readinessBody = await readJsonBody(res);
+    const readinessStatus = normalizeReadinessStatus(unwrapResponseEnvelope(readinessBody), res.ok);
+    services['readiness'] = readinessStatus;
   } catch (err) {
     services['readiness'] = `unhealthy: ${err instanceof Error ? err.message : err}`;
   }
 
-  const healthy = !Object.values(services).some(s => s.includes('unhealthy') || s.includes('unreachable'));
-  return { healthy, services };
+  const serviceStatuses = Object.values(services);
+  const healthy = !serviceStatuses.some(isUnhealthyServiceStatus);
+  const degraded = serviceStatuses.some(isDegradedServiceStatus);
+  return { healthy, degraded, services };
 }
 
 // ─── Content Validator (Rules C-001 to C-007, L-001 to L-003, ST-001 to ST-002) ─
@@ -514,7 +574,11 @@ async function main() {
     process.exitCode = 2;
     return;
   }
-  log('Health check passed');
+  if (health.degraded) {
+    log(`Infrastructure DEGRADED: ${JSON.stringify(health.services)}`);
+  } else {
+    log('Health check passed');
+  }
 
   // 2. Authenticate
   log('Authenticating...');
@@ -547,7 +611,18 @@ async function main() {
   ];
 
   // 5. Aggregate
-  const allIssues = results.flatMap(r => r.issues);
+  const infrastructureIssues: ValidationIssue[] = health.degraded
+    ? [{
+        rule: 'INFRA-DEGRADED',
+        severity: 'warning',
+        entity: 'health',
+        entityId: 'readiness',
+        entityName: 'Infrastructure readiness',
+        message: `Infrastructure readiness is degraded: ${JSON.stringify(health.services)}`,
+        recommendation: 'Check /api/v1/health/ready dependencies before launch.',
+      }]
+    : [];
+  const allIssues = [...infrastructureIssues, ...results.flatMap(r => r.issues)];
   const critical = allIssues.filter(i => i.severity === 'critical').length;
   const warning = allIssues.filter(i => i.severity === 'warning').length;
   const info = allIssues.filter(i => i.severity === 'info').length;
@@ -558,7 +633,7 @@ async function main() {
     timestamp: new Date().toISOString(),
     totalIssues: allIssues.length,
     critical, warning, info,
-    categories: results.map(r => r.category),
+    categories: [...(health.degraded ? ['health'] : []), ...results.map(r => r.category)],
     durationMs: Date.now() - runStart,
     issues: allIssues,
   };
@@ -581,7 +656,13 @@ async function main() {
   process.exitCode = readiness === 'READY' ? 0 : 1;
 }
 
-main().catch(err => {
-  log(`FATAL: ${err instanceof Error ? err.message : err}`);
-  process.exitCode = 2;
-});
+function isDirectRun(): boolean {
+  return process.argv[1] !== undefined && resolve(process.argv[1]) === resolve(SCRIPT_FILE);
+}
+
+if (isDirectRun()) {
+  main().catch(err => {
+    log(`FATAL: ${err instanceof Error ? err.message : err}`);
+    process.exitCode = 2;
+  });
+}

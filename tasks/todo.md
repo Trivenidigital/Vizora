@@ -1,5 +1,92 @@
 # Vizora - Task Tracker
 
+## Active Workstream: Validator Readiness Status Pass 62 (2026-06-03)
+
+**Branch:** `fix/readiness-monitor-status`
+
+**Why now:** `scripts/validate-monitor.ts` is an operator-facing readiness
+monitor. It currently treats `/api/v1/health/ready` as healthy whenever the
+HTTP response is 2xx. The Nest readiness endpoint returns HTTP 200 for
+`status: "degraded"` and only throws 503 for `status: "unhealthy"`, so the
+monitor can report overall `READY` while infrastructure is degraded.
+
+**New primitives introduced:** none planned. This pass should reuse the
+existing validator script, readiness response, state file, Slack alert path,
+and ops static gate tests. No new route, model, migration, env var, process,
+realtime event, MCP tool, Hermes skill, AI/provider spend path, or production
+runtime change is expected.
+
+**Hermes-first analysis:** checked per project convention. This is
+deterministic readiness parsing inside an existing TypeScript ops script, not a
+business-agent, MCP, Hermes runtime, or provider-spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Readiness JSON status parsing | none applicable | fix existing validator monitor |
+| Static release-readiness regression guard | none applicable | extend existing ops test |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+local readiness response parsing.
+
+**Plan**
+- [x] Add a failing ops gate proving `validate-monitor.ts` inspects the
+      readiness JSON status instead of only HTTP 200.
+- [x] Parse `/api/v1/health/ready` body status as `healthy`, `degraded`, or
+      `unhealthy`, failing closed on malformed readiness responses.
+- [x] Carry degraded infrastructure into the final monitor state as a warning so
+      content validators cannot overwrite it back to `READY`.
+- [x] Run focused ops tests, TypeScript/script checks, diff hygiene, and secret
+      scan.
+- [x] Request Claude Code review and resolve findings.
+- [ ] Commit, PR, CI, and merge if green.
+- [ ] Do not deploy by default; hand off deploy/runtime status and remaining
+      operator-only blockers.
+
+**Evidence so far**
+- Current `origin/main`: `45611bb2b2490065f5021efa3621641357d17c40`.
+- Drift-check:
+  - `middleware/src/modules/health/health.controller.ts` returns HTTP 200 for
+    degraded readiness and only throws 503 for unhealthy readiness.
+  - `scripts/validate-monitor.ts` labeled `/api/v1/health/ready` as
+    `healthy` on any 2xx response, so degraded infrastructure could be dropped
+    before final readiness was calculated.
+- Red focused run:
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`
+    failed as expected on the new `validate-monitor` body-status parsing gate.
+- Fix:
+  - Added `normalizeReadinessStatus()`, `unwrapResponseEnvelope()`, and
+    `readJsonBody()` helpers.
+  - Parse readiness response `status: "ok" | "degraded" | "unhealthy"` and
+    fail closed to unhealthy on malformed successful responses.
+  - Unwrap global response envelopes via `body.data ?? body` before
+    normalizing readiness status.
+  - Guarded the script entrypoint so pure helper tests can import the parser
+    without starting the monitor.
+  - Continue content validators during degraded infrastructure, but add a
+    synthetic `INFRA-DEGRADED` warning so the final monitor state cannot be
+    `READY` while infrastructure readiness is degraded.
+  - Added an explicit fail-closed comment for unknown readiness response shapes
+    and replaced broad substring health aggregation with exact
+    degraded/unhealthy status helpers after Claude Code review.
+- Green verification:
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`
+    => 14/14 tests passing.
+  - `node --import tsx --test scripts/ops/validate-monitor-readiness.test.ts`
+    => 5/5 tests passing.
+  - `pnpm test:ops` => 30/30 tests passing.
+  - `pnpm exec tsc --noEmit --pretty false --module ESNext --moduleResolution Bundler --target ES2022 --types node --skipLibCheck scripts/validate-monitor.ts scripts/ops/release-readiness-gates.test.ts scripts/ops/validate-monitor-readiness.test.ts`
+    => passing.
+  - `git diff --check -- scripts/validate-monitor.ts scripts/ops/release-readiness-gates.test.ts scripts/ops/validate-monitor-readiness.test.ts tasks/todo.md`
+    => exit 0, with LF/CRLF normalization warnings only.
+  - `pnpm security:no-hardcoded-jwts` => passing.
+- Claude Code review:
+  - Initial review returned `APPROVE` with non-blocking hardening notes.
+  - Follow-up review returned `REQUEST_CHANGES` on a critical envelope parsing
+    gap. Fixed by unwrapping `data ?? body` and adding executable tests for
+    enveloped healthy/degraded/malformed readiness responses.
+  - Final re-review after adding non-enveloped and non-2xx edge tests returned
+    `APPROVE`.
+
 ## Active Workstream: Backlog Readiness Truth Pass 61 (2026-06-03)
 
 **Branch:** `fix/overnight-readiness-followup`
@@ -35,7 +122,7 @@ static backlog/readiness UI truthfulness.
 - [x] Update Pass 60 evidence/checklist now that PR #200 merged green.
 - [x] Run focused web tests, TypeScript, diff hygiene, and secret scan.
 - [x] Request Claude Code review and resolve findings.
-- [ ] Commit, PR, CI, and merge if green.
+- [x] Commit, PR, CI, and merge if green.
 - [ ] Do not deploy by default; hand off deploy/runtime status and remaining
       operator-only blockers.
 
@@ -78,6 +165,9 @@ static backlog/readiness UI truthfulness.
     customer IT`, and `Operator + reviewer`, then added a negative regression
     assertion for the personal name.
   - Final re-review returned `APPROVE`.
+- PR/CI:
+  - PR #201 merged at `45611bb2b2490065f5021efa3621641357d17c40`.
+  - GitHub CI passed: audit, build, lint, security, test, and e2e.
 
 ## Active Workstream: Admin Health Overall Status Pass 60 (2026-06-03)
 
