@@ -437,6 +437,34 @@ describe('PairingService', () => {
       expect(result.pairingUrl).toContain('/dashboard/devices/pair');
     });
 
+    it('should use APP_URL for pairing URLs before legacy fallbacks', async () => {
+      const originalAppUrl = process.env.APP_URL;
+      const originalFrontendUrl = process.env.FRONTEND_URL;
+      const originalWebUrl = process.env.WEB_URL;
+
+      try {
+        process.env.APP_URL = 'https://app.vizora.test';
+        process.env.FRONTEND_URL = 'https://legacy.vizora.test';
+        process.env.WEB_URL = 'https://web.vizora.test';
+        mockDatabaseService.display.findUnique.mockResolvedValue(null);
+
+        const result = await service.requestPairingCode(mockRequestDto);
+
+        expect(result.pairingUrl).toBe(
+          `https://app.vizora.test/dashboard/devices/pair?code=${result.code}`,
+        );
+      } finally {
+        if (originalAppUrl === undefined) delete process.env.APP_URL;
+        else process.env.APP_URL = originalAppUrl;
+
+        if (originalFrontendUrl === undefined) delete process.env.FRONTEND_URL;
+        else process.env.FRONTEND_URL = originalFrontendUrl;
+
+        if (originalWebUrl === undefined) delete process.env.WEB_URL;
+        else process.env.WEB_URL = originalWebUrl;
+      }
+    });
+
     it('should throw if Redis storage fails', async () => {
       mockDatabaseService.display.findUnique.mockResolvedValue(null);
       mockRedisService.set.mockResolvedValueOnce(false);

@@ -313,6 +313,10 @@ describe('OrganizationsService', () => {
   });
 
   describe('sendOnboardingNudge (customer-lifecycle write — high blast radius)', () => {
+    let originalAppUrl: string | undefined;
+    let originalFrontendUrl: string | undefined;
+    let originalWebUrl: string | undefined;
+
     beforeEach(() => {
       // Default: claim succeeds (existing row had col=null, claim flipped it)
       mockDatabaseService.organizationOnboarding.updateMany.mockResolvedValue({ count: 1 });
@@ -327,6 +331,23 @@ describe('OrganizationsService', () => {
       // Reset env between tests
       delete process.env.LIFECYCLE_LIVE;
       delete process.env.LIFECYCLE_TEST_EMAILS;
+      originalAppUrl = process.env.APP_URL;
+      originalFrontendUrl = process.env.FRONTEND_URL;
+      originalWebUrl = process.env.WEB_URL;
+      delete process.env.APP_URL;
+      delete process.env.FRONTEND_URL;
+      delete process.env.WEB_URL;
+    });
+
+    afterEach(() => {
+      if (originalAppUrl === undefined) delete process.env.APP_URL;
+      else process.env.APP_URL = originalAppUrl;
+
+      if (originalFrontendUrl === undefined) delete process.env.FRONTEND_URL;
+      else process.env.FRONTEND_URL = originalFrontendUrl;
+
+      if (originalWebUrl === undefined) delete process.env.WEB_URL;
+      else process.env.WEB_URL = originalWebUrl;
     });
 
     afterAll(() => {
@@ -390,6 +411,25 @@ describe('OrganizationsService', () => {
       if (out.recipientHashes.length > 0) {
         expect(out.recipientHashes[0]).toMatch(/^[a-f0-9]{16}$/);
       }
+    });
+
+    it('uses the shared public app URL for lifecycle dashboard links', async () => {
+      const sendMail = jest.fn().mockResolvedValue({});
+      (service as unknown as { lifecycleTransporter: { sendMail: typeof sendMail } }).lifecycleTransporter = {
+        sendMail,
+      };
+      process.env.FRONTEND_URL = 'https://frontend.vizora.test/';
+      process.env.WEB_URL = 'https://web.vizora.test';
+      process.env.LIFECYCLE_TEST_EMAILS = 'redirect@example.test';
+
+      const out = await service.sendOnboardingNudge('org-1', 'day1-pair-screen');
+
+      expect(out.reason).toBe('sent');
+      expect(sendMail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          text: expect.stringContaining('https://frontend.vizora.test/dashboard'),
+        }),
+      );
     });
 
     it('creates a fresh onboarding row when one does not exist (no double-claim)', async () => {

@@ -26,6 +26,7 @@ import { BillingService } from '../billing/billing.service';
 import { StorageService } from '../storage/storage.service';
 import { getCleanupSafeMinioObjectKey, isMinioUrl } from '../storage/minio-object-key';
 import { AlertRulesService } from '../notifications/alert-rules/alert-rules.service';
+import { resolvePublicAppUrl } from '../common/utils/public-app-url';
 
 // Account lockout constants
 const MAX_LOGIN_ATTEMPTS = 10;
@@ -659,9 +660,7 @@ export class AuthService {
     });
 
     // Build reset URL
-    const frontendUrl =
-      process.env.APP_URL || process.env.FRONTEND_URL || process.env.WEB_URL || 'http://localhost:3001';
-    const resetUrl = `${frontendUrl}/reset-password?token=${rawToken}`;
+    const resetUrl = `${resolvePublicAppUrl()}/reset-password?token=${rawToken}`;
 
     // Send email (uses raw token, not hashed)
     await this.mailService.sendPasswordResetEmail(user.email, user.firstName, resetUrl);

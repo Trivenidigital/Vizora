@@ -1,5 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { BillingService } from './billing.service';
 import { DatabaseService } from '../database/database.service';
@@ -22,7 +21,6 @@ beforeAll(() => {
 describe('BillingService', () => {
   let service: BillingService;
   let mockDatabaseService: any;
-  let mockConfigService: any;
   let mockStripeProvider: any;
   let mockRazorpayProvider: any;
   let mockRedisService: any;
@@ -90,17 +88,6 @@ describe('BillingService', () => {
       },
     };
 
-    mockConfigService = {
-      get: jest.fn().mockImplementation((key: string) => {
-        const config: Record<string, string> = {
-          APP_URL: 'http://localhost:3001',
-          STRIPE_SECRET_KEY: 'sk_test_123',
-          RAZORPAY_KEY_ID: 'rzp_test_123',
-        };
-        return config[key];
-      }),
-    };
-
     mockStripeProvider = {
       name: 'stripe',
       createCustomer: jest.fn(),
@@ -145,7 +132,6 @@ describe('BillingService', () => {
       providers: [
         BillingService,
         { provide: DatabaseService, useValue: mockDatabaseService },
-        { provide: ConfigService, useValue: mockConfigService },
         { provide: StripeProvider, useValue: mockStripeProvider },
         { provide: RazorpayProvider, useValue: mockRazorpayProvider },
         { provide: MailService, useValue: mockMailService },
@@ -382,6 +368,41 @@ describe('BillingService', () => {
           cancelUrl: expect.stringContaining('/billing/cancel'),
         }),
       );
+    });
+
+    it('should use APP_URL for generated checkout return URLs before legacy fallbacks', async () => {
+      const originalAppUrl = process.env.APP_URL;
+      const originalFrontendUrl = process.env.FRONTEND_URL;
+      const originalWebUrl = process.env.WEB_URL;
+
+      try {
+        process.env.APP_URL = 'https://app.vizora.test';
+        process.env.FRONTEND_URL = 'https://legacy.vizora.test';
+        process.env.WEB_URL = 'https://web.vizora.test';
+        mockDatabaseService.organization.findUnique.mockResolvedValue(mockOrganization);
+        mockStripeProvider.createCheckoutSession.mockResolvedValue({
+          url: 'https://checkout.stripe.com/session123',
+          sessionId: 'cs_test_123',
+        });
+
+        await service.createCheckoutSession('org-123', checkoutDto);
+
+        expect(mockStripeProvider.createCheckoutSession).toHaveBeenCalledWith(
+          expect.objectContaining({
+            successUrl: 'https://app.vizora.test/dashboard/settings/billing/success',
+            cancelUrl: 'https://app.vizora.test/dashboard/settings/billing/cancel',
+          }),
+        );
+      } finally {
+        if (originalAppUrl === undefined) delete process.env.APP_URL;
+        else process.env.APP_URL = originalAppUrl;
+
+        if (originalFrontendUrl === undefined) delete process.env.FRONTEND_URL;
+        else process.env.FRONTEND_URL = originalFrontendUrl;
+
+        if (originalWebUrl === undefined) delete process.env.WEB_URL;
+        else process.env.WEB_URL = originalWebUrl;
+      }
     });
 
     it('should create checkout session with Razorpay for Indian organization', async () => {

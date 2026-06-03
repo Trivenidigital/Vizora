@@ -5,14 +5,11 @@ import {
   NotFoundException,
   OnModuleInit,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { DatabaseService } from '../database/database.service';
 import { StripeProvider } from './providers/stripe.provider';
 import { RazorpayProvider } from './providers/razorpay.provider';
 import {
   PaymentProvider,
-  Subscription,
-  WebhookEvent,
 } from './providers/payment-provider.interface';
 import { CreateCheckoutDto } from './dto/create-checkout.dto';
 import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
@@ -32,6 +29,7 @@ import {
 } from './constants/plans';
 import { MailService } from '../mail/mail.service';
 import { RedisService } from '../redis/redis.service';
+import { resolvePublicAppUrl } from '../common/utils/public-app-url';
 
 /** Webhook event data from Stripe/Razorpay — deeply nested untyped objects */
 interface WebhookData {
@@ -44,7 +42,6 @@ export class BillingService implements OnModuleInit {
 
   constructor(
     private readonly db: DatabaseService,
-    private readonly configService: ConfigService,
     private readonly stripeProvider: StripeProvider,
     private readonly razorpayProvider: RazorpayProvider,
     private readonly mailService: MailService,
@@ -287,7 +284,7 @@ export class BillingService implements OnModuleInit {
       throw new BadRequestException(`Price not configured for ${dto.planId} (${currency})`);
     }
 
-    const baseUrl = this.configService.get<string>('APP_URL') || 'http://localhost:3001';
+    const baseUrl = resolvePublicAppUrl();
     const successUrl = dto.successUrl || `${baseUrl}/dashboard/settings/billing/success`;
     const cancelUrl = dto.cancelUrl || `${baseUrl}/dashboard/settings/billing/cancel`;
 

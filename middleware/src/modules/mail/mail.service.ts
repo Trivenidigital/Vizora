@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
+import { resolvePublicAppUrl } from '../common/utils/public-app-url';
 
 /** Sender identities — from uses verified mail.vizora.cloud, reply-to goes to real inboxes */
 const SENDERS = {
@@ -55,7 +56,7 @@ export class MailService {
   }
 
   private get appUrl(): string {
-    return process.env.APP_URL || process.env.FRONTEND_URL || process.env.WEB_URL || 'http://localhost:3001';
+    return resolvePublicAppUrl();
   }
 
   private get upgradeUrl(): string {
