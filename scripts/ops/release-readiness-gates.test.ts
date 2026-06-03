@@ -323,6 +323,16 @@ test('customer-1 go-live smoke template captures C1-C4 launch evidence safely', 
   assert.doesNotMatch(template, /B16|2026-05-1[0-9]/);
 });
 
+test('first-customer C4 runbook avoids stale fixed unit-test counts', () => {
+  const runbook = readRepoFile('docs/runbooks/first-customer-onboarding.md');
+
+  assert.doesNotMatch(runbook, /2335\/2367|212\/212|864\/864/);
+  assert.match(runbook, /record current pass\/fail totals/i);
+  assert.match(runbook, /do not rely on historical counts/i);
+  assert.match(runbook, /higher totals with zero failures/i);
+  assert.match(runbook, /investigate lower totals/i);
+});
+
 test('first-customer runbook does not require nonexistent email verification flow', () => {
   const runbook = readRepoFile('docs/runbooks/first-customer-onboarding.md');
   const schema = readRepoFile('packages/database/prisma/schema.prisma');
