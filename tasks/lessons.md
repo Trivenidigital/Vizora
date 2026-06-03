@@ -1,5 +1,10 @@
 # Vizora - Lessons Learned
 
+## Session: 2026-06-03 - Runtime Assumption Correction
+
+### SMTP / Email State
+- When the operator says SMTP used to work, do not infer "SMTP unconfigured" from stale backlog gates alone. Separate repo-side email-link/config validation from runtime SMTP truth, and verify current env/runtime/test-send evidence before reporting email as broken. Customer-visible sends still require explicit operator approval.
+
 ## Session: 2026-05-31 - Autonomous Builder Correction
 
 ### Session Coordination

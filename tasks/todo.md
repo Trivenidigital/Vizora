@@ -1,6 +1,54 @@
 # Vizora - Task Tracker
 
-## Active Workstream: Display Auto-Update Command Pass 70 (2026-06-03)
+## Active Workstream: Readiness Backlog Reconciliation Pass 71 (2026-06-03)
+
+**Branch:** `fix/production-readiness-pass71`
+
+**Why now:** PR #211 merged the repo-side display auto-update command work,
+but the readiness handoff still has stale open checklist/docs items. Backlog
+also still lists two known issues as TODO even though current code/test
+evidence shows they are no longer true: admin RSC tests are green, and fleet
+commands already support server-side group targeting.
+
+**New primitives introduced:** none. This is source-of-truth reconciliation
+only; no production env change, deploy, email send, payment setup, display
+release publish, hardware action, DB migration, PM2 process, MCP tool, Hermes
+skill, or provider-spend path is planned.
+
+**Hermes-first analysis:** not applicable to a docs-only backlog reconciliation.
+No business-agent or Hermes runtime behavior is being designed or changed.
+
+**Plan**
+- [x] Verify current branch/head and confirm pass70 merged on `origin/main`.
+- [x] Re-run focused admin web tests to prove the stale K5 RSC-test claim.
+- [x] Drift-check K7 push-to-group against the fleet API/service path.
+- [x] Patch `tasks/todo.md`, `backlog.md`, and correction lessons with concrete
+      evidence only.
+- [ ] Run docs diff hygiene, request Claude Code review, commit, PR, and merge
+      if green.
+
+**Evidence**
+- Current branch: `fix/production-readiness-pass71`.
+- Base/head: `3494e025` (`origin/main`) after PR #211 merge.
+- Admin test verification:
+  - `pnpm --filter @vizora/web test -- --runInBand --runTestsByPath src/app/admin/__tests__/admin-dashboard.test.tsx src/app/admin/__tests__/organizations-page.test.tsx src/app/admin/__tests__/plans-page.test.tsx src/app/admin/analytics/__tests__/analytics-page.test.tsx src/app/admin/backlog/__tests__/backlog-page.test.tsx src/app/admin/health/__tests__/health-page.test.tsx src/app/admin/support/__tests__/support-dashboard.test.tsx src/app/admin/users/__tests__/users-page.test.tsx`
+  - Result: 8 suites / 80 tests passed; known React `act(...)` warnings in
+    `AdminAnalyticsClient` remain non-failing.
+- K7 drift-check evidence:
+  - `middleware/src/modules/fleet/dto/send-command.dto.ts` accepts
+    `target.type` values `device`, `group`, `organization`, and `tag`.
+  - `middleware/src/modules/fleet/fleet.service.ts` resolves `group` targets by
+    loading `displayGroupMember` rows, then fans out through the existing
+    gateway broadcast path once per command.
+  - `web/src/lib/api/fleet.ts` sends a single `POST /fleet/commands` request for
+    arbitrary fleet targets.
+- Verification:
+  - `git diff --check`: passed with CRLF warnings only.
+  - `pnpm security:no-hardcoded-jwts`: passed.
+- Claude Code review:
+  - Local `claude` CLI reviewed the docs-only diff and returned `CLEAN`.
+
+## Completed Workstream: Display Auto-Update Command Pass 70 (2026-06-03)
 
 **Branch:** `fix/production-readiness-pass70`
 
@@ -43,13 +91,15 @@ Electron update delivery.
 - [x] Run focused middleware/display tests, display typecheck/build,
       relevant realtime checks, diff hygiene, and secret scan.
 - [x] Request Claude Code review and resolve findings.
-- [ ] Commit, PR, CI, and merge if green.
+- [x] Commit, PR, CI, and merge if green.
 - [x] Do not publish display releases, deploy, edit production env, send real
       emails, touch payment setup, or run hardware commands.
 
 **Evidence**
 - Branch: `fix/production-readiness-pass70`.
 - Plan commit: `bb32194e` (`docs: plan display auto-update command`).
+- Implementation commit: `ce800cbc` (`fix(display): wire admin auto-update command`).
+- PR: #211, merged into `main` as `3494e025`; GitHub checks green before merge.
 - Red tests:
   - Middleware focused fleet tests failed before implementation because manager
     update was not forbidden and update `feedUrl` validation/payload sanitizing
