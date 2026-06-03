@@ -208,7 +208,7 @@ These are real but non-blocking for customer #1. Capture as P2 items, address po
 | # | Issue | Severity | Path forward |
 |---|---|---|---|
 | 1 | `hermes insights --source cli` returns "No sessions found" — sidecar can't enrich agent_runs with cost data | LOW (3 other cost-defense layers active) | Investigate Hermes session storage location; may need alternate insights query |
-| 2 | `agentRunId` not propagated runner→Hermes→MCP server. Sidecar's outcome refinement falls back to `no_work` for all rows | LOW (refinement is a quality signal, not a safety gate) | Implement runner env-var propagation in P3 |
+| 2 | `agentRunId` not propagated runner→Hermes→MCP server. Pass73 sidecar fallback now uses MCP audit `agentName` candidates + firing window when exact rows are absent, and leaves empty audit evidence unrefined instead of marking all rows `no_work` | LOW (refinement is a quality signal, not a safety gate) | Precise per-run propagation remains upstream/deferred; test Hermes env-var interpolation or `--header` support post-launch |
 | 3 | `hermes-vizora-support-triage` per-org token can only attribute its own org. Cross-org `log_shadow_row` writes get INVALID_INPUT | MEDIUM (support-triage NOT enabled today) | P2 design call: re-issue support-triage as platform-scope token + relax `support:*` tools to accept platform tokens |
 | 4 | `--max-tokens` is not a real Hermes 0.12.0 CLI flag (verified) — config setting is the only Layer 3 mechanism, unverified at OpenRouter request layer | MEDIUM | P0.0a smoke test once a long-tail firing happens with credits |
 | 5 | Tool allowlist (`-t` flag in ecosystem.config.js) currently empty — no model-side filtering | LOW (server-side scope check is the load-bearing backstop) | P0.0a smoke + P3 verification |

@@ -1,6 +1,93 @@
 # Vizora - Task Tracker
 
-## Active Workstream: Hermes Runner Cost Attribution Pass 72 (2026-06-03)
+## Active Workstream: Hermes Audit Outcome Fallback Pass 73 (2026-06-03)
+
+**Branch:** `fix/production-readiness-pass73`
+
+**Why now:** `backlog.md` T3 says the sidecar's `mcp_audit_log` join falls
+back to time range, but repo truth still joins only by `agentRunId`. The
+investigation doc records today's runtime constraint: Hermes 0.12.0 does not
+support per-invocation headers, so MCP audit rows can have null `agentRunId`.
+Current sidecar code then sees zero rows for each successful firing and marks
+it `no_work`, producing false monitoring evidence.
+
+**Drift-check:** existing primitives are already present: `AgentRun`,
+`McpAuditLog.agentName`, `McpAuditLog.createdAt`, the `@@index([agentName,
+createdAt])` Prisma index, and the `poll-insights.ts` sidecar refinement loop.
+The residual gap is specific: when exact `agentRunId` groups are absent, the
+sidecar does not use the documented MCP audit `agentName` candidates + firing
+window fallback and does not avoid false `no_work` refinements.
+
+**New primitives introduced:** one small pure TypeScript helper for classifying
+MCP audit status groups, plus fallback query logic in the existing sidecar. No
+DB model/migration, public API, PM2 process, env var, MCP tool, Hermes skill,
+provider-spend path, production deploy, prod env edit, customer email send,
+payment setup, or hardware action is planned.
+
+**Hermes-first analysis:** checked per project convention. Hermes is already
+the runtime/source for these agent firings; this pass does not add agent
+capability. No Hermes skill can classify Vizora's local `agent_runs` /
+`mcp_audit_log` rows because the data and response semantics are Vizora-native.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Hermes per-run MCP header propagation | none in Hermes 0.12.0 CLI/config | keep upstream/Path B as deferred; do not invent header plumbing |
+| Agent-run outcome classification | none found | build small helper in existing sidecar path |
+| MCP audit fallback query | none found | use existing Prisma `McpAuditLog` indexes |
+
+Awesome-hermes-agent ecosystem check: no installable skill replaces this
+repo-local monitoring refinement.
+
+**Plan**
+- [x] Add failing ops tests proving empty audit evidence does not classify as
+      `no_work` and mixed/failure audit rows classify correctly.
+- [x] Implement the minimal sidecar fallback by MCP audit `agentName`
+      candidates + firing window when exact `agentRunId` rows are absent.
+- [x] Update backlog/investigation docs to reflect repo-side fallback shipped
+      while precise `agentRunId` propagation remains upstream/operator-gated.
+- [x] Run focused ops tests, full ops tests, type/build/diff/secret checks,
+      and Claude Code review.
+- [ ] Commit, PR, CI, and merge if green.
+
+**Evidence**
+- Red tests:
+  - `node --import tsx --test scripts/ops/hermes-outcome-refinement.test.ts`
+    initially failed because `outcome-refinement.ts` did not exist and
+    `poll-insights.ts` still joined only by `agentRunId`.
+  - Follow-up red after Claude review failed because the fallback still pinned
+    `agentName: row.skillName` and had no `mcpAuditAgentNamesForSkill()`.
+- Implementation:
+  - Added `scripts/agents/hermes/outcome-refinement.ts` with pure audit-status
+    classification and skill-name to MCP-audit-agent-name mapping
+    (`vizora-*` plus `hermes-*` candidate).
+  - `poll-insights.ts` now queries exact `agentRunId` groups first; if absent,
+    it queries `agentRunId: null`, `agentName IN mcpAuditAgentNamesForSkill()`,
+    and the firing window with a 5s boundary pad.
+  - Empty audit evidence leaves the provisional outcome untouched instead of
+    writing `no_work`; concrete audit-derived outcomes, including confirmed
+    `success`, PATCH through the existing internal endpoint so `enrichedAt`
+    prevents later orphan-sweep misclassification.
+  - Candidate refinement now filters `enrichedAt: null` to avoid redundant
+    PATCHes on already-confirmed success rows.
+- Verification:
+  - `node --import tsx --test scripts/ops/hermes-outcome-refinement.test.ts`:
+    6 tests passed.
+  - `pnpm test:ops`: 47 tests passed.
+  - `pnpm exec tsc --noEmit --module nodenext --moduleResolution nodenext --target es2022 --lib es2022 --skipLibCheck --strict --esModuleInterop scripts/agents/hermes/outcome-refinement.ts scripts/agents/hermes/poll-insights.ts`: passed.
+  - `pnpm --filter @vizora/middleware test -- --runTestsByPath src/modules/agents/agent-runs.schemas.spec.ts src/modules/agents/agent-runs.service.spec.ts --runInBand`: 2 suites / 26 tests passed.
+  - `npx nx build @vizora/middleware`: passed with existing webpack warnings.
+  - `git diff --check`: passed with CRLF warnings only.
+  - `pnpm security:no-hardcoded-jwts`: passed.
+- Claude Code review:
+  - Initial review found a high-severity phantom join: `agent_runs.skillName`
+    is `vizora-*`, while prod `mcp_audit_log.agentName` is `hermes-*`.
+  - Follow-up review returned `CLEAN`; remaining notes were low/non-blocking
+    around future dormant `hermes insights` enrichment coupling and regex
+    fallback tests.
+
+---
+
+## Completed Workstream: Hermes Runner Cost Attribution Pass 72 (2026-06-03)
 
 **Branch:** `fix/production-readiness-pass72`
 
@@ -46,7 +133,7 @@ repo-local runner/accounting change.
 - [x] Implement post-flight OpenRouter balance delta in the existing Hermes
       runner without changing cost guards or invoking providers in tests.
 - [x] Update backlog and investigation docs to close T2 repo-side.
-- [ ] Run focused middleware tests, ops gates, shell syntax check, diff hygiene,
+- [x] Run focused middleware tests, ops gates, shell syntax check, diff hygiene,
       secret scan, Claude Code review, commit, PR, CI, and merge if green.
 
 **Evidence**
@@ -72,6 +159,9 @@ repo-local runner/accounting change.
 - Claude Code review:
   - Local `claude.exe` review returned `CLEAN`, with no required edits.
   - Reviewer explicitly checked cost-preservation on sidecar outcome-only enrichment, shell decimal validation, cost-guard preservation, secret exposure, and docs truthfulness.
+- PR/CI/merge:
+  - PR #213 merged to `origin/main` at `e21ff71f373a43c5a6d40fa6cce2bbc2bb0875f6`.
+  - GitHub CI passed audit, build, e2e, lint, security, and test.
 
 ## Completed Workstream: Readiness Backlog Reconciliation Pass 71 (2026-06-03)
 
