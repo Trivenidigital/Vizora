@@ -46,6 +46,14 @@ export class MailService {
     return process.env.EMAIL_FROM || SENDERS.noreply.from;
   }
 
+  private senderIdentity(sender: SenderKey): { from: string; replyTo?: string } {
+    if (sender === 'noreply') {
+      return { ...SENDERS.noreply, from: this.fromAddress };
+    }
+
+    return SENDERS[sender];
+  }
+
   private get appUrl(): string {
     return process.env.APP_URL || process.env.FRONTEND_URL || process.env.WEB_URL || 'http://localhost:3001';
   }
@@ -69,7 +77,7 @@ export class MailService {
     logLabel: string,
     sender: SenderKey = 'noreply',
   ): Promise<void> {
-    const { from, replyTo } = SENDERS[sender];
+    const { from, replyTo } = this.senderIdentity(sender);
 
     if (!this.transporter) {
       this.logger.warn(`[DEV] ${logLabel} email for ${to} (SMTP not configured)`);
@@ -128,7 +136,9 @@ export class MailService {
   }
 
   private ctaButton(label: string, href: string): string {
-    return `<a href="${href}" style="display:inline-block;background:#00E5A0;color:#061A21;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:8px;">${label}</a>`;
+    const safeHref = MailService.escapeHtml(href);
+    const safeLabel = MailService.escapeHtml(label);
+    return `<a href="${safeHref}" style="display:inline-block;background:#00E5A0;color:#061A21;font-size:14px;font-weight:600;text-decoration:none;padding:12px 28px;border-radius:8px;">${safeLabel}</a>`;
   }
 
   // ---------------------------------------------------------------------------
@@ -176,6 +186,7 @@ export class MailService {
     const urgency = daysRemaining <= 2 ? 'expires very soon' : 'is ending soon';
     const subject = `Your Vizora trial ${urgency} — ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left`;
     const safeFirstName = MailService.escapeHtml(firstName);
+    const safePricingAmount = pricing ? MailService.escapeHtml(pricing.amount) : '';
     const html = this.wrapInTemplate(`
           <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Your trial ${urgency}</h1>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
@@ -187,7 +198,7 @@ export class MailService {
             Upgrade now to keep everything running without interruption.
           </p>
           ${pricing ? `<p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
-            Plans start at <strong style="color:#00E5A0;">${pricing.amount}/screen/month</strong>.
+            Plans start at <strong style="color:#00E5A0;">${safePricingAmount}/screen/month</strong>.
           </p>` : ''}
           ${this.ctaButton('View Plans & Upgrade', this.upgradeUrl)}
           <p style="color:#5A6B73;font-size:12px;line-height:1.5;margin:16px 0 0 0;">
@@ -203,10 +214,12 @@ export class MailService {
     pricing?: { amount: string; currency: string },
   ): Promise<void> {
     const subject = 'Your Vizora trial has ended';
+    const safeFirstName = MailService.escapeHtml(firstName);
+    const safePricingAmount = pricing ? MailService.escapeHtml(pricing.amount) : '';
     const html = this.wrapInTemplate(`
           <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Your trial has ended</h1>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
-            Hi ${MailService.escapeHtml(firstName)},<br><br>
+            Hi ${safeFirstName},<br><br>
             Your Vizora free trial has expired. Your account is still active, but premium features — including
             multi-display management, advanced scheduling, and priority support — are now limited.
           </p>
@@ -214,7 +227,7 @@ export class MailService {
             Upgrade today to restore full access and keep your signage running smoothly.
           </p>
           ${pricing ? `<p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
-            Plans start at <strong style="color:#00E5A0;">${pricing.amount}/screen/month</strong>.
+            Plans start at <strong style="color:#00E5A0;">${safePricingAmount}/screen/month</strong>.
           </p>` : ''}
           ${this.ctaButton('Upgrade Now', this.upgradeUrl)}
           <p style="color:#5A6B73;font-size:12px;line-height:1.5;margin:16px 0 0 0;">
@@ -231,24 +244,28 @@ export class MailService {
     amount: string,
     currency: string,
   ): Promise<void> {
-    const subject = `Payment received — Vizora ${planName}`;
+    const safeFirstName = MailService.escapeHtml(firstName);
+    const safePlanName = MailService.escapeHtml(planName);
+    const safeAmount = MailService.escapeHtml(amount);
+    const safeCurrency = MailService.escapeHtml(currency.toUpperCase());
+    const subject = `Payment received — Vizora ${safePlanName}`;
     const html = this.wrapInTemplate(`
           <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Payment received</h1>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
-            Hi ${MailService.escapeHtml(firstName)},<br><br>
+            Hi ${safeFirstName},<br><br>
             We've received your payment. Here's a summary:
           </p>
           <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px 0;">
             <tr>
               <td style="padding:12px 16px;background:#0A1E26;border-radius:8px 8px 0 0;border-bottom:1px solid #1B3D47;">
                 <span style="color:#5A6B73;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Plan</span><br>
-                <span style="color:#F0ECE8;font-size:14px;font-weight:600;">${planName}</span>
+                <span style="color:#F0ECE8;font-size:14px;font-weight:600;">${safePlanName}</span>
               </td>
             </tr>
             <tr>
               <td style="padding:12px 16px;background:#0A1E26;border-radius:0 0 8px 8px;">
                 <span style="color:#5A6B73;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Amount</span><br>
-                <span style="color:#00E5A0;font-size:18px;font-weight:700;">${amount} ${currency.toUpperCase()}</span>
+                <span style="color:#00E5A0;font-size:18px;font-weight:700;">${safeAmount} ${safeCurrency}</span>
               </td>
             </tr>
           </table>
@@ -289,11 +306,14 @@ export class MailService {
     oldPlan: string,
     newPlan: string,
   ): Promise<void> {
-    const subject = `Plan updated — now on Vizora ${newPlan}`;
+    const safeFirstName = MailService.escapeHtml(firstName);
+    const safeOldPlan = MailService.escapeHtml(oldPlan);
+    const safeNewPlan = MailService.escapeHtml(newPlan);
+    const subject = `Plan updated — now on Vizora ${safeNewPlan}`;
     const html = this.wrapInTemplate(`
           <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Plan updated</h1>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
-            Hi ${MailService.escapeHtml(firstName)},<br><br>
+            Hi ${safeFirstName},<br><br>
             Your Vizora subscription has been changed:
           </p>
           <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px 0;">
@@ -301,12 +321,12 @@ export class MailService {
               <td style="padding:12px 16px;background:#0A1E26;border-radius:8px;display:flex;align-items:center;gap:12px;">
                 <div>
                   <span style="color:#5A6B73;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Previous</span><br>
-                  <span style="color:#8A9BA3;font-size:14px;text-decoration:line-through;">${oldPlan}</span>
+                  <span style="color:#8A9BA3;font-size:14px;text-decoration:line-through;">${safeOldPlan}</span>
                 </div>
                 <div style="color:#5A6B73;font-size:18px;padding:0 8px;">&rarr;</div>
                 <div>
                   <span style="color:#5A6B73;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">New plan</span><br>
-                  <span style="color:#00E5A0;font-size:14px;font-weight:600;">${newPlan}</span>
+                  <span style="color:#00E5A0;font-size:14px;font-weight:600;">${safeNewPlan}</span>
                 </div>
               </td>
             </tr>
@@ -325,12 +345,14 @@ export class MailService {
     accessUntil: string,
   ): Promise<void> {
     const subject = 'Your Vizora subscription has been canceled';
+    const safeFirstName = MailService.escapeHtml(firstName);
+    const safeAccessUntil = MailService.escapeHtml(accessUntil);
     const html = this.wrapInTemplate(`
           <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Subscription canceled</h1>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
-            Hi ${MailService.escapeHtml(firstName)},<br><br>
+            Hi ${safeFirstName},<br><br>
             Your Vizora subscription has been canceled as requested. You'll continue to have full access to
-            premium features until <strong style="color:#F0ECE8;">${accessUntil}</strong>.
+            premium features until <strong style="color:#F0ECE8;">${safeAccessUntil}</strong>.
           </p>
           <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
             After that date, your account will revert to the free tier. Your content and settings will be
