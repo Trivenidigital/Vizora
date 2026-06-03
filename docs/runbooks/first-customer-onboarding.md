@@ -1,32 +1,42 @@
 # First-Customer Onboarding Runbook
 
-**Audience:** Operator (Sri or designated on-call) for the first paying customer go-live (target 2026-05-13).
+**Audience:** Operator (Sri or designated on-call) for customer-1 go-live.
+Launch date: operator-confirmed. Do not use historical target dates from
+older readiness reports without reconfirming the actual customer window.
 **Companion docs:** `docs/plans/2026-05-09-production-readiness-report.md` (go/no-go logic), `docs/plans/2026-05-09-test-inventory.md` (coverage map).
 
 This runbook is what you do **on the day of customer #1's launch** and during the first 7 days of concierge support.
 
+> Windows/Codex SSH note: when running these commands from Codex on Windows,
+> redirect SSH output to a local .ssh_<check>.txt file, then read that file as a separate step.
+> Do not append `cat` after the SSH command; captured SSH stdout is unreliable
+> in that environment.
+
 ---
 
-## T-3 (3 days before launch — 2026-05-10)
+## T-3 (3 days before launch)
 
-### 1. SMTP / Resend on prod (BLOCKER)
-Per `backlog.md` B5/B6/B7. Without this, registration emails + password resets don't send and customer is stuck after signup.
+### 1. C1 — SMTP / Resend on prod (BLOCKER)
+Per `backlog.md` C1. Without this, registration emails + password resets don't send and customer is stuck after signup.
 
 ```bash
 # On prod VPS (root@vizora.cloud):
-ssh root@vizora.cloud 'grep -E "^SMTP_|^RESEND_|^EMAIL_FROM" /opt/vizora/app/.env'
+ssh root@vizora.cloud 'grep -E "^SMTP_|^RESEND_|^EMAIL_FROM" /opt/vizora/app/.env' > .ssh_smtp_env.txt 2>&1
+# Read .ssh_smtp_env.txt as a separate step.
 # Verify all of: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM
 # Resend domain `mail.vizora.cloud` must be verified (DKIM/SPF/DMARC green)
 ```
 
 Smoke test:
 ```bash
-ssh root@vizora.cloud 'cd /opt/vizora/app && bash scripts/smoke/api-critical-path.sh'
+ssh root@vizora.cloud 'cd /opt/vizora/app && bash scripts/smoke/api-critical-path.sh' > .ssh_local_smoke.txt 2>&1
+# Read .ssh_local_smoke.txt as a separate step.
 # Should return ALL critical-path checks passed. The script creates
 # timestamped smoke-test user/org/display/content/playlist/schedule rows.
 #
 # To probe public API/web ingress from the VPS, run:
-ssh root@vizora.cloud 'cd /opt/vizora/app && API_BASE=https://vizora.cloud WEB_BASE=https://vizora.cloud bash scripts/smoke/api-critical-path.sh'
+ssh root@vizora.cloud 'cd /opt/vizora/app && API_BASE=https://vizora.cloud WEB_BASE=https://vizora.cloud bash scripts/smoke/api-critical-path.sh' > .ssh_public_smoke.txt 2>&1
+# Read .ssh_public_smoke.txt as a separate step.
 # Realtime health is still checked locally on the VPS at the default
 # RT_BASE=http://localhost:3002 and probes /api/health. Public WebSocket
 # ingress is covered by the real-device walkthrough below, not by direct :3002 HTTPS.
@@ -39,13 +49,13 @@ curl -X POST https://vizora.cloud/api/v1/auth/register \
 # Within 30s, the configured EMAIL_FROM should land a welcome message in your inbox.
 ```
 
-### 2. Customer-#1 organization provisioned
+### 2. C2 — Customer-#1 organization provisioned
 Skip if the customer self-registers. Otherwise, pre-create:
 - Organization (slug, plan tier, screen quota — set per contract)
 - Admin user invitation (sent to customer's nominated admin email)
 - Initial template library access (per their content plan)
 
-### 3. Real-device walkthrough on customer hardware (BLOCKER)
+### 3. C3 — Real-device walkthrough on customer hardware (BLOCKER)
 Vizora's display app is Electron — `0% functional test coverage`. We pair-on-release as the only mitigation. This walkthrough proves it works on the customer's actual model.
 
 Steps (operator + customer's IT):
@@ -66,7 +76,8 @@ Document any deviations in `docs/runbooks/customer-1-walkthrough-{DATE}.md`. If 
 
 ### 4. Activate external dead-man
 ```
-ssh root@vizora.cloud 'grep HEALTHCHECKS_HEALTH_GUARDIAN_URL /opt/vizora/app/.env'
+ssh root@vizora.cloud 'grep HEALTHCHECKS_HEALTH_GUARDIAN_URL /opt/vizora/app/.env' > .ssh_healthchecks.txt 2>&1
+# Read .ssh_healthchecks.txt as a separate step.
 # Should be a URL from healthchecks.io. If empty, configure now.
 ```
 
@@ -78,15 +89,15 @@ pnpm --filter @vizora/middleware test:e2e:full   # NOT --silent
 
 ---
 
-## T-2 (2 days before launch — 2026-05-11)
+## T-2 (2 days before launch)
 
-### 1. Final go-live smoke (B16 — 60-step checklist)
+### 1. C4 — Final go-live smoke (60-step checklist)
 Run in this order:
 1. `pnpm --filter @vizora/middleware test --testPathIgnorePatterns="e2e-spec"` → expect 2335/2367 pass
 2. `pnpm --filter @vizora/realtime test` → expect 212/212
 3. `pnpm --filter @vizora/web test` → expect 864/864
 4. `bash scripts/smoke/api-critical-path.sh` (against localhost first; creates smoke-test rows)
-5. `ssh root@vizora.cloud 'cd /opt/vizora/app && API_BASE=https://vizora.cloud WEB_BASE=https://vizora.cloud bash scripts/smoke/api-critical-path.sh'` (against prod API/web ingress from the VPS; creates smoke-test rows; realtime health remains local `RT_BASE=http://localhost:3002` and probes `/api/health`)
+5. `ssh root@vizora.cloud 'cd /opt/vizora/app && API_BASE=https://vizora.cloud WEB_BASE=https://vizora.cloud bash scripts/smoke/api-critical-path.sh' > .ssh_go_live_smoke.txt 2>&1` (against prod API/web ingress from the VPS; creates smoke-test rows; realtime health remains local `RT_BASE=http://localhost:3002` and probes `/api/health`; read `.ssh_go_live_smoke.txt` as a separate step)
 6. Open `https://vizora.cloud` in a fresh incognito browser → verify landing page renders, all CTAs work
 7. Sign up with a NEW disposable email → verify welcome email lands within 60s
 8. Click email verify link → verify landed in dashboard
@@ -114,14 +125,15 @@ If pass rate >80%, declare Playwright restored. If <80%, accept as week-1 tech-d
 
 ---
 
-## T-1 (1 day before launch — 2026-05-12)
+## T-1 (1 day before launch)
 
 ### Freeze — only hotfixes for blockers found in T-2
 
 ### Pre-flight checklist on prod
 ```bash
 # Check 1: PM2 process state
-ssh root@vizora.cloud 'pm2 list'
+ssh root@vizora.cloud 'pm2 list' > .ssh_pm2.txt 2>&1
+# Read .ssh_pm2.txt as a separate step.
 # Expect: vizora-middleware (cluster ×2 online), vizora-realtime online, vizora-web online,
 #         hermes-insights-poller (cron: stopped between firings is normal),
 #         hermes-vizora-customer-lifecycle (cron: stopped between firings is normal)
@@ -129,7 +141,7 @@ ssh root@vizora.cloud 'pm2 list'
 
 # Check 2: Migrations applied (pre-flight visibility — no writes)
 ssh root@vizora.cloud 'cd /opt/vizora/app/packages/database && npx prisma migrate status' > .ssh_pmstat.txt 2>&1
-cat .ssh_pmstat.txt
+# Read .ssh_pmstat.txt as a separate step.
 # Expect: "Database schema is up to date!" — OR a list of pending migrations
 # you're about to apply via Check 2a below.
 
@@ -138,19 +150,19 @@ cat .ssh_pmstat.txt
 # between migrate-deploy and the seed leaves the local Prisma client stale,
 # and the seed will fail with a confusing `TypeError: Cannot read properties
 # of undefined (reading 'findUnique')` on whatever model was added by the
-# new migration. Verified locally 2026-05-19.
+# new migration. Verified during the May readiness work.
 # ---------------------------------------------------------------------------
 
 # Check 2a: Apply migrations
 ssh root@vizora.cloud 'cd /opt/vizora/app && pnpm --filter @vizora/database exec prisma migrate deploy' > .ssh_migrate.txt 2>&1
-cat .ssh_migrate.txt
+# Read .ssh_migrate.txt as a separate step.
 # Expect: "All migrations have been successfully applied." (or "No pending migrations.")
 
 # Check 2b: Regenerate the Prisma client BEFORE any script that imports
 # packages/database/src/generated/prisma (e.g. the O7 seed below). Schema
 # additions are invisible to runtime callers until generate runs.
 ssh root@vizora.cloud 'cd /opt/vizora/app && pnpm --filter @vizora/database exec prisma generate --schema packages/database/prisma/schema.prisma' > .ssh_prisma_generate.txt 2>&1
-cat .ssh_prisma_generate.txt
+# Read .ssh_prisma_generate.txt as a separate step.
 # Expect: "Generated Prisma Client (v...) to ./src/generated/prisma in Xms"
 
 # Check 2c (O7 — alert rules seed) — REQUIRED after migration 20260519050346_add_alert_rules
@@ -160,7 +172,7 @@ cat .ssh_prisma_generate.txt
 # backfill is needed only for orgs that pre-date the migration.
 # Idempotent — safe to re-run; rows with the auto-migrated name are skipped.
 ssh root@vizora.cloud 'cd /opt/vizora/app && export $(grep DATABASE_URL .env | xargs) && npx tsx packages/database/scripts/seed-default-alert-rules.ts' > .ssh_seed.txt 2>&1
-cat .ssh_seed.txt
+# Read .ssh_seed.txt as a separate step.
 # Expect: "[seed] Done. created=N skipped_existing=0 orgs_with_no_admins=M"
 # If `created=0 skipped_existing=N` on second run, the seed already landed — that's correct.
 # If you see "Cannot read properties of undefined (reading 'findUnique')" or similar
@@ -178,8 +190,10 @@ cat .ssh_seed.txt
 # Check 5: All health endpoints. Realtime is intentionally checked over
 # localhost on the VPS; direct public :3002 HTTPS is not the supported ingress.
 for url in https://vizora.cloud/api/v1/health https://vizora.cloud/ http://localhost:3002/api/health; do
-  ssh root@vizora.cloud "curl -s -o /dev/null -w '$url -> %{http_code}\n' '$url'"
+  safe_name=$(echo "$url" | sed -E 's#[^a-zA-Z0-9]+#_#g')
+  ssh root@vizora.cloud "curl -s -o /dev/null -w '$url -> %{http_code}\n' '$url'" > ".ssh_health_${safe_name}.txt" 2>&1
 done
+# Read each .ssh_health_*.txt file as a separate step.
 ```
 
 ### Notify on-call
@@ -188,7 +202,7 @@ done
 
 ---
 
-## T-0 (Launch day — 2026-05-13)
+## T-0 (Launch day)
 
 ### Hour 0 — customer onboarding session
 1. Walk customer through admin dashboard (5 min)
