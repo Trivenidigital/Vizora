@@ -1,6 +1,110 @@
 # Vizora - Task Tracker
 
-## Active Workstream: Backlog Launch Gate Truth Pass 65 (2026-06-03)
+## Active Workstream: Mail Sender Env + Template Coverage Pass 66 (2026-06-03)
+
+**Branch:** `fix/mail-sender-env-coverage`
+
+**Why now:** C1 SMTP/Resend remains operator-gated, but repo-side mail behavior
+can still reduce launch risk without sending real email. The first-customer
+runbook and docs tell the operator to verify `EMAIL_FROM`, yet
+`MailService.sendMail()` ignores the existing `fromAddress` getter and always
+uses hardcoded sender addresses for default transactional mail. The mail spec
+also covers only two customer-visible template families, while backlog B4
+tracks multi-template email testing as blocked on C1.
+
+**New primitives introduced:** none planned. This pass should reuse the
+existing NestJS `MailService`, nodemailer mock pattern, and middleware Jest
+tests. No new route, model, migration, env var, process, realtime event, MCP
+tool, Hermes skill, AI/provider spend path, customer email send, or production
+runtime change is expected.
+
+**Hermes-first analysis:** checked per project convention. This is
+deterministic transactional mail service behavior in NestJS, not a
+business-agent, MCP, Hermes runtime, or provider-spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Transactional email sender selection | none applicable | fix existing MailService |
+| Email template unit coverage | none applicable | extend existing Jest spec |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+local NestJS transactional mail sender selection or HTML template assertions.
+
+**Plan**
+- [x] Add failing mail-service tests for documented `EMAIL_FROM` default sender
+      behavior and customer-visible template escaping/CTA coverage.
+- [x] Update `MailService` narrowly: default/noreply sender respects
+      `EMAIL_FROM`, role-specific senders keep their verified identities, and
+      CTA/template dynamic values are HTML-escaped.
+- [x] Run focused mail tests plus adjacent auth/billing mail-caller tests,
+      TypeScript/static checks, diff hygiene, and secret scan.
+- [x] Request Claude Code review and resolve findings.
+- [ ] Commit, PR, CI, and merge if green.
+- [ ] Do not deploy, send real emails, or touch production SMTP/env state.
+
+**Evidence so far**
+- Current `origin/main`: `eab6e910a3baab94f36de047c124a592d501555a`.
+- Drift-check:
+  - `middleware/src/modules/mail/mail.service.ts` defines `fromAddress` as
+    `process.env.EMAIL_FROM || SENDERS.noreply.from`, but `sendMail()` ignores
+    it and always uses `SENDERS[sender].from`.
+  - `docs/runbooks/first-customer-onboarding.md` tells the operator to verify
+    `EMAIL_FROM` and expect welcome mail from the configured sender.
+  - `CLAUDE.md` documents `EMAIL_FROM` as the default sender for transactional
+    mail.
+  - `middleware/src/modules/organizations/organizations.service.ts` already
+    uses `EMAIL_FROM` for lifecycle SMTP sends, so the inconsistency is local
+    to `MailService`.
+  - Existing focused baseline:
+    `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/mail/mail.service.spec.ts`
+    => 10/10 tests passing before new red tests.
+- Red focused run:
+  - `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/mail/mail.service.spec.ts`
+    failed as expected: 5 new failures covered `EMAIL_FROM`, payment receipt
+    fields, plan-change fields, subscription cancellation access date, and CTA
+    href escaping.
+- Fix:
+  - `MailService` now uses the documented `EMAIL_FROM` only for the default
+    `noreply` sender path; role-specific `auth`, `billing`, and `support`
+    senders keep their existing verified identities and reply-to addresses.
+  - CTA button labels/hrefs are escaped before rendering into HTML attributes.
+  - Dynamic billing/subscription template fields now escape plan names, amount,
+    currency, pricing amount, and cancellation access date before interpolation.
+- Green focused run:
+  - `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/mail/mail.service.spec.ts`
+    => 17/17 tests passing after adding `EMAIL_FROM` fallback coverage.
+- Adjacent mail-caller verification:
+  - `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/mail/mail.service.spec.ts src/modules/auth/auth.service.spec.ts src/modules/billing/billing.service.spec.ts src/modules/notifications/alert-rules/alert-rule.evaluator.spec.ts src/modules/organizations/organizations.service.spec.ts src/modules/health/startup-self-test.service.spec.ts`
+    => 179/179 tests passing across 6 suites.
+- Static/build verification:
+  - Loose-file `tsc` failed before build with an existing project type-resolution
+    issue: `Cannot find type definition file for 'dompurify'`. This was not a
+    code failure in the touched files.
+  - `npx nx build @vizora/middleware` initially failed because the local
+    worktree lacked `packages/database/src/generated/prisma`. Generated the
+    local Prisma client with:
+    `$env:NODE_OPTIONS='--use-system-ca'; .\node_modules\.bin\prisma generate --schema prisma/schema.prisma`
+    from `packages/database`.
+  - `npx nx build @vizora/middleware` then passed. Existing webpack warnings
+    remained for OpenTelemetry dynamic requires, Express view, Handlebars
+    `require.extensions`, optional `canvas`, and `require-in-the-middle`.
+  - `$env:ESLINT_USE_FLAT_CONFIG='false'; npx eslint middleware/src/modules/mail/mail.service.ts middleware/src/modules/mail/mail.service.spec.ts`
+    => passing.
+  - `git diff --check -- middleware/src/modules/mail/mail.service.ts middleware/src/modules/mail/mail.service.spec.ts tasks/todo.md`
+    => exit 0, with LF/CRLF normalization warnings only.
+  - `pnpm security:no-hardcoded-jwts` => passing.
+- Claude Code review:
+  - Initial review returned `REQUEST CHANGES` with one medium test-hygiene
+    finding: the new CTA-href test set `SMTP_*` env vars without restoring
+    `process.env`, creating cross-suite leakage risk.
+  - Fixed by mirroring the existing env save/restore pattern in the template
+    escaping describe block and adding explicit fallback coverage for
+    `EMAIL_FROM` unset.
+  - Re-ran focused mail tests (17/17), adjacent caller suite (179/179), ESLint,
+    diff hygiene, and hardcoded-JWT scan after the fix.
+  - Final re-review returned `APPROVE` with no high/medium findings.
+
+## Completed Workstream: Backlog Launch Gate Truth Pass 65 (2026-06-03)
 
 **Branch:** `fix/backlog-launch-gate-truth`
 
@@ -35,12 +139,16 @@ local backlog truthfulness/static guard updates.
 - [x] Run focused ops tests, broader ops tests, TypeScript/static checks, diff
       hygiene, and secret scan.
 - [x] Request Claude Code review and resolve findings.
-- [ ] Commit, PR, CI, and merge if green.
-- [ ] Do not deploy by default; hand off deploy/runtime status and remaining
+- [x] Commit, PR, CI, and merge if green.
+- [x] Do not deploy by default; hand off deploy/runtime status and remaining
       operator-only blockers.
 
 **Evidence so far**
 - Current `origin/main`: `5ddabb7aa5611c85082a2a7729269637c98d0026`.
+- PR/CI/merge:
+  - PR #205 merged at `eab6e910a3baab94f36de047c124a592d501555a`; GitHub CI
+    passed audit, build, e2e, lint, security, and test.
+  - No deploy or production runtime change was performed.
 - Drift-check:
   - `backlog.md` top matter still used `Customer-1 launch target:
     2026-05-13`.

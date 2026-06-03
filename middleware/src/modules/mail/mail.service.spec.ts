@@ -29,10 +29,24 @@ describe('MailService.escapeHtml', () => {
 describe('MailService SMTP config', () => {
   const originalEnv = process.env;
 
+  const configureSmtp = () => {
+    process.env.SMTP_HOST = 'smtp.resend.com';
+    process.env.SMTP_PORT = '587';
+    process.env.SMTP_USER = 'resend';
+    process.env.SMTP_PASS = 'resend-secret';
+  };
+
+  const latestTransport = () =>
+    (nodemailer.createTransport as jest.Mock).mock.results.at(-1)?.value as {
+      sendMail: jest.Mock;
+    };
+
   beforeEach(() => {
     jest.clearAllMocks();
     process.env = { ...originalEnv };
     delete process.env.SMTP_PASSWORD;
+    delete process.env.SMTP_PASS;
+    delete process.env.EMAIL_FROM;
   });
 
   afterEach(() => {
@@ -40,10 +54,7 @@ describe('MailService SMTP config', () => {
   });
 
   it('accepts SMTP_PASS as the documented password alias', () => {
-    process.env.SMTP_HOST = 'smtp.resend.com';
-    process.env.SMTP_PORT = '587';
-    process.env.SMTP_USER = 'resend';
-    process.env.SMTP_PASS = 'resend-secret';
+    configureSmtp();
 
     new MailService();
 
@@ -53,6 +64,56 @@ describe('MailService SMTP config', () => {
         port: 587,
         secure: false,
         auth: { user: 'resend', pass: 'resend-secret' },
+      }),
+    );
+  });
+
+  it('uses EMAIL_FROM for default transactional sender', async () => {
+    configureSmtp();
+    process.env.EMAIL_FROM = 'Vizora Test <noreply@example.test>';
+    const service = new MailService();
+
+    await service.sendWelcomeEmail('user@example.com', 'Ada', 30);
+
+    const message = latestTransport().sendMail.mock.calls[0][0];
+    expect(message).toEqual(
+      expect.objectContaining({
+        from: 'Vizora Test <noreply@example.test>',
+        to: 'user@example.com',
+        subject: 'Welcome to Vizora!',
+      }),
+    );
+    expect(message).not.toHaveProperty('replyTo');
+  });
+
+  it('falls back to the verified noreply sender when EMAIL_FROM is unset', async () => {
+    configureSmtp();
+    const service = new MailService();
+
+    await service.sendWelcomeEmail('user@example.com', 'Ada', 30);
+
+    const message = latestTransport().sendMail.mock.calls[0][0];
+    expect(message).toEqual(
+      expect.objectContaining({
+        from: 'Vizora <noreply@mail.vizora.cloud>',
+        to: 'user@example.com',
+      }),
+    );
+  });
+
+  it('keeps role-specific senders even when EMAIL_FROM is configured', async () => {
+    configureSmtp();
+    process.env.EMAIL_FROM = 'Vizora Test <noreply@example.test>';
+    const service = new MailService();
+
+    await service.sendTrialReminderEmail('user@example.com', 'Ada', 2);
+
+    const message = latestTransport().sendMail.mock.calls[0][0];
+    expect(message).toEqual(
+      expect.objectContaining({
+        from: 'Vizora Billing <billing@mail.vizora.cloud>',
+        replyTo: 'billing@vizora.cloud',
+        to: 'user@example.com',
       }),
     );
   });
@@ -153,5 +214,112 @@ describe('MailService.sendUnrecognizedLoginEmail', () => {
     expect(html).not.toContain('<Ada>');
     expect(html).not.toContain('203.0.113.10"><script>');
     expect(html).not.toContain('<img src=x onerror=alert(1)>');
+  });
+});
+
+describe('MailService customer-visible template escaping', () => {
+  const originalEnv = process.env;
+  let service: MailService;
+  let sendMailSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    delete process.env.SMTP_HOST;
+    delete process.env.SMTP_PORT;
+    delete process.env.SMTP_USER;
+    delete process.env.SMTP_PASS;
+    delete process.env.SMTP_PASSWORD;
+    delete process.env.EMAIL_FROM;
+    service = new MailService();
+    sendMailSpy = jest.spyOn(service as unknown as { sendMail: jest.Func }, 'sendMail').mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    jest.restoreAllMocks();
+  });
+
+  it('escapes payment receipt plan, amount, and currency fields', async () => {
+    await service.sendPaymentReceiptEmail(
+      'billing@example.com',
+      '<Ada>',
+      '<Pro>',
+      '<999>',
+      'usd<script>',
+    );
+
+    const [, , html, label, sender] = sendMailSpy.mock.calls[0];
+
+    expect(html).toContain('&lt;Ada&gt;');
+    expect(html).toContain('&lt;Pro&gt;');
+    expect(html).toContain('&lt;999&gt;');
+    expect(html).toContain('USD&lt;SCRIPT&gt;');
+    expect(html).not.toContain('<Ada>');
+    expect(html).not.toContain('<Pro>');
+    expect(html).not.toContain('<999>');
+    expect(html).not.toContain('USD<SCRIPT>');
+    expect(label).toBe('Payment receipt');
+    expect(sender).toBe('billing');
+  });
+
+  it('escapes plan-change plan names', async () => {
+    await service.sendPlanChangedEmail(
+      'billing@example.com',
+      '<Ada>',
+      '<Free>',
+      '<Pro>',
+    );
+
+    const [, , html, label, sender] = sendMailSpy.mock.calls[0];
+
+    expect(html).toContain('&lt;Ada&gt;');
+    expect(html).toContain('&lt;Free&gt;');
+    expect(html).toContain('&lt;Pro&gt;');
+    expect(html).not.toContain('<Ada>');
+    expect(html).not.toContain('<Free>');
+    expect(html).not.toContain('<Pro>');
+    expect(label).toBe('Plan changed');
+    expect(sender).toBe('billing');
+  });
+
+  it('escapes subscription cancellation access date', async () => {
+    await service.sendSubscriptionCanceledEmail(
+      'billing@example.com',
+      '<Ada>',
+      '<script>date</script>',
+    );
+
+    const [, , html, label, sender] = sendMailSpy.mock.calls[0];
+
+    expect(html).toContain('&lt;Ada&gt;');
+    expect(html).toContain('&lt;script&gt;date&lt;/script&gt;');
+    expect(html).not.toContain('<Ada>');
+    expect(html).not.toContain('<script>date</script>');
+    expect(label).toBe('Subscription canceled');
+    expect(sender).toBe('billing');
+  });
+
+  it('escapes CTA href attributes such as password reset URLs', async () => {
+    process.env.SMTP_HOST = 'smtp.resend.com';
+    process.env.SMTP_PORT = '587';
+    process.env.SMTP_USER = 'resend';
+    process.env.SMTP_PASS = 'resend-secret';
+    service = new MailService();
+
+    await service.sendPasswordResetEmail(
+      'user@example.com',
+      'Ada',
+      'https://vizora.test/reset?token="bad"&next=<x>',
+    );
+
+    const transport = (nodemailer.createTransport as jest.Mock).mock.results.at(-1)?.value as {
+      sendMail: jest.Mock;
+    };
+    const message = transport.sendMail.mock.calls[0][0];
+
+    expect(message.html).toContain(
+      'https://vizora.test/reset?token=&quot;bad&quot;&amp;next=&lt;x&gt;',
+    );
+    expect(message.html).not.toContain('token="bad"&next=<x>');
   });
 });
