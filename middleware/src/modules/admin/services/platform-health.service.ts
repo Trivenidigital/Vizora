@@ -76,9 +76,13 @@ export class PlatformHealthService {
     // Determine overall health
     let overall: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
 
+    const hasUnhealthyAppService = [middlewareStatus, webStatus, realtimeStatus].some(
+      (service) => service.status !== 'healthy',
+    );
+
     if (!dbHealth.healthy) {
       overall = 'unhealthy';
-    } else if (!redisHealth.healthy || middlewareStatus.status !== 'healthy') {
+    } else if (!redisHealth.healthy || hasUnhealthyAppService) {
       overall = 'degraded';
     }
 
