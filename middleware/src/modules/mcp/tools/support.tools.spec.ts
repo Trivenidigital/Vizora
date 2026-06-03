@@ -7,10 +7,13 @@ import {
 } from './support.tools';
 import type { McpRequestContext } from '../auth/mcp-context';
 
-function ctx(scopes: string[]): McpRequestContext {
+function ctx(
+  scopes: string[],
+  organizationId: string | null = 'org_1',
+): McpRequestContext {
   return {
     tokenId: 'tok_1',
-    organizationId: 'org_1',
+    organizationId,
     agentName: 'hermes-support-triage',
     scopes,
   };
@@ -19,6 +22,7 @@ function ctx(scopes: string[]): McpRequestContext {
 function makeSupport(
   rows: Array<Partial<{
     id: string;
+    organizationId: string;
     status: string;
     priority: string | null;
     category: string | null;
@@ -35,7 +39,7 @@ function makeSupport(
     listTriageCandidates: jest.fn().mockResolvedValue({
       data: rows.map((r) => ({
         id: r.id,
-        organizationId: 'org_1',
+        organizationId: r.organizationId ?? 'org_1',
         status: r.status ?? 'open',
         priority: r.priority ?? 'normal',
         category: r.category ?? 'bug_report',
@@ -137,6 +141,27 @@ describe('listOpenSupportRequestsTool', () => {
     );
   });
 
+  it('allows platform-scope support:read tokens to list all-org structural candidates', async () => {
+    const svc = makeSupport([
+      { id: 'r1', organizationId: 'org_1' },
+      { id: 'r2', organizationId: 'org_2' },
+    ]);
+    const out = await listOpenSupportRequestsTool(
+      {},
+      ctx(['support:read'], null),
+      svc as never,
+    );
+
+    expect(svc.listTriageCandidates).toHaveBeenCalledWith(
+      null,
+      { page: 1, limit: 20, includeAlreadyTriaged: false },
+    );
+    expect(out.support_requests.map((r) => r.organization_id)).toEqual([
+      'org_1',
+      'org_2',
+    ]);
+  });
+
   it('forwards include_already_triaged through to the service', async () => {
     const svc = makeSupport([]);
     await listOpenSupportRequestsTool(
@@ -227,6 +252,18 @@ describe('updateSupportRequestPriorityTool', () => {
     const orgArg = svc.setRequestPriority.mock.calls[0][0];
     expect(orgArg).toBe('org_1');
   });
+
+  it('allows platform-scope support:write tokens to update priority by request id', async () => {
+    const svc = { setRequestPriority: jest.fn().mockResolvedValue(true) };
+    const out = await updateSupportRequestPriorityTool(
+      { request_id: 'r1', priority: 'urgent' },
+      ctx(['support:write'], null),
+      svc as never,
+    );
+
+    expect(out).toEqual({ request_id: 'r1', updated: true });
+    expect(svc.setRequestPriority).toHaveBeenCalledWith(null, 'r1', 'urgent');
+  });
 });
 
 describe('updateSupportRequestAiCategoryTool', () => {
@@ -265,6 +302,22 @@ describe('updateSupportRequestAiCategoryTool', () => {
       'org_1',
       'r1',
       'billing_invoice_question',
+    );
+  });
+
+  it('allows platform-scope support:write tokens to update ai category by request id', async () => {
+    const svc = { setRequestAiCategory: jest.fn().mockResolvedValue(true) };
+    const out = await updateSupportRequestAiCategoryTool(
+      { request_id: 'r1', ai_category: 'device_offline' },
+      ctx(['support:write'], null),
+      svc as never,
+    );
+
+    expect(out).toEqual({ request_id: 'r1', updated: true });
+    expect(svc.setRequestAiCategory).toHaveBeenCalledWith(
+      null,
+      'r1',
+      'device_offline',
     );
   });
 });
@@ -339,5 +392,31 @@ describe('createSupportMessageTool', () => {
       ),
     ).rejects.toThrow();
     expect(svc.createAgentMessage).not.toHaveBeenCalled();
+  });
+
+  it('allows platform-scope support:write tokens to create an agent message by request id', async () => {
+    const svc = {
+      createAgentMessage: jest.fn().mockResolvedValue({
+        id: 'msg-123',
+        createdAt: new Date('2026-05-04T13:00:00Z'),
+      }),
+    };
+    const out = await createSupportMessageTool(
+      { request_id: 'r1', content: 'Triage: urgent; escalating.' },
+      ctx(['support:write'], null),
+      svc as never,
+    );
+
+    expect(out).toEqual({
+      request_id: 'r1',
+      message_id: 'msg-123',
+      created_at: '2026-05-04T13:00:00.000Z',
+      created: true,
+    });
+    expect(svc.createAgentMessage).toHaveBeenCalledWith(
+      null,
+      'r1',
+      'Triage: urgent; escalating.',
+    );
   });
 });

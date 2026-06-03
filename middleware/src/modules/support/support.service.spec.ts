@@ -960,6 +960,15 @@ describe('SupportService', () => {
       expect(countCall.where.organizationId).toBe(orgId);
     });
 
+    it('omits the organization filter for platform-scope MCP tokens', async () => {
+      await service.listTriageCandidates(null);
+
+      const findCall = db.supportRequest.findMany.mock.calls[0][0];
+      const countCall = db.supportRequest.count.mock.calls[0][0];
+      expect(findCall.where.organizationId).toBeUndefined();
+      expect(countCall.where.organizationId).toBeUndefined();
+    });
+
     it('excludes already-triaged requests by default (D7 reply-loop prevention)', async () => {
       await service.listTriageCandidates(orgId);
 
@@ -1029,6 +1038,16 @@ describe('SupportService', () => {
       const ok = await service.setRequestPriority(orgId, 'r-missing', 'high');
       expect(ok).toBe(false);
     });
+
+    it('omits the organization guard for platform-scope tokens', async () => {
+      db.supportRequest.updateMany.mockResolvedValueOnce({ count: 1 });
+      const ok = await service.setRequestPriority(null, 'r1', 'urgent');
+      expect(ok).toBe(true);
+      expect(db.supportRequest.updateMany).toHaveBeenCalledWith({
+        where: { id: 'r1' },
+        data: { priority: 'urgent' },
+      });
+    });
   });
 
   describe('setRequestAiCategory (write tool)', () => {
@@ -1046,6 +1065,16 @@ describe('SupportService', () => {
       db.supportRequest.updateMany.mockResolvedValueOnce({ count: 0 });
       const ok = await service.setRequestAiCategory(orgId, 'r-missing', 'other');
       expect(ok).toBe(false);
+    });
+
+    it('omits the organization guard for platform-scope tokens', async () => {
+      db.supportRequest.updateMany.mockResolvedValueOnce({ count: 1 });
+      const ok = await service.setRequestAiCategory(null, 'r1', 'device_offline');
+      expect(ok).toBe(true);
+      expect(db.supportRequest.updateMany).toHaveBeenCalledWith({
+        where: { id: 'r1' },
+        data: { aiCategory: 'device_offline' },
+      });
     });
   });
 
@@ -1076,6 +1105,37 @@ describe('SupportService', () => {
       const out = await service.createAgentMessage(orgId, 'r-missing', 'hello');
       expect(out).toBeNull();
       expect(db.supportMessage.create).not.toHaveBeenCalled();
+    });
+
+    it('uses the request organization when creating a platform-scope agent message', async () => {
+      db.supportRequest.findFirst.mockResolvedValueOnce({
+        id: 'r1',
+        organizationId: 'org-from-row',
+        userId: 'u-original',
+      });
+      db.supportMessage.create.mockResolvedValueOnce({
+        id: 'msg-new',
+        createdAt: new Date('2026-05-04T12:00:00Z'),
+      });
+
+      const out = await service.createAgentMessage(null, 'r1', 'Triage: high urgency');
+
+      expect(out).toEqual({ id: 'msg-new', createdAt: new Date('2026-05-04T12:00:00Z') });
+      expect(db.supportRequest.findFirst).toHaveBeenCalledWith({
+        where: { id: 'r1' },
+        select: { id: true, organizationId: true, userId: true },
+      });
+      expect(db.supportMessage.create).toHaveBeenCalledWith({
+        data: {
+          requestId: 'r1',
+          organizationId: 'org-from-row',
+          userId: 'u-original',
+          role: 'assistant',
+          authorType: 'agent',
+          content: 'Triage: high urgency',
+        },
+        select: { id: true, createdAt: true },
+      });
     });
   });
 });

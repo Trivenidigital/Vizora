@@ -9,7 +9,7 @@
 ## The contradiction
 
 The support-triage Hermes skill needs to:
-1. Read open support requests via `list_open_support_requests` (per-org tool, requires per-org token)
+1. Read open support requests via `list_open_support_requests` (now supports per-org and platform-scope tokens)
 2. Write a per-ticket shadow row via `log_shadow_row` with the ticket's `organization_id` (the originating org)
 
 **P1.1 (this sprint)** added cross-tenant write defense: per-org tokens get their `organization_id` forced into the row; mismatched agent-supplied `organization_id` returns INVALID_INPUT.
@@ -31,10 +31,10 @@ These conflict for support-triage specifically.
 ## Five options
 
 ### Option 1: Re-issue support-triage as platform-scope token
-Add a NEW MCP token: `hermes-support-triage-shadow-platform` with `organizationId=NULL` and scopes `support:read, support:write, shadow:write, displays:read`.
+Add a NEW MCP token: `hermes-support-triage-shadow-platform` with `organizationId=NULL` and scopes `support:read, support:write, shadow:write`.
 
 **Pros:** Simplest. Just a token re-issue.
-**Cons:** `support:*` MCP tools are currently per-org-only — they reject platform-scope tokens with FORBIDDEN. So this token can't actually call `list_open_support_requests`.
+**Previous cons:** Before pass75, `support:*` MCP tools were per-org-only and rejected platform-scope tokens. Pass75 removed that repo-side blocker; remaining work is operator token issuance/cutover. Do not add or rely on `displays:read` for this platform token unless `list_displays` is separately changed and reviewed, because display tools still intentionally require per-org scope.
 
 ### Option 2: Make `support:*` tools accept platform-scope tokens
 Modify `support.tools.ts` to accept platform-scope tokens. When token is platform-scope, return tickets across ALL orgs.
@@ -80,5 +80,6 @@ Estimated effort: 4-6h including review.
 
 - Finding documented: ✅ this file
 - Customer #1 launch impact: NONE — Option 5 keeps support-triage disabled (its current state)
-- Tracked for week-2: Option 2 implementation in `tasks/feature-backlog.md`
+- Repo-side Option 2 implementation: DONE in pass75. `support:*` MCP tools now accept platform-scope tokens while per-org tokens retain org filters.
+- Remaining week-2/operator work: issue a platform-scope support-triage token, update prod Hermes MCP config/secrets, and perform the documented shadow-data comparison before live cutover.
 - Customer-lifecycle (the OTHER Hermes shadow agent) is platform-scope and works — verified today
