@@ -174,6 +174,19 @@ test('first-customer C1 runbook verifies email app URL env', () => {
   assert.match(runbook, /email links do not point at localhost/i);
 });
 
+test('first-customer runbook does not require nonexistent email verification flow', () => {
+  const runbook = readRepoFile('docs/runbooks/first-customer-onboarding.md');
+  const schema = readRepoFile('packages/database/prisma/schema.prisma');
+
+  // This should trip when B5 eventually lands, forcing the launch runbook to be
+  // updated alongside the real email-verification schema/flow.
+  assert.doesNotMatch(schema, /emailVerified|emailVerifiedAt|verificationToken/);
+  assert.match(runbook, /welcome email/i);
+  assert.match(runbook, /Email verification flow remains deferred/i);
+  assert.doesNotMatch(runbook, /email verify/i);
+  assert.doesNotMatch(runbook, /verif\w*\s+link/i);
+});
+
 test('backlog uses current customer-1 C-series launch gate truth', () => {
   const backlog = readRepoFile('backlog.md');
 
