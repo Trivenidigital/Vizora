@@ -174,6 +174,123 @@ test('first-customer C1 runbook verifies email app URL env', () => {
   assert.match(runbook, /email links do not point at localhost/i);
 });
 
+test('email readiness helper validates C1 SMTP config without sending by default', async () => {
+  const helperSource = readRepoFile('scripts/smoke/email-readiness.mjs');
+  assert.match(helperSource, /import ['"]dotenv\/config['"]/);
+
+  const helper = (await import(
+    pathToFileURL(join(repoRoot, 'scripts/smoke/email-readiness.mjs')).href
+  )) as {
+    buildEmailReadinessPlan: (input: {
+      env: Record<string, string | undefined>;
+      args: string[];
+    }) => {
+      ok: boolean;
+      mode: 'check' | 'verify-smtp' | 'send';
+      errors: string[];
+      warnings: string[];
+      shouldSend: boolean;
+      shouldVerifySmtp: boolean;
+      to: string | null;
+    };
+  };
+
+  const env = {
+    NODE_ENV: 'production',
+    SMTP_HOST: 'smtp.resend.com',
+    SMTP_PORT: '587',
+    SMTP_USER: 'resend',
+    SMTP_PASS: 'secret',
+    EMAIL_FROM: 'Vizora <noreply@mail.vizora.cloud>',
+    APP_URL: 'https://vizora.cloud',
+    SMTP_TO: 'ops@example.com',
+  };
+
+  const checkOnly = helper.buildEmailReadinessPlan({ env, args: ['--production'] });
+  assert.equal(checkOnly.ok, true);
+  assert.equal(checkOnly.mode, 'check');
+  assert.equal(checkOnly.shouldSend, false);
+  assert.equal(checkOnly.shouldVerifySmtp, false);
+
+  const separatorCheck = helper.buildEmailReadinessPlan({ env, args: ['--', '--production'] });
+  assert.equal(separatorCheck.ok, true);
+  assert.equal(separatorCheck.mode, 'check');
+  assert.equal(separatorCheck.shouldSend, false);
+
+  const missing = helper.buildEmailReadinessPlan({
+    env: { NODE_ENV: 'production', SMTP_HOST: 'smtp.resend.com' },
+    args: ['--production'],
+  });
+  assert.equal(missing.ok, false);
+  assert.match(missing.errors.join('\n'), /SMTP_PASS/);
+  assert.match(missing.errors.join('\n'), /EMAIL_FROM/);
+  assert.match(missing.errors.join('\n'), /APP_URL or WEB_URL/);
+
+  const blockedSend = helper.buildEmailReadinessPlan({
+    env,
+    args: ['--production', '--send', '--to', 'ops@example.com'],
+  });
+  assert.equal(blockedSend.ok, false);
+  assert.equal(blockedSend.shouldSend, false);
+  assert.match(blockedSend.errors.join('\n'), /EMAIL_READINESS_ALLOW_SEND=true/);
+
+  const blockedNetworkVerify = helper.buildEmailReadinessPlan({
+    env,
+    args: ['--production', '--verify-smtp'],
+  });
+  assert.equal(blockedNetworkVerify.ok, false);
+  assert.equal(blockedNetworkVerify.shouldVerifySmtp, false);
+  assert.match(blockedNetworkVerify.errors.join('\n'), /EMAIL_READINESS_ALLOW_NETWORK=true/);
+
+  const localhostUrl = helper.buildEmailReadinessPlan({
+    env: { ...env, APP_URL: 'http://[::1]:3001' },
+    args: ['--production'],
+  });
+  assert.equal(localhostUrl.ok, false);
+  assert.match(localhostUrl.errors.join('\n'), /must use https in production/);
+  assert.match(localhostUrl.errors.join('\n'), /must not point at localhost in production/);
+
+  const deceptiveSender = helper.buildEmailReadinessPlan({
+    env: { ...env, EMAIL_FROM: 'Vizora <noreply@mail.vizora.cloud.evil.example>' },
+    args: ['--production'],
+  });
+  assert.equal(deceptiveSender.ok, true);
+  assert.match(deceptiveSender.warnings.join('\n'), /verified mail\.vizora\.cloud domain/);
+
+  const allowedSend = helper.buildEmailReadinessPlan({
+    env: { ...env, EMAIL_READINESS_ALLOW_SEND: 'true' },
+    args: ['--production', '--send', '--to', 'ops@example.com'],
+  });
+  assert.equal(allowedSend.ok, true);
+  assert.equal(allowedSend.mode, 'send');
+  assert.equal(allowedSend.shouldSend, true);
+  assert.equal(allowedSend.to, 'ops@example.com');
+});
+
+test('package.json exposes email readiness smoke helper', () => {
+  const pkg = JSON.parse(readRepoFile('package.json')) as {
+    scripts?: Record<string, string>;
+  };
+
+  assert.equal(
+    pkg.scripts?.['smoke:email-readiness'],
+    'node scripts/smoke/email-readiness.mjs',
+  );
+});
+
+test('first-customer C1 runbook uses explicit email readiness helper for test sends', () => {
+  const runbook = readRepoFile('docs/runbooks/first-customer-onboarding.md');
+
+  assert.match(runbook, /ssh root@vizora\.cloud 'cd \/opt\/vizora\/app && pnpm smoke:email-readiness --production'/);
+  assert.match(runbook, /EMAIL_READINESS_ALLOW_NETWORK=true pnpm smoke:email-readiness --production --verify-smtp/);
+  assert.match(runbook, /EMAIL_READINESS_ALLOW_SEND=true pnpm smoke:email-readiness --production --send --to <your-real-email>/);
+  assert.match(runbook, /\.ssh_email_readiness_check\.txt/);
+  assert.match(runbook, /\.ssh_email_readiness_smtp\.txt/);
+  assert.match(runbook, /\.ssh_email_readiness_send\.txt/);
+  assert.doesNotMatch(runbook, /smoke:email-readiness -- --/);
+  assert.doesNotMatch(runbook, /Then trigger a real welcome email/);
+});
+
 test('first-customer runbook does not require nonexistent email verification flow', () => {
   const runbook = readRepoFile('docs/runbooks/first-customer-onboarding.md');
   const schema = readRepoFile('packages/database/prisma/schema.prisma');

@@ -42,12 +42,18 @@ ssh root@vizora.cloud 'cd /opt/vizora/app && API_BASE=https://vizora.cloud WEB_B
 # RT_BASE=http://localhost:3002 and probes /api/health. Public WebSocket
 # ingress is covered by the real-device walkthrough below, not by direct :3002 HTTPS.
 #
-# Then trigger a real welcome email:
-curl -X POST https://vizora.cloud/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"<your-real-email>","password":"Test123!@#",
-       "firstName":"Smoke","lastName":"Test","organizationName":"smoke-final"}'
-# Within 30s, the configured EMAIL_FROM should land a welcome message in your inbox.
+# Offline C1 email config check; this does NOT contact SMTP and does NOT send email:
+ssh root@vizora.cloud 'cd /opt/vizora/app && pnpm smoke:email-readiness --production' > .ssh_email_readiness_check.txt 2>&1
+# Read .ssh_email_readiness_check.txt as a separate step.
+#
+# Optional SMTP credential handshake; this contacts SMTP but does NOT send email:
+ssh root@vizora.cloud 'cd /opt/vizora/app && EMAIL_READINESS_ALLOW_NETWORK=true pnpm smoke:email-readiness --production --verify-smtp' > .ssh_email_readiness_smtp.txt 2>&1
+# Read .ssh_email_readiness_smtp.txt as a separate step.
+#
+# Operator-approved test send; sends one neutral readiness email to the chosen inbox:
+ssh root@vizora.cloud 'cd /opt/vizora/app && EMAIL_READINESS_ALLOW_SEND=true pnpm smoke:email-readiness --production --send --to <your-real-email>' > .ssh_email_readiness_send.txt 2>&1
+# Read .ssh_email_readiness_send.txt as a separate step.
+# Within 30s, the configured EMAIL_FROM should land a readiness message in your inbox.
 ```
 
 ### 2. C2 — Customer-#1 organization provisioned
