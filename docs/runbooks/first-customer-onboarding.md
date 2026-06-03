@@ -100,9 +100,9 @@ pnpm --filter @vizora/middleware test:e2e:full   # NOT --silent
 
 ### 1. C4 — Final go-live smoke (60-step checklist)
 Run in this order:
-1. `pnpm --filter @vizora/middleware test --testPathIgnorePatterns="e2e-spec"` → expect 2335/2367 pass
-2. `pnpm --filter @vizora/realtime test` → expect 212/212
-3. `pnpm --filter @vizora/web test` → expect 864/864
+1. `pnpm --filter @vizora/middleware test --testPathIgnorePatterns="e2e-spec"` → record current pass/fail totals
+2. `pnpm --filter @vizora/realtime test` → record current pass/fail totals
+3. `pnpm --filter @vizora/web test` → record current pass/fail totals
 4. `bash scripts/smoke/api-critical-path.sh` (against localhost first; creates smoke-test rows)
 5. `ssh root@vizora.cloud 'cd /opt/vizora/app && API_BASE=https://vizora.cloud WEB_BASE=https://vizora.cloud bash scripts/smoke/api-critical-path.sh' > .ssh_go_live_smoke.txt 2>&1` (against prod API/web ingress from the VPS; creates smoke-test rows; realtime health remains local `RT_BASE=http://localhost:3002` and probes `/api/health`; read `.ssh_go_live_smoke.txt` as a separate step)
 6. Open `https://vizora.cloud` in a fresh incognito browser → verify landing page renders, all CTAs work
@@ -114,6 +114,9 @@ Run in this order:
 Copy `docs/runbooks/customer-1-go-live-smoke-template.md` to
 `docs/runbooks/customer-1-go-live-smoke-{DATE}.md` before starting, then record
 every C1-C4 result there with timestamps.
+Do not rely on historical counts; treat fresh command failures as blockers and
+higher totals with zero failures as test-suite growth. Investigate lower totals
+even if the command exits zero.
 
 ### 2. Optional: Playwright customer-critical browser smoke
 GitHub's `e2e` check is a narrow middleware Jest gate, not this browser

@@ -1,6 +1,62 @@
 # Vizora - Task Tracker
 
-## Active Workstream: C4 Go-Live Smoke Template Pass 79 (2026-06-03)
+## Active Workstream: C4 Test Count Truth Pass 80 (2026-06-03)
+
+**Branch:** `fix/readiness-pass80`
+
+**Why now:** PR #220 added the reusable C4 smoke template, but the C4 section
+in the first-customer runbook still hardcoded historical unit-test totals
+(`2335/2367`, `212/212`, `864/864`). The repo and AGENTS guidance explicitly
+say test counts change and must be freshly verified. Launch should fail on
+actual command failures, not on harmless test-suite growth.
+
+**Drift-check:** `docs/runbooks/first-customer-onboarding.md` C4 local test
+baseline still contained those exact old counts. `backlog.md` already says
+historical aggregate reports must be refreshed before relying on older totals.
+
+**New primitives introduced:** one static release-readiness assertion and a
+runbook wording update. No runtime code, DB model/migration, public API, PM2
+process, env var, MCP tool, Hermes skill, provider-spend path, production
+deploy, prod env edit, customer email send, payment setup, or hardware action
+is planned.
+
+**Hermes-first analysis:** not applicable. This is launch runbook truth, not a
+business-agent, MCP, Hermes runtime, or AI/provider-spend path.
+
+**Plan**
+- [x] Add a failing readiness-gate assertion proving the C4 runbook no longer
+      contains stale fixed unit-test counts and tells the operator to record
+      current pass/fail totals.
+- [x] Update the C4 runbook commands to record fresh pass/fail totals and
+      distinguish command failures from zero-failure test-count growth.
+- [ ] Run focused ops test, broader ops tests, diff/secret checks, Claude Code
+      review, commit, PR, CI, and merge if green.
+
+**Evidence so far**
+- Red test:
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`
+    failed 1/34 because the runbook still contained `2335/2367`, `212/212`,
+    and `864/864`.
+- Green verification so far:
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`:
+    34/34 tests passed.
+  - `pnpm test:ops`: 59/59 tests passed.
+  - `git diff --check`: passed with CRLF normalization warnings only.
+  - `pnpm security:no-hardcoded-jwts`: passed.
+- Claude Code review:
+  - First pass: CLEAN with one low note that lower test totals should be
+    investigated. Fixed the wording to treat higher zero-failure totals as
+    growth and lower zero-failure totals as investigate-worthy.
+  - Second pass: CLEAN. Reviewer verified the low note is closed and no
+    high/medium findings remain.
+- Operator boundary:
+  - No production env change, SMTP/Resend setup, network SMTP verify, real
+    email send, customer registration, deploy, or service restart was
+    performed.
+
+---
+
+## Completed Workstream: C4 Go-Live Smoke Template Pass 79 (2026-06-03)
 
 **Branch:** `fix/readiness-pass79`
 
@@ -32,7 +88,7 @@ path.
       origin/main SHA, production SHA, GO/NO-GO, SSH artifacts, email readiness,
       API smoke, Playwright, real-device evidence, and residual risks.
 - [x] Update first-customer runbook and backlog C4 to use the template.
-- [ ] Run focused ops test, broader ops tests, diff/secret checks, Claude Code
+- [x] Run focused ops test, broader ops tests, diff/secret checks, Claude Code
       review, commit, PR, CI, and merge if green.
 
 **Evidence so far**
@@ -50,6 +106,11 @@ path.
   - CLEAN. Reviewer verified C1-C4 evidence coverage, origin/main and
     production SHA capture, GO/NO-GO fields, SSH output-capture discipline,
     stale B16/date guards, operator boundary, and CI/deploy safety.
+- PR/CI/merge:
+  - Commit `7e297599` (`docs(runbook): add go-live smoke template`).
+  - PR #220 merged as `3e1ceb2f`.
+  - GitHub checks passed before merge: audit, build, e2e, lint, security, and
+    test.
 - Operator boundary:
   - No production env change, SMTP/Resend setup, network SMTP verify, real
     email send, customer registration, deploy, or service restart was
