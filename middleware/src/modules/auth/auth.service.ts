@@ -659,7 +659,8 @@ export class AuthService {
     });
 
     // Build reset URL
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+    const frontendUrl =
+      process.env.APP_URL || process.env.FRONTEND_URL || process.env.WEB_URL || 'http://localhost:3001';
     const resetUrl = `${frontendUrl}/reset-password?token=${rawToken}`;
 
     // Send email (uses raw token, not hashed)

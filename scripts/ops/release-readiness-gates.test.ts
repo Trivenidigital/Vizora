@@ -63,6 +63,39 @@ test('gitignore protects SSH output files captured by operator runbooks', () => 
   assert.match(gitignore, /^\.ssh_\*\.txt$/m);
 });
 
+test('.env.example documents customer-1 email readiness variables', () => {
+  const envExample = readRepoFile('.env.example');
+
+  for (const name of [
+    'APP_URL',
+    'WEB_URL',
+    'FRONTEND_URL',
+    'SMTP_HOST',
+    'SMTP_PORT',
+    'SMTP_USER',
+    'SMTP_PASS',
+    'SMTP_FROM',
+    'SMTP_TO',
+    'OPS_ALERT_EMAIL',
+    'EMAIL_FROM',
+    'LIFECYCLE_LIVE',
+    'LIFECYCLE_TEST_EMAILS',
+  ]) {
+    assert.match(envExample, new RegExp(`^${name}=`, 'm'), `${name} is documented`);
+  }
+
+  assert.match(envExample, /SMTP_PASSWORD.*legacy alias/i);
+  assert.match(envExample, /EMAIL_FROM=.*noreply@mail\.vizora\.cloud/);
+});
+
+test('first-customer C1 runbook verifies email app URL env', () => {
+  const runbook = readRepoFile('docs/runbooks/first-customer-onboarding.md');
+
+  assert.match(runbook, /\^APP_URL\|\^WEB_URL/);
+  assert.match(runbook, /Verify all of: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM, and APP_URL or WEB_URL/);
+  assert.match(runbook, /email links do not point at localhost/i);
+});
+
 test('backlog uses current customer-1 C-series launch gate truth', () => {
   const backlog = readRepoFile('backlog.md');
 
@@ -84,7 +117,7 @@ test('backlog uses current customer-1 C-series launch gate truth', () => {
   );
   assert.match(
     backlog,
-    /Customer-1 remaining gates: C1 SMTP\/Resend verification\/test send, C2 customer-1 org provisioning, C3 real-device walkthrough, C4 final go-live smoke\./,
+    /Customer-1 remaining gates: C1 SMTP\/Resend verification\/test send plus public email-link URL \(`APP_URL` or `WEB_URL`\), C2 customer-1 org provisioning, C3 real-device walkthrough, C4 final go-live smoke\./,
   );
 });
 

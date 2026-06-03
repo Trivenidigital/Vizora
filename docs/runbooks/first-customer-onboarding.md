@@ -21,9 +21,10 @@ Per `backlog.md` C1. Without this, registration emails + password resets don't s
 
 ```bash
 # On prod VPS (root@vizora.cloud):
-ssh root@vizora.cloud 'grep -E "^SMTP_|^RESEND_|^EMAIL_FROM" /opt/vizora/app/.env' > .ssh_smtp_env.txt 2>&1
+ssh root@vizora.cloud 'grep -E "^SMTP_|^RESEND_|^EMAIL_FROM|^APP_URL|^WEB_URL" /opt/vizora/app/.env' > .ssh_smtp_env.txt 2>&1
 # Read .ssh_smtp_env.txt as a separate step.
-# Verify all of: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM
+# Verify all of: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM, and APP_URL or WEB_URL
+# APP_URL or WEB_URL must be the public web URL so email links do not point at localhost
 # Resend domain `mail.vizora.cloud` must be verified (DKIM/SPF/DMARC green)
 ```
 

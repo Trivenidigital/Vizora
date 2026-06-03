@@ -1,6 +1,119 @@
 # Vizora - Task Tracker
 
-## Active Workstream: Mail Sender Env + Template Coverage Pass 66 (2026-06-03)
+## Completed Workstream: Email Env Example + App URL Readiness Pass 67 (2026-06-03)
+
+**Branch:** `fix/email-env-example-readiness`
+
+**Why now:** C1 SMTP/Resend remains operator-gated, but `.env.example` does not
+list the operator-critical email variables consumed by `MailService`, startup
+self-test, ops alerting, and lifecycle agents. The first-customer runbook also
+checks SMTP credentials and `EMAIL_FROM`, but does not call out `APP_URL`/`WEB_URL`
+even though backend-generated email links use those values and can otherwise
+point at localhost. Drift-check also found the password-reset path still used
+only `FRONTEND_URL`, so the C1 URL guidance could pass while reset links still
+pointed at the wrong host.
+
+**New primitives introduced:** none planned. This pass should update existing
+operator docs, existing env examples, release-readiness static gates, and the
+existing password-reset URL fallback only. No new route, model, migration,
+process, realtime event, MCP tool, Hermes skill, AI/provider spend path,
+customer email send, or production runtime change is expected.
+
+**Hermes-first analysis:** checked per project convention. This is deterministic
+configuration documentation/readiness gating, not a business-agent, MCP, Hermes
+runtime, or provider-spend task.
+
+| Domain | Hermes skill found? | Decision |
+|---|---|---|
+| Email env example documentation | none applicable | update `.env.example` |
+| C1 app URL runbook guidance | none applicable | update existing first-customer runbook |
+| Password-reset URL fallback | none applicable | align existing AuthService fallback order |
+| Static release-readiness regression guard | none applicable | extend existing ops test |
+
+Awesome-hermes-agent ecosystem check: no applicable skill/library primitive for
+local env-example and operator runbook truthfulness updates.
+
+**Plan**
+- [x] Add failing release-readiness gate for email env variables and C1 app URL
+      guidance.
+- [x] Update `.env.example`, first-customer runbook, backlog, and CLAUDE docs so
+      C1 includes SMTP/Resend, transactional sender, ops alert sender, lifecycle
+      gates, and backend app URL guidance.
+- [x] Add focused password-reset regression coverage and align AuthService URL
+      fallback with the documented app URL precedence.
+- [x] Run focused ops tests, broader ops tests, diff hygiene, and secret scan.
+- [x] Request Claude Code review and resolve findings.
+- [x] Commit, PR, CI, and merge if green.
+- [x] Do not deploy, send real emails, or touch production SMTP/env state.
+
+**Evidence so far**
+- Current `origin/main`: `9181ff57630d01ecafb7241fe75fed645ae33939`.
+- Branch/PR:
+  - Branch: `fix/email-env-example-readiness`.
+  - Commit: `ed6bc3d7` (`fix(auth): align email readiness URLs`).
+  - PR #207: `fix(auth): align email readiness URLs`.
+  - GitHub CI passed audit, build, e2e, lint, security, and test before merge.
+  - No deploy, production env change, SMTP/Resend setup, or real email send was
+    performed.
+- Drift-check:
+  - `.env.example` has no `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`,
+    `SMTP_FROM`, `SMTP_TO`, `OPS_ALERT_EMAIL`, `EMAIL_FROM`,
+    `LIFECYCLE_LIVE`, or `LIFECYCLE_TEST_EMAILS` entries.
+  - `middleware/src/modules/mail/mail.service.ts` consumes `SMTP_HOST`,
+    `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD || SMTP_PASS`, `EMAIL_FROM`, and
+    `APP_URL || FRONTEND_URL || WEB_URL`.
+  - `middleware/src/modules/health/startup-self-test.service.ts` validates SMTP
+    with `transporter.verify()` when SMTP env is configured.
+  - `scripts/ops/lib/alerting.ts` consumes `SMTP_FROM`, `SMTP_TO`, and
+    `OPS_ALERT_EMAIL`.
+  - `scripts/agents/customer-lifecycle.ts` consumes `LIFECYCLE_LIVE`,
+    `LIFECYCLE_TEST_EMAILS`, `EMAIL_FROM`, `APP_URL`, and `WEB_URL`.
+  - `docs/runbooks/first-customer-onboarding.md` checks SMTP and `EMAIL_FROM`
+    but not the app URL used in generated transactional email links.
+- Red focused runs:
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`
+    failed as expected before the doc/env patch: `.env.example` lacked
+    `APP_URL` and the runbook lacked `^APP_URL|^WEB_URL` guidance.
+  - `pnpm --filter @vizora/middleware test -- --runTestsByPath src/modules/auth/auth.service.spec.ts`
+    failed as expected before the AuthService fix: password-reset URLs used
+    `FRONTEND_URL` even when `APP_URL` was configured.
+- Fix:
+  - `.env.example` now documents `APP_URL`, `WEB_URL`, legacy `FRONTEND_URL`,
+    SMTP/Resend variables, `SMTP_PASSWORD` legacy alias, ops alert mail vars,
+    `EMAIL_FROM`, and lifecycle live/test gates.
+  - First-customer runbook and backlog C1 now require a public `APP_URL` or
+    `WEB_URL`, so generated email links do not point at localhost.
+  - `AuthService.forgotPassword()` now resolves reset-link base URL as
+    `APP_URL || FRONTEND_URL || WEB_URL || localhost`, matching the mail service
+    precedence while preserving the legacy alias.
+- Green focused runs:
+  - `pnpm --filter @vizora/middleware test -- --runTestsByPath src/modules/auth/auth.service.spec.ts`
+    => 66/66 tests passing after adding coverage for `APP_URL`, legacy
+    `FRONTEND_URL`, and `WEB_URL` fallback tiers.
+  - `node --import tsx --test scripts/ops/release-readiness-gates.test.ts`
+    => 21/21 tests passing.
+- Broader verification:
+  - `pnpm test:ops` => 40/40 ops tests passing.
+  - `pnpm --filter @vizora/middleware test -- --runInBand --runTestsByPath src/modules/auth/auth.service.spec.ts src/modules/mail/mail.service.spec.ts src/modules/health/startup-self-test.service.spec.ts src/modules/organizations/organizations.service.spec.ts`
+    => 126/126 tests passing across affected auth/mail/startup/lifecycle suites.
+  - `$env:ESLINT_USE_FLAT_CONFIG='false'; npx eslint middleware/src/modules/auth/auth.service.ts middleware/src/modules/auth/auth.service.spec.ts`
+    => exit 0 with one pre-existing warning in `sanitizeUser()` (`_` unused);
+    left unchanged to keep this PR scoped to email readiness/reset-link behavior.
+  - `npx nx build @vizora/middleware` => passing; existing webpack warnings
+    remain for dynamic/optional dependencies (`@opentelemetry`, Express view,
+    Handlebars `require.extensions`, optional `canvas`, `require-in-the-middle`).
+  - `git diff --check -- .env.example docs/runbooks/first-customer-onboarding.md backlog.md CLAUDE.md middleware/src/modules/auth/auth.service.ts middleware/src/modules/auth/auth.service.spec.ts scripts/ops/release-readiness-gates.test.ts tasks/todo.md`
+    => exit 0, with LF/CRLF normalization warnings only.
+  - `pnpm security:no-hardcoded-jwts` => passing.
+- Claude Code review:
+  - Initial review returned `APPROVE` with low/non-blocking findings only.
+  - Builder resolved two low items anyway: removed the unrelated `sanitizeUser()`
+    cleanup from the diff and added fallback-tier tests for `FRONTEND_URL` and
+    `WEB_URL`.
+  - Final Claude Code re-review returned `APPROVE` with no high/medium
+    actionable issues.
+
+## Completed Workstream: Mail Sender Env + Template Coverage Pass 66 (2026-06-03)
 
 **Branch:** `fix/mail-sender-env-coverage`
 
@@ -39,11 +152,18 @@ local NestJS transactional mail sender selection or HTML template assertions.
 - [x] Run focused mail tests plus adjacent auth/billing mail-caller tests,
       TypeScript/static checks, diff hygiene, and secret scan.
 - [x] Request Claude Code review and resolve findings.
-- [ ] Commit, PR, CI, and merge if green.
-- [ ] Do not deploy, send real emails, or touch production SMTP/env state.
+- [x] Commit, PR, CI, and merge if green.
+- [x] Do not deploy, send real emails, or touch production SMTP/env state.
 
 **Evidence so far**
 - Current `origin/main`: `eab6e910a3baab94f36de047c124a592d501555a`.
+- PR/CI/merge:
+  - PR #206 merged at `9181ff57630d01ecafb7241fe75fed645ae33939`.
+  - Initial CI `test` failure was infrastructure-only: Docker Hub timed out
+    pulling `postgres:16-alpine` during service-container setup before repo
+    tests ran. Reran failed jobs.
+  - Final GitHub CI passed audit, build, e2e, lint, security, and test.
+  - No deploy, customer email send, or production runtime change was performed.
 - Drift-check:
   - `middleware/src/modules/mail/mail.service.ts` defines `fromAddress` as
     `process.env.EMAIL_FROM || SENDERS.noreply.from`, but `sendMail()` ignores
