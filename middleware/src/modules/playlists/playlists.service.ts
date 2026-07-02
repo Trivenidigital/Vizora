@@ -233,50 +233,37 @@ export class PlaylistsService {
       }
     }
 
-    const updatedPlaylist = items
-      ? await this.db.$transaction(async (tx) => {
-          await tx.playlistItem.deleteMany({
-            where: { playlistId: id },
-          });
+    const includeItems = {
+      items: { include: { content: true }, orderBy: { order: 'asc' as const } },
+    };
 
-          return tx.playlist.update({
-            where: { id },
-            data: {
-              ...playlistData,
-              items: {
-                create: items.map((item, index) => ({
-                  contentId: item.contentId,
-                  order: item.order ?? index,
-                  duration: item.duration,
-                })),
-              },
-            },
-            include: {
-              items: {
-                include: {
-                  content: true,
-                },
-                orderBy: {
-                  order: 'asc',
-                },
-              },
-            },
-          });
-        })
-      : await this.db.playlist.update({
-          where: { id },
-          data: playlistData,
-          include: {
-            items: {
-              include: {
-                content: true,
-              },
-              orderBy: {
-                order: 'asc',
-              },
-            },
-          },
+    const updatedPlaylist = await this.db.$transaction(async (tx) => {
+      // Org-scoped write: updateMany requires id AND organizationId, so a
+      // cross-tenant id affects zero rows — the isolation is enforced in the
+      // statement, not by relying on the preceding findOne's ordering (B9).
+      const scoped = await tx.playlist.updateMany({
+        where: { id, organizationId },
+        data: playlistData,
+      });
+      if (scoped.count === 0) {
+        throw new NotFoundException('Playlist not found');
+      }
+
+      if (items) {
+        await tx.playlistItem.deleteMany({ where: { playlistId: id } });
+        await tx.playlistItem.createMany({
+          data: items.map((item, index) => ({
+            playlistId: id,
+            contentId: item.contentId,
+            order: item.order ?? index,
+            duration: item.duration,
+          })),
         });
+      }
+
+      // Re-fetch org-scoped so a concurrent cross-tenant race can't return foreign rows.
+      return tx.playlist.findFirst({ where: { id, organizationId }, include: includeItems });
+    });
 
     this.eventEmitter.emit('playlist.updated', { entityId: id, organizationId });
 
@@ -407,18 +394,20 @@ export class PlaylistsService {
     // Use transaction with two-pass approach to avoid unique constraint violations
     // (@@unique([playlistId, order]))
     await this.db.$transaction(async (tx) => {
-      // Pass 1: Set all orders to negative values to avoid conflicts
+      // Pass 1: Set all orders to negative values to avoid conflicts.
+      // updateMany scoped to {id, playlistId} enforces that each item belongs to
+      // this (org-owned) playlist in the write, not just the prior validation.
       for (let i = 0; i < itemIds.length; i++) {
-        await tx.playlistItem.update({
-          where: { id: itemIds[i] },
+        await tx.playlistItem.updateMany({
+          where: { id: itemIds[i], playlistId },
           data: { order: -(i + 1) },
         });
       }
 
       // Pass 2: Set final order values
       for (let i = 0; i < itemIds.length; i++) {
-        await tx.playlistItem.update({
-          where: { id: itemIds[i] },
+        await tx.playlistItem.updateMany({
+          where: { id: itemIds[i], playlistId },
           data: { order: i },
         });
       }
@@ -462,12 +451,16 @@ export class PlaylistsService {
   }
 
   async remove(organizationId: string, id: string) {
-    await this.findOne(organizationId, id);
-    const result = await this.db.playlist.delete({
-      where: { id },
+    // Org-scoped in the write itself (not a prior findOne): a cross-tenant id has
+    // zero row effect, so the isolation holds regardless of call order (B9).
+    const result = await this.db.playlist.deleteMany({
+      where: { id, organizationId },
     });
+    if (result.count === 0) {
+      throw new NotFoundException('Playlist not found');
+    }
     this.eventEmitter.emit('playlist.deleted', { entityId: id, organizationId });
-    return result;
+    return { id };
   }
 
   /**
