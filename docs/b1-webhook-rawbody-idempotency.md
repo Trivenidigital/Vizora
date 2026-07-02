@@ -42,6 +42,22 @@ because the tests call `billingService.handleWebhookEvent` directly with a hand-
   across replays → can create duplicate transaction rows on the no-invoice-id path. Fold into the
   B6 follow-up (use the event id as the stable transaction key).
 
+## Claim-window residual (operator-flagged) — closed
+
+The 5-min pending TTL must exceed worst-case handler duration, else a slow handler's claim could
+expire mid-work and let the PSP retry double-process. Verified:
+
+- **State mutations are internally idempotent by construction** — every handler does fixed-value
+  `organization.update` (re-run rewrites identical values) and the one insert
+  (`billingTransaction.create`) is guarded by `@@unique([provider, providerTransactionId])` (replay
+  → P2002, deduped). So even a claim-expiry double-process **cannot** double-charge or
+  double-provision. This is the primary backstop.
+- **The only external call is the awaited receipt/failed email** in `handlePaymentSucceeded`/
+  `handlePaymentFailed`. Now bounded: the SMTP transport carries `connectionTimeout`/`greetingTimeout`
+  (10s) + `socketTimeout` (15s), so a send caps at ~15s — far under the 5-min window. Worst case of a
+  double-process is thus a duplicate *receipt email* (annoyance, not S1), and it requires a hung SMTP
+  beyond its own timeouts, which the caps prevent.
+
 ## Acceptance status
 
 Replay (duplicate event → no-op) and the distinct-event regression are covered by automated tests.

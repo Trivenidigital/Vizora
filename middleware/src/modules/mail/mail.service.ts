@@ -39,6 +39,14 @@ export class MailService {
       port,
       secure: port === 465,
       auth: { user, pass },
+      // Bounded timeouts: a hung SMTP server must not block the caller. This
+      // matters on the webhook path — payment handlers await a receipt/failed
+      // email inside the idempotency claim window (5-min pending TTL); capping a
+      // send at ~15s keeps handler duration far under that window so the claim
+      // cannot expire mid-work and let a retry double-process.
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 15_000,
     });
   }
 
