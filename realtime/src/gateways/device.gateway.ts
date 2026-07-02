@@ -4,6 +4,7 @@ import {
   SubscribeMessage,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
   ConnectedSocket,
   MessageBody,
 } from '@nestjs/websockets';
@@ -42,6 +43,10 @@ import { WsAllExceptionsFilter } from './filters/ws-exception.filter';
 import { WsAuthGuard, WsDeviceGuard } from './guards/ws-auth.guard';
 import { redactSensitiveTokens } from '../utils/redact-sensitive-url';
 import { hashDeviceToken, isCurrentDeviceToken } from './device-token-hash';
+import {
+  authenticateDeviceHandshake,
+  DeviceHandshakePayload,
+} from './device-handshake-auth';
 import {
   redactDeviceContentMetadata,
   redactDevicePayload,
@@ -107,10 +112,64 @@ const HEARTBEAT_DB_REFRESH_INTERVAL_MS = 60_000;
 @UseFilters(new WsAllExceptionsFilter())
 @UseGuards(WsAuthGuard)
 export class DeviceGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit
 {
   @WebSocketServer()
   server: Server;
+
+  /**
+   * Contract v1.1 item 2: register the device-handshake middleware. Running auth
+   * as a Socket.IO connection middleware (rather than only post-connection in
+   * handleConnection) is what lets a rejection surface on the client as a
+   * structured `connect_error.data.code`. On success the verified payload is
+   * stashed on socket.data so authenticateConnection does not re-verify.
+   */
+  afterInit(server: Server): void {
+    server.use((socket, next) => {
+      void this.runDeviceHandshake(socket, next);
+    });
+  }
+
+  private async runDeviceHandshake(
+    socket: Socket,
+    next: (err?: Error) => void,
+  ): Promise<void> {
+    try {
+      const token = socket.handshake.auth?.token as string | undefined;
+      const result = await authenticateDeviceHandshake(token, {
+        jwtService: this.jwtService,
+        databaseService: this.databaseService,
+        deviceSecret: process.env.DEVICE_JWT_SECRET,
+        userSecret: process.env.JWT_SECRET,
+      });
+
+      if (result.action === 'reject') {
+        // err.message carries the legacy string (Electron client reads
+        // connect_error.message); err.data.code carries the contract code
+        // (the Android TV app reads connect_error.data.code).
+        const err = new Error(result.message);
+        (err as Error & { data?: { code: string } }).data = { code: result.code };
+        next(err);
+        return;
+      }
+
+      if (result.action === 'accept') {
+        socket.data = socket.data || {};
+        socket.data.deviceAuthPayload = result.payload;
+        socket.data.deviceAuthTokenHash = result.tokenHash;
+      }
+      // 'pass' and 'accept' both continue; handleConnection finishes setup.
+      next();
+    } catch (err) {
+      // Never convert an unexpected middleware error into a terminal code —
+      // let the connection proceed so handleConnection classifies it (or
+      // rejects with a plain string, which the device treats as transient).
+      this.logger.warn(
+        `Device handshake middleware error: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      next();
+    }
+  }
 
   private readonly logger = new Logger(DeviceGateway.name);
 
@@ -333,6 +392,38 @@ export class DeviceGateway
     };
     socket.emit('error', { message: reason });
     socket.disconnect(true);
+    return true;
+  }
+
+  /**
+   * Device Revocation Contract v1.1 item 3: notify a device it has been revoked.
+   * Emits `device:revoked {reason}` to the device room as the fast-path trigger —
+   * the device then confirms via GET /devices/auth/check (410) before purging, so
+   * this event never destroys credentials on its own and a lost event is recovered
+   * on the next reconnect+probe. We still force-disconnect a revoked device.
+   * Broadcasts to the room (not a single socket) so all of the device's live
+   * connections are covered.
+   */
+  revokeDevice(deviceId: string, reason = 'revoked'): boolean {
+    if (!this.server) return false;
+    this.server.to(`device:${deviceId}`).emit('device:revoked', { reason });
+    return this.disconnectDevice(deviceId, 'device_disabled');
+  }
+
+  /**
+   * Contract v1.1 item 3: entitlement suspend/resume for a whole tenant. Emits
+   * `tenant:suspended` / `tenant:resumed` to the org room. Reversible — the device
+   * holds on suspend (branded holding, credentials kept) and resumes on resume;
+   * no disconnect, no credential change.
+   */
+  emitTenantEntitlement(
+    organizationId: string,
+    suspended: boolean,
+    reason?: string,
+  ): boolean {
+    if (!this.server) return false;
+    const event = suspended ? 'tenant:suspended' : 'tenant:resumed';
+    this.server.to(`org:${organizationId}`).emit(event, { reason });
     return true;
   }
 
@@ -755,6 +846,36 @@ export class DeviceGateway
    * Returns a discriminated union on success, or null if connection was rejected.
    */
   private async authenticateConnection(client: Socket): Promise<AuthPayload | null> {
+    // Contract v1.1 item 2: if the handshake middleware already verified this
+    // device (accept), trust its result — do NOT re-verify or re-query. The
+    // middleware is the single device-auth authority; here we only do the
+    // post-connection bookkeeping (dedup + socket.data). Middleware rejections
+    // never reach handleConnection at all.
+    const preVerified = client.data?.deviceAuthPayload as
+      | DeviceHandshakePayload
+      | undefined;
+    if (preVerified) {
+      const deviceId = preVerified.sub;
+      const existingSocketId = this.deviceSockets.get(deviceId);
+      if (existingSocketId) {
+        const existingSocket = this.server?.sockets?.sockets?.get(existingSocketId);
+        if (existingSocket) {
+          this.logger.log(`Disconnecting stale socket ${existingSocketId} for device ${deviceId}`);
+          existingSocket.disconnect(true);
+        }
+      }
+      this.deviceSockets.set(deviceId, client.id);
+
+      client.data.deviceId = deviceId;
+      client.data.organizationId = preVerified.organizationId;
+      client.data.deviceIdentifier = preVerified.deviceIdentifier;
+      client.data.capabilities = client.handshake.auth?.capabilities;
+      client.data.deliveryAckCapable = this.supportsDeliveryAck(client);
+      client.data.deviceTokenHash = client.data.deviceAuthTokenHash;
+
+      return { kind: 'device', payload: preVerified as DevicePayload };
+    }
+
     const token = this.getTokenFromClient(client);
 
     if (!token) {
@@ -1289,6 +1410,11 @@ export class DeviceGateway
         organizationId: client.data.organizationId,
         metrics: data.metrics,
         currentContent: data.currentContent,
+        // Contract v1.1: surface dark-screen signals for the fleet view. A device
+        // that is connected but not (screenState=playing, playbackSource=live) is
+        // the "on but dark/stale" case the fleet view previously could not see.
+        screenState: data.screenState,
+        playbackSource: data.playbackSource,
       });
 
       // Keep Redis as the fast heartbeat path, but refresh Postgres often

@@ -692,20 +692,36 @@ describe('DisplaysService', () => {
       httpService.post.mockReturnValue(of({ data: { success: true } }) as any);
     });
 
-    it('should send disable commands using realtime internal command DTO shape', async () => {
+    it('disable emits device:revoked (Contract v1.1 item 3: block == DEVICE_REVOKED)', async () => {
       databaseService.display.updateMany.mockResolvedValue({ count: 1 } as any);
 
       await service.disableDevice(mockDisplayId, mockOrganizationId);
 
+      // Block now routes through the revocation path (device confirms via
+      // auth/check 410 and purges), NOT the legacy 'disable' command.
       expect(httpService.post).toHaveBeenCalledWith(
-        expect.stringContaining('/internal/command'),
-        {
-          deviceId: mockDisplayId,
-          command: {
-            type: 'disable',
-            payload: undefined,
-          },
-        },
+        expect.stringContaining('/internal/device-revoked'),
+        { deviceId: mockDisplayId, reason: 'blocked' },
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'x-internal-api-key': expect.any(String) }),
+          timeout: 15000,
+        }),
+      );
+    });
+
+    it('delete emits device:revoked for the removed device', async () => {
+      // findOne succeeds, deleteMany removes the row
+      databaseService.display.findFirst.mockResolvedValue({
+        id: mockDisplayId,
+        organizationId: mockOrganizationId,
+      } as any);
+      databaseService.display.deleteMany.mockResolvedValue({ count: 1 } as any);
+
+      await service.remove(mockOrganizationId, mockDisplayId);
+
+      expect(httpService.post).toHaveBeenCalledWith(
+        expect.stringContaining('/internal/device-revoked'),
+        { deviceId: mockDisplayId, reason: 'deleted' },
         expect.objectContaining({
           headers: expect.objectContaining({ 'x-internal-api-key': expect.any(String) }),
           timeout: 15000,
