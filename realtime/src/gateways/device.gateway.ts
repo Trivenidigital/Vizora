@@ -1289,6 +1289,11 @@ export class DeviceGateway
         organizationId: client.data.organizationId,
         metrics: data.metrics,
         currentContent: data.currentContent,
+        // Contract v1.1: surface dark-screen signals for the fleet view. A device
+        // that is connected but not (screenState=playing, playbackSource=live) is
+        // the "on but dark/stale" case the fleet view previously could not see.
+        screenState: data.screenState,
+        playbackSource: data.playbackSource,
       });
 
       // Keep Redis as the fast heartbeat path, but refresh Postgres often

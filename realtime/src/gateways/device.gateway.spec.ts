@@ -881,6 +881,23 @@ describe('DeviceGateway', () => {
       expect(mockHeartbeatService.processHeartbeat).toHaveBeenCalled();
     });
 
+    it('ingests screenState + playbackSource into device status (Contract v1.1 dark-screen fields)', async () => {
+      const client = createMockSocket();
+      const data = {
+        metrics: { cpuUsage: 5, memoryUsage: 20 },
+        currentContent: { contentId: 'content-1' },
+        screenState: 'holding',
+        playbackSource: 'cached',
+      };
+
+      await gateway.handleHeartbeat(client as any, data as any);
+
+      expect(mockRedisService.setDeviceStatus).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ screenState: 'holding', playbackSource: 'cached' }),
+      );
+    });
+
     it('should replay pending deliveries after heartbeat without returning command drains', async () => {
       const emit = jest.fn((_event: string, _payload: any, ackCb?: (ack?: { ok: boolean }) => void) => {
         ackCb?.({ ok: true });

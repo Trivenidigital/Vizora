@@ -536,6 +536,10 @@ describe('PairingService', () => {
       expect(status.deviceToken).toBe('mock-jwt-token'); // plaintext token from jwtService.sign mock
       expect(status.deviceId).toBe('display-id');
       expect(status.organizationId).toBe('org-123');
+      // Contract v1.1 item 1: tenantId is the wire-boundary alias of organizationId
+      // that the device binds its cache/playlist to. Must be present and equal.
+      expect(status.tenantId).toBe('org-123');
+      expect(status.tenantId).toBe(status.organizationId);
     });
 
     it('should clean up pairing request after successful pairing', async () => {

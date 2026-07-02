@@ -503,6 +503,11 @@ export class PairingService implements OnModuleDestroy {
         deviceToken: request.plaintextToken,
         deviceId: display?.id,
         organizationId: display?.organizationId,
+        // Device Revocation Contract v1.1 item 1: the device binds its cache and
+        // persisted playlist to `tenantId` and refuses to render on mismatch.
+        // The backend's tenant identity IS organizationId — this is a wire-boundary
+        // alias, NOT a model rename (the device reads the literal key `tenantId`).
+        tenantId: display?.organizationId,
       };
     }
 

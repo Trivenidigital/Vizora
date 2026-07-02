@@ -78,6 +78,21 @@ export class HeartbeatMessageDto {
   @IsOptional()
   @IsString()
   appVersion?: string;
+
+  // Device Revocation Contract v1.1: dark-screen detection. The player reports
+  // which screen-state owns the glass and where its content came from, so the
+  // fleet view can distinguish offline / on-but-dark / playing-stale. These MUST
+  // be whitelisted here — the pipe runs forbidNonWhitelisted, so an enriched
+  // heartbeat would otherwise be rejected and the device would look offline.
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  screenState?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  playbackSource?: string;
 }
 
 /**
