@@ -139,7 +139,7 @@ describe('BillingService', () => {
 
     // getClient().set(key,'1','EX',ttl,'NX') — 'OK' = claim won (first time),
     // null = already processed (duplicate). Default: always win the claim.
-    mockRedisClient = { set: jest.fn().mockResolvedValue('OK') };
+    mockRedisClient = { set: jest.fn().mockResolvedValue('OK'), del: jest.fn().mockResolvedValue(1) };
     mockRedisService = {
       get: jest.fn().mockResolvedValue(null),
       set: jest.fn().mockResolvedValue(true),
@@ -657,7 +657,7 @@ describe('BillingService', () => {
       expect(result).toEqual({ received: true });
       // The claim was keyed on the top-level event id, not the object id.
       expect(mockRedisClient.set).toHaveBeenCalledWith(
-        'webhook:processed:stripe:evt_duplicate', '1', 'EX', 172800, 'NX',
+        'webhook:processed:stripe:evt_duplicate', 'pending', 'EX', 300, 'NX',
       );
       expect(mockDatabaseService.organization.findFirst).not.toHaveBeenCalled();
     });
@@ -675,9 +675,26 @@ describe('BillingService', () => {
       await service.handleWebhookEvent('stripe', { rawBody, signature });
 
       // Distinct event ids → two distinct NX claims → both processed.
-      expect(mockRedisClient.set).toHaveBeenCalledWith('webhook:processed:stripe:evt_A', '1', 'EX', 172800, 'NX');
-      expect(mockRedisClient.set).toHaveBeenCalledWith('webhook:processed:stripe:evt_B', '1', 'EX', 172800, 'NX');
+      expect(mockRedisClient.set).toHaveBeenCalledWith('webhook:processed:stripe:evt_A', 'pending', 'EX', 300, 'NX');
+      expect(mockRedisClient.set).toHaveBeenCalledWith('webhook:processed:stripe:evt_B', 'pending', 'EX', 300, 'NX');
+      // Each successful process flips its key pending → completed.
+      expect(mockRedisClient.set).toHaveBeenCalledWith('webhook:processed:stripe:evt_A', 'completed', 'EX', 172800);
       expect(mockDatabaseService.organization.update).toHaveBeenCalledTimes(2);
+    });
+
+    it('claim-then-crash: a handler THROW releases the claim so the PSP retry re-enters', async () => {
+      // First delivery: claim ok, but the handler throws AFTER the claim.
+      mockStripeProvider.verifyWebhookSignature.mockReturnValue({
+        id: 'evt_crash', type: 'customer.subscription.updated', data: { id: 'sub_c', customer: 'cus_stripe123', status: 'active' },
+      });
+      mockDatabaseService.organization.findFirst.mockResolvedValue(mockOrganization);
+      mockDatabaseService.organization.update.mockRejectedValueOnce(new Error('DB write failed'));
+
+      await expect(service.handleWebhookEvent('stripe', { rawBody, signature })).rejects.toThrow('DB write failed');
+
+      // NEGATIVE: the claim was RELEASED (del), not left as a poison-pill 'pending'
+      // that would cause the retry to be silently dropped as a duplicate.
+      expect(mockRedisClient.del).toHaveBeenCalledWith('webhook:processed:stripe:evt_crash');
     });
 
     it('fails CLOSED when the idempotency store is unavailable (PSP will retry)', async () => {

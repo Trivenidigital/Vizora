@@ -61,8 +61,14 @@ export class StripeProvider implements PaymentProvider {
     metadata?: Record<string, unknown>,
   ): Promise<Customer> {
     this.ensureConfigured();
+    // Idempotency key derived from the org id (one Stripe customer per org).
+    // Stripe caches idempotent responses for 24h, so a network retry of this
+    // create returns the SAME customer instead of minting a duplicate — without
+    // permanently locking the key (it frees after the retry window).
+    const orgId = typeof metadata?.organizationId === 'string' ? metadata.organizationId : undefined;
+    const requestOptions = orgId ? { idempotencyKey: `customer:${orgId}` } : undefined;
     const customer = await this.withCircuitBreaker(() =>
-      this.stripe!.customers.create({ email, name, metadata }),
+      this.stripe!.customers.create({ email, name, metadata }, requestOptions),
     );
     return {
       id: customer.id,

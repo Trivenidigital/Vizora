@@ -84,11 +84,15 @@ describe('StripeProvider', () => {
         { organizationId: 'org_123' },
       );
 
-      expect(mockStripe.customers.create).toHaveBeenCalledWith({
-        email: 'test@example.com',
-        name: 'Test User',
-        metadata: { organizationId: 'org_123' },
-      });
+      expect(mockStripe.customers.create).toHaveBeenCalledWith(
+        {
+          email: 'test@example.com',
+          name: 'Test User',
+          metadata: { organizationId: 'org_123' },
+        },
+        // Org-derived idempotency key: a retry returns the same customer.
+        { idempotencyKey: 'customer:org_123' },
+      );
       expect(result).toEqual({
         id: 'cus_123',
         email: 'test@example.com',
