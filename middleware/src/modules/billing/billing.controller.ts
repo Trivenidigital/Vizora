@@ -14,6 +14,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { BillingService } from './billing.service';
+import { EntitlementService } from './entitlement.service';
 import { CreateCheckoutDto } from './dto/create-checkout.dto';
 import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
 
@@ -22,11 +23,24 @@ type BillingInterval = 'monthly' | 'yearly';
 @Controller('billing')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class BillingController {
-  constructor(private readonly billingService: BillingService) {}
+  constructor(
+    private readonly billingService: BillingService,
+    private readonly entitlementService: EntitlementService,
+  ) {}
 
   @Get('subscription')
   async getSubscription(@CurrentUser('organizationId') organizationId: string) {
     return this.billingService.getSubscriptionStatus(organizationId);
+  }
+
+  /**
+   * B3 — data for the dashboard payment banner: current entitlement state, days
+   * remaining until the next rung, and whether publishing is locked. The React
+   * banner renders this; the dashboard-first escalation depends on it being shown.
+   */
+  @Get('entitlement/banner')
+  async getEntitlementBanner(@CurrentUser('organizationId') organizationId: string) {
+    return this.entitlementService.getBannerState(organizationId);
   }
 
   @Get('plans')

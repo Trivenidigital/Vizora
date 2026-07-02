@@ -33,6 +33,7 @@ import {
 } from './constants/plans';
 import { MailService } from '../mail/mail.service';
 import { RedisService } from '../redis/redis.service';
+import { EntitlementService } from './entitlement.service';
 
 /** Webhook event data from Stripe/Razorpay — deeply nested untyped objects */
 interface WebhookData {
@@ -50,6 +51,7 @@ export class BillingService implements OnModuleInit {
     private readonly razorpayProvider: RazorpayProvider,
     private readonly mailService: MailService,
     private readonly redisService: RedisService,
+    private readonly entitlementService: EntitlementService,
   ) {}
 
   /**
@@ -857,12 +859,11 @@ export class BillingService implements OnModuleInit {
       description: 'Subscription payment',
     });
 
-    // Update subscription status to active if it was past_due
-    if (org.subscriptionStatus === 'past_due') {
-      await this.db.organization.update({
-        where: { id: org.id },
-        data: { subscriptionStatus: 'active' },
-      });
+    // Recover from any degradation rung → active. EntitlementService clears the
+    // episode clock and emits tenant:resumed IFF the org had reached `suspended`
+    // (B3 ladder). Covers past_due / publish_locked / suspended uniformly.
+    if (['past_due', 'publish_locked', 'suspended'].includes(org.subscriptionStatus)) {
+      await this.entitlementService.recover(org.id);
     }
 
     // Send payment receipt email
@@ -916,10 +917,10 @@ export class BillingService implements OnModuleInit {
 
     if (!org) return;
 
-    await this.db.organization.update({
-      where: { id: org.id },
-      data: { subscriptionStatus: 'past_due' },
-    });
+    // Begin the degradation episode (past_due + episode clock). Idempotent — a
+    // repeat payment-failed while already past_due/publish_locked/suspended does
+    // NOT reset the clock or un-advance the ladder (B3).
+    await this.entitlementService.beginPastDue(org.id);
 
     // Send payment failed email
     const admin = org.users[0];

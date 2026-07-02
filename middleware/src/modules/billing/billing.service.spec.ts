@@ -7,6 +7,7 @@ import { StripeProvider } from './providers/stripe.provider';
 import { RazorpayProvider } from './providers/razorpay.provider';
 import { MailService } from '../mail/mail.service';
 import { RedisService } from '../redis/redis.service';
+import { EntitlementService } from './entitlement.service';
 import { PLAN_TIERS } from './constants/plans';
 
 // Set up environment variables before tests run
@@ -27,6 +28,10 @@ describe('BillingService', () => {
   let mockRazorpayProvider: any;
   let mockRedisService: any;
   let mockRedisClient: any;
+  const mockEntitlementService = {
+    beginPastDue: jest.fn().mockResolvedValue(undefined),
+    recover: jest.fn().mockResolvedValue(undefined),
+  };
 
   const mockOrganization = {
     id: 'org-123',
@@ -155,6 +160,7 @@ describe('BillingService', () => {
         { provide: RazorpayProvider, useValue: mockRazorpayProvider },
         { provide: MailService, useValue: mockMailService },
         { provide: RedisService, useValue: mockRedisService },
+        { provide: EntitlementService, useValue: mockEntitlementService },
       ],
     }).compile();
 
