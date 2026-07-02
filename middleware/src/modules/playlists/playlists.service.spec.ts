@@ -36,16 +36,19 @@ describe('PlaylistsService', () => {
         findFirst: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         delete: jest.fn(),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
         count: jest.fn(),
       },
       playlistItem: {
         create: jest.fn(),
+        createMany: jest.fn().mockResolvedValue({ count: 0 }),
         findFirst: jest.fn(),
         delete: jest.fn(),
         deleteMany: jest.fn(),
         update: jest.fn(),
-        updateMany: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       $transaction: jest.fn((fn) => fn(mockDatabaseService)),
       content: {
@@ -268,26 +271,27 @@ describe('PlaylistsService', () => {
   describe('update', () => {
     const updateDto = { name: 'Updated Playlist' };
 
-    it('should update playlist', async () => {
-      mockDatabaseService.playlist.findFirst.mockResolvedValue(mockPlaylist);
-      mockDatabaseService.playlist.update.mockResolvedValue({
-        ...mockPlaylist,
-        ...updateDto,
-      });
+    it('should update playlist via an org-scoped write', async () => {
+      // findFirst #1 = findOne guard; #2 = re-fetch after the org-scoped updateMany.
+      mockDatabaseService.playlist.findFirst
+        .mockResolvedValueOnce(mockPlaylist)
+        .mockResolvedValueOnce({ ...mockPlaylist, ...updateDto });
 
       const result = await service.update('org-123', 'playlist-123', updateDto);
 
       expect(result.name).toBe('Updated Playlist');
+      // NEGATIVE / structural: the write carries organizationId, not a bare id.
+      expect(mockDatabaseService.playlist.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'playlist-123', organizationId: 'org-123' } }),
+      );
     });
 
     it('should replace items when updating with new items', async () => {
-      mockDatabaseService.playlist.findFirst.mockResolvedValue(mockPlaylist);
+      mockDatabaseService.playlist.findFirst
+        .mockResolvedValueOnce(mockPlaylist)
+        .mockResolvedValueOnce({ ...mockPlaylist, items: [mockPlaylistItem] });
       mockDatabaseService.content.count.mockResolvedValue(1);
       mockDatabaseService.playlistItem.deleteMany.mockResolvedValue({ count: 1 });
-      mockDatabaseService.playlist.update.mockResolvedValue({
-        ...mockPlaylist,
-        items: [mockPlaylistItem],
-      });
 
       await service.update('org-123', 'playlist-123', {
         items: [{ contentId: 'content-456', order: 0 }],
@@ -296,6 +300,18 @@ describe('PlaylistsService', () => {
       expect(mockDatabaseService.playlistItem.deleteMany).toHaveBeenCalledWith({
         where: { playlistId: 'playlist-123' },
       });
+      expect(mockDatabaseService.playlistItem.createMany).toHaveBeenCalled();
+    });
+
+    it('rejects a cross-tenant update with zero row effect (NotFound)', async () => {
+      // findOne passes (guard removed from the write path), but the org-scoped
+      // updateMany matches zero rows for a foreign playlist → NotFound, no write.
+      mockDatabaseService.playlist.findFirst.mockResolvedValueOnce(mockPlaylist);
+      mockDatabaseService.playlist.updateMany.mockResolvedValueOnce({ count: 0 });
+
+      await expect(
+        service.update('org-123', 'playlist-123', updateDto),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -519,15 +535,16 @@ describe('PlaylistsService', () => {
         .mockResolvedValueOnce(playlistWithItems)
         .mockResolvedValueOnce(playlistWithItems);
 
-      const updateCalls: Array<{ id: string; order: number }> = [];
+      const updateCalls: Array<{ id: string; playlistId: string; order: number }> = [];
       mockDatabaseService.$transaction.mockImplementation(async (fn) => {
         const txProxy = {
           ...mockDatabaseService,
           playlistItem: {
             ...mockDatabaseService.playlistItem,
-            update: jest.fn().mockImplementation(({ where, data }) => {
-              updateCalls.push({ id: where.id, order: data.order });
-              return Promise.resolve({});
+            // Org/playlist-scoped write: updateMany({ where: { id, playlistId } }).
+            updateMany: jest.fn().mockImplementation(({ where, data }) => {
+              updateCalls.push({ id: where.id, playlistId: where.playlistId, order: data.order });
+              return Promise.resolve({ count: 1 });
             }),
           },
         };
@@ -536,14 +553,12 @@ describe('PlaylistsService', () => {
 
       await service.reorder('org-123', 'playlist-123', ['item-2', 'item-1']);
 
-      // Should have 4 calls: 2 negative + 2 final
+      // Should have 4 calls: 2 negative + 2 final, each scoped to the playlist id.
       expect(updateCalls).toHaveLength(4);
-      // Pass 1: negative values
-      expect(updateCalls[0]).toEqual({ id: 'item-2', order: -1 });
-      expect(updateCalls[1]).toEqual({ id: 'item-1', order: -2 });
-      // Pass 2: final values
-      expect(updateCalls[2]).toEqual({ id: 'item-2', order: 0 });
-      expect(updateCalls[3]).toEqual({ id: 'item-1', order: 1 });
+      expect(updateCalls[0]).toEqual({ id: 'item-2', playlistId: 'playlist-123', order: -1 });
+      expect(updateCalls[1]).toEqual({ id: 'item-1', playlistId: 'playlist-123', order: -2 });
+      expect(updateCalls[2]).toEqual({ id: 'item-2', playlistId: 'playlist-123', order: 0 });
+      expect(updateCalls[3]).toEqual({ id: 'item-1', playlistId: 'playlist-123', order: 1 });
     });
 
     it('should handle single item reorder', async () => {
@@ -588,19 +603,23 @@ describe('PlaylistsService', () => {
   });
 
   describe('remove', () => {
-    it('should delete playlist', async () => {
-      mockDatabaseService.playlist.findFirst.mockResolvedValue(mockPlaylist);
-      mockDatabaseService.playlist.delete.mockResolvedValue(mockPlaylist);
+    it('should delete playlist via an org-scoped write', async () => {
+      mockDatabaseService.playlist.deleteMany.mockResolvedValue({ count: 1 });
 
       const result = await service.remove('org-123', 'playlist-123');
 
-      expect(result).toEqual(mockPlaylist);
+      expect(result).toEqual({ id: 'playlist-123' });
+      // Structural: the delete carries organizationId, not a bare id.
+      expect(mockDatabaseService.playlist.deleteMany).toHaveBeenCalledWith({
+        where: { id: 'playlist-123', organizationId: 'org-123' },
+      });
     });
 
-    it('should throw NotFoundException if playlist not found', async () => {
-      mockDatabaseService.playlist.findFirst.mockResolvedValue(null);
+    it('rejects a cross-tenant delete with zero row effect (NotFound)', async () => {
+      // A foreign playlist id matches zero rows under the org-scoped where → NotFound.
+      mockDatabaseService.playlist.deleteMany.mockResolvedValue({ count: 0 });
 
-      await expect(service.remove('org-123', 'invalid-id')).rejects.toThrow(NotFoundException);
+      await expect(service.remove('org-123', 'foreign-id')).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -608,10 +627,9 @@ describe('PlaylistsService', () => {
     const updatedPlaylist = { ...mockPlaylist, name: 'Updated' };
 
     beforeEach(() => {
-      // findOne succeeds
-      mockDatabaseService.playlist.findFirst.mockResolvedValue(mockPlaylist);
-      // update succeeds
-      mockDatabaseService.playlist.update.mockResolvedValue(updatedPlaylist);
+      // findOne guard + org-scoped re-fetch both resolve to the updated playlist.
+      mockDatabaseService.playlist.findFirst.mockResolvedValue(updatedPlaylist);
+      mockDatabaseService.playlist.updateMany.mockResolvedValue({ count: 1 });
       // Set env so internal headers are returned
       process.env.INTERNAL_API_SECRET = 'test-secret';
     });
