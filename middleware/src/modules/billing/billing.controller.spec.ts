@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { BillingController } from './billing.controller';
 import { BillingService } from './billing.service';
+import { EntitlementService } from './entitlement.service';
 
 describe('BillingController', () => {
   let controller: BillingController;
@@ -83,7 +84,10 @@ describe('BillingController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [BillingController],
-      providers: [{ provide: BillingService, useValue: mockBillingService }],
+      providers: [
+        { provide: BillingService, useValue: mockBillingService },
+        { provide: EntitlementService, useValue: { getBannerState: jest.fn() } },
+      ],
     }).compile();
 
     controller = module.get<BillingController>(BillingController);
