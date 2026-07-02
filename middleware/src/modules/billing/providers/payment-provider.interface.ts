@@ -44,6 +44,13 @@ export interface WebhookEventData {
 export interface WebhookEvent {
   type: string;
   data: WebhookEventData;
+  /**
+   * Stable, provider-issued event identifier for idempotency/replay dedup.
+   * Stripe: the `evt_...` event id. Razorpay: a content hash of the signed
+   * payload (Razorpay has no top-level event id in the body), which is stable
+   * across delivery retries but distinct across genuinely different events.
+   */
+  id: string;
 }
 
 export interface PaymentProvider {

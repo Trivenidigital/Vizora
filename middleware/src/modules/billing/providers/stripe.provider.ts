@@ -8,6 +8,7 @@ import {
   Subscription,
   Invoice,
   WebhookEvent,
+  WebhookEventData,
 } from './payment-provider.interface';
 import { CircuitBreakerService } from '../../common/services/circuit-breaker.service';
 
@@ -208,8 +209,11 @@ export class StripeProvider implements PaymentProvider {
       this.webhookSecret,
     );
     return {
+      // The Stripe EVENT id (evt_...) — stable per event, distinct across
+      // events even when they share an object id. This is the dedup key.
+      id: event.id,
       type: event.type,
-      data: event.data.object,
+      data: event.data.object as unknown as WebhookEventData,
     };
   }
 

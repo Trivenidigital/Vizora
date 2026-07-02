@@ -3,6 +3,7 @@ import {
   Logger,
   BadRequestException,
   NotFoundException,
+  ServiceUnavailableException,
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -573,6 +574,27 @@ export class BillingService implements OnModuleInit {
    * Handle webhook events from payment providers.
    * Verifies the webhook signature before processing events.
    */
+  /**
+   * Atomically claim a webhook event id for processing (idempotency).
+   * Returns true if this caller won the claim (first time seen), false if the
+   * event was already processed. Fail-CLOSED: if Redis is unavailable the claim
+   * cannot be guaranteed, so we THROW — the webhook returns 5xx and the PSP
+   * retries later. This never double-processes and never silently drops an event
+   * (the prior get-then-set was both racy and fail-open on Redis outage).
+   */
+  private async claimWebhookEvent(idempotencyKey: string): Promise<boolean> {
+    const client = this.redisService.getClient();
+    if (!client) {
+      throw new ServiceUnavailableException(
+        'Idempotency store unavailable; webhook will be retried',
+      );
+    }
+    // 48h TTL — comfortably beyond Stripe's ~3-day retry window start; the key
+    // only needs to outlive the retry burst for a given event.
+    const result = await client.set(idempotencyKey, '1', 'EX', 172800, 'NX');
+    return result === 'OK';
+  }
+
   async handleWebhookEvent(
     provider: 'stripe' | 'razorpay',
     rawEvent: { rawBody: Buffer; signature: string },
@@ -586,18 +608,18 @@ export class BillingService implements OnModuleInit {
       rawEvent.signature,
     );
 
-    this.logger.log(`Processing ${provider} webhook: ${event.type}`);
+    this.logger.log(`Processing ${provider} webhook: ${event.type} (${event.id})`);
 
-    // Idempotency: skip duplicate events
-    const eventId = event.data?.id || event.data?.object?.id;
-    if (eventId) {
-      const idempotencyKey = `webhook:processed:${provider}:${eventId}`;
-      const alreadyProcessed = await this.redisService.get(idempotencyKey);
-      if (alreadyProcessed) {
-        this.logger.debug(`Skipping duplicate webhook: ${eventId}`);
-        return { received: true };
-      }
-      await this.redisService.set(idempotencyKey, '1', 172800); // 48h TTL
+    // Idempotency: skip duplicate events. Keyed on the provider EVENT id
+    // (event.id) — NOT the object id, which is shared across distinct events for
+    // the same subscription/invoice and would wrongly drop the second one.
+    // Claimed atomically with SET NX so two concurrent deliveries of the same
+    // event cannot both pass the check (the previous get-then-set had a race).
+    const idempotencyKey = `webhook:processed:${provider}:${event.id}`;
+    const claimed = await this.claimWebhookEvent(idempotencyKey);
+    if (!claimed) {
+      this.logger.debug(`Skipping duplicate webhook: ${event.id}`);
+      return { received: true };
     }
 
     try {

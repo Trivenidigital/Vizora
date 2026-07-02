@@ -26,6 +26,7 @@ describe('BillingService', () => {
   let mockStripeProvider: any;
   let mockRazorpayProvider: any;
   let mockRedisService: any;
+  let mockRedisClient: any;
 
   const mockOrganization = {
     id: 'org-123',
@@ -136,9 +137,13 @@ describe('BillingService', () => {
       sendSubscriptionCanceledEmail: jest.fn().mockResolvedValue(undefined),
     };
 
+    // getClient().set(key,'1','EX',ttl,'NX') — 'OK' = claim won (first time),
+    // null = already processed (duplicate). Default: always win the claim.
+    mockRedisClient = { set: jest.fn().mockResolvedValue('OK') };
     mockRedisService = {
       get: jest.fn().mockResolvedValue(null),
       set: jest.fn().mockResolvedValue(true),
+      getClient: jest.fn(() => mockRedisClient),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -538,9 +543,10 @@ describe('BillingService', () => {
       mockDatabaseService.organization.findFirst.mockResolvedValue(mockOrganization);
       mockDatabaseService.organization.update.mockResolvedValue({});
       mockStripeProvider.verifyWebhookSignature.mockReturnValue({
+        id: 'evt_123',
         type: 'customer.subscription.updated',
         data: {
-          id: 'evt_123',
+          id: 'sub_123',
           customer: 'cus_stripe123',
           status: 'active',
         },
@@ -560,9 +566,10 @@ describe('BillingService', () => {
       mockDatabaseService.organization.findFirst.mockResolvedValue(mockOrganization);
       mockDatabaseService.organization.update.mockResolvedValue({});
       mockStripeProvider.verifyWebhookSignature.mockReturnValue({
+        id: 'evt_456',
         type: 'customer.subscription.deleted',
         data: {
-          id: 'evt_456',
+          id: 'sub_456',
           customer: 'cus_stripe123',
         },
       });
@@ -582,6 +589,7 @@ describe('BillingService', () => {
     it('should handle checkout.session.completed', async () => {
       mockDatabaseService.organization.update.mockResolvedValue({});
       mockStripeProvider.verifyWebhookSignature.mockReturnValue({
+        id: 'evt_cs_789',
         type: 'checkout.session.completed',
         data: {
           id: 'cs_789',
@@ -611,6 +619,7 @@ describe('BillingService', () => {
       mockDatabaseService.organization.update.mockResolvedValue({});
       mockDatabaseService.billingTransaction.create.mockResolvedValue({});
       mockStripeProvider.verifyWebhookSignature.mockReturnValue({
+        id: 'evt_inv_123',
         type: 'invoice.payment_succeeded',
         data: {
           id: 'inv_123',
@@ -634,25 +643,64 @@ describe('BillingService', () => {
       });
     });
 
-    it('should skip duplicate webhook events via idempotency', async () => {
-      mockRedisService.get.mockResolvedValue('1');
+    it('should skip duplicate webhook events via idempotency (SETNX returns null)', async () => {
+      // Second delivery of the same event: the NX claim fails (key exists).
+      mockRedisClient.set.mockResolvedValue(null);
       mockStripeProvider.verifyWebhookSignature.mockReturnValue({
+        id: 'evt_duplicate',
         type: 'customer.subscription.updated',
-        data: { id: 'evt_duplicate' },
+        data: { id: 'sub_dup' },
       });
 
       const result = await service.handleWebhookEvent('stripe', { rawBody, signature });
 
       expect(result).toEqual({ received: true });
+      // The claim was keyed on the top-level event id, not the object id.
+      expect(mockRedisClient.set).toHaveBeenCalledWith(
+        'webhook:processed:stripe:evt_duplicate', '1', 'EX', 172800, 'NX',
+      );
       expect(mockDatabaseService.organization.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('processes two DISTINCT events that share an object id (was wrongly deduped)', async () => {
+      // Regression for the object-id keying bug: two different events for the
+      // same subscription must both process.
+      mockDatabaseService.organization.findFirst.mockResolvedValue(mockOrganization);
+      mockDatabaseService.organization.update.mockResolvedValue({});
+      mockStripeProvider.verifyWebhookSignature
+        .mockReturnValueOnce({ id: 'evt_A', type: 'customer.subscription.updated', data: { id: 'sub_shared', customer: 'cus_stripe123', status: 'active' } })
+        .mockReturnValueOnce({ id: 'evt_B', type: 'customer.subscription.updated', data: { id: 'sub_shared', customer: 'cus_stripe123', status: 'active' } });
+
+      await service.handleWebhookEvent('stripe', { rawBody, signature });
+      await service.handleWebhookEvent('stripe', { rawBody, signature });
+
+      // Distinct event ids → two distinct NX claims → both processed.
+      expect(mockRedisClient.set).toHaveBeenCalledWith('webhook:processed:stripe:evt_A', '1', 'EX', 172800, 'NX');
+      expect(mockRedisClient.set).toHaveBeenCalledWith('webhook:processed:stripe:evt_B', '1', 'EX', 172800, 'NX');
+      expect(mockDatabaseService.organization.update).toHaveBeenCalledTimes(2);
+    });
+
+    it('fails CLOSED when the idempotency store is unavailable (PSP will retry)', async () => {
+      // Redis down → cannot guarantee idempotency → throw → 5xx → PSP retries.
+      // Never double-process, never silently drop.
+      mockRedisService.getClient.mockReturnValue(null);
+      mockStripeProvider.verifyWebhookSignature.mockReturnValue({
+        id: 'evt_noredis', type: 'customer.subscription.updated', data: { id: 'sub_x' },
+      });
+
+      await expect(
+        service.handleWebhookEvent('stripe', { rawBody, signature }),
+      ).rejects.toThrow(/unavailable/i);
+      expect(mockDatabaseService.organization.update).not.toHaveBeenCalled();
     });
 
     it('should use razorpay provider for razorpay webhooks', async () => {
       mockDatabaseService.organization.findFirst.mockResolvedValue(mockOrganization);
       mockDatabaseService.organization.update.mockResolvedValue({});
       mockRazorpayProvider.verifyWebhookSignature.mockReturnValue({
+        id: 'rzp_deadbeef',
         type: 'subscription.updated',
-        data: { id: 'evt_rz', subscription: { customer_id: 'cust_razorpay123', status: 'active' } },
+        data: { subscription: { customer_id: 'cust_razorpay123', status: 'active' } },
       });
 
       await service.handleWebhookEvent('razorpay', { rawBody, signature });
