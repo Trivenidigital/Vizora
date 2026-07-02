@@ -61,7 +61,7 @@ describe('authenticateDeviceHandshake', () => {
       throw e;
     });
     const r = await authenticateDeviceHandshake(TOKEN, makeDeps({ verify }));
-    expect(r).toEqual({ action: 'reject', message: 'token_expired', code: 'AUTH_EXPIRED' });
+    expect(r).toEqual({ action: 'reject', message: 'auth_expired', code: 'AUTH_EXPIRED' });
   });
 
   it('rejects a bad-signature token with AUTH_INVALID (never DEVICE_REVOKED)', async () => {
@@ -71,7 +71,42 @@ describe('authenticateDeviceHandshake', () => {
       throw e;
     });
     const r = await authenticateDeviceHandshake('garbage', makeDeps({ verify }));
-    expect(r).toEqual({ action: 'reject', message: 'invalid_token', code: 'AUTH_INVALID' });
+    expect(r).toEqual({ action: 'reject', message: 'auth_invalid', code: 'AUTH_INVALID' });
+  });
+
+  it('NO structured-rejection message contains a pre-fix-APK wipe substring', async () => {
+    // The pre-fix TV build wiped credentials on
+    // connect_error.message.includes('unauthorized' | 'invalid token').
+    // Every legacy message we emit for a structured rejection must be clear of
+    // both, so a pre-fix APK (if one ever connected) would not self-de-pair.
+    const WIPE_SUBSTRINGS = ['unauthorized', 'invalid token'];
+    const rejections = await Promise.all([
+      // expired
+      authenticateDeviceHandshake(TOKEN, makeDeps({
+        verify: jest.fn().mockImplementation(() => { const e = new Error('x'); e.name = 'TokenExpiredError'; throw e; }),
+      })),
+      // bad signature
+      authenticateDeviceHandshake('garbage', makeDeps({
+        verify: jest.fn().mockImplementation(() => { const e = new Error('x'); e.name = 'JsonWebTokenError'; throw e; }),
+      })),
+      // revoked
+      authenticateDeviceHandshake(TOKEN, makeDeps({
+        verify: jest.fn().mockReturnValue(devicePayload),
+        findUnique: jest.fn().mockResolvedValue(null),
+      })),
+      // suspended
+      authenticateDeviceHandshake(TOKEN, makeDeps({
+        verify: jest.fn().mockReturnValue(devicePayload),
+        findUnique: jest.fn().mockResolvedValue(currentDisplay({ organization: { subscriptionStatus: 'suspended' } })),
+      })),
+    ]);
+    for (const r of rejections) {
+      expect(r.action).toBe('reject');
+      const msg = (r as { message: string }).message.toLowerCase();
+      for (const bad of WIPE_SUBSTRINGS) {
+        expect(msg.includes(bad)).toBe(false);
+      }
+    }
   });
 
   it('rejects a deleted device with DEVICE_REVOKED', async () => {

@@ -77,16 +77,20 @@ export async function authenticateDeviceHandshake(
     if (isValidUserToken(token, deps)) return { action: 'pass' };
     const name = (err as { name?: string })?.name;
     if (name === 'TokenExpiredError') {
-      return { action: 'reject', message: 'token_expired', code: 'AUTH_EXPIRED' };
+      return { action: 'reject', message: 'auth_expired', code: 'AUTH_EXPIRED' };
     }
-    return { action: 'reject', message: 'invalid_token', code: 'AUTH_INVALID' };
+    // NB: 'auth_invalid', NOT 'invalid_token' — the pre-fix TV APK wiped
+    // credentials on connect_error.message.includes('invalid token'). These
+    // legacy strings must never contain that substring or 'unauthorized'
+    // (see the assertion in device-handshake-auth.spec.ts).
+    return { action: 'reject', message: 'auth_invalid', code: 'AUTH_INVALID' };
   }
 
   // A non-device token that happens to verify under DEVICE_JWT_SECRET → not our
   // concern; let handleConnection classify it.
   if (payload.type !== 'device' || !payload.sub || !payload.organizationId) {
     if (payload.type !== 'device') return { action: 'pass' };
-    return { action: 'reject', message: 'invalid_token', code: 'AUTH_INVALID' };
+    return { action: 'reject', message: 'auth_invalid', code: 'AUTH_INVALID' };
   }
 
   let display: {

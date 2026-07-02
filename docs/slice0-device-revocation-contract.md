@@ -30,6 +30,17 @@ its legacy-unpair carve-out. Therefore:
 Recommended single rollout: **1 + B2 → 2 → 3 → 4** (3 and 4 may go together). Each is behind its
 own commit for independent revert.
 
+## Item 2 — legacy-message safety (pre-fix APK)
+
+The pre-fix TV build wiped credentials on `connect_error.message.includes('unauthorized' |
+'invalid token')` (the F3 bug). Item 2's structured rejections carry legacy message strings for the
+Electron client; those strings are deliberately clear of both wipe substrings
+(`auth_expired`, `auth_invalid`, `device_token_stale`, `tenant_suspended`), pinned by a regression
+test (`device-handshake-auth.spec.ts` — "NO structured-rejection message contains a pre-fix-APK
+wipe substring"). Deploy order is device-APK-first, so no updated fleet device is at risk regardless;
+**pre-fix APKs are nonetheless explicitly unsupported against this backend** — this note plus the
+test are belt-and-suspenders for a sideloaded/unupdated test box.
+
 ## Scope boundary (checkpoint-respecting)
 
 Item 3 delivers the **emission plumbing** for `tenant:suspended`/`resumed` and the auth/check `403`
