@@ -104,6 +104,72 @@ describe('MailService.sendDeviceOfflineAlertEmail', () => {
   });
 });
 
+describe('MailService critical email (B7) — sandbox-intercepted smoke', () => {
+  const originalEnv = process.env;
+  let sentMailMock: jest.Mock;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env = { ...originalEnv };
+    // Sandbox transport: intercepts sends instead of hitting a real SMTP server.
+    sentMailMock = jest.fn().mockResolvedValue({ messageId: 'sandbox-1' });
+    (nodemailer.createTransport as jest.Mock).mockReturnValue({ sendMail: sentMailMock });
+    process.env.SMTP_HOST = 'sandbox.smtp';
+    process.env.SMTP_USER = 'u';
+    process.env.SMTP_PASSWORD = 'p';
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
+    jest.restoreAllMocks();
+  });
+
+  it('password reset: dispatches an email carrying the reset URL', async () => {
+    const service = new MailService();
+    await service.sendPasswordResetEmail('locked@example.com', 'Ada', 'https://app/reset?token=abc');
+
+    expect(sentMailMock).toHaveBeenCalledTimes(1);
+    const arg = sentMailMock.mock.calls[0][0];
+    expect(arg.to).toBe('locked@example.com');
+    expect(arg.subject).toBe('Reset your Vizora password');
+    expect(arg.html).toContain('https://app/reset?token=abc');
+  });
+
+  it('invoice/receipt: dispatches a billing email', async () => {
+    const service = new MailService();
+    // sendPaymentReceiptEmail(to, firstName, planName, amount, currency)
+    await service.sendPaymentReceiptEmail('cust@example.com', 'Ada', 'Pro', '29.00', 'usd');
+    expect(sentMailMock).toHaveBeenCalledTimes(1);
+    expect(sentMailMock.mock.calls[0][0].to).toBe('cust@example.com');
+  });
+
+  it('CRITICAL fail-loud: password reset THROWS in production when SMTP is unconfigured', async () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.SMTP_HOST;
+    delete process.env.SMTP_USER;
+    delete process.env.SMTP_PASSWORD;
+    (nodemailer.createTransport as jest.Mock).mockReturnValue(null);
+
+    const service = new MailService();
+    await expect(
+      service.sendPasswordResetEmail('locked@example.com', 'Ada', 'https://app/reset?token=abc'),
+    ).rejects.toThrow(/SMTP not configured|unavailable/i);
+  });
+
+  it('non-critical email does NOT throw when SMTP is unconfigured (welcome swallows)', async () => {
+    delete process.env.SMTP_HOST;
+    delete process.env.SMTP_USER;
+    delete process.env.SMTP_PASSWORD;
+    (nodemailer.createTransport as jest.Mock).mockReturnValue(null);
+
+    const service = new MailService();
+    // Welcome is best-effort — a dead mailer must not break registration.
+    await expect(
+      service.sendWelcomeEmail('new@example.com', 'Ada'),
+    ).resolves.not.toThrow();
+  });
+});
+
 describe('MailService.sendUnrecognizedLoginEmail', () => {
   let service: MailService;
   let sendMailSpy: jest.SpyInstance;

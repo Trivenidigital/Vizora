@@ -39,6 +39,14 @@ export class MailService {
       port,
       secure: port === 465,
       auth: { user, pass },
+      // Bounded timeouts: a hung SMTP server must not block the caller. This
+      // matters on the webhook path — payment handlers await a receipt/failed
+      // email inside the idempotency claim window (5-min pending TTL); capping a
+      // send at ~15s keeps handler duration far under that window so the claim
+      // cannot expire mid-work and let a retry double-process.
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 15_000,
     });
   }
 
@@ -60,7 +68,14 @@ export class MailService {
 
   /**
    * Shared helper: sends an email or logs to console in dev mode.
-   * Returns silently on failure — never throws.
+   *
+   * `critical` (B7): launch-critical mail (e.g. password reset) MUST NOT fail
+   * silently — with the account-recovery path, a swallowed failure leaves the
+   * user permanently locked out with no signal. When `critical: true`, an
+   * unconfigured transport OR a send failure THROWS, so the caller can surface a
+   * real error to the user instead of a false success. Non-critical mail keeps
+   * the swallow-and-log behavior (a failed marketing/receipt email must not break
+   * the request that triggered it).
    */
   private async sendMail(
     to: string,
@@ -68,10 +83,15 @@ export class MailService {
     html: string,
     logLabel: string,
     sender: SenderKey = 'noreply',
+    options: { critical?: boolean } = {},
   ): Promise<void> {
     const { from, replyTo } = SENDERS[sender];
 
     if (!this.transporter) {
+      if (options.critical) {
+        this.logger.error(`Cannot send critical ${logLabel} email to ${to}: SMTP not configured`);
+        throw new Error(`Email delivery unavailable (SMTP not configured) for ${logLabel}`);
+      }
       this.logger.warn(`[DEV] ${logLabel} email for ${to} (SMTP not configured)`);
       return;
     }
@@ -87,6 +107,9 @@ export class MailService {
       this.logger.log(`${logLabel} email sent to ${to}`);
     } catch (error) {
       this.logger.error(`Failed to send ${logLabel} email to ${to}:`, error);
+      if (options.critical) {
+        throw error instanceof Error ? error : new Error(`Failed to send ${logLabel} email`);
+      }
     }
   }
 
@@ -420,13 +443,17 @@ export class MailService {
           </p>
     `);
 
-    if (!this.transporter) {
-      this.logger.warn(`[DEV] Password reset email for ${to}:`);
-      this.logger.warn(`[DEV] Reset URL: ${resetUrl}`);
+    // Password reset is the account-recovery path — in production it must never
+    // silently no-op (a locked-out user would have no recourse). In dev we keep
+    // logging the URL for convenience; in prod, critical mode makes sendMail throw
+    // when SMTP is unconfigured or delivery fails, surfacing a real error.
+    const critical = process.env.NODE_ENV === 'production';
+    if (!this.transporter && !critical) {
+      this.logger.warn(`[DEV] Password reset email for ${to}: ${resetUrl}`);
       return;
     }
 
-    await this.sendMail(to, subject, html, 'Password reset', 'auth');
+    await this.sendMail(to, subject, html, 'Password reset', 'auth', { critical });
   }
 
   /**

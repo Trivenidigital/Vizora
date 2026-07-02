@@ -3,6 +3,7 @@ import {
   Logger,
   BadRequestException,
   NotFoundException,
+  ServiceUnavailableException,
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -573,6 +574,64 @@ export class BillingService implements OnModuleInit {
    * Handle webhook events from payment providers.
    * Verifies the webhook signature before processing events.
    */
+  // Idempotency state machine (webhook dedup):
+  //   absent   → claim it (write 'pending', short TTL), process
+  //   pending  → someone else is processing (or crashed); skip this delivery.
+  //              The short TTL means a crashed 'pending' auto-expires so a later
+  //              PSP retry can re-enter — no permanent silent drop.
+  //   completed→ genuinely processed; skip (true duplicate).
+  // On a processing THROW we release the claim immediately so the retry re-enters
+  // without waiting for the TTL. This closes the claim-then-crash silent-drop that
+  // bare SET-NX-before-processing has (key set, processing fails, retry sees the
+  // key and drops the event forever).
+  private static readonly WEBHOOK_PENDING_TTL_S = 300; // 5 min — > max handler time
+  private static readonly WEBHOOK_COMPLETED_TTL_S = 172800; // 48h — outlives retry burst
+
+  private async claimWebhookEvent(
+    idempotencyKey: string,
+  ): Promise<'claimed' | 'duplicate'> {
+    const client = this.redisService.getClient();
+    if (!client) {
+      // Fail-CLOSED: cannot guarantee idempotency → 5xx → PSP retries.
+      throw new ServiceUnavailableException(
+        'Idempotency store unavailable; webhook will be retried',
+      );
+    }
+    const result = await client.set(
+      idempotencyKey,
+      'pending',
+      'EX',
+      BillingService.WEBHOOK_PENDING_TTL_S,
+      'NX',
+    );
+    if (result === 'OK') return 'claimed';
+    // Key exists: completed → real duplicate; pending → concurrent/crashed worker.
+    // Either way we skip THIS delivery; a crashed pending self-heals via TTL.
+    return 'duplicate';
+  }
+
+  private async completeWebhookEvent(idempotencyKey: string): Promise<void> {
+    const client = this.redisService.getClient();
+    if (!client) return; // best-effort; a stuck 'pending' expires and allows re-process
+    await client.set(
+      idempotencyKey,
+      'completed',
+      'EX',
+      BillingService.WEBHOOK_COMPLETED_TTL_S,
+    );
+  }
+
+  private async releaseWebhookClaim(idempotencyKey: string): Promise<void> {
+    const client = this.redisService.getClient();
+    if (!client) return;
+    try {
+      await client.del(idempotencyKey);
+    } catch (err) {
+      // Non-fatal: the pending TTL will expire and allow the retry to re-enter.
+      this.logger.warn(`Failed to release webhook claim ${idempotencyKey}: ${err}`);
+    }
+  }
+
   async handleWebhookEvent(
     provider: 'stripe' | 'razorpay',
     rawEvent: { rawBody: Buffer; signature: string },
@@ -586,18 +645,18 @@ export class BillingService implements OnModuleInit {
       rawEvent.signature,
     );
 
-    this.logger.log(`Processing ${provider} webhook: ${event.type}`);
+    this.logger.log(`Processing ${provider} webhook: ${event.type} (${event.id})`);
 
-    // Idempotency: skip duplicate events
-    const eventId = event.data?.id || event.data?.object?.id;
-    if (eventId) {
-      const idempotencyKey = `webhook:processed:${provider}:${eventId}`;
-      const alreadyProcessed = await this.redisService.get(idempotencyKey);
-      if (alreadyProcessed) {
-        this.logger.debug(`Skipping duplicate webhook: ${eventId}`);
-        return { received: true };
-      }
-      await this.redisService.set(idempotencyKey, '1', 172800); // 48h TTL
+    // Idempotency: skip duplicate events. Keyed on the provider EVENT id
+    // (event.id) — NOT the object id, which is shared across distinct events for
+    // the same subscription/invoice and would wrongly drop the second one.
+    // Claimed atomically with SET NX so two concurrent deliveries of the same
+    // event cannot both pass the check (the previous get-then-set had a race).
+    const idempotencyKey = `webhook:processed:${provider}:${event.id}`;
+    const claim = await this.claimWebhookEvent(idempotencyKey);
+    if (claim === 'duplicate') {
+      this.logger.debug(`Skipping duplicate webhook: ${event.id}`);
+      return { received: true };
     }
 
     try {
@@ -614,7 +673,7 @@ export class BillingService implements OnModuleInit {
 
         case 'invoice.payment_succeeded':
         case 'payment.captured':
-          await this.handlePaymentSucceeded(provider, event.data);
+          await this.handlePaymentSucceeded(provider, event.data, event.id);
           break;
 
         case 'invoice.payment_failed':
@@ -630,10 +689,15 @@ export class BillingService implements OnModuleInit {
           this.logger.debug(`Unhandled webhook event: ${event.type}`);
       }
     } catch (error) {
+      // Release the pending claim so the PSP's retry re-enters immediately
+      // rather than being dropped as a "duplicate" of a never-completed claim.
+      await this.releaseWebhookClaim(idempotencyKey);
       this.logger.error(`Error processing webhook: ${error}`);
       throw error;
     }
 
+    // Mark completed only after the work succeeded (flips 'pending' → 'completed').
+    await this.completeWebhookEvent(idempotencyKey);
     return { received: true };
   }
 
@@ -747,7 +811,7 @@ export class BillingService implements OnModuleInit {
   /**
    * Handle payment succeeded webhook
    */
-  private async handlePaymentSucceeded(provider: string, data: WebhookData): Promise<void> {
+  private async handlePaymentSucceeded(provider: string, data: WebhookData, eventId?: string): Promise<void> {
     const invoiceId = provider === 'stripe' ? data.id : data.invoice?.id;
     const amount = provider === 'stripe' ? data.amount_paid : data.payment?.amount;
     const currency = provider === 'stripe' ? data.currency : data.payment?.currency;
@@ -777,11 +841,15 @@ export class BillingService implements OnModuleInit {
 
     if (!org) return;
 
-    // Record the transaction
+    // Record the transaction. Fall back to the webhook EVENT id (stable across
+    // retries) rather than Date.now() (which changes per delivery and defeats the
+    // @@unique([provider, providerTransactionId]) dedup → duplicate rows on replay
+    // of a no-invoice-id payment). Only a genuinely id-less event uses a synthetic
+    // key, and that key is still replay-stable.
     await this.recordTransaction({
       organizationId: org.id,
       provider: provider as 'stripe' | 'razorpay',
-      providerTransactionId: invoiceId || `payment_${Date.now()}`,
+      providerTransactionId: invoiceId || eventId || `payment_${provider}_unknown`,
       type: 'subscription',
       status: 'succeeded',
       amount: amount || 0,

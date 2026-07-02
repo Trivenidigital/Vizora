@@ -196,6 +196,10 @@ export class RazorpayProvider implements PaymentProvider {
 
     const event = JSON.parse(payload.toString());
     return {
+      // Razorpay has no top-level event id in the body; derive a stable id from
+      // the signed payload. Retries of the same event carry an identical body →
+      // identical hash → deduped; genuinely different events differ → not deduped.
+      id: `rzp_${crypto.createHash('sha256').update(payload).digest('hex').slice(0, 40)}`,
       type: event.event,
       data: event.payload,
     };
