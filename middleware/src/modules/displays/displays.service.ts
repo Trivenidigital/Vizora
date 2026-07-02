@@ -437,6 +437,12 @@ export class DisplaysService {
     if (result.count === 0) {
       throw new NotFoundException('Display not found');
     }
+    // Contract v1.1 item 3: tell the device it is revoked (fast path). The device
+    // confirms via auth/check (410) before purging, so this is fire-and-forget and
+    // a missed event is recovered on the device's next reconnect+probe.
+    this.sendDeviceRevoked(id, 'deleted').catch((error) => {
+      this.logger.warn(`Failed to send device:revoked for ${id}: ${error.message}`);
+    });
     this.emitDisplayEvent('deleted', id, organizationId);
     return { id };
   }
@@ -822,9 +828,11 @@ export class DisplaysService {
       throw new NotFoundException('Display not found');
     }
 
-    // Send disable command to device via realtime gateway (fire-and-forget)
-    this.sendDeviceCommand(id, 'disable').catch((error) => {
-      this.logger.warn(`Failed to send disable command to device ${id}: ${error.message}`);
+    // Contract v1.1 item 3: block == DEVICE_REVOKED. Emit device:revoked (the
+    // device confirms via auth/check 410 and purges) instead of the legacy
+    // 'disable' command. Force-disconnect happens inside revokeDevice.
+    this.sendDeviceRevoked(id, 'blocked').catch((error) => {
+      this.logger.warn(`Failed to send device:revoked for ${id}: ${error.message}`);
     });
 
     this.emitDisplayEvent('disabled', id, organizationId);
@@ -875,6 +883,41 @@ export class DisplaysService {
           this.logger.warn(`Failed to send command '${command}' to device ${displayId}: ${error.message}`);
         } else {
           this.logger.warn(`Realtime service circuit is open, cannot send command '${command}' to device ${displayId}`);
+        }
+      },
+      REALTIME_CIRCUIT_CONFIG,
+    );
+  }
+
+  /**
+   * Contract v1.1 item 3: emit device:revoked to the realtime gateway. Separate
+   * from sendDeviceCommand because revocation is a distinct internal route that
+   * broadcasts to the device room and force-disconnects, rather than a queued
+   * command. Fire-and-forget; the device's auth/check 410 probe is the backstop.
+   */
+  private async sendDeviceRevoked(displayId: string, reason: string): Promise<void> {
+    const headers = this.getInternalApiHeaders();
+    if (!headers) return;
+
+    const url = `${this.realtimeUrl}/api/internal/device-revoked`;
+
+    await this.circuitBreaker.executeWithFallback(
+      'realtime-service',
+      async () => {
+        await firstValueFrom(
+          this.httpService.post(
+            url,
+            { deviceId: displayId, reason },
+            { headers, timeout: REALTIME_HTTP_TIMEOUT_MS },
+          ),
+        );
+        this.logger.log(`device:revoked (${reason}) sent for device ${displayId}`);
+      },
+      (error) => {
+        if (error) {
+          this.logger.warn(`Failed to send device:revoked for device ${displayId}: ${error.message}`);
+        } else {
+          this.logger.warn(`Realtime circuit open, cannot send device:revoked for device ${displayId}`);
         }
       },
       REALTIME_CIRCUIT_CONFIG,

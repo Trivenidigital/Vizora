@@ -336,6 +336,38 @@ export class DeviceGateway
     return true;
   }
 
+  /**
+   * Device Revocation Contract v1.1 item 3: notify a device it has been revoked.
+   * Emits `device:revoked {reason}` to the device room as the fast-path trigger —
+   * the device then confirms via GET /devices/auth/check (410) before purging, so
+   * this event never destroys credentials on its own and a lost event is recovered
+   * on the next reconnect+probe. We still force-disconnect a revoked device.
+   * Broadcasts to the room (not a single socket) so all of the device's live
+   * connections are covered.
+   */
+  revokeDevice(deviceId: string, reason = 'revoked'): boolean {
+    if (!this.server) return false;
+    this.server.to(`device:${deviceId}`).emit('device:revoked', { reason });
+    return this.disconnectDevice(deviceId, 'device_disabled');
+  }
+
+  /**
+   * Contract v1.1 item 3: entitlement suspend/resume for a whole tenant. Emits
+   * `tenant:suspended` / `tenant:resumed` to the org room. Reversible — the device
+   * holds on suspend (branded holding, credentials kept) and resumes on resume;
+   * no disconnect, no credential change.
+   */
+  emitTenantEntitlement(
+    organizationId: string,
+    suspended: boolean,
+    reason?: string,
+  ): boolean {
+    if (!this.server) return false;
+    const event = suspended ? 'tenant:suspended' : 'tenant:resumed';
+    this.server.to(`org:${organizationId}`).emit(event, { reason });
+    return true;
+  }
+
   private shouldAttemptHeartbeatReplay(deviceId: string): boolean {
     const state = this.heartbeatReplayState.get(deviceId);
     if (!state) {

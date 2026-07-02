@@ -860,6 +860,49 @@ describe('DeviceGateway', () => {
     });
   });
 
+  describe('revokeDevice (Contract v1.1 item 3)', () => {
+    it('emits device:revoked to the device room and disconnects', () => {
+      const socket = { id: 'rs-1', emit: jest.fn(), disconnect: jest.fn() };
+      mockServer.sockets.sockets.set('rs-1', socket);
+      (gateway as any).deviceSockets.set('device-1', 'rs-1');
+      mockServer.to.mockClear();
+      const roomEmit = mockServer.to() as unknown as { emit: jest.Mock };
+      roomEmit.emit.mockClear();
+
+      const result = gateway.revokeDevice('device-1', 'blocked');
+
+      expect(mockServer.to).toHaveBeenCalledWith('device:device-1');
+      expect(roomEmit.emit).toHaveBeenCalledWith('device:revoked', { reason: 'blocked' });
+      // Force-disconnect still happens (revoked device must go offline)
+      expect(socket.disconnect).toHaveBeenCalledWith(true);
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('emitTenantEntitlement (Contract v1.1 item 3)', () => {
+    it('emits tenant:suspended to the org room on suspend', () => {
+      mockServer.to.mockClear();
+      const roomEmit = mockServer.to() as unknown as { emit: jest.Mock };
+      roomEmit.emit.mockClear();
+
+      gateway.emitTenantEntitlement('org-1', true, 'past_due');
+
+      expect(mockServer.to).toHaveBeenCalledWith('org:org-1');
+      expect(roomEmit.emit).toHaveBeenCalledWith('tenant:suspended', { reason: 'past_due' });
+    });
+
+    it('emits tenant:resumed to the org room on resume', () => {
+      mockServer.to.mockClear();
+      const roomEmit = mockServer.to() as unknown as { emit: jest.Mock };
+      roomEmit.emit.mockClear();
+
+      gateway.emitTenantEntitlement('org-1', false);
+
+      expect(mockServer.to).toHaveBeenCalledWith('org:org-1');
+      expect(roomEmit.emit).toHaveBeenCalledWith('tenant:resumed', { reason: undefined });
+    });
+  });
+
   describe('handleHeartbeat', () => {
     beforeEach(() => {
       mockServer.sockets.sockets.set('socket-1', {});
