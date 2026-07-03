@@ -19,8 +19,8 @@ B3 (entitlement ladder backend), tenant-isolation write-scoping.
 | **B7** | Password reset silently no-ops | **FIXED** (merged) — fail-loud in prod, sandbox smoke |
 | **B8** | Grace clock resets on `updatedAt`; live-sig untested; $0 charge | **grace-reset FIXED** (B3 `entitlementStateSince`). *Live-sig integration test = P2; $0-charge = minor.* |
 | **B9** | No structural tenant isolation; PlaylistsService bare-id writes | **FIXED** — writes org-scoped in-statement; contentId recheck already present. *No other reachable gap found (sweep); global Prisma-extension backstop = P2.* |
-| **B10** | Non-expiring device token (`generatePairingToken`) | **FIXED (merged)** — 90d expiry, graceful via Slice 0 auth-degraded |
-| **B12** | No pair→publish→playback→revoke E2E; no multi-tenant fixture | **PARTIAL** — negative unit suites added throughout; full E2E fixture = P1 |
+| **B10** | Non-expiring device token (`generatePairingToken`) | **FIXED (merged)** — 90d expiry, graceful via Slice 0 auth-degraded. *Classification: this is a revocation **defense-in-depth** layer (a non-expiring credential is a standing un-revocable key), not hygiene — it belongs to the same integrity axis as Slice 0, now asserted end-to-end by B12.* |
+| **B12** | No pair→publish→playback→revoke E2E; no multi-tenant fixture | **FIXED (merged, 10/10 green)** — canonical two-tenant fixture + lifecycle E2E run against docker-compose.test.yml. Revocation leg asserts the full Slice 0 promise at integration level (410 only on genuine revoke/delete; expired→401 AUTH_EXPIRED and malformed→401 AUTH_INVALID never 410 = F3 non-behavior; zero cross-tenant bleed through playlist assembly). |
 | **B13/B14** | Pairing code logged; dead `CurrentOrganization` decorator | **OPEN (P3)** — minor hygiene |
 | Contract items 1–5 | device revocation contract server half | **FIXED** (Slice 0, all merged) |
 
@@ -35,7 +35,7 @@ B3 (entitlement ladder backend), tenant-isolation write-scoping.
 | 5 | Identity & security | 3 | **3.5** | `auth/check` = sole authenticated revocation authority (false-410 impossible). Not higher: B10 non-expiring token open; no device-token denylist. |
 | 6 | Observability | 2 | **3** | `screenState`/`playbackSource` ingested; ladder staleness watchdog; revocation events. Not higher: dashboard fleet-view dark-screen UI (frontend) + crash reporting still to wire. |
 | 7 | Economics | n/a | **n/a** | Cost-per-screen still not measured — out of engagement scope; do not claim a number. |
-| 8 | Testing | 3 | **3.5** | Strong negative suites across contract/billing/entitlement/tenant-iso. Not higher: no E2E lifecycle/multi-tenant fixture (B12). |
+| 8 | Testing | 3 | **4** | Strong negative suites across contract/billing/entitlement/tenant-iso, plus the B12 two-tenant lifecycle E2E (10/10 green) asserting the revocation contract + zero cross-tenant bleed at integration level. Not 5: no cross-service socket-handshake E2E (realtime is a separate app; covered by realtime unit tests). |
 | 9 | Code & ops quality | 3 | **3.5** | rawBody fixed, email fail-loud, migration + watchdog hygiene. |
 
 ## Remaining blockers to launch
@@ -50,11 +50,18 @@ B3 (entitlement ladder backend), tenant-isolation write-scoping.
 
 **Not launch-blocking (post-launch-safe P1 tail):**
 - ✅ **Done since close-out (merged):** B3 payment banner + dunning dedup, B10 device-token expiry,
-  B6 checkout-session idempotency key.
-- **Remaining:** B12 E2E + two-tenant fixture (needs test-DB infra — the one non-trivial tail item);
-  fleet-view dark-screen dashboard column (data ingested, UI pending); B8 live-signature integration
-  test; B13/B14 hygiene; a global Prisma tenant-scoping extension as a structural backstop (no
-  reachable gap today).
+  B6 checkout-session idempotency key, **B12 two-tenant fixture + lifecycle E2E (10/10 green)**.
+- **Remaining, ranked:**
+  1. **Prisma tenant-scoping extension (TOP)** — a global `$extends` that stamps `organizationId` into
+     every tenant-model `where` at the client layer. This is the **dimension-1 4→5 structural backstop**:
+     today isolation is enforced per-service (B9 closed the reachable gap, B12 proves it end-to-end), but
+     a *future* bare-id write could reopen it. The extension makes a cross-tenant write structurally
+     impossible rather than review-dependent. Highest-leverage remaining item.
+  2. Fleet-view dark-screen dashboard column (data ingested, UI pending).
+  3. B8 live-signature integration test; B13/B14 hygiene.
+- **Operational note (from the B12 live run):** the e2e setup (`db:test:push --skip-generate`) does not
+  regenerate the Prisma client — after any schema change, run `prisma generate` before e2e or the stale
+  client 400s on new columns (e.g. B3's `entitlementStateSince`). Unit tests mock the DB and won't catch it.
 
 ## Verdict revisited
 
