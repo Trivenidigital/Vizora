@@ -22,7 +22,7 @@ B3 (entitlement ladder backend), tenant-isolation write-scoping.
 | **B10** | Non-expiring device token (`generatePairingToken`) | **FIXED (merged)** — 90d expiry, graceful via Slice 0 auth-degraded. *Classification: this is a revocation **defense-in-depth** layer (a non-expiring credential is a standing un-revocable key), not hygiene — it belongs to the same integrity axis as Slice 0, now asserted end-to-end by B12.* |
 | **B12** | No pair→publish→playback→revoke E2E; no multi-tenant fixture | **FIXED (merged, 10/10 green)** — canonical two-tenant fixture + lifecycle E2E run against docker-compose.test.yml. Revocation leg asserts the full Slice 0 promise at integration level (410 only on genuine revoke/delete; expired→401 AUTH_EXPIRED and malformed→401 AUTH_INVALID never 410 = F3 non-behavior; zero cross-tenant bleed through playlist assembly). |
 | **B13/B14** | Pairing code logged; dead `CurrentOrganization` decorator | **OPEN (P3)** — minor hygiene |
-| **B16** | `JWT_EXPIRES_IN` unit footgun — a bare-number value (`3600`) is parsed by jsonwebtoken as **milliseconds** (3.6s), not seconds → near-instant token expiry / logout storm | **FIXED (merged)** — surfaced by investigating the B12 "late 401" (which was *not* a B15 entitlement lockout: a `past_due` tenant still pairs (201) and the banner is reachable (200), so the dashboard-first ladder holds). `coerceJwtExpiry()` coerces bare integers → seconds; `.env.test` → `1h`. Also fixed the local e2e bootstrap to regenerate the Prisma client (CI/Docker already did), closing the `--skip-generate` stale-client footgun. |
+| **B16** | `JWT_EXPIRES_IN` unit footgun — a bare-number value (`3600`) is parsed by jsonwebtoken as **milliseconds** (3.6s), not seconds → near-instant token expiry / logout storm | **FIXED + HARDENED (merged)** — surfaced by investigating the B12 "late 401" (which was *not* a B15 entitlement lockout: a `past_due` tenant still pairs (201) and the banner is reachable (200), so the dashboard-first ladder holds). Went through adversarial security review, which found 3 more issues now closed: a single fail-safe `resolveAccessTokenTtlSeconds()` (bounded [60s, 7d], decimals/garbage → default, oversize clamps down — no ~19yr fat-finger token), response `expiresIn`/cookie `maxAge`/JWT `exp` now derive from ONE resolved value (closes the "ghost session" where the UI thinks it's logged in for 7d while the token dies early), and the TTL cap is pinned to the revocation-marker TTL so a token can never outlive its own `user_revoked` marker (closes a latent revocation-bypass). Also fixed the local e2e bootstrap to regenerate the Prisma client (CI/Docker already did), closing the `--skip-generate` stale-client footgun. |
 | Contract items 1–5 | device revocation contract server half | **FIXED** (Slice 0, all merged) |
 
 ## Scorecard — re-scored (was → now)
@@ -53,11 +53,17 @@ B3 (entitlement ladder backend), tenant-isolation write-scoping.
 - ✅ **Done since close-out (merged):** B3 payment banner + dunning dedup, B10 device-token expiry,
   B6 checkout-session idempotency key, **B12 two-tenant fixture + lifecycle E2E (10/10 green)**.
 - **Remaining, ranked:**
-  1. **Prisma tenant-scoping extension (TOP)** — a global `$extends` that stamps `organizationId` into
-     every tenant-model `where` at the client layer. This is the **dimension-1 4→5 structural backstop**:
-     today isolation is enforced per-service (B9 closed the reachable gap, B12 proves it end-to-end), but
-     a *future* bare-id write could reopen it. The extension makes a cross-tenant write structurally
-     impossible rather than review-dependent. Highest-leverage remaining item.
+  1. **Prisma tenant-scoping backstop — LANDED log-first (merged), enforce-mode gated.** The
+     dimension-1 4→5 structural backstop is implemented: an AsyncLocalStorage `TenantContext` + a
+     pure `evaluateTenantOp` policy applied in-place via Prisma `$use` (Prisma 5), behind
+     `TENANT_GUARD_MODE` (prod default `off`, non-prod `log`). Guarded-model allowlist; injects org
+     into `updateMany`/`deleteMany` where + `create` data; rejects foreign-org writes; flags bare
+     unique-where `update`/`delete` (the B9 pattern). 18 policy unit tests + 4 propagation e2e (proves
+     the ALS context reaches the `$use` hook). Zero behavior change in log mode (B12 10/10 +
+     customer-critical-path 3/3 with it active). **Enforce-mode gated on:** the two in-flight
+     adversarial reviews (policy-correctness + ALS/concurrency) and a log-mode soak. Design +
+     rollout: `docs/design/tenant-scoping-extension.md`. `$extends` (vs the in-place `$use`) is the
+     target once `DatabaseService` is de-subclassed from `PrismaClient` — documented tradeoff.
   2. Fleet-view dark-screen dashboard column (data ingested, UI pending).
   3. B8 live-signature integration test; B13/B14 hygiene.
 - **Operational note (from the B12 live run):** the e2e setup (`db:test:push --skip-generate`) does not
