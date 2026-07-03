@@ -74,6 +74,12 @@ export function evaluateTenantOp(input: GuardInput): GuardAction {
   const org = context.organizationId;
   if (!org) return { action: 'pass' }; // tenant unknown → cannot scope
 
+  // A violation. In `log` mode this MUST NOT block (observe-only / zero behavior
+  // change — the guarantee that makes log-mode safe to enable anywhere); only
+  // `enforce` rejects. Applies to foreign-org AND un-scoped writes alike.
+  const denied = (reason: string): GuardAction =>
+    mode === 'log' ? { action: 'warn', reason } : { action: 'reject', reason };
+
   const a = args ?? {};
 
   // ---- WHERE-scoped writes: updateMany / deleteMany (org injectable) ----
@@ -84,7 +90,7 @@ export function evaluateTenantOp(input: GuardInput): GuardAction {
         if (mode === 'log') return { action: 'warn', reason: `${model}.${operation} without organizationId scope` };
         return { action: 'inject', args: { ...a, where: { ...where, organizationId: org } } };
       case 'foreign':
-        return { action: 'reject', reason: `${model}.${operation} targets a foreign organizationId (tenant ${org})` };
+        return denied(`${model}.${operation} targets a foreign organizationId (tenant ${org})`);
       default:
         return { action: 'pass' };
     }
@@ -94,12 +100,10 @@ export function evaluateTenantOp(input: GuardInput): GuardAction {
   if (UNIQUE_WHERE_WRITES.has(operation)) {
     const where = asObj(a.where) ?? {};
     switch (classifyOrg(where.organizationId, org)) {
-      case 'missing': {
-        const reason = `${model}.${operation} uses a bare unique where without organizationId; use ${operation}Many({ where: { id, organizationId } }) for tenant safety`;
-        return mode === 'log' ? { action: 'warn', reason } : { action: 'reject', reason };
-      }
+      case 'missing':
+        return denied(`${model}.${operation} uses a bare unique where without organizationId; use ${operation}Many({ where: { id, organizationId } }) for tenant safety`);
       case 'foreign':
-        return { action: 'reject', reason: `${model}.${operation} targets a foreign organizationId` };
+        return denied(`${model}.${operation} targets a foreign organizationId`);
       default:
         return { action: 'pass' };
     }
@@ -114,7 +118,7 @@ export function evaluateTenantOp(input: GuardInput): GuardAction {
       const r = asObj(row);
       if (!r) continue;
       const cls = classifyOrg(r.organizationId, org);
-      if (cls === 'foreign') return { action: 'reject', reason: `${model}.${operation} writes a foreign organizationId for tenant ${org}` };
+      if (cls === 'foreign') return denied(`${model}.${operation} writes a foreign organizationId for tenant ${org}`);
       if (cls === 'missing') anyMissing = true;
     }
     if (anyMissing) {
@@ -135,7 +139,7 @@ export function evaluateTenantOp(input: GuardInput): GuardAction {
     const whereCls = classifyOrg(where.organizationId, org);
     const createCls = classifyOrg(create.organizationId, org);
     if (whereCls === 'foreign' || createCls === 'foreign') {
-      return { action: 'reject', reason: `${model}.upsert targets a foreign organizationId (tenant ${org})` };
+      return denied(`${model}.upsert targets a foreign organizationId (tenant ${org})`);
     }
     if (whereCls === 'missing' || createCls === 'missing') {
       const reason = `${model}.upsert without organizationId on ${whereCls === 'missing' ? 'where' : 'create'}; the unique where cannot be org-filtered — scope it explicitly`;

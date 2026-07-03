@@ -39,11 +39,9 @@ describe('evaluateTenantOp', () => {
     it('passes when where already carries the correct org', () => {
       expect(ev({ operation: 'updateMany', mode: 'enforce', args: { where: { id: 'p1', organizationId: ORG }, data: {} } }).action).toBe('pass');
     });
-    it('rejects a where scoped to a FOREIGN org (both modes)', () => {
-      for (const mode of ['log', 'enforce'] as TenantGuardMode[]) {
-        const r = ev({ operation: 'deleteMany', mode, args: { where: { organizationId: 'org-B' } } });
-        expect(r.action).toBe('reject');
-      }
+    it('foreign org: WARNS in log (observe-only), REJECTS in enforce', () => {
+      expect(ev({ operation: 'deleteMany', mode: 'log', args: { where: { organizationId: 'org-B' } } }).action).toBe('warn');
+      expect(ev({ operation: 'deleteMany', mode: 'enforce', args: { where: { organizationId: 'org-B' } } }).action).toBe('reject');
     });
   });
 
@@ -124,6 +122,24 @@ describe('evaluateTenantOp', () => {
       expect(ev({ operation: 'updateMany', mode: 'enforce', args: { where: { organizationId: { equals: ORG } }, data: {} } }).action).toBe('pass');
       expect(ev({ operation: 'deleteMany', mode: 'enforce', args: { where: { organizationId: { in: [ORG] } } } }).action).toBe('pass');
     });
+  });
+
+  it('INVARIANT: log mode never mutates or throws (only pass/warn) — the observe-only guarantee', () => {
+    // Every write shape that would inject/reject in enforce must be pass|warn in log.
+    const cases: Array<{ operation: string; args: Record<string, unknown> }> = [
+      { operation: 'updateMany', args: { where: { id: 'p1' }, data: {} } },        // missing → inject in enforce
+      { operation: 'deleteMany', args: { where: { organizationId: 'org-B' } } },     // foreign
+      { operation: 'update', args: { where: { id: 'p1' }, data: {} } },             // bare unique
+      { operation: 'delete', args: { where: { id: 'p1' } } },                        // bare unique
+      { operation: 'create', args: { data: { name: 'x' } } },                        // missing
+      { operation: 'create', args: { data: { organizationId: 'org-B' } } },          // foreign
+      { operation: 'createMany', args: { data: [{ name: 'a' }] } },                  // missing rows
+      { operation: 'upsert', args: { where: { id: 'p1' }, create: { name: 'x' }, update: {} } },
+    ];
+    for (const c of cases) {
+      const r = ev({ ...c, mode: 'log' });
+      expect(['pass', 'warn']).toContain(r.action);
+    }
   });
 
   it('the guarded set covers the tenant-resource models but excludes the tenant root', () => {

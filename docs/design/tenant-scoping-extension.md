@@ -88,12 +88,44 @@ or a documented backstop gap:
    decide whether absence-of-context should fail *closed* for guarded-model writes on
    authenticated routes. (Second review — ALS/concurrency — informs this.)
 
+## Coverage gaps & trust boundaries (from ALS/concurrency review)
+
+The ALS wiring itself is **verified correct** (Observable-wrapped `run()` propagates through Nest's
+async composition and event-emitter `@OnEvent` handlers; no cross-request leakage; guards run before
+the interceptor). The gaps are in *which requests the interceptor can see the tenant for*:
+
+- **Device-JWT routes are currently invisible (enforce blocker + soak gap).** `req.deviceAuthPayload`
+  is read by `deriveTenantContext` but **never assigned** — device routes (`displays.controller`
+  heartbeat, `schedules` active, device-content serve) verify the token into a local var, and the
+  interceptor runs *before* the controller body. Fix: a Nest **Guard** that verifies the device token
+  and sets the org on the request, running before the interceptor (don't patch each controller). Until
+  then device writes bind `bypass` → not observed by the soak, not enforced. (Safe today: those writes
+  are already org-scoped at their call sites.)
+- **`realtime` is a separate process with its own Prisma client and NO guard.** A `$use` hook protects
+  only its own client instance; the guard is **per-process, not per-database**. `realtime`
+  (device.gateway/notification/heartbeat writes to Display/Notification/ContentImpression) is a
+  distinct trust boundary. Decision required before claiming DB-wide structural safety: either port the
+  same ALS+`$use` wiring into `realtime/src/database/database.service.ts`, or formally accept realtime
+  as a separately-secured, un-backstopped surface.
+- **Soak-coverage caveat.** "Zero violations in log mode" certifies only the traffic the interceptor
+  scopes (user-JWT; MCP now — see below). It CANNOT certify device paths until the device guard lands.
+  Read the soak as "clean for observed traffic," not "clean."
+- **Fail-closed on unresolved context (enforce).** Today `deriveTenantContext` returns the same
+  `bypass:true` for a genuine cross-org system job AND for "couldn't resolve the org." Before enforce,
+  split these — an *audited* bypass vs a *resolution failure* — and fail the latter CLOSED for
+  guarded-model writes on authenticated routes, so plumbing gaps fail loudly instead of passing forever.
+- **MCP writes: CLOSED.** `deriveTenantContext` now reads `req['__mcpContext']` (MCP attaches its
+  per-org principal there, not `req.user`), so MCP tool writes are scoped/observed.
+
 ## Known scope limits (v1, by design)
 
 - **Reads are unguarded** — a forgotten org filter on a read is as review-dependent as before.
   The "structural" claim covers WRITES only.
+- **Nested-relation creates** are invisible to `$use` (see pre-enforce checklist #2).
 - **`$use` (not `$extends`)** because `DatabaseService extends PrismaClient`; do NOT upgrade to
   Prisma 6 (removes `$use`) without first migrating to a composed `$extends` client.
+- **Log mode is strictly observe-only** — pass/warn only, never inject or throw (enforced by a unit
+  invariant). Safe to enable in any non-prod env; enforce is the blocking mode.
 
 ## Test surface
 
