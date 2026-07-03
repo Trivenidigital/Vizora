@@ -14,12 +14,12 @@ B3 (entitlement ladder backend), tenant-isolation write-scoping.
 | **B4** | No structured socket codes; key rotation = fleet de-auth | **FIXED** (Slice 0 item 2) — handshake middleware, graceful rotation, transport/app split |
 | **B11** | `device:revoked`/`tenant:*` never emitted | **FIXED** (Slice 0 item 3) — emitted on delete/block + entitlement |
 | **B5** | Razorpay zero replay protection; Stripe dedupe mis-keyed | **FIXED** (B1/B6) — event-id keyed, atomic SETNX, fail-closed, claim-window |
-| **B3** | Entitlement lapse no effect on live screens, no signal | **FIXED (backend, merged)** — degrade ladder + guard + emission. *Remaining: React payment banner + dunning dedup (frontend).* |
-| **B6** | No PSP idempotency keys | **FIXED** webhook side + customer key. *Checkout-session key deferred (needs request-scoped token; documented, not double-charge).* |
+| **B3** | Entitlement lapse no effect on live screens, no signal | **FIXED (full, merged)** — degrade ladder + guard + emission (backend) + React payment banner + per-rung deduped dunning email. |
+| **B6** | No PSP idempotency keys | **FIXED (full, merged)** — webhook side + customer key + per-invocation checkout-session idempotency key. |
 | **B7** | Password reset silently no-ops | **FIXED** (merged) — fail-loud in prod, sandbox smoke |
 | **B8** | Grace clock resets on `updatedAt`; live-sig untested; $0 charge | **grace-reset FIXED** (B3 `entitlementStateSince`). *Live-sig integration test = P2; $0-charge = minor.* |
 | **B9** | No structural tenant isolation; PlaylistsService bare-id writes | **FIXED** — writes org-scoped in-statement; contentId recheck already present. *No other reachable gap found (sweep); global Prisma-extension backstop = P2.* |
-| **B10** | Non-expiring device token (`generatePairingToken`) | **OPEN (P1)** — not addressed this session |
+| **B10** | Non-expiring device token (`generatePairingToken`) | **FIXED (merged)** — 90d expiry, graceful via Slice 0 auth-degraded |
 | **B12** | No pair→publish→playback→revoke E2E; no multi-tenant fixture | **PARTIAL** — negative unit suites added throughout; full E2E fixture = P1 |
 | **B13/B14** | Pairing code logged; dead `CurrentOrganization` decorator | **OPEN (P3)** — minor hygiene |
 | Contract items 1–5 | device revocation contract server half | **FIXED** (Slice 0, all merged) |
@@ -49,11 +49,12 @@ B3 (entitlement ladder backend), tenant-isolation write-scoping.
    hardware session. Runbook: `docs/slice0-device-revocation-contract.md`.
 
 **Not launch-blocking (post-launch-safe P1 tail):**
-- B3 frontend: dashboard payment banner (endpoint `GET /billing/entitlement/banner` ready) + the
-  fleet-view dark-screen surface (data ingested) + per-tenant/rung dunning dedup keys.
-- B10 device-token expiry; B12 E2E + two-tenant fixture; checkout-session idempotency key; B8
-  live-signature integration test; B13/B14 hygiene; a global Prisma tenant-scoping extension as a
-  structural backstop (no reachable gap today).
+- ✅ **Done since close-out (merged):** B3 payment banner + dunning dedup, B10 device-token expiry,
+  B6 checkout-session idempotency key.
+- **Remaining:** B12 E2E + two-tenant fixture (needs test-DB infra — the one non-trivial tail item);
+  fleet-view dark-screen dashboard column (data ingested, UI pending); B8 live-signature integration
+  test; B13/B14 hygiene; a global Prisma tenant-scoping extension as a structural backstop (no
+  reachable gap today).
 
 ## Verdict revisited
 
