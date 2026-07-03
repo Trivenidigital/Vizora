@@ -14,6 +14,7 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import { Icon } from '@/theme/icons';
 import type { IconName } from '@/theme/icons';
 import TrialBanner from '@/components/TrialBanner';
+import EntitlementBanner from '@/components/EntitlementBanner';
 import { SupportChatProvider } from '@/components/support/SupportChatProvider';
 import { SupportChat } from '@/components/support/SupportChat';
 import { useCustomization } from '@/components/providers/CustomizationProvider';
@@ -232,8 +233,11 @@ export default function DashboardLayout({
         </div>
       </header>
 
-      {/* Trial/Subscription Banner */}
+      {/* Trial/Subscription + entitlement-ladder banners. EntitlementBanner owns
+          the past_due→publish_locked→suspended ladder (paid tier); TrialBanner
+          owns trial + free-tier-expired. They do not overlap. */}
       <div className="fixed top-16 left-0 right-0 z-20 lg:left-56">
+        <EntitlementBanner />
         <TrialBanner />
       </div>
 

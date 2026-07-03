@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
+import { MailService } from '../mail/mail.service';
 import { TenantEntitlementNotifier } from './tenant-entitlement.notifier';
 
 /**
@@ -37,7 +38,23 @@ export class EntitlementService {
     private readonly db: DatabaseService,
     private readonly redis: RedisService,
     private readonly notifier: TenantEntitlementNotifier,
+    private readonly mail: MailService,
   ) {}
+
+  /**
+   * Claim a one-time dunning notice for (org, key). Redis SETNX with a TTL past
+   * the rung window so the daily ladder job can re-run without re-sending the same
+   * escalation email. Returns true only for the first caller. Fail-safe: if Redis
+   * is unavailable we return false (skip the email) rather than risk a spam loop —
+   * the banner remains the always-on channel.
+   */
+  private async claimDunningNotice(organizationId: string, key: string): Promise<boolean> {
+    const client = this.redis.getClient();
+    if (!client) return false;
+    const redisKey = `dunning:${organizationId}:${key}`;
+    const result = await client.set(redisKey, '1', 'EX', 40 * 24 * 60 * 60, 'NX');
+    return result === 'OK';
+  }
 
   private wholeDaysBetween(from: Date, to: Date): number {
     // UTC-day difference, floored — a rung is reached only after N *full* days.
@@ -139,7 +156,11 @@ export class EntitlementService {
   ): Promise<number> {
     const candidates = await this.db.organization.findMany({
       where: { subscriptionStatus: fromStatus, entitlementStateSince: { not: null } },
-      select: { id: true, entitlementStateSince: true },
+      select: {
+        id: true,
+        entitlementStateSince: true,
+        users: { where: { role: 'admin' }, take: 1, select: { email: true, firstName: true } },
+      },
     });
 
     let count = 0;
@@ -158,6 +179,19 @@ export class EntitlementService {
 
       if (toStatus === 'suspended') {
         await this.notifier.emit(org.id, 'suspended', suspendReason ?? 'past_due');
+      }
+
+      // Dunning escalation email, deduped per (org, rung) so a job re-run can't
+      // re-send. publish_locked and suspended are the owner-action moments; the
+      // transition guard already prevents a double-flip, and the dedup key is
+      // belt-and-suspenders. Fire-and-forget; the banner is the always-on channel.
+      if (toStatus === 'publish_locked' || toStatus === 'suspended') {
+        const admin = org.users?.[0];
+        if (admin?.email && (await this.claimDunningNotice(org.id, toStatus))) {
+          this.mail
+            .sendPaymentFailedEmail(admin.email, admin.firstName || admin.email.split('@')[0])
+            .catch((err) => this.logger.warn(`Dunning email failed for org ${org.id}: ${err}`));
+        }
       }
       this.logger.log(`Org ${org.id} ${fromStatus} → ${toStatus} (episode age ${age}d)`);
     }
