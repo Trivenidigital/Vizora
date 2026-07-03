@@ -11,10 +11,11 @@
     "db:test:stop": "docker-compose -f ../docker-compose.test.yml down",
     "db:test:reset": "cross-env NODE_ENV=test pnpm exec prisma migrate reset --force --skip-generate",
     "db:test:push": "cross-env NODE_ENV=test pnpm exec prisma db push --skip-generate",
+    "db:test:generate": "pnpm --filter @vizora/database db:generate",
     "db:test:seed": "cross-env NODE_ENV=test ts-node prisma/seed.ts",
     "test:e2e": "cross-env NODE_ENV=test jest --config=jest.e2e.config.js --runInBand",
     "test:e2e:cov": "cross-env NODE_ENV=test jest --config=jest.e2e.config.js --coverage --runInBand",
-    "test:e2e:setup": "pnpm db:test:start && sleep 3 && pnpm db:test:push",
+    "test:e2e:setup": "pnpm db:test:start && sleep 3 && pnpm db:test:generate && pnpm db:test:push",
     "test:e2e:full": "pnpm test:e2e:setup && pnpm test:e2e:cov && pnpm db:test:stop",
     "test:all": "pnpm test:cov && pnpm test:e2e:cov"
   },
