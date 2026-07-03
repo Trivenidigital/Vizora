@@ -29,7 +29,7 @@ B3 (entitlement ladder backend), tenant-isolation write-scoping.
 
 | # | Dimension | Was | Now | Why not higher |
 |---|---|---|---|---|
-| 1 | Tenant isolation & content integrity | 3 | **4** | PlaylistsService writes org-scoped in-statement; no reachable gap remains. Not 5: no *global* structural backstop (Prisma extension) — other services still per-handler (audit found them correct). |
+| 1 | Tenant isolation & content integrity | 3 | **4** | PlaylistsService writes org-scoped in-statement; no reachable gap remains; B12 proves isolation e2e. The tenant-scoping backstop is **built and safe but NOT enforcing** — it ships log-only (observe, never blocks). **The 4→5 completes only when enforce-mode ships**, which is gated on real work: the bare-id sweep across ~7 services (their log-warns are the go/no-go), the device-auth guard, the realtime per-process trust boundary, nested creates, fail-closed-on-unresolved-context. Until then isolation is per-service + B12 proof = a legitimate 4, not 5. |
 | 2 | Publish-path safety | 3* | **3*** | Not deep-audited this engagement (flag stands); publish-lock guard added is adjacent. |
 | 3 | Delivery reliability & socket layer | 3 | **4** | Structured codes + graceful key rotation + transport/app split at the middleware. Not 5: pending the hardware key-rotation proof. |
 | 4 | Billing & entitlement integrity | 2 | **4** | Webhooks work; idempotency atomic + fail-closed + claim-window; Razorpay replay closed; entitlement ladder gates live screens. Not 5: live-key sandbox proof + checkout-session idempotency key outstanding. |
@@ -53,19 +53,31 @@ B3 (entitlement ladder backend), tenant-isolation write-scoping.
 - ✅ **Done since close-out (merged):** B3 payment banner + dunning dedup, B10 device-token expiry,
   B6 checkout-session idempotency key, **B12 two-tenant fixture + lifecycle E2E (10/10 green)**.
 - **Remaining, ranked:**
-  1. **Prisma tenant-scoping backstop — LANDED log-first (merged), enforce-mode gated.** The
-     dimension-1 4→5 structural backstop is implemented: an AsyncLocalStorage `TenantContext` + a
-     pure `evaluateTenantOp` policy applied in-place via Prisma `$use` (Prisma 5), behind
-     `TENANT_GUARD_MODE` (prod default `off`, non-prod `log`). Guarded-model allowlist; injects org
-     into `updateMany`/`deleteMany` where + `create` data; rejects foreign-org writes; flags bare
-     unique-where `update`/`delete` (the B9 pattern). 18 policy unit tests + 4 propagation e2e (proves
-     the ALS context reaches the `$use` hook). Zero behavior change in log mode (B12 10/10 +
-     customer-critical-path 3/3 with it active). **Enforce-mode gated on:** the two in-flight
-     adversarial reviews (policy-correctness + ALS/concurrency) and a log-mode soak. Design +
-     rollout: `docs/design/tenant-scoping-extension.md`. `$extends` (vs the in-place `$use`) is the
-     target once `DatabaseService` is de-subclassed from `PrismaClient` — documented tradeoff.
+  1. **Prisma tenant-scoping backstop — BUILT & SAFE, log-only, NOT enforcing (merged).** The
+     mechanism for the dimension-1 4→5 exists, is tested, and is proven to propagate — but the 4→5
+     *only completes when enforce ships*. AsyncLocalStorage `TenantContext` + a pure `evaluateTenantOp`
+     policy applied in-place via Prisma `$use` (Prisma 5), behind `TENANT_GUARD_MODE` (prod default
+     `off`, non-prod `log`). **Log mode is strictly observe-only** (pass/warn, never throws — proved by
+     a unit invariant). 40 tests (29 policy + 4 propagation e2e + 7 derivation). Zero behavior change
+     with it active (B12 10/10 + customer-critical-path 3/3). **Both adversarial reviews addressed**
+     (policy: upsert/createMany/operator/MCP blind spots closed; ALS: wiring verified correct,
+     log-observe-only fixed). **Enforce is gated on the documented pre-enforce checklist** — the bare-id
+     `update`/`delete` sweep across ~7 services (their log-warns = the go/no-go), the device-auth guard
+     (`req.deviceAuthPayload` is dead code), the `realtime` per-process trust boundary, nested creates,
+     and fail-closed-on-unresolved-context. Flipping the flag before that sweep is clean would enforce a
+     policy we haven't verified every write survives. Design + checklist:
+     `docs/design/tenant-scoping-extension.md`. `$extends` (vs in-place `$use`) is the target once
+     `DatabaseService` is de-subclassed from `PrismaClient`.
   2. Fleet-view dark-screen dashboard column (data ingested, UI pending).
   3. B8 live-signature integration test; B13/B14 hygiene.
+  4. **(P2, flagged — not dismissed) The older `.e2e-spec` suites (content/playlists/displays/auth)
+     have ~15 failures that are NOT from this engagement** (verified: reproduce with
+     `TENANT_GUARD_MODE=off`). They are two distinct latent issues worth their own line so they don't
+     become silently load-bearing: (a) a "reject without auth → 403 (CSRF) vs 401 (auth)" expectation —
+     possibly a real guard-ordering question in the middleware chain, not just a stale assertion; (b)
+     `deviceIdentifier` unique-constraint collisions = test-hygiene (no per-run isolation / DB reset).
+     And the meta-finding: **these specs aren't run in CI** (`ci.yml` runs only `agents` +
+     `customer-critical-path`) — specs that don't run rot. Not blocking; wire them into CI or delete them.
 - **Operational note (from the B12 live run):** the e2e setup (`db:test:push --skip-generate`) does not
   regenerate the Prisma client — after any schema change, run `prisma generate` before e2e or the stale
   client 400s on new columns (e.g. B3's `entitlementStateSince`). Unit tests mock the DB and won't catch it.
