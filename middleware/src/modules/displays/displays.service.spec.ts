@@ -20,6 +20,7 @@ import { PaginationDto } from '../common/dto/pagination.dto';
 describe('DisplaysService', () => {
   let service: DisplaysService;
   let databaseService: jest.Mocked<DatabaseService>;
+  let jwtService: jest.Mocked<JwtService>;
   let httpService: jest.Mocked<HttpService>;
 
   const mockOrganizationId = 'org-123';
@@ -155,6 +156,7 @@ describe('DisplaysService', () => {
 
     service = module.get<DisplaysService>(DisplaysService);
     databaseService = module.get(DatabaseService);
+    jwtService = module.get(JwtService);
     httpService = module.get(HttpService);
   });
 
@@ -1170,6 +1172,28 @@ describe('DisplaysService', () => {
         service.pushContent(mockOrganizationId, mockDisplayId, mockContent.id, 5),
       ).rejects.toThrow(ServiceUnavailableException);
       expect(httpService.post).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('generatePairingToken (B10 — token must expire)', () => {
+    beforeEach(() => {
+      process.env.DEVICE_JWT_SECRET = 'x'.repeat(32);
+      databaseService.display.findFirst.mockResolvedValue(mockDisplay as any);
+      databaseService.display.updateMany.mockResolvedValue({ count: 1 } as any);
+      (jwtService.sign as jest.Mock).mockReturnValue('signed.device.token');
+    });
+
+    it('signs the device token WITH a 90d expiry (not a non-expiring token)', async () => {
+      const result = await service.generatePairingToken(mockOrganizationId, mockDisplayId);
+
+      // The explicit signOptions overrides the module default, so expiresIn must
+      // be set here or the token has no exp claim (the B10 bug).
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'device' }),
+        expect.objectContaining({ algorithm: 'HS256', expiresIn: '90d' }),
+      );
+      // Returned value is now truthful.
+      expect(result.expiresIn).toBe('90d');
     });
   });
 });

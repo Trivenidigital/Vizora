@@ -3,7 +3,7 @@
 import type {
   ApiKey, CreateApiKeyResponse,
   SubscriptionStatus, Plan, QuotaUsage, Invoice,
-  CheckoutResponse, BillingPortalResponse,
+  CheckoutResponse, BillingPortalResponse, EntitlementBanner,
 } from '../types';
 import { ApiClient } from './client';
 
@@ -15,6 +15,7 @@ declare module './client' {
     revokeApiKey(id: string): Promise<void>;
     // Billing
     getSubscriptionStatus(): Promise<SubscriptionStatus>;
+    getEntitlementBanner(): Promise<EntitlementBanner>;
     getPlans(country?: string, interval?: 'monthly' | 'yearly'): Promise<Plan[]>;
     getQuotaUsage(): Promise<QuotaUsage>;
     createCheckout(planId: string, interval: 'monthly' | 'yearly'): Promise<CheckoutResponse>;
@@ -46,6 +47,11 @@ ApiClient.prototype.revokeApiKey = async function (id: string): Promise<void> {
 // Billing
 ApiClient.prototype.getSubscriptionStatus = async function (): Promise<SubscriptionStatus> {
   return this.request<SubscriptionStatus>('/billing/subscription');
+};
+
+// B3 entitlement ladder banner: state, days-to-next-rung, publish-lock.
+ApiClient.prototype.getEntitlementBanner = async function (): Promise<EntitlementBanner> {
+  return this.request<EntitlementBanner>('/billing/entitlement/banner');
 };
 
 ApiClient.prototype.getPlans = async function (

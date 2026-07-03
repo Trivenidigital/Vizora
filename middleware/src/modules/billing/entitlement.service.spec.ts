@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { EntitlementService, LADDER } from './entitlement.service';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
+import { MailService } from '../mail/mail.service';
 import { TenantEntitlementNotifier } from './tenant-entitlement.notifier';
 
 /**
@@ -13,8 +14,10 @@ import { TenantEntitlementNotifier } from './tenant-entitlement.notifier';
 describe('EntitlementService (B3 ladder)', () => {
   let service: EntitlementService;
   let db: { organization: { findMany: jest.Mock; updateMany: jest.Mock; update: jest.Mock; findUnique: jest.Mock } };
-  let redis: { get: jest.Mock; set: jest.Mock };
+  let redis: { get: jest.Mock; set: jest.Mock; getClient: jest.Mock };
+  let redisClient: { set: jest.Mock };
   let notifier: { emit: jest.Mock };
+  let mail: { sendPaymentFailedEmail: jest.Mock };
 
   const NOW = new Date('2026-07-02T00:00:00.000Z');
   const daysAgo = (n: number) => new Date(NOW.getTime() - n * 24 * 60 * 60 * 1000);
@@ -28,8 +31,15 @@ describe('EntitlementService (B3 ladder)', () => {
         findUnique: jest.fn().mockResolvedValue(null),
       },
     };
-    redis = { get: jest.fn().mockResolvedValue(null), set: jest.fn().mockResolvedValue(true) };
+    // getClient().set(NX) → 'OK' = first claim (send), null = already sent (dedup).
+    redisClient = { set: jest.fn().mockResolvedValue('OK') };
+    redis = {
+      get: jest.fn().mockResolvedValue(null),
+      set: jest.fn().mockResolvedValue(true),
+      getClient: jest.fn(() => redisClient),
+    };
     notifier = { emit: jest.fn().mockResolvedValue(undefined) };
+    mail = { sendPaymentFailedEmail: jest.fn().mockResolvedValue(undefined) };
 
     const mod = await Test.createTestingModule({
       providers: [
@@ -37,6 +47,7 @@ describe('EntitlementService (B3 ladder)', () => {
         { provide: DatabaseService, useValue: db },
         { provide: RedisService, useValue: redis },
         { provide: TenantEntitlementNotifier, useValue: notifier },
+        { provide: MailService, useValue: mail },
       ],
     }).compile();
     service = mod.get(EntitlementService);
@@ -171,5 +182,44 @@ describe('EntitlementService (B3 ladder)', () => {
     expect(banner.publishLocked).toBe(true);
     expect(banner.nextRung).toBe('suspended');
     expect(banner.daysUntilNextRung).toBe(LADDER.DAYS_TO_SUSPEND - 9); // 14 - 9 = 5
+  });
+
+  // ---- dunning email dedup ----
+
+  it('sends a deduped dunning email on the publish_lock transition (keyed per org+rung)', async () => {
+    db.organization.findMany.mockImplementation(({ where }: any) =>
+      where.subscriptionStatus === 'past_due'
+        ? [{ id: 'o1', entitlementStateSince: daysAgo(LADDER.DAYS_TO_PUBLISH_LOCK), users: [{ email: 'a@x.com', firstName: 'Ada' }] }]
+        : [],
+    );
+    await service.advanceLadder(NOW);
+    // claim keyed per (org, rung); email sent on first claim
+    expect(redisClient.set).toHaveBeenCalledWith('dunning:o1:publish_locked', '1', 'EX', expect.any(Number), 'NX');
+    expect(mail.sendPaymentFailedEmail).toHaveBeenCalledWith('a@x.com', 'Ada');
+  });
+
+  it('does NOT re-send the dunning email when the claim already exists (job re-run)', async () => {
+    redisClient.set.mockResolvedValue(null); // key already claimed
+    db.organization.findMany.mockImplementation(({ where }: any) =>
+      where.subscriptionStatus === 'publish_locked'
+        ? [{ id: 'o1', entitlementStateSince: daysAgo(LADDER.DAYS_TO_SUSPEND), users: [{ email: 'a@x.com', firstName: 'Ada' }] }]
+        : [],
+    );
+    await service.advanceLadder(NOW);
+    // suspended device signal still fires (that's transition-guarded), but the
+    // email is suppressed by the dedup claim.
+    expect(notifier.emit).toHaveBeenCalledWith('o1', 'suspended', expect.any(String));
+    expect(mail.sendPaymentFailedEmail).not.toHaveBeenCalled();
+  });
+
+  it('past_due → publish_lock with no admin email does not crash', async () => {
+    db.organization.findMany.mockImplementation(({ where }: any) =>
+      where.subscriptionStatus === 'past_due'
+        ? [{ id: 'o1', entitlementStateSince: daysAgo(LADDER.DAYS_TO_PUBLISH_LOCK) }] // no users
+        : [],
+    );
+    const { advanced } = await service.advanceLadder(NOW);
+    expect(advanced).toBe(1);
+    expect(mail.sendPaymentFailedEmail).not.toHaveBeenCalled();
   });
 });
