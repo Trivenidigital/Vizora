@@ -1,5 +1,6 @@
 import { Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'node:crypto';
 import Stripe from 'stripe';
 import {
   PaymentProvider,
@@ -100,15 +101,23 @@ export class StripeProvider implements PaymentProvider {
     params: CheckoutParams,
   ): Promise<{ url: string; sessionId: string }> {
     this.ensureConfigured();
+    // B6: a per-invocation idempotency key makes THIS create call retry-safe —
+    // if the SDK/network retries it, Stripe returns the same session instead of
+    // a duplicate. Generated once per call (not deterministic per org/plan), so
+    // it never collides across distinct user-initiated checkouts.
+    const idempotencyKey = randomUUID();
     const session = await this.withCircuitBreaker(() =>
-      this.stripe!.checkout.sessions.create({
-        customer: params.customerId,
-        mode: 'subscription',
-        line_items: [{ price: params.priceId, quantity: 1 }],
-        success_url: params.successUrl,
-        cancel_url: params.cancelUrl,
-        metadata: params.metadata,
-      }),
+      this.stripe!.checkout.sessions.create(
+        {
+          customer: params.customerId,
+          mode: 'subscription',
+          line_items: [{ price: params.priceId, quantity: 1 }],
+          success_url: params.successUrl,
+          cancel_url: params.cancelUrl,
+          metadata: params.metadata,
+        },
+        { idempotencyKey },
+      ),
     );
     if (!session.url) {
       throw new ServiceUnavailableException('Stripe checkout session did not return a URL');
