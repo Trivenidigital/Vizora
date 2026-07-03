@@ -21,6 +21,7 @@ import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { RegisterDto, LoginDto } from './dto';
 import { AUTH_CONSTANTS } from './constants/auth.constants';
+import { getAccessTokenTtlSeconds } from './jwt-expiry';
 import { GeoService } from '../common/services/geo.service';
 import { BillingService } from '../billing/billing.service';
 import { StorageService } from '../storage/storage.service';
@@ -190,7 +191,7 @@ export class AuthService {
         trialEndsAt: organization.trialEndsAt,
       },
       token,
-      expiresIn: 604800, // 7 days in seconds
+      expiresIn: getAccessTokenTtlSeconds(), // matches the token's real exp
     };
   }
 
@@ -350,7 +351,7 @@ export class AuthService {
         },
       },
       token,
-      expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
+      expiresIn: getAccessTokenTtlSeconds(),
       isNewUser,
     };
   }
@@ -564,7 +565,7 @@ export class AuthService {
         },
       },
       token,
-      expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
+      expiresIn: getAccessTokenTtlSeconds(),
     };
   }
 
@@ -587,7 +588,7 @@ export class AuthService {
 
     return {
       token,
-      expiresIn: 604800,
+      expiresIn: getAccessTokenTtlSeconds(),
     };
   }
 
