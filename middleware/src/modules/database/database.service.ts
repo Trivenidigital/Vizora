@@ -1,9 +1,20 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaClient } from '@vizora/database';
+import { getTenantContext } from './tenant-context';
+import { evaluateTenantOp, TenantGuardMode } from './tenant-guard';
 
 @Injectable()
 export class DatabaseService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DatabaseService.name);
+
+  /**
+   * Tenant-guard mode. `off` in production until the log-mode soak + review
+   * clear enforce; `log` elsewhere (observe cross-tenant writes, never block).
+   * Override with TENANT_GUARD_MODE=off|log|enforce.
+   */
+  private readonly tenantGuardMode: TenantGuardMode =
+    (process.env.TENANT_GUARD_MODE as TenantGuardMode) ||
+    (process.env.NODE_ENV === 'production' ? 'off' : 'log');
 
   private reconnectAttempts = 0;
   private readonly maxReconnectAttempts = 5;
@@ -30,7 +41,41 @@ export class DatabaseService extends PrismaClient implements OnModuleInit, OnMod
   }
 
   async onModuleInit() {
+    this.registerTenantGuard();
     await this.connectWithRetry();
+  }
+
+  /**
+   * Tenant-scoping backstop (docs/design/tenant-scoping-extension.md). Applied
+   * in-place via $use so every `this.<model>.<op>()` is intercepted with no
+   * call-site changes (Prisma 5). The guard only acts when a concrete tenant
+   * context is bound (getTenantContext) and the model is tenant-scoped; `log`
+   * mode never mutates or throws. Reads its decision from the pure
+   * evaluateTenantOp policy.
+   */
+  private registerTenantGuard(): void {
+    if (this.tenantGuardMode === 'off') return;
+    this.logger.log(`Tenant guard active in "${this.tenantGuardMode}" mode`);
+    this.$use(async (params, next) => {
+      const decision = evaluateTenantOp({
+        model: params.model,
+        operation: params.action,
+        args: params.args,
+        context: getTenantContext(),
+        mode: this.tenantGuardMode,
+      });
+      switch (decision.action) {
+        case 'inject':
+          return next({ ...params, args: decision.args });
+        case 'warn':
+          this.logger.warn(`[tenant-guard] ${decision.reason}`);
+          return next(params);
+        case 'reject':
+          throw new ForbiddenException(`[tenant-guard] ${decision.reason}`);
+        default:
+          return next(params);
+      }
+    });
   }
 
   private async connectWithRetry(): Promise<void> {
