@@ -41,6 +41,19 @@ const asObj = (v: unknown): Record<string, unknown> | undefined =>
   v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined;
 
 /**
+ * Classify an organizationId value found in a where/data object against the
+ * request tenant. `opaque` = an operator/nested shape ({equals}/{in}/AND) we
+ * can't cheaply verify — treated as present (pass) so a same-tenant query with
+ * an unusual shape is never falsely rejected (review #6).
+ */
+type OrgClass = 'missing' | 'match' | 'foreign' | 'opaque';
+function classifyOrg(cur: unknown, org: string): OrgClass {
+  if (cur === undefined) return 'missing';
+  if (typeof cur === 'string') return cur === org ? 'match' : 'foreign';
+  return 'opaque';
+}
+
+/**
  * Decide what the tenant guard should do for one operation. Pure — no Prisma, no
  * IO — so the whole policy is unit-testable. The caller (DatabaseService $use)
  * maps the action onto behavior.
@@ -63,52 +76,79 @@ export function evaluateTenantOp(input: GuardInput): GuardAction {
 
   const a = args ?? {};
 
-  // ---- WHERE-scoped writes: updateMany / deleteMany ----
+  // ---- WHERE-scoped writes: updateMany / deleteMany (org injectable) ----
   if (WHERE_SCOPED_WRITES.has(operation)) {
     const where = asObj(a.where) ?? {};
-    const cur = where.organizationId;
-    if (cur === undefined) {
-      if (mode === 'log') return { action: 'warn', reason: `${model}.${operation} without organizationId scope` };
-      return { action: 'inject', args: { ...a, where: { ...where, organizationId: org } } };
+    switch (classifyOrg(where.organizationId, org)) {
+      case 'missing':
+        if (mode === 'log') return { action: 'warn', reason: `${model}.${operation} without organizationId scope` };
+        return { action: 'inject', args: { ...a, where: { ...where, organizationId: org } } };
+      case 'foreign':
+        return { action: 'reject', reason: `${model}.${operation} targets a foreign organizationId (tenant ${org})` };
+      default:
+        return { action: 'pass' };
     }
-    if (cur !== org) return { action: 'reject', reason: `${model}.${operation} targets organizationId=${String(cur)} but request tenant is ${org}` };
-    return { action: 'pass' };
   }
 
-  // ---- UNIQUE-where writes: update / delete (Prisma forbids extra org filter) ----
+  // ---- UNIQUE-where writes: update / delete (Prisma forbids an extra org filter) ----
   if (UNIQUE_WHERE_WRITES.has(operation)) {
     const where = asObj(a.where) ?? {};
-    if (where.organizationId === undefined) {
-      const reason = `${model}.${operation} uses a bare unique where without organizationId; use ${operation}Many({ where: { id, organizationId } }) for tenant safety`;
-      return mode === 'log' ? { action: 'warn', reason } : { action: 'reject', reason };
+    switch (classifyOrg(where.organizationId, org)) {
+      case 'missing': {
+        const reason = `${model}.${operation} uses a bare unique where without organizationId; use ${operation}Many({ where: { id, organizationId } }) for tenant safety`;
+        return mode === 'log' ? { action: 'warn', reason } : { action: 'reject', reason };
+      }
+      case 'foreign':
+        return { action: 'reject', reason: `${model}.${operation} targets a foreign organizationId` };
+      default:
+        return { action: 'pass' };
     }
-    if (where.organizationId !== org) return { action: 'reject', reason: `${model}.${operation} targets a foreign organizationId` };
-    return { action: 'pass' };
   }
 
   // ---- DATA writes: create / createMany ----
   if (DATA_WRITES.has(operation)) {
     const data = a.data;
     const rows = Array.isArray(data) ? data : [data];
+    let anyMissing = false;
     for (const row of rows) {
       const r = asObj(row);
       if (!r) continue;
-      const cur = r.organizationId;
-      if (cur !== undefined && cur !== org) {
-        return { action: 'reject', reason: `${model}.${operation} writes organizationId=${String(cur)} for tenant ${org}` };
-      }
+      const cls = classifyOrg(r.organizationId, org);
+      if (cls === 'foreign') return { action: 'reject', reason: `${model}.${operation} writes a foreign organizationId for tenant ${org}` };
+      if (cls === 'missing') anyMissing = true;
     }
-    // Missing org on create: injectable (single object) in enforce; warn in log.
-    const single = asObj(data);
-    if (single && single.organizationId === undefined) {
+    if (anyMissing) {
       if (mode === 'log') return { action: 'warn', reason: `${model}.${operation} without organizationId in data` };
-      return { action: 'inject', args: { ...a, data: { ...single, organizationId: org } } };
+      // Inject org into every row missing it (arrays included — review #3).
+      const injected = Array.isArray(data)
+        ? data.map((row) => ({ ...(asObj(row) ?? {}), organizationId: (asObj(row)?.organizationId ?? org) }))
+        : { ...(asObj(data) ?? {}), organizationId: org };
+      return { action: 'inject', args: { ...a, data: injected } };
     }
     return { action: 'pass' };
   }
 
-  // upsert and reads: pass (v1 is write-focused; upsert's unique where is handled
-  // like update by the DATA/where rules above only when decomposed — left as pass
-  // to avoid partial coverage that reads as complete).
+  // ---- upsert: unique where (like update) + create data (like create) — review #2 ----
+  if (operation === 'upsert') {
+    const where = asObj(a.where) ?? {};
+    const create = asObj(a.create) ?? {};
+    const whereCls = classifyOrg(where.organizationId, org);
+    const createCls = classifyOrg(create.organizationId, org);
+    if (whereCls === 'foreign' || createCls === 'foreign') {
+      return { action: 'reject', reason: `${model}.upsert targets a foreign organizationId (tenant ${org})` };
+    }
+    if (whereCls === 'missing' || createCls === 'missing') {
+      const reason = `${model}.upsert without organizationId on ${whereCls === 'missing' ? 'where' : 'create'}; the unique where cannot be org-filtered — scope it explicitly`;
+      if (mode === 'log') return { action: 'warn', reason };
+      // Enforce: a missing where can't be injected (unique) → reject; a missing
+      // create org alone can be injected.
+      if (whereCls === 'missing') return { action: 'reject', reason };
+      return { action: 'inject', args: { ...a, create: { ...create, organizationId: org } } };
+    }
+    return { action: 'pass' };
+  }
+
+  // reads (findUnique/findFirst/findMany/count/aggregate): pass. v1 is write-focused;
+  // reads are scoped by the services and remain review-dependent (documented).
   return { action: 'pass' };
 }

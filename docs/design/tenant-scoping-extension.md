@@ -62,6 +62,39 @@ OrganizationOnboarding, PromotionRedemption, CustomerIncident. **Excluded:** `Or
 log (non-prod) → observe violations for a soak window → fix any surfaced un-scoped writes →
 flip `enforce` in non-prod → soak → prod `enforce`. Each step reversible via the flag.
 
+## Pre-enforce checklist (from adversarial review — MUST clear before flipping `enforce`)
+
+Enforce is **not** safe until these are done. In `log` mode each is either a warn (act on it)
+or a documented backstop gap:
+
+1. **Bare-`{id}` `update`/`delete` on guarded models → will 403 in enforce.** These are safe
+   today (each pre-authorizes via a `findFirst({id, organizationId})`), but the guard can't see
+   that, so enforce would reject core CRUD. They surface as `warn` in log mode — that is the
+   go/no-go signal. Convert each to `updateMany`/`deleteMany({ where: { id, organizationId } })`
+   (the B9 pattern) first. Sites: `folders.service.ts` (151,182), `webhooks.service.ts`
+   (124,139,337,349,360), `support.service.ts` (498,544), `tag-rules.service.ts` (105,146),
+   `provisioning-templates.service.ts` (67,82), `template-library.service.ts` (215,500),
+   `pairing.service.ts` (620, device hot path — scrutinize).
+2. **Nested relation `create` is invisible to `$use`** (fires once, top-level). A guarded model
+   written via a parent's `data.<relation>.create` (e.g. `SupportMessage` under `SupportRequest`,
+   `support.service.ts:105-138`) gets no backstop. Either add a CI test that fails if a guarded
+   model with a scalar `organizationId` is nested-created without stamping org, or document each
+   such path as a reviewed permanent exclusion. Do NOT claim "structurally impossible" until this
+   is resolved.
+3. **`upsert` unique-where cannot be org-injected** — enforce rejects a bare upsert where. Confirm
+   the guarded-model upsert sites (`onboarding.service.ts:109`, `organizations.service.ts:190,230`)
+   scope their `where` by org before enforce.
+4. **deriveTenantContext fail-open on missing org** is fine for log (passes), but for enforce
+   decide whether absence-of-context should fail *closed* for guarded-model writes on
+   authenticated routes. (Second review — ALS/concurrency — informs this.)
+
+## Known scope limits (v1, by design)
+
+- **Reads are unguarded** — a forgotten org filter on a read is as review-dependent as before.
+  The "structural" claim covers WRITES only.
+- **`$use` (not `$extends`)** because `DatabaseService extends PrismaClient`; do NOT upgrade to
+  Prisma 6 (removes `$use`) without first migrating to a composed `$extends` client.
+
 ## Test surface
 
 - Unit: the extension's decision function over (model, operation, args, context) — guarded vs

@@ -83,6 +83,49 @@ describe('evaluateTenantOp', () => {
     });
   });
 
+  describe('createMany arrays (review #3 — was a silent pass in every mode)', () => {
+    it('log: warns when any row omits org', () => {
+      expect(ev({ operation: 'createMany', mode: 'log', args: { data: [{ organizationId: ORG }, { name: 'x' }] } }).action).toBe('warn');
+    });
+    it('enforce: injects org into every row missing it (rows with org kept)', () => {
+      const r = ev({ operation: 'createMany', mode: 'enforce', args: { data: [{ name: 'a' }, { name: 'b', organizationId: ORG }] } });
+      expect(r).toEqual({ action: 'inject', args: { data: [{ name: 'a', organizationId: ORG }, { name: 'b', organizationId: ORG }] } });
+    });
+    it('rejects when any row is a foreign org', () => {
+      expect(ev({ operation: 'createMany', mode: 'enforce', args: { data: [{ organizationId: ORG }, { organizationId: 'org-B' }] } }).action).toBe('reject');
+    });
+    it('passes when every row already carries the request org', () => {
+      expect(ev({ operation: 'createMany', mode: 'enforce', args: { data: [{ organizationId: ORG }, { organizationId: ORG }] } }).action).toBe('pass');
+    });
+  });
+
+  describe('upsert (review #2 — was a full bypass in every mode)', () => {
+    it('log: warns when where or create omits org', () => {
+      expect(ev({ operation: 'upsert', mode: 'log', args: { where: { id: 'p1' }, create: { organizationId: ORG }, update: {} } }).action).toBe('warn');
+    });
+    it('enforce: rejects a bare unique where (cannot inject a unique where)', () => {
+      expect(ev({ operation: 'upsert', mode: 'enforce', args: { where: { id: 'p1' }, create: { organizationId: ORG }, update: {} } }).action).toBe('reject');
+    });
+    it('enforce: injects org into create when where is scoped but create omits it', () => {
+      const r = ev({ operation: 'upsert', mode: 'enforce', args: { where: { organizationId: ORG, key: 'k' }, create: { name: 'x' }, update: {} } });
+      expect(r).toEqual({ action: 'inject', args: { where: { organizationId: ORG, key: 'k' }, create: { name: 'x', organizationId: ORG }, update: {} } });
+    });
+    it('rejects a foreign org on where or create', () => {
+      expect(ev({ operation: 'upsert', mode: 'enforce', args: { where: { organizationId: 'org-B' }, create: { organizationId: ORG }, update: {} } }).action).toBe('reject');
+      expect(ev({ operation: 'upsert', mode: 'enforce', args: { where: { organizationId: ORG }, create: { organizationId: 'org-B' }, update: {} } }).action).toBe('reject');
+    });
+    it('passes when both where and create carry the request org', () => {
+      expect(ev({ operation: 'upsert', mode: 'enforce', args: { where: { organizationId: ORG }, create: { organizationId: ORG }, update: {} } }).action).toBe('pass');
+    });
+  });
+
+  describe('operator-shaped org filter (review #6 — must not false-reject)', () => {
+    it('does NOT reject a same-tenant query expressed as {equals}/{in}', () => {
+      expect(ev({ operation: 'updateMany', mode: 'enforce', args: { where: { organizationId: { equals: ORG } }, data: {} } }).action).toBe('pass');
+      expect(ev({ operation: 'deleteMany', mode: 'enforce', args: { where: { organizationId: { in: [ORG] } } } }).action).toBe('pass');
+    });
+  });
+
   it('the guarded set covers the tenant-resource models but excludes the tenant root', () => {
     expect(GUARDED_MODELS.has('Playlist')).toBe(true);
     expect(GUARDED_MODELS.has('Content')).toBe(true);
