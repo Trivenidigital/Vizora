@@ -399,6 +399,13 @@ export class DisplaysService {
       {
         secret: deviceSecret,
         algorithm: 'HS256',
+        // B10: this explicit signOptions object OVERRIDES the JwtModule default,
+        // so without expiresIn the token had NO exp claim (non-expiring). Match
+        // the primary pairing path (pairing.service.ts, 90d). Expiry is now
+        // graceful: an expired device token → AUTH_EXPIRED on the socket handshake
+        // → the device keeps playing cached content and re-auths (Slice 0), it
+        // does not de-pair.
+        expiresIn: '90d',
       },
     );
 
@@ -422,7 +429,7 @@ export class DisplaysService {
     // Return the actual token to the client (only time it's available)
     return {
       pairingToken,
-      expiresIn: '30d',
+      expiresIn: '90d', // now truthful — the token actually carries a 90d exp
       displayId: display.id,
       deviceIdentifier: display.deviceIdentifier,
     };
