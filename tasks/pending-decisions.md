@@ -310,4 +310,25 @@ becomes structurally enforced (a future unvalidated-client-id write fails closed
 quality, not cross-tenant.
 
 ---
+
+# Enforce #4 + #6 — CHECKED CLEAN on evidence; surface fully executed (2026-07-04)
+
+**#4 device-auth writes** and **#6 nested creates** both checked clean on their OWN code (not by resemblance):
+- #4: `verifyCurrentDeviceToken` routes run under bypass (`req.deviceAuthPayload` assigned nowhere — dead
+  branch). Only the heartbeat writes; its WHERE embeds `organizationId: verifiedDevice.organizationId` →
+  cross-tenant id = zero rows. Others read-only.
+- #6: only nested guarded target (`SupportMessage`) carries explicit org. Unguarded children (PlaylistItem/
+  DisplayTag) verified reachable ONLY via guarded parents — every child-item op does `findOne(org, parentId)`
+  first + scopes by parent id. No child-by-id read hole.
+- The `pairing.service.ts:620` bare-unique-where the auditor flagged on main is **already fixed on the T4-2
+  held branch** — covered by #1.
+
+**FLIP-READINESS: the enforce surface is fully enumerated + executed keyboard-side.** #1–#6 done; no third
+context class. The complete statement (incl. what the log-warn review should watch for) is in
+`docs/enforce-readiness.md`. **Two structural items remain, both gated to you:** (1) the flip
+(`TENANT_GUARD_MODE=enforce`, after the log-warn review) and (2) the realtime `$use` guard (#7). dimension-1
+stays 4 until BOTH land. **Proof-of-play cluster** (future focused pass): contentImpression unvalidated ids +
+the PD-1/PD-7 duplicate-emit fix.
+
+---
 *(New items appended below as they arise.)*

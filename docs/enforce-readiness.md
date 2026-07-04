@@ -30,9 +30,9 @@ third-category finding below).
 | 1 | **CRUD bare-id sweep** (controller→service writes) | ✅ DONE | T4 merged `13f79b85` (folders/webhooks/tag-rules/provisioning). T4-2 held `7847fd88` (support/template-library/pairing + tag-rules/provisioning update) — 229 green. |
 | 2 | **System writes under inherited context → bypass** | ✅ DONE | `11ced158` (+test `b7927b22`), reviewed SHIP. Webhook `recordAttempt` + template-library `clone` global counter wrapped in `BYPASS_TENANT_CONTEXT`, leak-proof (ALS teardown on resolve/reject). |
 | 3 | **`@OnEvent` handler writes** (async, inherited context) | ✅ CHECKED CLEAN | Classify-then-fix sweep of all 6 handlers (onboarding, validation-monitor, alert-rule & tag-rule evaluators, notifications, playlists): **zero fixes needed** — every guarded write already carries explicit org, hits an unguarded model, or is read-only. No third category. Load-bearing invariants below. |
-| 4 | **Device-auth write paths set a concrete context** | ⬜ REMAINING | Device-JWT requests derive context via `req.deviceAuthPayload.organizationId` (`tenant-context.interceptor.ts`). Verify every device-authenticated *write* path populates it before the interceptor runs (else the write runs under bypass — safe but unenforced) AND that no device write is bare-id-foreign. |
+| 4 | **Device-auth write paths** | ✅ CHECKED CLEAN (safe-by-construction) | All `verifyCurrentDeviceToken` routes verify the token INSIDE the handler (`@Public`), so they run under **bypass** (`req.deviceAuthPayload` is read by `deriveTenantContext` but assigned NOWHERE — the concrete-device-context branch is dead for HTTP). Enumerated each: only ONE writes — heartbeat `updateHeartbeat` (`displays.service.ts:271`), whose WHERE embeds `organizationId: verifiedDevice.organizationId` (verified on the actual write, not by resemblance to #5) → a cross-tenant id affects zero rows. `device.online`→`notification.create` stamps server-read org. schedules/device-content/device-auth-check are read-only. No bare-id-foreign device write. |
 | 5 | **Realtime trust boundary** | ✅ CHECKED CLEAN (formal gap, not a live leak) | Realtime's `DatabaseService` is a plain `PrismaClient` — NO `$use` guard, NO tenant context — so enforce never evaluates realtime writes. Full write audit + spot-verify: **tenant-safe by construction.** Every mutating write (`display.update*`) keys on the device's OWN authenticated `deviceId` (verified JWT + DB cross-check at handshake AND re-checked per-message by `WsDeviceGuard`); every create stamps org from the device-authenticated `client.data.organizationId`, never a client-supplied value. No write selects a foreign row by a socket-message id. **Nothing to fix before enforce is meaningful.** Disposition = optional defense-in-depth (see below). |
-| 6 | **Nested creates** | ⬜ REMAINING | Prisma nested writes (`create`/`update` with nested relation writes) may not be intercepted per-nested-op by the `$use` hook. Verify guarded nested creates/updates carry org or are caught. |
+| 6 | **Nested creates** | ✅ CHECKED CLEAN (inheritance VERIFIED) | The `$use` hook fires once per top-level op, so nested relation writes aren't independently guarded. Full enumeration: the ONLY nested write targeting a **guarded** model is `support.service.ts:121` `messages.create` (SupportMessage) — and it carries explicit `organizationId` on every row. All other nested creates target **unguarded** child/join models (PlaylistItem, DisplayTag, AlertRuleRecipient, PromotionPlan). The load-bearing carve-out — unguarded children safe *only if* reachable exclusively via a guarded parent — is **verified, not assumed**: every child-item op (`playlists.updateItem/removeItem:313/334`, `displays.removeTags:510`) calls `findOne(org, parentId)` FIRST and scopes the child query by the parent id (`{id: itemId, playlistId}`). No query selects an unguarded child by its own id outside a guarded parent's org scope → no direct-read isolation hole. |
 
 ## THIRD-CATEGORY FINDING — ENUMERATION CONFIRMED (both the @OnEvent and realtime checks came back negative)
 **No third category exists — verified from both directions.** Every inherited-context guarded write
@@ -51,15 +51,45 @@ surface is now believed ENUMERATED, not still-discovering. The remaining distanc
 **known, bounded, mechanical** set #4 + #6 (plus a log-warn review), not open-ended discovery.
 
 ## Optional defense-in-depth (NOT a flip blocker)
+### #7 — Realtime `$use` guard = the FINAL 4→5 item (NOT backlog, NOT a flip blocker)
 Realtime's tenant-safety rests on a **convention** (every handler self-derives org from the authenticated
-socket), not a structurally-enforced invariant — a *future* realtime handler could introduce an
-update/create keyed on an unvalidated client-supplied id and nothing would catch it. Low-urgency hardening:
+socket), not a structurally-enforced invariant — a *future* realtime handler could introduce an update/create
+keyed on an unvalidated client-supplied id and nothing would catch it. **After the middleware flip the
+guarantee is asymmetric: structural in middleware, conventional in realtime.** Asymmetric is not a structural
+5. So this is ranked as the **terminus of the 4→5 path**, after #4/#6, before dimension-1 is called complete:
 add a `$use` tenant-guard to `realtime/src/database/database.service.ts` mirroring the middleware (with a
 device-derived concrete context), OR assert org-scoping at the realtime write sites — so a future regression
-fails closed instead of silently opening a seam. Separately: `contentImpression.create` accepts unvalidated
-`contentId`/`playlistId` — an OWN-tenant analytics-integrity / proof-of-play-quality concern (a device can
-file impressions referencing ids it doesn't own, in its own org partition), NOT a cross-tenant leak. Backlog
-note if impression analytics are trusted downstream for billing.
+fails closed instead of silently opening a seam. It is NOT a flip blocker (realtime is safe today), but
+**dimension-1 stays 4 until BOTH the flip AND this realtime guard land.**
+
+**Proof-of-play cluster (future focused pass, not now):** two findings that belong together — (a)
+`contentImpression.create` accepts unvalidated `contentId`/`playlistId` (own-tenant analytics integrity; a
+device can file impressions referencing ids it doesn't own, in its own partition), and (b) the duplicate
+`content:impression` emit on reconnect double-render that PD-1/PD-7 fixed. Both touch proof-of-play
+correctness; worth one deliberate pass when prioritized.
+
+## FLIP-READINESS STATEMENT (2026-07-04)
+**The enforce surface is fully enumerated and executed keyboard-side, verified on evidence.** Every inherited-
+context guarded write across both apps has been classified and checked on its own code (not by resemblance):
+- #1 CRUD sweep ✅ (T4 merged + T4-2 held) · #2 system-write bypass ✅ (reviewed SHIP) · #3 @OnEvent ✅
+  (checked clean) · #4 device-auth ✅ (heartbeat org-scoped in WHERE) · #5 realtime ✅ (safe-by-construction)
+  · #6 nested creates ✅ (guarded nested carries org; unguarded children reachable only via verified guarded
+  parents).
+- The pairing bare-unique-where update (`pairing.service.ts:620`) an auditor flagged is **already fixed on the
+  T4-2 held branch** (`updateMany({id,organizationId})`+count) — covered by #1, not a new gap.
+- **No third context class** — the two-context model (concrete-enforce | bypass/self-stamping-safe) is
+  sufficient; both falsification checks (@OnEvent, realtime) came back negative.
+
+**What the log-warn review should watch for** (run in `log` mode, review journalctl `[tenant-guard]` warns
+before flipping): any `warn` on a write path NOT in the swept set — i.e. a bare-id `update`/`delete` or a
+`create`/`data` without org on a guarded model under a concrete context. Zero such warns over a representative
+window (a full dashboard-usage cycle + a device fleet's heartbeats + a webhook fan-out + an onboarding) is the
+go signal. Any warn = an un-swept path; fix before flip.
+
+**The two things between here and a STRUCTURAL 5:** (1) the flip itself (`TENANT_GUARD_MODE=enforce`, yours,
+gated, after the log-warn review), and (2) the realtime `$use` guard (#7 — makes the guarantee structural in
+both processes, not conventional in one). Until both land, dimension-1 is a legitimate 4, worded "structural
+in middleware, convention-safe in realtime."
 
 ## Load-bearing enforce-safety invariants (from the @OnEvent sweep — protect these on refactor)
 These handler writes are safe *by invariant*; a future refactor to a bare-id write would silently break
@@ -74,10 +104,12 @@ them under enforce. Documented so the invariant is explicit, not accidental:
 
 ## The honest scorecard note
 Dimension-1 (tenant isolation) 4→5 is gated on this set. For three blocks the flip was "gated on the sweep
-plus a few things," and the few things grew as each look revealed more inherited-context surface. Two
-consecutive blocks have now **reversed that trend and confirmed enumeration**: #3 (@OnEvent) checked clean,
-and #5 (realtime) — the one item that could still have surfaced a new write class — also checked clean
-(safe-by-construction, no third category). **The enforce surface is enumerated.** The flip is gated on the
-**mechanical** completion of #4 (device-auth paths) + #6 (nested creates) + a log-mode warn review — no
-open discovery remains. That is a genuine "close," earned by the checks coming back negative, not asserted.
-(Optional realtime defense-in-depth above is a hardening item, not a flip blocker.)
+plus a few things," and the few things grew as each look revealed more inherited-context surface. That trend
+is now **reversed and enumeration confirmed** — #3 (@OnEvent), #5 (realtime), and #4/#6 all checked clean on
+their own evidence, no third category. **The enforce surface is fully executed keyboard-side.** What remains
+is not discovery and not more sweeping — it is exactly two structural items, both gated to the operator:
+1. **The flip** (`TENANT_GUARD_MODE=enforce`) — after a log-warn review, yours.
+2. **The realtime `$use` guard (#7)** — turns the guarantee from "structural in middleware, conventional in
+   realtime" into structural in both processes.
+**dimension-1 stays 4 until BOTH land** — asymmetric enforcement is not a structural 5. That is a genuine,
+earned "close," not an asserted one.
