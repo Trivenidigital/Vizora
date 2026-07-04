@@ -331,4 +331,28 @@ stays 4 until BOTH land. **Proof-of-play cluster** (future focused pass): conten
 the PD-1/PD-7 duplicate-emit fix.
 
 ---
+
+# T2 delivery — increments 2-4 + PD-9 built & build-verified; merge gate cleared (2026-07-04)
+
+All on branch `fix/t2-effective-content-resolver` (vizora), held, each build-verified (both apps compile
+against the shared package):
+- **2a/2b (35f8222e, b7db49b4):** shared `schedule-active` helper + `resolveEffectiveContent` (the single
+  two-layer resolver: priority via schedule??currentPlaylist, version-wins idempotency) in `@vizora/database`.
+- **3 (35aa17b0):** `GET /devices/me/content` pull endpoint (device-JWT self-identity, cross-tenant
+  zero-effect tested, throttled) + the shared `serializeDeviceContent` wire serializer.
+- **4 (17e4dbf3):** realtime `sendInitialState` via the SAME resolver + serializer → **push==pull is a wire
+  fact** (byte-identical test) + C-7/Finding-2 closed on the push path.
+- **PD-9 (d28a6918):** layout zone resolution in the SHARED path + per-zone versioning → **the merge gate is
+  CLEARED** (layouts no longer lose zone content). Coherence: byte-identical push==pull for layouts.
+
+**T2 is merge-ready keyboard-side EXCEPT increment 5** (TV-app: pull-on-connect + boundary re-pull + heartbeat
+reconcile — the completing half; its "fires on real connect" validation is FIELD-PENDING on offshore, so it's
+keyboard-closed/field-pending, NOT hardware-closed). After increment 5, C-7 + Finding-2 are structurally closed
+keyboard-side and the whole T2 stack merges as a unit. Note: increments 4 + PD-9 removed the realtime-only
+layout resolution, so the T2 stack must merge together (4 without PD-9 would regress layouts).
+
+**Testing-dimension observation logged** (scorecard #8): 5 build-verify catches across T2 → unit-green
+necessary-not-sufficient; mocks hide integration seams; CI needs the cross-app typecheck gate.
+
+---
 *(New items appended below as they arise.)*
