@@ -54,7 +54,11 @@ function redactWidgetSecrets(value: unknown): unknown {
 }
 
 export interface DeviceContentItem {
+  // contentId + duration at the item level: the TV app's PlaylistItem (and its
+  // computePlaylistSignature) key on them, so both must be on the wire.
+  contentId: string;
   order: number;
+  duration: number | null;
   content: {
     id: string;
     name: string;
@@ -131,7 +135,9 @@ export function serializeDeviceContent(
   const items: DeviceContentItem[] = (playlist.items ?? []).map((item: EffectivePlaylistItem) => {
     const c = item.content as JsonRecord | null | undefined;
     return {
+      contentId: item.contentId,
       order: item.order,
+      duration: item.duration ?? null,
       content: c
         ? {
             id: String(c.id),
