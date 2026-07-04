@@ -247,4 +247,29 @@ workspace (`workspace:*`). Two paths, your call:
   session rush. Deferred pending your (a)-vs-(b) ruling.
 
 ---
+
+# Enforce prereqs — bypass fix done; @OnEvent surface surfaced (2026-07-04)
+
+**BYPASS-CONTEXT SYSTEM WRITES (BUILT + REVIEWED SHIP) — closes the fail-closed prereq.** vizora
+`fix/enforce-bypass-system-writes` (11ced158 + review-test b7927b22), held. `webhooks.recordAttempt` (via a
+thin `persistDeliveryAttempt` delegation) and template-library `clone`'s global `useCount` update now run
+under `runWithTenantContext(BYPASS_TENANT_CONTEXT, …)`. Review: **leak-proof** (ALS restores the caller's
+context at the first await, independent of resolve/reject — the fanOut loop's next delivery runs under the
+concrete context, never a leaked bypass), **narrowly scoped** (clone `create` stays guarded), **complete for
+the delivery path** (every guarded write incl. auto-disable is inside the wrap; `deliver` has no other write;
+no retry/cron path). Negative tests prove no-leak on return AND on a throw-after-await, tied to the guard
+decision. 5/5 context + 102/102 across the touched suites.
+
+**⚠ HS-4 — NEW enforce prereq the review flagged (broader @OnEvent surface).** The bypass fix covers the
+webhook delivery path. But **12 other files carry `@OnEvent` handlers** (playlists, notifications, content,
+tag-rule.evaluator, alert-rule.evaluator, onboarding, validation-monitor, …) that do TENANT writes on the
+org's own rows under the INHERITED emitter context. They pass/inject correctly under enforce **iff** they
+carry `organizationId` or use `updateMany`/`deleteMany` with an org filter — but any **bare-id `update`/
+`delete`** in those handlers would REJECT under enforce (async-handler throw → unhandledRejection → PM2
+restart). This is the async-handler analogue of the T4 CRUD sweep and MUST be swept before the enforce flip.
+Distinct from the bypass fix (those were system/cross-org writes → bypass; these are tenant writes → org-scope
+or `updateMany`). **Add to the HS-4 checklist:** @OnEvent bare-id sweep (12 files) + the still-open
+device-auth guard + realtime trust boundary + nested creates. Enforce stays gated until all clear.
+
+---
 *(New items appended below as they arise.)*
