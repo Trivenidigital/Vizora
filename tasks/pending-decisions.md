@@ -289,4 +289,25 @@ nested creates. HS-4 enforce-flip stays gated until those clear + a log-warn rev
 that doc.
 
 ---
+
+# Enforce #5 (realtime boundary) — CHECKED CLEAN; enumeration CONFIRMED (2026-07-04)
+
+Realtime has NO tenant guard (plain `PrismaClient`, no `$use`, no context) — enforce never evaluates its
+writes. Full write audit + spot-verify: **tenant-safe by construction.** Every mutating `display` write keys
+on the device's OWN authenticated `deviceId` (verified JWT + DB cross-check at handshake AND per-message via
+`WsDeviceGuard`); every create stamps org from the device-authenticated socket, never client payload. No
+write selects a foreign row by a message-supplied id. **Formal-coverage gap, not a live leak — nothing to
+fix before enforce is meaningful.** **No third context class** — realtime is the existing "system/self-
+stamping trusted writer" context in an unguarded process.
+
+**ENUMERATION CONFIRMED.** Both checks that could have falsified it (#3 @OnEvent, #5 realtime) came back
+clean. The enforce flip is now gated on the KNOWN, MECHANICAL remainder only: **#4 device-auth write paths +
+#6 nested creates + a log-warn review** (`docs/enforce-readiness.md`). dimension-1 4→5 is genuinely close.
+
+**Optional (NOT a blocker):** add a `$use` guard to realtime's `DatabaseService` so its safety-by-convention
+becomes structurally enforced (a future unvalidated-client-id write fails closed). Plus a backlog note:
+`contentImpression.create` accepts unvalidated content/playlist ids — own-tenant analytics/proof-of-play
+quality, not cross-tenant.
+
+---
 *(New items appended below as they arise.)*
