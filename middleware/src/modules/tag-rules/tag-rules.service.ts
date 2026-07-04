@@ -102,8 +102,10 @@ export class TagRulesService {
       await this.validateRuleRefs(organizationId, dto.tagId, dto.playlistId);
     }
 
-    const after = await this.db.tagAssignmentRule.update({
-      where: { id },
+    // Org-scoped in the write itself (tenant-guard enforce prereq): updateMany
+    // requires id AND organizationId, so a cross-tenant id affects zero rows.
+    const scoped = await this.db.tagAssignmentRule.updateMany({
+      where: { id, organizationId },
       data: {
         ...(dto.name !== undefined ? { name: dto.name } : {}),
         ...(dto.tagId !== undefined ? { tagId: dto.tagId } : {}),
@@ -112,6 +114,15 @@ export class TagRulesService {
         ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
       },
     });
+    if (scoped.count === 0) {
+      throw new NotFoundException(`Tag assignment rule ${id} not found`);
+    }
+    const after = await this.db.tagAssignmentRule.findFirst({
+      where: { id, organizationId },
+    });
+    if (!after) {
+      throw new NotFoundException(`Tag assignment rule ${id} not found`);
+    }
 
     // Re-sweep when ANY of these change — including priority, since a
     // priority drop can promote this rule past an existing rule for a

@@ -595,10 +595,23 @@ export class TemplateLibraryService {
       updateData.description = dto.description;
     }
 
-    const updated = await this.db.content.update({
-      where: { id },
+    // Org-scoped in the write itself (tenant-guard enforce prereq). The row was
+    // already resolved as this org's own non-global template above; updateMany
+    // with id AND organizationId keeps the write itself tenant-safe, so a
+    // cross-tenant id affects zero rows.
+    const scoped = await this.db.content.updateMany({
+      where: { id, organizationId },
       data: updateData,
     });
+    if (scoped.count === 0) {
+      throw new NotFoundException('Template not found');
+    }
+    const updated = await this.db.content.findFirst({
+      where: { id, organizationId },
+    });
+    if (!updated) {
+      throw new NotFoundException('Template not found');
+    }
 
     return this.mapTemplateResponse(updated);
   }

@@ -52,7 +52,7 @@ describe('SupportService', () => {
         findUnique: jest.fn(),
         findFirst: jest.fn(),
         update: jest.fn(),
-        updateMany: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         count: jest.fn(),
       },
       supportMessage: {
@@ -548,7 +548,8 @@ describe('SupportService', () => {
   describe('update', () => {
     it('should update status and priority', async () => {
       db.supportRequest.findUnique.mockResolvedValue(mockRequest);
-      db.supportRequest.update.mockResolvedValue({
+      // The returned entity now comes from the org-scoped re-fetch (findFirst).
+      db.supportRequest.findFirst.mockResolvedValue({
         ...mockRequest,
         status: 'in_progress',
         priority: 'high',
@@ -561,8 +562,9 @@ describe('SupportService', () => {
 
       expect(result.status).toBe('in_progress');
       expect(result.priority).toBe('high');
-      expect(db.supportRequest.update).toHaveBeenCalledWith({
-        where: { id: mockRequest.id },
+      // Non-superadmin → org-scoped write; a cross-tenant id affects zero rows.
+      expect(db.supportRequest.updateMany).toHaveBeenCalledWith({
+        where: { id: mockRequest.id, organizationId: orgId },
         data: expect.objectContaining({
           status: 'in_progress',
           priority: 'high',
@@ -572,7 +574,7 @@ describe('SupportService', () => {
 
     it('should set resolvedById and resolvedAt when status is resolved', async () => {
       db.supportRequest.findUnique.mockResolvedValue(mockRequest);
-      db.supportRequest.update.mockResolvedValue({
+      db.supportRequest.findFirst.mockResolvedValue({
         ...mockRequest,
         status: 'resolved',
         resolvedById: 'admin-user',
@@ -584,8 +586,8 @@ describe('SupportService', () => {
         resolvedById: 'admin-user',
       });
 
-      expect(db.supportRequest.update).toHaveBeenCalledWith({
-        where: { id: mockRequest.id },
+      expect(db.supportRequest.updateMany).toHaveBeenCalledWith({
+        where: { id: mockRequest.id, organizationId: orgId },
         data: expect.objectContaining({
           status: 'resolved',
           resolvedById: 'admin-user',
@@ -602,6 +604,15 @@ describe('SupportService', () => {
       ).rejects.toThrow(NotFoundException);
     });
 
+    it('should throw NotFoundException when the org-scoped updateMany affects zero rows', async () => {
+      db.supportRequest.findUnique.mockResolvedValue(mockRequest); // access-control passes
+      db.supportRequest.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.update(mockRequest.id, orgId, false, { status: 'resolved' }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
     it('should throw ForbiddenException for wrong org (non-superadmin)', async () => {
       db.supportRequest.findUnique.mockResolvedValue({
         ...mockRequest,
@@ -613,12 +624,12 @@ describe('SupportService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('should allow superadmin to update any request', async () => {
+    it('should allow superadmin to update any request (cross-org, no org filter)', async () => {
       db.supportRequest.findUnique.mockResolvedValue({
         ...mockRequest,
         organizationId: 'other-org',
       });
-      db.supportRequest.update.mockResolvedValue({
+      db.supportRequest.findFirst.mockResolvedValue({
         ...mockRequest,
         organizationId: 'other-org',
         status: 'resolved',
@@ -626,11 +637,16 @@ describe('SupportService', () => {
 
       const result = await service.update(mockRequest.id, orgId, true, { status: 'resolved' });
       expect(result).toBeDefined();
+      // Superadmin acts cross-org → NO organizationId filter on the write.
+      expect(db.supportRequest.updateMany).toHaveBeenCalledWith({
+        where: { id: mockRequest.id },
+        data: expect.objectContaining({ status: 'resolved' }),
+      });
     });
 
     it('should add requestNumber to the returned result', async () => {
       db.supportRequest.findUnique.mockResolvedValue(mockRequest);
-      db.supportRequest.update.mockResolvedValue(mockRequest);
+      db.supportRequest.findFirst.mockResolvedValue(mockRequest);
 
       const result = await service.update(mockRequest.id, orgId, false, { status: 'in_progress' });
       expect(result.requestNumber).toBe(mockRequest.id.substring(0, 8).toUpperCase());
@@ -743,12 +759,12 @@ describe('SupportService', () => {
         status: 'resolved',
       });
       db.supportMessage.create.mockResolvedValue(mockMessage);
-      db.supportRequest.update.mockResolvedValue({ ...mockRequest, status: 'open' });
 
       await service.addMessage(mockRequest.id, regularUser, 'Still having issues');
 
-      expect(db.supportRequest.update).toHaveBeenCalledWith({
-        where: { id: mockRequest.id },
+      // Org-scoped reopen write (tenant-guard enforce prereq).
+      expect(db.supportRequest.updateMany).toHaveBeenCalledWith({
+        where: { id: mockRequest.id, organizationId: mockRequest.organizationId },
         data: { status: 'open' },
       });
     });
@@ -762,7 +778,7 @@ describe('SupportService', () => {
 
       await service.addMessage(mockRequest.id, adminUser, 'This was fixed');
 
-      expect(db.supportRequest.update).not.toHaveBeenCalled();
+      expect(db.supportRequest.updateMany).not.toHaveBeenCalled();
     });
 
     it('returns an existing message for a repeated client mutation id without writing again', async () => {
@@ -782,7 +798,7 @@ describe('SupportService', () => {
 
       expect(result.content).toBe('Retry me safely');
       expect(db.supportMessage.create).not.toHaveBeenCalled();
-      expect(db.supportRequest.update).not.toHaveBeenCalled();
+      expect(db.supportRequest.updateMany).not.toHaveBeenCalled();
     });
 
     it('reopens resolved requests when returning an existing repeated user message', async () => {
@@ -805,8 +821,8 @@ describe('SupportService', () => {
 
       expect(result.content).toBe('Retry me safely');
       expect(db.supportMessage.create).not.toHaveBeenCalled();
-      expect(db.supportRequest.update).toHaveBeenCalledWith({
-        where: { id: mockRequest.id },
+      expect(db.supportRequest.updateMany).toHaveBeenCalledWith({
+        where: { id: mockRequest.id, organizationId: mockRequest.organizationId },
         data: { status: 'open' },
       });
     });
@@ -857,8 +873,8 @@ describe('SupportService', () => {
 
       expect(result.content).toBe('Retry me safely');
       expect(db.supportMessage.findFirst).toHaveBeenCalledTimes(2);
-      expect(db.supportRequest.update).toHaveBeenCalledWith({
-        where: { id: mockRequest.id },
+      expect(db.supportRequest.updateMany).toHaveBeenCalledWith({
+        where: { id: mockRequest.id, organizationId: mockRequest.organizationId },
         data: { status: 'open' },
       });
     });

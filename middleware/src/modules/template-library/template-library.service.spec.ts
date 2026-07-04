@@ -50,7 +50,7 @@ describe('TemplateLibraryService', () => {
         count: jest.fn().mockResolvedValue(0),
         create: jest.fn(),
         update: jest.fn(),
-        updateMany: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       display: {
         findFirst: jest.fn(),
@@ -736,11 +736,11 @@ describe('TemplateLibraryService', () => {
   });
 
   describe('saveUserTemplate', () => {
-    it('should save a user-owned non-global template via an org-scoped query', async () => {
+    it('should save a user-owned non-global template via an org-scoped query and write', async () => {
       const template = makeTemplate({ isGlobal: false, organizationId: 'org-1' });
+      // findFirst backs both the org-scoped existence check and the
+      // post-updateMany re-fetch.
       mockDb.content.findFirst.mockResolvedValue(template);
-      const updated = makeTemplate({ isGlobal: false, organizationId: 'org-1', name: 'New Name' });
-      mockDb.content.update.mockResolvedValue(updated);
 
       const result = await service.saveUserTemplate('tmpl-1', { name: 'New Name' }, 'org-1');
 
@@ -748,11 +748,23 @@ describe('TemplateLibraryService', () => {
       expect(mockDb.content.findFirst).toHaveBeenCalledWith({
         where: { id: 'tmpl-1', type: 'template', isGlobal: false, organizationId: 'org-1' },
       });
-      expect(mockDb.content.update).toHaveBeenCalledWith({
-        where: { id: 'tmpl-1' },
+      // The write itself is org-scoped (tenant-guard enforce prereq).
+      expect(mockDb.content.updateMany).toHaveBeenCalledWith({
+        where: { id: 'tmpl-1', organizationId: 'org-1' },
         data: expect.objectContaining({ name: 'New Name' }),
       });
+      expect(mockDb.content.update).not.toHaveBeenCalled();
       expect(result.id).toBe('tmpl-1');
+    });
+
+    it('throws NotFound when the org-scoped updateMany affects zero rows (cross-tenant write backstop)', async () => {
+      const template = makeTemplate({ isGlobal: false, organizationId: 'org-1' });
+      mockDb.content.findFirst.mockResolvedValue(template); // existence check passes
+      mockDb.content.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.saveUserTemplate('tmpl-1', { name: 'New Name' }, 'org-1'),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should reject when the template belongs to another org (NotFoundException, no existence leak)', async () => {
@@ -763,6 +775,7 @@ describe('TemplateLibraryService', () => {
       await expect(
         service.saveUserTemplate('tmpl-1', { name: 'Hack' }, 'org-1'),
       ).rejects.toThrow(NotFoundException);
+      expect(mockDb.content.updateMany).not.toHaveBeenCalled();
       expect(mockDb.content.update).not.toHaveBeenCalled();
     });
 
@@ -775,6 +788,7 @@ describe('TemplateLibraryService', () => {
       await expect(
         service.saveUserTemplate('tmpl-1', { templateHtml: '<p>hacked</p>' }, 'org-1'),
       ).rejects.toThrow(NotFoundException);
+      expect(mockDb.content.updateMany).not.toHaveBeenCalled();
       expect(mockDb.content.update).not.toHaveBeenCalled();
     });
 

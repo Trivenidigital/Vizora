@@ -617,8 +617,12 @@ export class PairingService implements OnModuleDestroy {
       if (existingDisplay) {
         // Update existing display
         // Set status to 'pairing' - the WebSocket gateway will update to 'online' when device connects
-        display = await this.db.display.update({
-          where: { id: existingDisplay.id },
+        // Org-scoped in the write itself (tenant-guard enforce prereq). The
+        // check above guarantees existingDisplay.organizationId === organizationId,
+        // so scoping the write to that org always matches the intended row; a
+        // cross-tenant id would affect zero rows.
+        const scopedUpdate = await this.db.display.updateMany({
+          where: { id: existingDisplay.id, organizationId },
           data: {
             nickname: nickname || request.nickname,
             organizationId,
@@ -631,8 +635,18 @@ export class PairingService implements OnModuleDestroy {
             // override the Vizora-level defaults but NOT explicit fields above.
             ...(provisioningDefaults ?? {}),
           },
+        });
+        if (scopedUpdate.count === 0) {
+          throw new NotFoundException('Display not found');
+        }
+        const pairedDisplay = await this.db.display.findFirst({
+          where: { id: existingDisplay.id, organizationId },
           select: PAIRING_RESULT_SELECT,
         });
+        if (!pairedDisplay) {
+          throw new NotFoundException('Display not found');
+        }
+        display = pairedDisplay;
       } else {
         // Create new display
         // Set status to 'pairing' - the WebSocket gateway will update to 'online' when device connects

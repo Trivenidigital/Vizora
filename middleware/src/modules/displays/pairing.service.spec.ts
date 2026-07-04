@@ -70,9 +70,16 @@ describe('PairingService', () => {
     mockDatabaseService = {
       display: {
         findUnique: jest.fn(),
+        findFirst: jest.fn().mockResolvedValue({
+          id: 'refetch-display',
+          nickname: 'Refetched Display',
+          deviceIdentifier: 'refetch-device',
+          status: 'pairing',
+        }),
         findMany: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       organization: {
         findUnique: jest.fn().mockResolvedValue({
@@ -656,7 +663,9 @@ describe('PairingService', () => {
         metadata: {},
       });
 
-      mockDatabaseService.display.update.mockResolvedValue({
+      // The returned entity now comes from the org-scoped re-fetch (findFirst
+      // with PAIRING_RESULT_SELECT); the write is a select-less updateMany.
+      mockDatabaseService.display.findFirst.mockResolvedValue({
         id: 'existing-display-id',
         nickname: 'Updated Display',
         deviceIdentifier: 'existing-device',
@@ -676,14 +685,23 @@ describe('PairingService', () => {
           select: { id: true, location: true, organizationId: true },
         },
       );
-      expect(mockDatabaseService.display.update).toHaveBeenCalledWith(
+      // The write itself is org-scoped (tenant-guard enforce prereq).
+      expect(mockDatabaseService.display.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
+          where: { id: 'existing-display-id', organizationId },
+        }),
+      );
+      // The response select (which excludes sensitive fields) is now on the
+      // re-fetch findFirst, not the write.
+      expect(mockDatabaseService.display.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'existing-display-id', organizationId },
           select: pairingResultSelect,
         }),
       );
-      const updateArgs = mockDatabaseService.display.update.mock
+      const refetchArgs = mockDatabaseService.display.findFirst.mock
         .calls[0][0] as any;
-      expectSelectToExcludeSensitiveDisplayFields(updateArgs.select);
+      expectSelectToExcludeSensitiveDisplayFields(refetchArgs.select);
     });
 
     it('should throw NotFoundException for non-existent code', async () => {
@@ -930,7 +948,7 @@ describe('PairingService', () => {
         metadata: {},
       });
 
-      mockDatabaseService.display.update.mockResolvedValue({
+      mockDatabaseService.display.findFirst.mockResolvedValue({
         id: 'existing-at-quota-display',
         nickname: 'Existing At Quota',
         deviceIdentifier: 'existing-at-quota-device',
@@ -944,7 +962,7 @@ describe('PairingService', () => {
       expect(
         mockDatabaseService.organization.findUnique,
       ).not.toHaveBeenCalled();
-      expect(mockDatabaseService.display.update).toHaveBeenCalled();
+      expect(mockDatabaseService.display.updateMany).toHaveBeenCalled();
     });
 
     it('should clean up pairing request after device retrieves token', async () => {

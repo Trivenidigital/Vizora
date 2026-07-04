@@ -16,6 +16,7 @@ describe('TagRulesService', () => {
     db = {
       tagAssignmentRule: {
         deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         create: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
@@ -98,46 +99,55 @@ describe('TagRulesService', () => {
       db.displayTag.findMany.mockResolvedValue([]);
     });
 
-    it('throws NotFound on cross-org PATCH', async () => {
+    it('throws NotFound on cross-org PATCH (findOne guard)', async () => {
       db.tagAssignmentRule.findFirst.mockResolvedValue(null);
       await expect(service.update(orgId, 'rule-x', { name: 'y' })).rejects.toThrow(NotFoundException);
+      expect(db.tagAssignmentRule.updateMany).not.toHaveBeenCalled();
       expect(db.tagAssignmentRule.update).not.toHaveBeenCalled();
     });
 
+    it('throws NotFound when the org-scoped updateMany affects zero rows (cross-tenant write backstop)', async () => {
+      db.tagAssignmentRule.findFirst.mockResolvedValue(before); // findOne passes
+      db.tagAssignmentRule.updateMany.mockResolvedValue({ count: 0 });
+      await expect(service.update(orgId, 'rule-1', { name: 'y' })).rejects.toThrow(NotFoundException);
+    });
+
     it('priority-only update STILL triggers a sweep (PR-review fix)', async () => {
-      db.tagAssignmentRule.update.mockResolvedValue({ ...before, priority: 50 });
       await service.update(orgId, 'rule-1', { priority: 50 });
       expect(db.displayTag.findMany).toHaveBeenCalledTimes(1); // sweep ran
     });
 
-    it('priority-only update persists the new priority value via Prisma update', async () => {
+    it('priority-only update persists the new priority value via an org-scoped updateMany', async () => {
       // PR-review gap: prove the priority change actually reaches the DB
       // (not just that the sweep was triggered as a side effect).
-      db.tagAssignmentRule.update.mockResolvedValue({ ...before, priority: 50 });
       await service.update(orgId, 'rule-1', { priority: 50 });
-      expect(db.tagAssignmentRule.update).toHaveBeenCalledWith({
-        where: { id: 'rule-1' },
+      expect(db.tagAssignmentRule.updateMany).toHaveBeenCalledWith({
+        where: { id: 'rule-1', organizationId: orgId },
         data: { priority: 50 },
       });
     });
 
     it('name-only update does NOT trigger sweep (cosmetic)', async () => {
-      db.tagAssignmentRule.update.mockResolvedValue({ ...before, name: 'renamed' });
       await service.update(orgId, 'rule-1', { name: 'renamed' });
       expect(db.displayTag.findMany).not.toHaveBeenCalled();
     });
 
     it('tagId change sweeps BOTH the old tag (if active) and the new tag', async () => {
       db.tag.findFirst.mockResolvedValue({ id: 'tag-NEW', organizationId: orgId });
-      db.tagAssignmentRule.update.mockResolvedValue({ ...before, tagId: 'tag-NEW' });
+      // findFirst backs both the findOne guard (before) and the post-updateMany
+      // re-fetch (the updated row with the new tag).
+      db.tagAssignmentRule.findFirst
+        .mockResolvedValueOnce(before)
+        .mockResolvedValueOnce({ ...before, tagId: 'tag-NEW' });
       await service.update(orgId, 'rule-1', { tagId: 'tag-NEW' });
       expect(db.displayTag.findMany).toHaveBeenCalledTimes(2); // old tag + new tag
     });
 
     it('isActive false→true triggers sweep', async () => {
       const beforeInactive = { ...before, isActive: false };
-      db.tagAssignmentRule.findFirst.mockResolvedValue(beforeInactive);
-      db.tagAssignmentRule.update.mockResolvedValue({ ...beforeInactive, isActive: true });
+      db.tagAssignmentRule.findFirst
+        .mockResolvedValueOnce(beforeInactive) // findOne
+        .mockResolvedValueOnce({ ...beforeInactive, isActive: true }); // re-fetch
       await service.update(orgId, 'rule-1', { isActive: true });
       expect(db.displayTag.findMany).toHaveBeenCalledTimes(1);
     });

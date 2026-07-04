@@ -12,6 +12,7 @@ describe('ProvisioningTemplatesService', () => {
     db = {
       provisioningTemplate: {
         deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         create: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
@@ -85,10 +86,17 @@ describe('ProvisioningTemplatesService', () => {
   // update + remove — cross-org guards
   // ---------------------------------------------------------------------------
   describe('update', () => {
-    it('throws NotFound on cross-org PATCH', async () => {
+    it('throws NotFound on cross-org PATCH (findOne guard)', async () => {
       db.provisioningTemplate.findFirst.mockResolvedValue(null);
       await expect(service.update(orgId, 'tpl-x', { name: 'new' })).rejects.toThrow(NotFoundException);
+      expect(db.provisioningTemplate.updateMany).not.toHaveBeenCalled();
       expect(db.provisioningTemplate.update).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFound when the org-scoped updateMany affects zero rows (cross-tenant write backstop)', async () => {
+      db.provisioningTemplate.findFirst.mockResolvedValue({ id: 'tpl-1', organizationId: orgId }); // findOne passes
+      db.provisioningTemplate.updateMany.mockResolvedValue({ count: 0 });
+      await expect(service.update(orgId, 'tpl-1', { name: 'new' })).rejects.toThrow(NotFoundException);
     });
 
     it('rejects PATCH with cross-org defaultPlaylistId', async () => {
@@ -101,14 +109,17 @@ describe('ProvisioningTemplatesService', () => {
     });
 
     it('allows PATCH defaultPlaylistId to null (clear the default playlist)', async () => {
-      db.provisioningTemplate.findFirst.mockResolvedValue({ id: 'tpl-1', organizationId: orgId });
-      db.provisioningTemplate.update.mockResolvedValue({ id: 'tpl-1', defaultPlaylistId: null });
+      // findFirst backs both the findOne guard and the post-updateMany re-fetch.
+      db.provisioningTemplate.findFirst.mockResolvedValue({ id: 'tpl-1', organizationId: orgId, defaultPlaylistId: null });
 
       await service.update(orgId, 'tpl-1', { defaultPlaylistId: null as unknown as string });
 
       // No cross-org check is run when clearing (defaultPlaylistId is null, not undefined)
       expect(db.playlist.findFirst).not.toHaveBeenCalled();
-      expect(db.provisioningTemplate.update).toHaveBeenCalled();
+      expect(db.provisioningTemplate.updateMany).toHaveBeenCalledWith({
+        where: { id: 'tpl-1', organizationId: orgId },
+        data: { defaultPlaylistId: null },
+      });
     });
   });
 

@@ -495,10 +495,20 @@ export class SupportService {
       if (!request.resolvedAt) updateData.resolvedAt = new Date();
     }
 
-    const updated = await this.db.supportRequest.update({
-      where: { id },
-      data: updateData,
-    });
+    // Org-scoped in the write itself (tenant-guard enforce prereq). Superadmins
+    // legitimately act cross-org (their request carries a bypass tenant context),
+    // so only non-superadmins get the organizationId filter — for them a
+    // cross-tenant id affects zero rows. The findUnique + access-control check
+    // above still runs; this scoping is the enforce-safe write backstop.
+    const where = isSuperAdmin ? { id } : { id, organizationId };
+    const scoped = await this.db.supportRequest.updateMany({ where, data: updateData });
+    if (scoped.count === 0) {
+      throw new NotFoundException('Support request not found');
+    }
+    const updated = await this.db.supportRequest.findFirst({ where });
+    if (!updated) {
+      throw new NotFoundException('Support request not found');
+    }
 
     this.logger.log(`Updated support request ${id}: ${JSON.stringify(data)}`);
 
@@ -541,8 +551,13 @@ export class SupportService {
 
     const reopenIfNeeded = async () => {
       if (role === 'user' && (request.status === 'resolved' || request.status === 'closed')) {
-        await this.db.supportRequest.update({
-          where: { id: requestId },
+        // Org-scoped in the write itself (tenant-guard enforce prereq). This
+        // reopen only runs for a role='user' actor, whose org is already asserted
+        // equal to request.organizationId above, so scoping to it always matches.
+        // Best-effort side-effect (the request was loaded + verified, and the
+        // message is already persisted) — no count-check throw here on purpose.
+        await this.db.supportRequest.updateMany({
+          where: { id: requestId, organizationId: request.organizationId },
           data: { status: 'open' },
         });
         this.logger.log(`Reopened support request ${requestId} due to new user message`);

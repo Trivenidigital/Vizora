@@ -64,8 +64,10 @@ export class ProvisioningTemplatesService {
       await this.validatePlaylistInOrg(organizationId, dto.defaultPlaylistId);
     }
 
-    return this.db.provisioningTemplate.update({
-      where: { id },
+    // Org-scoped in the write itself (tenant-guard enforce prereq): updateMany
+    // requires id AND organizationId, so a cross-tenant id affects zero rows.
+    const scoped = await this.db.provisioningTemplate.updateMany({
+      where: { id, organizationId },
       data: {
         ...(dto.name !== undefined ? { name: dto.name } : {}),
         ...(dto.description !== undefined ? { description: dto.description } : {}),
@@ -74,6 +76,12 @@ export class ProvisioningTemplatesService {
         ...(dto.defaultPlaylistId !== undefined ? { defaultPlaylistId: dto.defaultPlaylistId } : {}),
         ...(dto.isDefault !== undefined ? { isDefault: dto.isDefault } : {}),
       },
+    });
+    if (scoped.count === 0) {
+      throw new NotFoundException(`Provisioning template ${id} not found`);
+    }
+    return this.db.provisioningTemplate.findFirst({
+      where: { id, organizationId },
     });
   }
 
