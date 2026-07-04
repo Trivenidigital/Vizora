@@ -18,8 +18,9 @@ import EntitlementBanner from '@/components/EntitlementBanner';
 import { SupportChatProvider } from '@/components/support/SupportChatProvider';
 import { SupportChat } from '@/components/support/SupportChat';
 import { useCustomization } from '@/components/providers/CustomizationProvider';
+import { SCHEDULES_ENABLED } from '@/lib/feature-flags';
 
-const navigation: Array<{ name: string; href: string; icon: IconName; exactMatch?: boolean }> = [
+const allNavigation: Array<{ name: string; href: string; icon: IconName; exactMatch?: boolean }> = [
   { name: 'Overview', href: '/dashboard', icon: 'overview', exactMatch: true },
   { name: 'Devices', href: '/dashboard/devices', icon: 'devices' },
   { name: 'Content', href: '/dashboard/content', icon: 'content' },
@@ -27,11 +28,17 @@ const navigation: Array<{ name: string; href: string; icon: IconName; exactMatch
   { name: 'Widgets', href: '/dashboard/widgets', icon: 'widget' },
   { name: 'Layouts', href: '/dashboard/layouts', icon: 'layout' },
   { name: 'Playlists', href: '/dashboard/playlists', icon: 'playlists' },
+  // Schedules hidden from nav while SCHEDULES_ENABLED is off (interim C-7 mitigation).
   { name: 'Schedules', href: '/dashboard/schedules', icon: 'schedules' },
   { name: 'Analytics', href: '/dashboard/analytics', icon: 'analytics' },
   { name: 'Settings', href: '/dashboard/settings', icon: 'settings' },
   { name: 'Help', href: '/dashboard/help', icon: 'help' },
 ];
+
+// Schedules hidden from nav while SCHEDULES_ENABLED is off (interim C-7 mitigation).
+const navigation = allNavigation.filter(
+  (item) => SCHEDULES_ENABLED || item.href !== '/dashboard/schedules',
+);
 
 export default function DashboardLayout({
   children,
