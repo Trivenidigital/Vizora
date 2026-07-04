@@ -44,8 +44,10 @@ Branch `fix/finding2-reconnect-rehydration` (backend, reviewed) fixes the connec
 emits `playlist:update` twice on reconnect (best-effort pending + authoritative DB re-send), and the
 TV app's `updatePlaylist` (`vizora-tv/src/main.ts:1151-1187`) has **no identity check** — it resets
 `currentIndex=0` and re-commits, so the second emit (separated by the DB round-trip) tears down the
-first render → **template flash / video restart-to-0:00 + a DUPLICATE `content:impression`** (proof-of-play
-defect). Never-black absorbs the black-frame; not the flash/restart/duplicate.
+first render → **template flash / video restart-to-0:00 + a DUPLICATE `content:impression`**. Never-black
+absorbs the black-frame; not the flash/restart/duplicate. **Severity: NOT cosmetic** — the duplicate
+impression corrupts **proof-of-play** (a billing-adjacent, customer-facing metric) on *every* reconnect;
+the review prevented merging a fix that would have silently skewed play counts.
 
 **Why queued:** the required fix is CLIENT-side (`updatePlaylist` becomes a no-op when the incoming
 `playlist.id` + item set already matches the currently-playing one). It's cross-repo (vizora-tv), which
@@ -60,8 +62,9 @@ concede the review is right.
 **Recommendation:** land the client idempotency change (`updatePlaylist` no-op on same-playlist) —
 which is *elegant*: it distinguishes "pending rendered" (P already current → DB re-send is a no-op, no
 flash) from "pending lost/strand" (P not current → DB re-send renders it, recovery works) — then merge
-the backend branch. This idempotency change is a natural part of the pull-on-connect slice (see
-`docs/pull-on-connect.md`). Backend branch is ready and waiting. *(Hard stop: cross-repo TV-app impl +
+the backend branch. **PD-1 and the pull-on-connect slice are ONE decision, not two** — the client
+idempotency change IS §5 of `docs/pull-on-connect.md`; approve/build them together (the backend branch
+merges as part of that slice). Backend branch is ready and waiting. *(Hard stop: cross-repo TV-app impl +
 review-vs-analysis disagreement.)*
 
 ## PD-2 — CI-excluded e2e specs: wire-in vs delete → RECOMMEND wire-in; one sub-question queued
