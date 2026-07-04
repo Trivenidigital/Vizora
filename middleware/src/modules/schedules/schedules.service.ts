@@ -7,63 +7,14 @@ import { UpdateScheduleDto } from './dto/update-schedule.dto';
 import { CheckConflictsDto } from './dto/check-conflicts.dto';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 
-const MINUTES_PER_DAY = 24 * 60;
-const DAYS_PER_WEEK = 7;
-const MINUTES_PER_WEEK = DAYS_PER_WEEK * MINUTES_PER_DAY;
-
-type ScheduleWindow = {
-  daysOfWeek: number[];
-  startTime?: number | null;
-  endTime?: number | null;
-};
-
-const previousDay = (day: number) => (day + DAYS_PER_WEEK - 1) % DAYS_PER_WEEK;
-const nextDay = (day: number) => (day + 1) % DAYS_PER_WEEK;
-
-const expandAdjacentDays = (days: number[]): number[] => Array.from(new Set(
-  days.flatMap((day) => [day, previousDay(day), nextDay(day)]),
-));
-
-const expandWeeklyIntervals = (window: ScheduleWindow): Array<{ start: number; end: number }> => {
-  return window.daysOfWeek.flatMap((day) => {
-    if (window.startTime == null || window.endTime == null || window.startTime === window.endTime) {
-      return [{ start: day * MINUTES_PER_DAY, end: (day + 1) * MINUTES_PER_DAY }];
-    }
-
-    const start = day * MINUTES_PER_DAY + window.startTime;
-    const end = window.startTime < window.endTime
-      ? day * MINUTES_PER_DAY + window.endTime
-      : (day + 1) * MINUTES_PER_DAY + window.endTime;
-    return [{ start, end }];
-  });
-};
-
-const intervalsOverlap = (
-  left: { start: number; end: number },
-  right: { start: number; end: number },
-): boolean => {
-  return [-MINUTES_PER_WEEK, 0, MINUTES_PER_WEEK].some((shift) => {
-    const shiftedRight = { start: right.start + shift, end: right.end + shift };
-    return left.start < shiftedRight.end && shiftedRight.start < left.end;
-  });
-};
-
-const schedulesOverlapInTime = (candidate: ScheduleWindow, existing: ScheduleWindow): boolean => {
-  const candidateIntervals = expandWeeklyIntervals(candidate);
-  const existingIntervals = expandWeeklyIntervals(existing);
-  return candidateIntervals.some((candidateInterval) => (
-    existingIntervals.some((existingInterval) => intervalsOverlap(candidateInterval, existingInterval))
-  ));
-};
-
-const isScheduleActiveAt = (schedule: ScheduleWindow, dayOfWeek: number, currentTime: number): boolean => {
-  const point = dayOfWeek * MINUTES_PER_DAY + currentTime;
-  return expandWeeklyIntervals(schedule).some((interval) => (
-    [point - MINUTES_PER_WEEK, point, point + MINUTES_PER_WEEK].some((shiftedPoint) => (
-      interval.start <= shiftedPoint && shiftedPoint < interval.end
-    ))
-  ));
-};
+// Pure schedule-activity math now lives in a single, reusable module (T2 coherence
+// ruling) so the effective-content resolver evaluates "active now?" identically.
+import {
+  previousDay,
+  expandAdjacentDays,
+  schedulesOverlapInTime,
+  isScheduleActiveAt,
+} from './schedule-active.util';
 
 @Injectable()
 export class SchedulesService {
