@@ -81,6 +81,29 @@ depends on it.
 | §3 pull-on-connect | ✅ (belt) | ✅ (reconnect) | ✅ (boundary) | — |
 | §4 heartbeat reconcile | — | ✅ (no-reconnect) | — | — |
 
+## Build status (2026-07-04)
+
+**Built + held for merge:** §5 client idempotency (`computePlaylistSignature` no-op in `updatePlaylist`,
+vizora-tv `b0a7aaa`) and the §1 S1-2 content-status/expiry filter in `findActiveSchedules` (vizora
+`b624ca0c`). §5 unblocks the Finding-2 backend fix (PD-1).
+
+**Not yet built (large cross-app slice; de-risked because T1 hides the schedules UI → no C-7 exposure):**
+§1 resolver + §2 endpoint + §3 pull-on-connect + §4 heartbeat reconcile. The one real decision to make
+first: **push↔pull coherence.** On connect a device would both pull `/devices/me/content` (schedule ??
+currentPlaylist) AND receive realtime's `sendInitialState` push (currentPlaylist today). If a schedule is
+active they disagree, and whichever `updatePlaylist` runs last wins. Resolve it ONE of two ways before
+building:
+- (A) route realtime's `sendInitialState` through the SAME resolver (schedule ?? currentPlaylist) so its
+  push == the pull. Cost: realtime must resolve schedules — it doesn't today, and duplicating the
+  timezone/day-window logic risks divergence from `findActiveSchedules`. Prefer extracting the
+  schedule-active evaluation into a shared, pure, unit-tested helper both apps import.
+- (B) make the device-pull authoritative on connect and have realtime NOT push on connect (device pulls
+  instead); realtime keeps only LIVE currentPlaylist-change pushes, which the device reconciles against
+  its pulled version (§4). Cleaner separation, but live currentPlaylist changes during an active schedule
+  still need the resolver to avoid overriding the schedule — so (A)'s shared helper is needed regardless.
+Recommended: extract the shared schedule-active helper first, then (A). Build order: resolver+filter →
+endpoint → sendInitialState-via-resolver → client pull-on-connect → boundary re-pull → heartbeat reconcile.
+
 ## Test oracle (when built)
 Extend the B12 two-tenant fixture: (a) schedule-only assignment → device pull renders it (C-7); (b)
 assign → drop the push while socket stays up → next heartbeat reconciles → device renders (residual 1);
