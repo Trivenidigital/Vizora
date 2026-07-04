@@ -108,3 +108,48 @@ endpoint → sendInitialState-via-resolver → client pull-on-connect → bounda
 Extend the B12 two-tenant fixture: (a) schedule-only assignment → device pull renders it (C-7); (b)
 assign → drop the push while socket stays up → next heartbeat reconciles → device renders (residual 1);
 (c) same-version pull/push → `updatePlaylist` no-op, single `content:impression` (review #1).
+
+---
+
+## RATIFIED build plan (2026-07-04 — coherence ruling: A + version-wins)
+
+**The two-layer coherence model (operator-ruled):**
+1. **Priority — the resolver's job.** ONE shared resolver decides what should show now: an active schedule
+   (highest priority, its window per `isScheduleActiveAt`) OVERRIDES the default `currentPlaylist`; else
+   `currentPlaylist`; else nothing (holding). This is priority, NOT edit-recency.
+2. **Idempotency — version-wins, on top.** The device applies resolver output only if its version
+   (`content.updatedAt`-based, the PD-7 signature) is newer than what's rendered — so push and pull feeding
+   the SAME resolver output never race or double-apply.
+
+**INVARIANT:** the resolver is the *single* definition of "what shows now." Both channels call it; neither
+is authoritative by itself; **resolver-output + version is authoritative.** If push computes priority one way
+and pull another, incoherence returns one level up. Same resolver, called from both.
+
+**Resolver home — the one build-mechanics finding:** `@vizora/shared` is currently an ORPHAN (declared as a
+dep by no app; middleware/realtime import only `@vizora/database`). So the cross-app single-resolver needs a
+consumption path *established* first. Decision for increment 2: **wire `@vizora/shared` consumption by
+mirroring `@vizora/database`'s proven workspace wiring** (add `"@vizora/shared": "workspace:*"` to
+middleware + realtime, add tsconfig project references, ensure it builds to `dist`), then put
+`resolveEffectiveContent(prisma, deviceId, orgId, now)` + move `schedule-active.util` there. Fallback if that
+build-config proves fragile under a full build: host the resolver in `@vizora/database` (already consumed by
+both), accepting the minor layering compromise. **Verify with a full build of both apps before proceeding.**
+
+**Increments (each reviewed, held; 1 done):**
+1. ✅ **Shared schedule-active helper** — `schedule-active.util.ts` extracted, `findActiveSchedules` refactored,
+   37+9 green. Commit `35f8222e` (branch `fix/t2-effective-content-resolver`).
+2. **Resolver** — establish `@vizora/shared` consumption (above); `resolveEffectiveContent` = active-schedule
+   (S1-2 filtered, priority-ordered, `isScheduleActiveAt`) `?? currentPlaylist` `?? none`, returning
+   `{ playlist, source, version }` where `version` = the PD-7 signature over the effective playlist. Refactor
+   `findActiveSchedules` to reuse the shared query. Unit-test: schedule-overrides-playlist, fallback,
+   version stability, S1-2 filter, boundary in/out.
+3. **Pull endpoint** — `GET /api/v1/devices/me/content` (device-JWT via `@Public()` + `verifyCurrentDeviceToken`,
+   org from the token, never a path param) → resolver → the device-content payload (same transform as
+   realtime, INCLUDING `content.updatedAt`).
+4. **Realtime via resolver** — `sendInitialState` calls the SAME resolver so its push == the pull (closes C-7
+   on the push path + makes push/pull coherent). Reuses the existing playlist→device transform.
+5. **TV client** — pull `/devices/me/content` on connect/`exitAuthDegraded` → `updatePlaylist` (idempotent by
+   the PD-7 signature); compute next schedule boundary → timer re-pull; carry `version` on heartbeat →
+   server compares vs the resolver → mismatch tells the device to re-pull (closes residual-1 no-reconnect).
+
+**Depends on:** PD-7 merged (the `content.updatedAt` discriminator IS the version) — so land PD-7 before/with
+increment 5. The schedules UI stays hidden (T1) until this ships, so there's no C-7 exposure during the build.
