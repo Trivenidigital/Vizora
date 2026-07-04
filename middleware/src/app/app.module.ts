@@ -77,6 +77,17 @@ import { CsrfMiddleware } from '../modules/common/middleware/csrf.middleware';
               ttl: 3600000,
               limit: 1000,
             },
+            // 'default' MUST be registered or every `@Throttle({ default: {...} })`
+            // per-route override in the app is silently dead (PD-4) — sensitive
+            // endpoints (auth/login/register, pairing) then run at only the global
+            // ceiling. A generous global limit here means un-annotated routes gain
+            // no new restriction (medium 100/min still binds first); the strictness
+            // lives in the per-route overrides, which now actually fire.
+            {
+              name: 'default',
+              ttl: 60000,
+              limit: 1000,
+            },
           ]
         : [
             // DEVELOPMENT/TEST: Very permissive limits
@@ -93,6 +104,13 @@ import { CsrfMiddleware } from '../modules/common/middleware/csrf.middleware';
             {
               name: 'long',
               ttl: 3600000,
+              limit: 100000,
+            },
+            // Registered so per-route @Throttle({ default }) overrides fire (PD-4).
+            // Permissive in dev/test so suites aren't rate-limited.
+            {
+              name: 'default',
+              ttl: 60000,
               limit: 100000,
             },
           ]
