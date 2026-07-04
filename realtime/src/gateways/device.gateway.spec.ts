@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
+import { resolveEffectiveContent, serializeDeviceContent } from '@vizora/database';
 import { DeviceGateway } from './device.gateway';
 import { RedisService } from '../services/redis.service';
 import { HeartbeatService } from '../services/heartbeat.service';
@@ -97,6 +98,12 @@ describe('DeviceGateway', () => {
         deviceIdentifier: 'test-id',
         jwtToken: hashToken('valid-token'),
       }),
+      findMany: jest.fn().mockResolvedValue([]),
+      // The T2 effective-content resolver reads the display via findFirst
+      // (timezone / isDisabled / currentPlaylistId).
+      findFirst: jest.fn().mockResolvedValue({ timezone: 'UTC', isDisabled: false, currentPlaylistId: null }),
+    },
+    schedule: {
       findMany: jest.fn().mockResolvedValue([]),
     },
     playlist: {
@@ -230,208 +237,69 @@ describe('DeviceGateway', () => {
     jest.useRealTimers();
   });
 
-  describe('layout content resolution', () => {
-    it('emits display-compatible resolvedPlaylist and resolvedContent zone fields', async () => {
-      mockDatabaseService.playlist.findFirst.mockResolvedValueOnce({
-        id: 'playlist-1',
-        name: 'Menu Loop',
-        items: [
-          {
-            id: 'item-1',
-            contentId: 'content-1',
-            duration: 10,
-            order: 0,
-            content: {
-              id: 'content-1',
-              name: 'Menu Image',
-              type: 'image',
-              url: 'minio://org/content-1.png',
-              thumbnail: '/thumb.png',
-              mimeType: 'image/png',
-              duration: 10,
-            },
+  // NOTE (PD-9): the former 'layout content resolution' tests exercised the realtime-
+  // only resolveLayoutContent (removed in increment 4 — it made push != pull for
+  // layouts). Layout zone resolution moves to the SHARED serializer path under PD-9,
+  // where it'll be tested once for both channels.
+
+  describe('sendInitialState — via the shared resolver + serializer (T2 increment 4)', () => {
+    const stamp = new Date('2026-01-01T00:00:00Z');
+    const currentPlaylistState = (contentMetadata?: unknown) => {
+      mockDatabaseService.display.findFirst.mockResolvedValue({ timezone: 'UTC', isDisabled: false, currentPlaylistId: 'p-1' });
+      mockDatabaseService.schedule.findMany.mockResolvedValue([]);
+      mockDatabaseService.playlist.findFirst.mockResolvedValue({
+        id: 'p-1', name: 'Current Playlist', updatedAt: stamp,
+        items: [{
+          contentId: 'content-1', order: 0, duration: 10, updatedAt: stamp,
+          content: {
+            id: 'content-1', name: 'API Menu', type: 'template', url: '/api/v1/device-content/content-1/file',
+            thumbnail: null, mimeType: 'text/html', duration: 10, updatedAt: stamp, metadata: contentMetadata,
           },
-        ],
+        }],
       });
-      mockDatabaseService.content.findFirst.mockResolvedValueOnce({
-        id: 'content-2',
-        name: 'Weather',
-        type: 'url',
-        url: 'https://example.com/weather',
-        thumbnail: null,
-        mimeType: null,
-        duration: null,
-      });
+    };
 
-      const result = await (gateway as any).resolveLayoutContent({
-        id: 'layout-1',
-        type: 'layout',
-        metadata: {
-          zones: [
-            { id: 'zone-playlist', gridArea: 'main', playlistId: 'playlist-1' },
-            { id: 'zone-content', gridArea: 'side', contentId: 'content-2' },
-          ],
-        },
-      }, 'org-1');
-
-      expect(result.metadata.zones[0].resolvedPlaylist).toEqual(
-        expect.objectContaining({
-          id: 'playlist-1',
-          items: expect.arrayContaining([
-            expect.objectContaining({
-              content: expect.objectContaining({
-                id: 'content-1',
-                name: 'Menu Image',
-                url: 'http://localhost:3000/api/v1/device-content/content-1/file',
-              }),
-            }),
-          ]),
-        }),
-      );
-      expect(result.metadata.zones[0].playlist).toBeUndefined();
-      expect(result.metadata.zones[1].resolvedContent).toEqual(
-        expect.objectContaining({
-          id: 'content-2',
-          name: 'Weather',
-          url: 'https://example.com/weather',
-        }),
-      );
-      expect(result.metadata.zones[1].content).toBeUndefined();
-      expect(mockDatabaseService.playlist.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'playlist-1', organizationId: 'org-1' },
-        }),
-      );
-      expect(mockDatabaseService.content.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'content-2', organizationId: 'org-1' },
-        }),
-      );
-    });
-
-    it('does not resolve cross-organization layout zone references', async () => {
-      mockDatabaseService.playlist.findFirst.mockResolvedValueOnce(null);
-      mockDatabaseService.content.findFirst.mockResolvedValueOnce(null);
-
-      const result = await (gateway as any).resolveLayoutContent({
-        id: 'layout-1',
-        type: 'layout',
-        metadata: {
-          zones: [
-            { id: 'zone-playlist', gridArea: 'main', playlistId: 'other-org-playlist' },
-            { id: 'zone-content', gridArea: 'side', contentId: 'other-org-content' },
-          ],
-        },
-      }, 'org-1');
-
-      expect(result.metadata.zones[0].resolvedPlaylist).toBeUndefined();
-      expect(result.metadata.zones[1].resolvedContent).toBeUndefined();
-      expect(mockDatabaseService.playlist.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'other-org-playlist', organizationId: 'org-1' },
-        }),
-      );
-      expect(mockDatabaseService.content.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'other-org-content', organizationId: 'org-1' },
-        }),
-      );
-    });
-
-    it('redacts generic API widget headers from layout metadata before returning device payloads', async () => {
-      const result = await (gateway as any).resolveLayoutContent({
-        id: 'layout-1',
-        type: 'layout',
-        metadata: {
-          ...genericApiWidgetMetadata,
-          zones: [
-            {
-              id: 'zone-content',
-              gridArea: 'main',
-              resolvedContent: {
-                id: 'content-1',
-                name: 'API Menu',
-                type: 'template',
-                url: '/api/v1/device-content/content-1/file',
-                metadata: genericApiWidgetMetadata,
-              },
-            },
-            {
-              id: 'zone-playlist',
-              gridArea: 'side',
-              resolvedPlaylist: {
-                id: 'playlist-1',
-                name: 'Widget Loop',
-                items: [
-                  {
-                    id: 'item-1',
-                    contentId: 'content-2',
-                    duration: 10,
-                    content: {
-                      id: 'content-2',
-                      name: 'API Menu 2',
-                      type: 'template',
-                      url: '/api/v1/device-content/content-2/file',
-                      metadata: genericApiWidgetMetadata,
-                    },
-                  },
-                ],
-              },
-            },
-          ],
-        },
-      }, 'org-1');
-
-      expect(result.metadata.widgetConfig).toBeUndefined();
-      expect(result.metadata.zones[0].resolvedContent.metadata.widgetConfig).toBeUndefined();
-      expect(result.metadata.zones[1].resolvedPlaylist.items[0].content.metadata.widgetConfig).toBeUndefined();
-      expect(JSON.stringify(result)).not.toContain('live-secret');
-      expect(JSON.stringify(result)).not.toContain('live-api-key');
-      expect(JSON.stringify(result)).not.toContain('live-query-key');
-    });
-  });
-
-  describe('sendInitialState', () => {
-    it('redacts generic API widget headers from the initial playlist payload', async () => {
-      mockDatabaseService.display.findUnique.mockResolvedValueOnce({
-        id: 'device-1',
-        organizationId: 'org-1',
-        metadata: {},
-        currentPlaylistId: 'p-1',
-        currentPlaylist: {
-          id: 'p-1',
-          name: 'Current Playlist',
-          items: [
-            {
-              id: 'item-1',
-              contentId: 'content-1',
-              duration: 10,
-              order: 0,
-              content: {
-                id: 'content-1',
-                name: 'API Menu',
-                type: 'template',
-                url: '/api/v1/device-content/content-1/file',
-                thumbnail: null,
-                mimeType: 'text/html',
-                duration: 10,
-                metadata: genericApiWidgetMetadata,
-              },
-            },
-          ],
-        },
-      });
+    it('redacts generic-api widget secrets from the pushed payload (via the shared serializer)', async () => {
+      currentPlaylistState(genericApiWidgetMetadata);
       const client = createMockSocket();
-
       await (gateway as any).sendInitialState(client, 'device-1', 'org-1');
-
-      const playlistCall = client.emit.mock.calls.find(([event]) => event === 'playlist:update');
-      expect(playlistCall).toBeDefined();
-      const payload = playlistCall![1];
+      const payload = client.emit.mock.calls.find(([event]) => event === 'playlist:update')![1];
+      expect(payload.source).toBe('currentPlaylist');
       expect(payload.playlist.items[0].content.metadata.widgetConfig).toBeUndefined();
       expect(JSON.stringify(payload)).not.toContain('live-secret');
       expect(JSON.stringify(payload)).not.toContain('live-api-key');
-      expect(JSON.stringify(payload)).not.toContain('live-query-key');
+    });
+
+    it('C-7 close (push side): an ACTIVE schedule delivers the schedule playlist, not currentPlaylist', async () => {
+      mockDatabaseService.display.findFirst.mockResolvedValue({ timezone: 'UTC', isDisabled: false, currentPlaylistId: 'p-current' });
+      mockDatabaseService.schedule.findMany.mockResolvedValue([{ // all-day → active regardless of wall clock
+        id: 'sch-1', daysOfWeek: [0, 1, 2, 3, 4, 5, 6], startTime: null, endTime: null, priority: 10, updatedAt: stamp,
+        playlist: { id: 'p-sched', name: 'Scheduled', updatedAt: stamp, items: [{ contentId: 'c-s', order: 0, duration: 5, updatedAt: stamp, content: { id: 'c-s', name: 's', type: 'image', url: '', updatedAt: stamp } }] },
+      }]);
+      const client = createMockSocket();
+      await (gateway as any).sendInitialState(client, 'device-1', 'org-1');
+      const payload = client.emit.mock.calls.find(([event]) => event === 'playlist:update')![1];
+      expect(payload.source).toBe('schedule');
+      expect(payload.playlist.id).toBe('p-sched');
+    });
+
+    it('push == pull: the emitted payload is EXACTLY serializeDeviceContent(resolver output) — byte-identical', async () => {
+      currentPlaylistState(undefined);
+      const client = createMockSocket();
+      await (gateway as any).sendInitialState(client, 'device-1', 'org-1');
+      const emitted = client.emit.mock.calls.find(([event]) => event === 'playlist:update')![1];
+      // Exactly what the pull endpoint (GET /devices/me/content) returns for the same state:
+      const effective = await resolveEffectiveContent(mockDatabaseService as any, 'device-1', 'org-1', new Date('2026-06-01T12:00:00Z'));
+      const pull = serializeDeviceContent(effective, { contentBaseUrl: process.env.API_BASE_URL || 'http://localhost:3000' });
+      expect(emitted).toEqual(pull);
+    });
+
+    it('no effective content → no playlist:update (does not push a wrong/empty payload)', async () => {
+      mockDatabaseService.display.findFirst.mockResolvedValue({ timezone: 'UTC', isDisabled: false, currentPlaylistId: null });
+      mockDatabaseService.schedule.findMany.mockResolvedValue([]);
+      const client = createMockSocket();
+      await (gateway as any).sendInitialState(client, 'device-1', 'org-1');
+      expect(client.emit.mock.calls.find(([event]) => event === 'playlist:update')).toBeUndefined();
     });
   });
 

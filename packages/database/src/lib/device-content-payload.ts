@@ -73,7 +73,7 @@ export interface DeviceContentPayload {
   source: EffectiveContent['source'];
   /** The idempotency stamp `shouldApplyContent` keys on. */
   version: string;
-  playlist: { id: string; items: DeviceContentItem[] } | null;
+  playlist: { id: string; name: string; loopPlaylist: boolean; items: DeviceContentItem[] } | null;
 }
 
 const toIso = (v: Date | string | null | undefined): string | null =>
@@ -121,5 +121,14 @@ export function serializeDeviceContent(
     };
   });
 
-  return { source, version, playlist: { id: playlist.id, items } };
+  return {
+    source,
+    version,
+    playlist: {
+      id: playlist.id,
+      name: String((playlist as Record<string, unknown>).name ?? ''),
+      loopPlaylist: true, // playlists loop by default (matches the prior push behavior)
+      items,
+    },
+  };
 }
