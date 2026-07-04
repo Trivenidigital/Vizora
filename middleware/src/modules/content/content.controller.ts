@@ -98,7 +98,11 @@ export class ContentController {
     return this.contentService.create(organizationId, createContentDto);
   }
 
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  // 30/min: the now-LIVE override (PD-4) must clear the dashboard's own bulk-upload
+  // cap (MAX_UPLOAD_QUEUE_ITEMS=10, BULK_UPLOAD_CONCURRENCY=3) plus retries and
+  // back-to-back batches — 10/min would 429 a single legitimate batch + a retry.
+  // (Follow-up: key per-org/user instead of per-IP so shared-NAT admins don't collide.)
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @Post('upload')
   @Roles('admin', 'manager')
   @HttpCode(HttpStatus.CREATED)
