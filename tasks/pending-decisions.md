@@ -247,4 +247,42 @@ workspace (`workspace:*`). Two paths, your call:
   session rush. Deferred pending your (a)-vs-(b) ruling.
 
 ---
+
+# Build block cont. (2026-07-04) — PD-6 built, T4 sweep-2 done, PD-9 verified own-slice, T2 axis surfaced
+
+**PD-6 (BUILT) — Redis ThrottlerStorage, prod-only.** vizora `fix/pd6-redis-throttler-storage` (53b79a93):
+`@nest-lab/throttler-storage-redis` wired via `REDIS_URL` in `forRoot`'s object form; dev/test keep
+in-memory (no Redis in suites). 36/36 green. **Acceptance (operator, needs a running cluster):** hammer one
+throttled endpoint across both PM2 workers → 429 at nominal, not 2×. dimension-5 → ~4 when this + PD-5 land.
+
+**T4 sweep-2 (BUILT + spot-checked) — bare-id → org-scoped, remaining services.** vizora
+`fix/tenant-guard-enforce-prereqs-2` (7847fd88), held, 229 tests green. Converted 6 genuine user-initiated
+org-owned writes: tag-rules `update`, provisioning `update`, support `update` (superadmin-aware conditional
+`where`) + reopen, pairing existing-display, template-library `saveUserTemplate`. Correctly SKIPPED as
+NOT tenant-scoping gaps: webhooks `recordAttempt` (system-context, org derived from the row), template-
+library `clone` global-counter + `setFeatured`/`updateTemplate`/`deleteTemplate` (SuperAdmin/`isGlobal`
+bypass). Spot-checked support-superadmin + saveUserTemplate — both correct.
+
+**⚠ ENFORCE BLOCKER surfaced by the sweep (fail-closed prereq — do NOT bare-id-convert):** the webhook
+dispatcher's `recordAttempt` runs inside the emitter's concrete tenant context (`@OnEvent {async:true}` in
+`webhooks.dispatcher.ts`), so under `TENANT_GUARD_MODE=enforce` its bare `webhook.update` (failureCount /
+auto-disable) would be **rejected** → silently broken. Same for template-library `clone`'s global useCount
+write. **Correct fix = run the delivery pipeline / global-counter writes under a bypass/system context
+(`BYPASS_TENANT_CONTEXT`), NOT org-scoping.** This is a genuine item on the enforce checklist (HS-4) — must
+be closed before the enforce flip, alongside the device-auth guard + realtime boundary + nested creates.
+
+**PD-9 — VERIFIED own-slice, do NOT fold into PD-7.** `resolveLayoutContent` runs only in `sendInitialState`
+(`device.gateway.ts:1139`); live-push paths (`sendPlaylistUpdate:1751`, `pushContent:2128`) ship unresolved
+zones (no `resolvedContent.updatedAt`). A signature descending into zones now would flip-flop between
+resolved (reconnect) and unresolved (live-push) deliveries of the same layout. PD-9's slice must FIRST make
+zone resolution consistent across paths, THEN add `updatedAt` at `device.gateway.ts:2174-2182` + descend the
+signature. PD-7 merges as-is (correct for standard content + top-level layout items).
+
+**T2 — coherence axis surfaced for your ruling (unbuilt).** Decision in `docs/pull-on-connect.md`: (A) route
+`sendInitialState` through a shared resolver so push==pull, vs (B) pull-authoritative-on-connect. Version-wins
+(`content.updatedAt`) is the idempotency LAYER (already have it via the PD-7 signature) but does NOT settle
+*which* content is authoritative when schedule vs currentPlaylist differ — that's priority, not edit-recency.
+**Recommended: (A) + version-wins, extract the (already-pure) `isScheduleActiveAt` helper first.** Awaiting ruling.
+
+---
 *(New items appended below as they arise.)*
