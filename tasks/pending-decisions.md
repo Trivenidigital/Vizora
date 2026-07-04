@@ -148,4 +148,57 @@ the route annotation.
   token until a device-authenticated exchange.
 
 ---
+
+# Keyboard-track build session (2026-07-04) — slice status + new items
+
+**Held branches (all reviewed, awaiting your merge):**
+- **T1 `feat/schedules-ui-interim-hide`** (cdf6aae0) — schedules UI hidden (nav + server-page gate +
+  command palette + overview quick-action), reversible flag, 17/17 green. **Review: SHIP.** Closes PD-3's
+  interim mitigation (stops C-7 exposure). *Ready to merge.*
+- **T2 `feat/pull-on-connect-backend`** (S1-2 filter) + **`fix/pd1-updateplaylist-idempotent`** (PD-1).
+  S1-2 filter **review: SHIP**. **PD-1 `fix/pd1-updateplaylist-idempotent` has a REGRESSION — DO NOT MERGE
+  as-is (see PD-7).**
+- **T3 `fix/pd4-throttle-and-auth-limits`** (591caf2d + e61f8503) — throttle wiring + auth limits now fire +
+  content-upload 30/min. **Review: SHIP.** *Ready to merge* (see PD-6/PD-8 follow-ups).
+- **T4 `fix/tenant-guard-enforce-prereqs`** (f6b7ce65) — bare-id org-scoping for folders/webhooks/tag-rules/
+  provisioning (4 suites green). PARTIAL — remaining sweep + guard/realtime/nested/fail-closed documented in
+  the commit. Enforce flip STILL QUEUED (HS-4).
+- **`fix/finding2-reconnect-rehydration`** (backend Finding-2 fix) — now UNBLOCKED by PD-1 *once PD-7 lands*.
+
+## PD-7 — PD-1 (updatePlaylist no-op) has a REGRESSION; branch must not merge as-is
+The T2 review (deep, well-evidenced) found `computePlaylistSignature` uses only contentId+order+duration —
+it OMITS `content.updatedAt`/`renderedHtml`, so an **in-place template/file edit** (same id/order/duration)
+collides to the same signature and is wrongly absorbed as a no-op. Because `content.updated` does NOT push
+to devices (only `playlist.updated` does), the reconnect `sendInitialState` re-push is the PRIMARY delivery
+path for edits — PD-1 would make "edit the sign → device updates" **never heal** (and it skips the
+Preferences persist, so a restart restores the old playlist too). My analysis said the signature was
+sufficient; the review disproved it → hard-stop + queued. **Fix (before merging PD-1 or Finding-2):** add
+`content.updatedAt` (or a version) to the signature AND to the device payload from every `playlist:update`
+emitter (`realtime/.../device.gateway.ts` sendInitialState transform + the emits at ~1644/1779/2128).
+Cross-repo. Until then both PD-1 and the Finding-2 branch stay held.
+
+## PD-5 (was noted under PD-4) — checkPairingStatus hands the 90-day device JWT to any code-holder
+The T3 review confirmed AND found a second race: the read-then-delete is NOT atomic (Redis GET at
+`pairing.service.ts:469` → `display.findUnique` at :489 → delete at :499), so two concurrent `/status/:code`
+polls can BOTH receive the token. The 40/min per-IP throttle does NOT mitigate this (one well-timed poll from
+another IP suffices). **Minimal fix (RFC 8628 device-grant):** at `POST /pairing/request` return a separate
+high-entropy poll-secret (NOT shown in the code/QR) required on `/status/:code` before `deviceToken` is
+included; + atomic get-and-delete (Redis GETDEL / Lua). Cross-repo (device carries the secret). *(Hard stop:
+security-protocol change.)*
+
+## PD-6 — throttle limits are ~2x nominal in prod (PM2 cluster + in-memory ThrottlerStorage)
+`ecosystem.config.js` runs middleware `instances: 2` cluster; `ThrottlerModule.forRoot` uses the default
+**in-memory per-process** storage (no Redis), and nginx has no session affinity for middleware. So every
+now-live per-route limit (incl. login/register) has a real ceiling of ~2x nominal, split non-deterministically.
+Undercuts the "real brute-force limits" claim. **Fix:** Redis-backed `ThrottlerStorage` (RedisService already
+wired). Track with similar urgency to PD-5.
+
+## PD-8 — content-upload throttle is per-IP; shared-NAT admins collide. Follow-up: key per-org/user (the
+`DeviceAuthCheckThrottlerGuard` custom-tracker pattern exists). Non-blocking.
+
+## Dimension-5 (identity/security) score note
+Revised DOWN to 3 earlier (dead throttles). T3 (held) makes them FIRE → **→ 3.5 once T3 merges**, minus the
+residual JWT leak (PD-5) + the PM2/Redis 2x ceiling (PD-6). Net when T3+PD-5+PD-6 land: ~4.
+
+---
 *(New items appended below as they arise.)*
