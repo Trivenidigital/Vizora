@@ -7,6 +7,7 @@ import { PairingService } from './pairing.service';
 import { PairingController } from './pairing.controller';
 import { DeviceAuthCheckService } from './device-auth-check.service';
 import { DeviceAuthController } from './device-auth.controller';
+import { DeviceMeController } from './device-me.controller';
 import { StorageModule } from '../storage/storage.module';
 import { BillingModule } from '../billing/billing.module';
 import { ProvisioningTemplatesModule } from '../provisioning-templates/provisioning-templates.module';
@@ -28,7 +29,7 @@ import { ProvisioningTemplatesModule } from '../provisioning-templates/provision
     // ProvisioningTemplate model when a templateId is supplied.
     ProvisioningTemplatesModule,
   ],
-  controllers: [DisplaysController, PairingController, DeviceAuthController],
+  controllers: [DisplaysController, PairingController, DeviceAuthController, DeviceMeController],
   providers: [DisplaysService, PairingService, DeviceAuthCheckService],
   exports: [DisplaysService, PairingService],
 })

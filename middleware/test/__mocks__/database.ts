@@ -75,3 +75,10 @@ export {
   DAYS_PER_WEEK,
   MINUTES_PER_WEEK,
 } from '../../../packages/database/src/lib/schedule-active';
+
+// The effective-content resolver + wire serializer touch the DB (resolver) or produce
+// the device payload — jest.fn() stubs so controller tests assert what they're CALLED
+// with (e.g. the device's own org/displayId). Their real logic is covered by
+// @vizora/database's own tests.
+export const resolveEffectiveContent = jest.fn();
+export const serializeDeviceContent = jest.fn();
