@@ -142,8 +142,12 @@ export class TagRulesService {
   }
 
   async remove(organizationId: string, id: string): Promise<void> {
-    await this.findOne(organizationId, id);
-    await this.db.tagAssignmentRule.delete({ where: { id } });
+    // Org-scoped in the write (tenant-guard enforce prereq): deleteMany requires
+    // id AND organizationId, so a cross-tenant id affects zero rows → NotFound.
+    const result = await this.db.tagAssignmentRule.deleteMany({ where: { id, organizationId } });
+    if (result.count === 0) {
+      throw new NotFoundException('Tag assignment rule not found');
+    }
     // Note: currently-assigned playlists STAY on displays. Intentional v1
     // behavior — assignments persist independently of the rule that set them.
   }

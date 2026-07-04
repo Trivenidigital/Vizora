@@ -148,12 +148,20 @@ export class FoldersService {
       }
     }
 
-    return this.db.contentFolder.update({
-      where: { id },
+    // Org-scoped in the write itself (tenant-guard enforce prereq): updateMany
+    // requires id AND organizationId, so a cross-tenant id affects zero rows.
+    const scoped = await this.db.contentFolder.updateMany({
+      where: { id, organizationId },
       data: {
         name: dto.name,
         parentId: dto.parentId,
       },
+    });
+    if (scoped.count === 0) {
+      throw new NotFoundException('Folder not found');
+    }
+    return this.db.contentFolder.findFirst({
+      where: { id, organizationId },
       include: {
         parent: true,
         children: true,
@@ -179,9 +187,13 @@ export class FoldersService {
       data: { parentId: folder.parentId },
     });
 
-    return this.db.contentFolder.delete({
-      where: { id },
+    const result = await this.db.contentFolder.deleteMany({
+      where: { id, organizationId },
     });
+    if (result.count === 0) {
+      throw new NotFoundException('Folder not found');
+    }
+    return folder;
   }
 
   async moveContent(organizationId: string, folderId: string, dto: MoveContentDto) {
