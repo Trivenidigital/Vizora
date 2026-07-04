@@ -201,4 +201,44 @@ Revised DOWN to 3 earlier (dead throttles). T3 (held) makes them FIRE → **→ 
 residual JWT leak (PD-5) + the PM2/Redis 2x ceiling (PD-6). Net when T3+PD-5+PD-6 land: ~4.
 
 ---
+
+# Build block (2026-07-04) — PD-7/PD-5 built; PD-6 spec; new findings
+
+**PD-7 (BUILT, cross-repo, reviewed) — fixes the PD-1 regression → unblocks PD-1 + Finding-2.**
+- vizora `fix/pd7-content-version-payload` (0233d5cf): realtime emits `content.updatedAt` in the
+  playlist:update payloads.
+- vizora-tv: signature includes `content.updatedAt` — committed on `fix/pd1-updateplaylist-idempotent`
+  (9fec12f, on top of the PD-1 no-op b0a7aaa).
+- Review verdict: **field-complete for standard content (image/video/html/url) on all paths — no
+  flip-flop, idempotency preserved.** Two action items:
+  - **MERGE CONSTRAINT (do together):** the PD-7 backend branch and the PD-1/PD-7 TV branch are INERT
+    alone — TV-only makes every signature `~empty` (edits still never propagate); backend-only has no
+    reader. Merge `fix/pd7-content-version-payload` (vizora) AND `fix/pd1-updateplaylist-idempotent`
+    (vizora-tv) in the SAME release, and merge the Finding-2 branch only after/with them.
+  - **PD-9 (queued): layout zone-edit gap.** The signature reads top-level `items[].content.updatedAt`
+    only; it does not descend into `content.metadata.zones[]`. Editing content INSIDE a layout zone (a
+    different Content row) doesn't bump the layout row's updatedAt → the zone edit is absorbed as a no-op
+    on reconnect and never reaches the screen. Fix option (a): descend the signature into
+    `zones[].resolved{Playlist,Content}.…updatedAt` + add `updatedAt` at `device.gateway.ts:2174-2182`
+    (the zone single-content transform currently omits it). Option (b): bump the parent layout row's
+    updatedAt on any zone-referenced content edit. **Your scope ruling:** are dynamically-edited layout
+    zones a supported "edit the sign → it updates" use case? If yes → build option (a); if layouts are
+    static compositions → negligible, close PD-9.
+
+**PD-5 (BUILT, cross-repo) — pairing poll-secret + atomic release.** vizora `fix/pd5-pairing-pollsecret`
+(1d8d7328) + vizora-tv `fix/pd5-pairing-pollsecret` (68bdfd1). Security review IN FLIGHT — hold merge for
+its verdict. Coordinated deploy (backend requires the secret; the device must send it — merge both together).
+
+**PD-6 (NOT built — needs a dependency decision).** Redis-backed ThrottlerStorage so PD-4's limits mean
+their numbers under PM2 cluster (currently ~2× nominal). `npm install` FAILS here — the repo is a pnpm
+workspace (`workspace:*`). Two paths, your call:
+- (a) `pnpm add @nest-lab/throttler-storage-redis --filter @vizora/middleware` (the maintained standard
+  for @nestjs/throttler v6; pass `new ThrottlerStorageRedisService(process.env.REDIS_URL)` as `storage`
+  in forRoot). Adds a dep + touches the pnpm lockfile. **Recommended** — battle-tested, low-risk.
+- (b) hand-roll a custom `ThrottlerStorage` on the existing ioredis client (increment via a Lua
+  INCR+PEXPIRE). No dep, but rate-limiting correctness is security-critical — a subtly-wrong storage is
+  exactly the "one-field-short" failure mode; warrants its own focused build + review, not a tail-of-
+  session rush. Deferred pending your (a)-vs-(b) ruling.
+
+---
 *(New items appended below as they arise.)*
