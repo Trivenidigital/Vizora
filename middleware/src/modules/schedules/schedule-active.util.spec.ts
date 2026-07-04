@@ -2,7 +2,7 @@ import {
   isScheduleActiveAt,
   schedulesOverlapInTime,
   expandAdjacentDays,
-} from './schedule-active.util';
+} from '@vizora/database';
 
 // Time is minutes-of-day; dayOfWeek 0=Sun..6=Sat. Mon=1.
 const H = (h: number, m = 0) => h * 60 + m;

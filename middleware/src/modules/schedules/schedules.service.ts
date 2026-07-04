@@ -7,14 +7,15 @@ import { UpdateScheduleDto } from './dto/update-schedule.dto';
 import { CheckConflictsDto } from './dto/check-conflicts.dto';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 
-// Pure schedule-activity math now lives in a single, reusable module (T2 coherence
-// ruling) so the effective-content resolver evaluates "active now?" identically.
+// Pure schedule-activity math + the effective-content resolver live in the shared
+// @vizora/database package (T2 coherence ruling — single definition) so both this
+// service and the realtime app evaluate "active now?" and resolve content identically.
 import {
   previousDay,
   expandAdjacentDays,
   schedulesOverlapInTime,
   isScheduleActiveAt,
-} from './schedule-active.util';
+} from '@vizora/database';
 
 @Injectable()
 export class SchedulesService {
