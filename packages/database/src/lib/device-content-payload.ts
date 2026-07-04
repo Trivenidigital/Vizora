@@ -89,6 +89,33 @@ function deviceContentUrl(content: JsonRecord, contentBaseUrl: string): string {
   return url;
 }
 
+/** PD-9 — transform the urls of a layout's resolved ZONE content (single content +
+ *  zone-playlist items) the same way top-level content urls are transformed. Pure:
+ *  clones each level it touches. Applied identically by both channels. */
+function transformLayoutZoneUrls(metadata: unknown, contentBaseUrl: string): unknown {
+  if (!isRecord(metadata) || !Array.isArray(metadata.zones)) return metadata;
+  const zones = (metadata.zones as unknown[]).map((z) => {
+    if (!isRecord(z)) return z;
+    const zone: JsonRecord = { ...z };
+    if (isRecord(zone.resolvedContent)) {
+      zone.resolvedContent = { ...zone.resolvedContent, url: deviceContentUrl(zone.resolvedContent, contentBaseUrl) };
+    }
+    if (isRecord(zone.resolvedPlaylist) && Array.isArray((zone.resolvedPlaylist as JsonRecord).items)) {
+      const rp = zone.resolvedPlaylist as JsonRecord;
+      zone.resolvedPlaylist = {
+        ...rp,
+        items: (rp.items as unknown[]).map((it) =>
+          isRecord(it) && isRecord(it.content)
+            ? { ...it, content: { ...it.content, url: deviceContentUrl(it.content, contentBaseUrl) } }
+            : it,
+        ),
+      };
+    }
+    return zone;
+  });
+  return { ...metadata, zones };
+}
+
 /**
  * Serialize the resolver's EffectiveContent into the device wire payload. Pure — the
  * one app-specific input (the content base url) is a parameter, so both apps produce
@@ -115,7 +142,10 @@ export function serializeDeviceContent(
             mimeType: (c.mimeType as string | null | undefined) ?? null,
             duration: (c.duration as number | null | undefined) ?? null,
             updatedAt: toIso(c.updatedAt as Date | string | null | undefined),
-            metadata: redactWidgetSecrets(c.metadata),
+            metadata:
+              String(c.type ?? '') === 'layout'
+                ? transformLayoutZoneUrls(redactWidgetSecrets(c.metadata), opts.contentBaseUrl)
+                : redactWidgetSecrets(c.metadata),
           }
         : null,
     };

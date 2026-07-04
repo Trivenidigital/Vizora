@@ -63,7 +63,7 @@ const activeContentItemsInclude = (now: Date) => ({
 const empty: EffectiveContent = { playlist: null, source: 'none', scheduleId: null, version: '' };
 
 export async function resolveEffectiveContent(
-  db: Pick<PrismaClient, 'display' | 'schedule' | 'playlist'>,
+  db: Pick<PrismaClient, 'display' | 'schedule' | 'playlist' | 'content'>,
   displayId: string,
   organizationId: string,
   now: Date,
@@ -104,31 +104,69 @@ export async function resolveEffectiveContent(
     ),
   );
   if (active?.playlist) {
+    const playlist = active.playlist as unknown as EffectivePlaylist;
+    await resolveLayoutZones(db, playlist, organizationId, now);
     return {
-      playlist: active.playlist as unknown as EffectivePlaylist,
+      playlist,
       source: 'schedule',
       scheduleId: active.id,
-      version: contentVersion(active.playlist as unknown as EffectivePlaylist, active.updatedAt),
+      version: contentVersion(playlist, active.updatedAt),
     };
   }
 
   // Layer 1b — fall back to the directly-assigned currentPlaylist.
   if (display.currentPlaylistId) {
-    const playlist = await db.playlist.findFirst({
+    const found = await db.playlist.findFirst({
       where: { id: display.currentPlaylistId, organizationId },
       include: activeContentItemsInclude(now),
     });
-    if (playlist) {
+    if (found) {
+      const playlist = found as unknown as EffectivePlaylist;
+      await resolveLayoutZones(db, playlist, organizationId, now);
       return {
-        playlist: playlist as unknown as EffectivePlaylist,
+        playlist,
         source: 'currentPlaylist',
         scheduleId: null,
-        version: contentVersion(playlist as unknown as EffectivePlaylist, null),
+        version: contentVersion(playlist, null),
       };
     }
   }
 
   return empty;
+}
+
+/**
+ * PD-9 — resolve layout ZONE content in the SHARED path (both channels call this via
+ * the resolver), so push and pull are identical for layouts. For each item whose
+ * content is a layout, each zone's `playlistId`/`contentId` is fetched ORG-SCOPED and
+ * inlined as `resolvedPlaylist`/`resolvedContent` (raw — the serializer transforms urls
+ * + redacts). Cross-org zone ids resolve to nothing (org filter). Mutates in place.
+ */
+export async function resolveLayoutZones(
+  db: Pick<PrismaClient, 'playlist' | 'content'>,
+  playlist: EffectivePlaylist | null,
+  organizationId: string,
+  now: Date,
+): Promise<void> {
+  for (const item of playlist?.items ?? []) {
+    const content = item.content as Record<string, unknown> | null | undefined;
+    if (!content || content.type !== 'layout') continue;
+    const metadata = content.metadata as Record<string, unknown> | null | undefined;
+    const zones = Array.isArray(metadata?.zones) ? (metadata!.zones as Record<string, unknown>[]) : [];
+    for (const zone of zones) {
+      if (typeof zone.playlistId === 'string') {
+        zone.resolvedPlaylist = await db.playlist.findFirst({
+          where: { id: zone.playlistId, organizationId },
+          include: activeContentItemsInclude(now),
+        });
+      }
+      if (typeof zone.contentId === 'string') {
+        zone.resolvedContent = await db.content.findFirst({
+          where: { id: zone.contentId, organizationId },
+        });
+      }
+    }
+  }
 }
 
 /** Max `updatedAt` (ISO) across the playlist, its items + their content, and the
@@ -149,6 +187,24 @@ export function contentVersion(
   for (const item of playlist.items ?? []) {
     push(item.updatedAt);
     push(item.content?.updatedAt);
+    // PD-9 — descend into layout zones so a single-zone content edit (a DIFFERENT
+    // content row that doesn't bump the layout's own updatedAt) still raises the
+    // version, propagating the zone edit. Both channels compute this identically.
+    const metadata = (item.content as Record<string, unknown> | null | undefined)?.metadata as
+      | Record<string, unknown>
+      | null
+      | undefined;
+    const zones = Array.isArray(metadata?.zones) ? (metadata!.zones as Record<string, unknown>[]) : [];
+    for (const zone of zones) {
+      const rc = zone.resolvedContent as { updatedAt?: Date | string | null } | null | undefined;
+      push(rc?.updatedAt);
+      const rp = zone.resolvedPlaylist as
+        | { updatedAt?: Date | string | null; items?: Array<{ content?: { updatedAt?: Date | string | null } | null }> }
+        | null
+        | undefined;
+      push(rp?.updatedAt);
+      for (const zi of rp?.items ?? []) push(zi.content?.updatedAt);
+    }
   }
   if (stamps.length === 0) return '';
   return new Date(Math.max(...stamps)).toISOString();
