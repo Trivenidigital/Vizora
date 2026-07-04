@@ -272,4 +272,21 @@ or `updateMany`). **Add to the HS-4 checklist:** @OnEvent bare-id sweep (12 file
 device-auth guard + realtime trust boundary + nested creates. Enforce stays gated until all clear.
 
 ---
+
+# @OnEvent enforce sweep — CHECKED CLEAN, no third category (2026-07-04)
+
+The classify-then-fix sweep of all 6 `@OnEvent` handlers (onboarding, validation-monitor, alert-rule &
+tag-rule evaluators, notifications, playlists) returned **zero fixes needed** — every guarded write already
+carries explicit org, hits an unguarded model, or is read-only. **No third category** of inherited-context
+write: everything classifies cleanly as tenant or system. Spot-verified the two load-bearing non-obvious
+claims (device.online heartbeat → bypass; device.offline cron-only → no context). No branch created (a
+no-op commit would misrepresent).
+
+**Consequence:** the enforce surface is now believed ENUMERATED, not still-growing. The complete, single-
+source enforce prerequisite list is **`docs/enforce-readiness.md`** — CRUD sweep ✅, system-write bypass ✅,
+@OnEvent ✅ checked-clean; REMAINING (known, bounded): device-auth write paths, realtime trust boundary,
+nested creates. HS-4 enforce-flip stays gated until those clear + a log-warn review. dimension-1 4→5 tracks
+that doc.
+
+---
 *(New items appended below as they arise.)*
