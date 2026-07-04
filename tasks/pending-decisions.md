@@ -225,9 +225,15 @@ residual JWT leak (PD-5) + the PM2/Redis 2x ceiling (PD-6). Net when T3+PD-5+PD-
     zones a supported "edit the sign → it updates" use case? If yes → build option (a); if layouts are
     static compositions → negligible, close PD-9.
 
-**PD-5 (BUILT, cross-repo) — pairing poll-secret + atomic release.** vizora `fix/pd5-pairing-pollsecret`
-(1d8d7328) + vizora-tv `fix/pd5-pairing-pollsecret` (68bdfd1). Security review IN FLIGHT — hold merge for
-its verdict. Coordinated deploy (backend requires the secret; the device must send it — merge both together).
+**PD-5 (BUILT + REVIEWED SHIP, cross-repo) — pairing poll-secret + atomic release.** vizora
+`fix/pd5-pairing-pollsecret` (1d8d7328 + review-fix 0cdedc60) + vizora-tv `fix/pd5-pairing-pollsecret`
+(68bdfd1). Security review: **SHIP — leak fully closed, atomicity exactly-once, no other leak path, secret
+not logged/QR'd, timingSafeEqual sound.** Review residual FIXED (0cdedc60): resolve `display` BEFORE the
+SET-NX claim so a transient DB error in the winning poll can't strand the claim + brick re-pairing; added a
+deterministic claim-loss test (60/60). **MERGE CONSTRAINT (do together):** new backend requires the secret;
+old device app can't pair → merge both `fix/pd5-pairing-pollsecret` branches (middleware + vizora-tv) in the
+SAME release. Until 1d8d7328 is an ancestor of middleware `main`, `main` STILL leaks the JWT to any
+code-holder — the fix is on the branch, not yet merged.
 
 **PD-6 (NOT built — needs a dependency decision).** Redis-backed ThrottlerStorage so PD-4's limits mean
 their numbers under PM2 cluster (currently ~2× nominal). `npm install` FAILS here — the repo is a pnpm
