@@ -110,5 +110,39 @@ deterministic for any schedule-only display; silent (dashboard shows "active", s
    the schedules UI is hidden (removes the silent-failure surface); a hard blocker if scheduling ships
    visible. *(Launch-blocking severity call = operator's.)*
 
+## PD-4 — Fleet-wide `@Throttle({ default })` is DEAD (per-route rate limits silently unenforced) + 429 misdiagnosed
+**Verified (me + adversarial review, empirically reproduced):** `ThrottlerModule.forRoot` registers only
+NAMED throttlers `short`/`medium`/`long` (`app.module.ts:61-99`) — there is **no `default` throttler**.
+`@nestjs/throttler` v6 only reads metadata for registered names, so every `@Throttle({ default: {...} })`
+in the tree (pairing, **auth/login**, content, users, device-auth) writes metadata that is **never read**.
+The review reproduced this: 429 starts at request #11 = the global `'short'` 10/1s ceiling, regardless of
+the route annotation.
+
+**Consequences:**
+1. **My pairing-status throttle fix (`fix/pairing-status-throttle`, 10→40) is a NO-OP — ABANDONED, not
+   merged, branch deleted.** Merging it would create false "429 fixed" confidence. The commit's rationale
+   ("still under global medium") was backwards — short/medium are the ONLY things that bound the route.
+2. **The 429 was misdiagnosed.** A steady 2s poll (30/min = 0.5/s) can't trip `'short'` (>10/s) or
+   `'medium'` (>1.67/s sustained). The observed "429 after ~20s" was almost certainly bursty/back-to-back
+   retries (no backoff) hitting `'short'`, or test-env concurrency — NOT the steady poll. Real fix
+   candidates: (a) TV-app poll backoff/jitter; (b) a per-CODE guard for pairing-status (mirror
+   `DeviceAuthCheckThrottlerGuard`'s per-token pattern) — more correct than per-IP anyway.
+3. **SECURITY (the bigger finding):** intended stricter-than-global limits on sensitive endpoints —
+   **auth/login especially** — are silently running at the generous global ceiling (prod short 10/1s /
+   medium 100/60s / long 1000/hr). Brute-force/abuse limits are weaker than the code implies.
+4. **Pre-existing (flag, not made worse):** `checkPairingStatus` returns the device's 90-day JWT
+   (`deviceToken`) to ANY unauthenticated caller holding the code (`pairing.service.ts:501-511`) — a
+   race-the-legitimate-device credential-theft window, gated only by the 32^6 code keyspace + 5–15min TTL.
+
+**DECISIONS/RECOMMENDATIONS for the operator:**
+- Open the throttle-wiring as its OWN ticket (fleet-wide security-config bug, not a pairing issue). Fix =
+  register a `'default'` named throttler OR rewrite decorators to target named throttlers — but **audit
+  first**: making the dead overrides live will suddenly TIGHTEN dozens of endpoints (incl. auth/login),
+  which needs its own review, not a drive-by. *(Hard stop: security-config change with broad blast radius
+  + review-vs-analysis disagreement — queued.)*
+- Pairing 429 specifically: fix the burst source (TV-app backoff) and/or add a per-code guard.
+- Consider binding the pairing-status `deviceToken` return to the requesting device, or not returning the
+  token until a device-authenticated exchange.
+
 ---
 *(New items appended below as they arise.)*
