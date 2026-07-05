@@ -376,15 +376,23 @@ the signal, fails safe to last-known-good.
 **Field-pending (offshore, `docs/t2-offshore-checklist.md`):** pull fires on real cold-boot; reconcile
 self-heals over a flaky link; reconcile-pull failure holds last-known-good. Green tests ≠ closed-on-hardware.
 
-**Keyboard follow-ups (not blockers):**
-1. **CI cross-app typecheck gate** — THE fix for the build-verify-catch pattern: 6 type-level seams (moved
-   helpers, ts-jest ESM, missing `databaseService`, orphaned imports, resolver Pick, serializer item shape)
-   were caught only by the full typecheck, not unit tests. A CI gate that typechecks all apps against the
-   shared package pre-merge catches all six. PLUS: 2 RUNTIME seams (the ack `.data` wrapping; the
-   `forbidNonWhitelisted` DTO whitelist) that neither unit-mocks NOR typecheck catch — need an integration
-   test of the real client↔server heartbeat ack (or a shared ack-contract type). Both belong on the testing-
-   dimension #8 fix list.
-2. **Route sendPlaylistUpdate through the resolver** — it pushes raw currentPlaylist, so a live push during
+**⚠ catch-7 was silent-inert:** `response.reconcileContent` was ALWAYS undefined until the ack-`.data` fix —
+the heartbeat-reconcile mechanism existed (client wired, server wired, tests green) but the signal **never
+fired**. Had it shipped without the real round-trip, the never-drops residual would have read "closed" while
+doing nothing — the same disguised-failure shape as the 3.6s token, the empty signature, the unacked delivery.
+Caught only by building the real client↔server round-trip.
+
+**Keyboard follow-ups (not blockers), ranked:**
+1. **Integration test of the real client↔server heartbeat ack** (or a shared ack-contract type) — RANKED
+   FIRST. The runtime-contract class (ack `.data` shape, `forbidNonWhitelisted` DTO whitelist) produces
+   **silent-inert** failures: the mechanism is present but does nothing, and nothing announces it. That's
+   strictly more dangerous than the type-level class, which produces build-breaks that announce themselves.
+   This test is what prevents the catch-7 class from recurring.
+2. **CI cross-app typecheck gate** — catches the 6 type-level seams (moved helpers, ts-jest ESM, missing
+   `databaseService`, orphaned imports, resolver Pick, serializer item shape) that the full typecheck caught
+   but unit tests didn't. Build-breaks, so lower risk than #1 — but still off unit-mocks' radar.
+   (Both #1 and #2 belong on the testing-dimension #8 fix list.)
+3. **Route sendPlaylistUpdate through the resolver** — it pushes raw currentPlaylist, so a live push during
    an active schedule isn't resolver-authoritative (caches currentPlaylist's version). The reconcile
    eventually-corrects it, but the clean fix makes all pushes resolver-coherent.
 
