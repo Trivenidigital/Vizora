@@ -355,4 +355,38 @@ layout resolution, so the T2 stack must merge together (4 without PD-9 would reg
 necessary-not-sufficient; mocks hide integration seams; CI needs the cross-app typecheck gate.
 
 ---
+
+# T2 DELIVERY COMPLETE keyboard-side — C-7 + Finding-2 structurally closed (2026-07-05)
+
+The full pull-on-connect stack is built + build-verified. **C-7 and Finding-2 — the two oldest findings in
+the whole effort — are structurally closed keyboard-side, on both channels and both processes.**
+
+**Branches (held, merge as ONE unit):**
+- vizora `fix/t2-effective-content-resolver`: increments 1–4 (resolver + pull endpoint + serializer +
+  sendInitialState-via-resolver = push==pull wire fact) + PD-9 (layout zones, merge gate) + serializer
+  item-shape fix + heartbeat-reconcile server compare (`4a5f0f11`) + offshore checklist.
+- vizora-tv `fix/pd1-updateplaylist-idempotent`: PD-1/PD-7 (signature) + increment 5 (pull-on-connect +
+  version-wins + fail-safe) + heartbeat-reconcile client fix (`51efb4e`).
+
+**What's closed:** pull-on-connect (reconnect strand + C-7 on pull) fully wired client+server; push==pull
+byte-identical; layout coherence (PD-9); **heartbeat-reconcile (connected-never-drops residual)** — server
+compares reported version vs a last-sent-per-device cache (written at every send path) + client re-pulls on
+the signal, fails safe to last-known-good.
+
+**Field-pending (offshore, `docs/t2-offshore-checklist.md`):** pull fires on real cold-boot; reconcile
+self-heals over a flaky link; reconcile-pull failure holds last-known-good. Green tests ≠ closed-on-hardware.
+
+**Keyboard follow-ups (not blockers):**
+1. **CI cross-app typecheck gate** — THE fix for the build-verify-catch pattern: 6 type-level seams (moved
+   helpers, ts-jest ESM, missing `databaseService`, orphaned imports, resolver Pick, serializer item shape)
+   were caught only by the full typecheck, not unit tests. A CI gate that typechecks all apps against the
+   shared package pre-merge catches all six. PLUS: 2 RUNTIME seams (the ack `.data` wrapping; the
+   `forbidNonWhitelisted` DTO whitelist) that neither unit-mocks NOR typecheck catch — need an integration
+   test of the real client↔server heartbeat ack (or a shared ack-contract type). Both belong on the testing-
+   dimension #8 fix list.
+2. **Route sendPlaylistUpdate through the resolver** — it pushes raw currentPlaylist, so a live push during
+   an active schedule isn't resolver-authoritative (caches currentPlaylist's version). The reconcile
+   eventually-corrects it, but the clean fix makes all pushes resolver-coherent.
+
+---
 *(New items appended below as they arise.)*
