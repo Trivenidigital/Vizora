@@ -93,6 +93,15 @@ export class HeartbeatMessageDto {
   @IsString()
   @MaxLength(32)
   playbackSource?: string;
+
+  // T2 heartbeat-reconcile: the content version the device is currently rendering. The
+  // server compares it against the last version SENT to this device and, on drift, tells
+  // the device to re-pull. MUST be whitelisted (forbidNonWhitelisted) or the enriched
+  // heartbeat is rejected and the device looks offline.
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  contentVersion?: string;
 }
 
 /**

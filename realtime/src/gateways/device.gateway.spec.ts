@@ -56,6 +56,7 @@ describe('DeviceGateway', () => {
     getPendingPlaylist: jest.fn().mockResolvedValue(null),
     exists: jest.fn().mockResolvedValue(false),
     get: jest.fn().mockResolvedValue(null),
+    set: jest.fn().mockResolvedValue(undefined),
     getCachedPlaylist: jest.fn().mockResolvedValue(null),
     cachePlaylist: jest.fn().mockResolvedValue(undefined),
   };
@@ -300,6 +301,15 @@ describe('DeviceGateway', () => {
       const client = createMockSocket();
       await (gateway as any).sendInitialState(client, 'device-1', 'org-1');
       expect(client.emit.mock.calls.find(([event]) => event === 'playlist:update')).toBeUndefined();
+    });
+
+    it('caches the SENT version for heartbeat-reconcile (last-serialized, keyed on device)', async () => {
+      currentPlaylistState(undefined);
+      const client = createMockSocket();
+      await (gateway as any).sendInitialState(client, 'device-1', 'org-1');
+      const versionSetCall = mockRedisService.set.mock.calls.find(([key]: [string]) => key === 'device:content-version:device-1');
+      expect(versionSetCall).toBeDefined();
+      expect(typeof versionSetCall![1]).toBe('string'); // the serialized payload's version
     });
   });
 
@@ -768,6 +778,34 @@ describe('DeviceGateway', () => {
 
       expect(mockServer.to).toHaveBeenCalledWith('org:org-1');
       expect(roomEmit.emit).toHaveBeenCalledWith('tenant:resumed', { reason: undefined });
+    });
+  });
+
+  describe('handleHeartbeat — T2 reconcile (server compare)', () => {
+    const activeHeartbeatClient = () => {
+      const client = createMockSocket({ data: { deviceId: 'device-1', organizationId: 'org-1', deviceTokenHash: hashToken('valid-token'), deliveryAckCapable: true } });
+      (gateway as any).deviceSockets.set('device-1', 'socket-1'); // isActiveDeviceSocket
+      return client;
+    };
+    const cacheReturns = (v: string | null) =>
+      mockRedisService.get.mockImplementation((key: string) => Promise.resolve(key === 'device:content-version:device-1' ? v : null));
+
+    it('a device BEHIND the last-sent version gets reconcileContent=true (self-heal signal)', async () => {
+      cacheReturns('v2');
+      const result = await gateway.handleHeartbeat(activeHeartbeatClient() as any, { contentVersion: 'v1' } as any);
+      expect(result.data.reconcileContent).toBe(true);
+    });
+
+    it('a device AT the last-sent version gets NO reconcile signal', async () => {
+      cacheReturns('v2');
+      const result = await gateway.handleHeartbeat(activeHeartbeatClient() as any, { contentVersion: 'v2' } as any);
+      expect(result.data.reconcileContent).toBe(false);
+    });
+
+    it('no cached version yet → no signal (never false-reconciles)', async () => {
+      cacheReturns(null);
+      const result = await gateway.handleHeartbeat(activeHeartbeatClient() as any, { contentVersion: 'v1' } as any);
+      expect(result.data.reconcileContent).toBe(false);
     });
   });
 

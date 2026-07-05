@@ -17,7 +17,7 @@ import { PlaylistService } from '../services/playlist.service';
 import { NotificationService } from '../services/notification.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { DatabaseService } from '../database/database.service';
-import { resolveEffectiveContent, serializeDeviceContent } from '@vizora/database';
+import { resolveEffectiveContent, serializeDeviceContent, contentVersion } from '@vizora/database';
 import { StorageService } from '../storage/storage.service';
 import { WsValidationPipe } from './pipes/ws-validation.pipe';
 import {
@@ -1056,6 +1056,26 @@ export class DeviceGateway
   /**
    * Send initial state to the device: config, playlist, pending commands.
    */
+  private contentVersionKey(deviceId: string): string {
+    return `device:content-version:${deviceId}`;
+  }
+
+  /**
+   * T2 heartbeat-reconcile cache: the last content version SENT to a device, written at
+   * EVERY send path (sendInitialState, sendPlaylistUpdate, and the middleware pull
+   * endpoint) so it reflects the last-serialized version regardless of channel — "last
+   * sent" can't disagree with what was serialized. The heartbeat handler compares the
+   * device's reported version against this; a device behind it (missed a send — the
+   * connected-but-flaky-never-drops case) is told to re-pull. 1h TTL, refreshed per send.
+   */
+  private async recordSentContentVersion(deviceId: string, version: string): Promise<void> {
+    try {
+      await this.redisService.set(this.contentVersionKey(deviceId), version, 3600);
+    } catch (error) {
+      this.logger.warn(`Failed to cache sent content version for ${deviceId}: ${error}`);
+    }
+  }
+
   private async sendInitialState(client: Socket, deviceId: string, orgId: string): Promise<void> {
     try {
       // Check if device has an active content override
@@ -1116,6 +1136,9 @@ export class DeviceGateway
       } else {
         this.logger.log(`Device ${deviceId} has no effective content`);
       }
+      // T2 heartbeat-reconcile: record the version just sent so a device that later
+      // drifts below it (missed a subsequent send) is detected on heartbeat.
+      await this.recordSentContentVersion(deviceId, payload.version);
     } catch (playlistError: unknown) {
       const playlistErrorMsg = playlistError instanceof Error ? playlistError.stack || playlistError.message : 'Unknown error';
       this.logger.error(`Failed to fetch playlist for device ${deviceId}: ${playlistErrorMsg}`);
@@ -1417,9 +1440,22 @@ export class DeviceGateway
 
       void this.replayPendingDeliveries(client, deviceId);
 
+      // T2 heartbeat-reconcile: compare the device's reported contentVersion against the
+      // last version we SENT it (cached at every send path). If the device is behind it,
+      // it missed a send — the connected-but-flaky-never-drops case — so tell it to
+      // re-pull (self-heal without a disconnect). Its own pull fails safe (last-known-good).
+      let reconcileContent = false;
+      if (typeof data.contentVersion === 'string') {
+        const lastSent = await this.redisService.get(this.contentVersionKey(deviceId));
+        if (lastSent != null && lastSent !== data.contentVersion) {
+          reconcileContent = true;
+        }
+      }
+
       return createSuccessResponse({
         nextHeartbeatIn: 15000,
         commands: [],
+        reconcileContent,
       });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -1712,6 +1748,15 @@ export class DeviceGateway
       }),
     });
 
+    // T2 heartbeat-reconcile: this live push is a MISS-able send path — a device that
+    // misses it (connected-but-flaky) falls below the cached version, which is how the
+    // heartbeat detects the drift. Cache the version (so "last sent" reflects this change)
+    // and carry it on the emit so a device that DOES receive it tracks the same version
+    // (and won't false-reconcile). Degrades gracefully to '' when the source lacks
+    // content.updatedAt (pre-PD-7 payloads).
+    const version = contentVersion(playlist as unknown as Parameters<typeof contentVersion>[0], null);
+    await this.recordSentContentVersion(deviceId, version);
+
     // Get all sockets in the device room
     const roomName = `device:${deviceId}`;
     const allSockets = await this.server.in(roomName).fetchSockets();
@@ -1731,6 +1776,7 @@ export class DeviceGateway
     for (const socket of sockets) {
       const result = await this.emitWithDeliveryAck(socket as any, 'playlist:update', {
         playlist: resolvedPlaylist,
+        version,
         timestamp: new Date().toISOString(),
       });
       if (result.delivered) {
