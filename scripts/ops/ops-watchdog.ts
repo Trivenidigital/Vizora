@@ -33,7 +33,7 @@
 
 import 'dotenv/config';
 import type { Incident, AgentResult } from './lib/types.js';
-import { readOpsState, writeOpsState, recordAgentRun } from './lib/state.js';
+import { readOpsState, readOpsStateSnapshot, writeOpsState, recordAgentRun } from './lib/state.js';
 import { log, sendSlackAlert } from './lib/alerting.js';
 
 const AGENT = 'ops-watchdog';
@@ -113,120 +113,116 @@ async function main(): Promise<void> {
     log(AGENT, `invalid OPS_WATCHDOG_SLA_MINUTES=${process.env.OPS_WATCHDOG_SLA_MINUTES}; ignoring`);
   }
 
-  // readOpsState() acquires a file lock that MUST be released by the
-  // paired writeOpsState() — see scripts/ops/lib/state.ts:106-133. The
-  // try/finally below ensures we always release the lock, even when
-  // sendSlackAlert throws or when no stale agents are found and we
-  // exit early. Skipping the writeOpsState call would leak the lock
-  // for ~30 s (LOCK_STALE_MS) and block any other ops script that
-  // fires in that window.
-  let state: ReturnType<typeof readOpsState>;
+  // Phase 1: lock-free snapshot for staleness detection. The Slack alert in
+  // phase 2 is network I/O that must NOT run under the state lock, so the real
+  // locked read→merge→write (which also releases the lock) is deferred to
+  // phase 3. See scripts/ops/lib/state.ts.
+  let snapshot: ReturnType<typeof readOpsStateSnapshot>;
   try {
-    state = readOpsState();
+    snapshot = readOpsStateSnapshot();
   } catch (err) {
     log(AGENT, `FATAL: cannot read ops state: ${err instanceof Error ? err.message : err}`);
     process.exitCode = 2;
     return;
   }
 
-  let stale: StaleAgent[] = [];
+  const stale: StaleAgent[] = [];
   const healthyAgents = new Set<string>();
-  let durationMs = 0;
+  const lastRun: Record<string, string> = snapshot.lastRun ?? {};
+  const now = Date.now();
+
+  for (const [agent, slaDefault] of Object.entries(SLA_MINUTES_BY_AGENT)) {
+    const slaMinutes = (slaOverride && Number.isFinite(slaOverride) && slaOverride > 0)
+      ? slaOverride
+      : slaDefault;
+    const ts = lastRun[agent];
+    if (!ts) {
+      // No record at all — agent has never run, or state was wiped.
+      // Don't alert on first deploy; require the cron to have fired at
+      // least once. We'll catch persistent silence next tick.
+      log(AGENT, `${agent}: no lastRun record — skipping (first run after deploy?)`);
+      continue;
+    }
+    const ranAt = Date.parse(ts);
+    if (Number.isNaN(ranAt)) {
+      log(AGENT, `${agent}: malformed lastRun timestamp '${ts}'; skipping`);
+      continue;
+    }
+    const minsSinceRun = Math.floor((now - ranAt) / 60_000);
+    if (minsSinceRun > slaMinutes) {
+      stale.push({ agent, minsSinceRun, slaMinutes });
+    } else {
+      healthyAgents.add(agent);
+    }
+  }
+
+  const durationMs = Date.now() - startTime;
   let alertSent = false;
 
-  try {
-    const lastRun: Record<string, string> = state.lastRun ?? {};
-    const now = Date.now();
+  // Phase 2: alert I/O (no lock held).
+  if (stale.length === 0) {
+    log(AGENT, `all watched agents within SLA (${Object.keys(SLA_MINUTES_BY_AGENT).length} checked) in ${durationMs}ms`);
+    process.exitCode = 0;
+  } else {
+    const summary = stale
+      .map((s) => `${s.agent} silent ${s.minsSinceRun}m (sla=${s.slaMinutes}m)`)
+      .join(', ');
+    log(AGENT, `STALE: ${summary}`);
 
-    for (const [agent, slaDefault] of Object.entries(SLA_MINUTES_BY_AGENT)) {
-      const slaMinutes = (slaOverride && Number.isFinite(slaOverride) && slaOverride > 0)
-        ? slaOverride
-        : slaDefault;
-      const ts = lastRun[agent];
-      if (!ts) {
-        // No record at all — agent has never run, or state was wiped.
-        // Don't alert on first deploy; require the cron to have fired at
-        // least once. We'll catch persistent silence next tick.
-        log(AGENT, `${agent}: no lastRun record — skipping (first run after deploy?)`);
-        continue;
-      }
-      const ranAt = Date.parse(ts);
-      if (Number.isNaN(ranAt)) {
-        log(AGENT, `${agent}: malformed lastRun timestamp '${ts}'; skipping`);
-        continue;
-      }
-      const minsSinceRun = Math.floor((now - ranAt) / 60_000);
-      if (minsSinceRun > slaMinutes) {
-        stale.push({ agent, minsSinceRun, slaMinutes });
-      } else {
-        healthyAgents.add(agent);
-      }
-    }
+    const incidents = stale.map((s) => makeAgentSilentIncident(s, new Date(now).toISOString()));
 
-    durationMs = Date.now() - startTime;
-
-    if (stale.length === 0) {
-      log(AGENT, `all watched agents within SLA (${Object.keys(SLA_MINUTES_BY_AGENT).length} checked) in ${durationMs}ms`);
-      process.exitCode = 0;
-    } else {
-      const summary = stale
-        .map((s) => `${s.agent} silent ${s.minsSinceRun}m (sla=${s.slaMinutes}m)`)
-        .join(', ');
-      log(AGENT, `STALE: ${summary}`);
-
-      const incidents = stale.map((s) => makeAgentSilentIncident(s, new Date(now).toISOString()));
-
-      await sendSlackAlert(
-        'CRITICAL',
-        state.systemStatus ?? 'unknown',
-        incidents,
-        0,
-      );
-      alertSent = true;
-
-      log(AGENT, `alert sent for ${stale.length} stale agent(s) in ${durationMs}ms`);
-      process.exitCode = 1;
-    }
-  } finally {
-    // Record the watchdog's own run so that:
-    //   1. ops-state.json reflects ops-watchdog itself is alive (visible
-    //      via the dashboard / GET /api/v1/health/ops-status).
-    //   2. The lock acquired by readOpsState() is released — writeOpsState
-    //      always runs in a finally{} inside lib/state.ts.
-    // Mutations are limited to lastRun + agentResults + watchdog-owned
-    // incident updates, all driven through recordAgentRun for consistency.
-    const timestamp = new Date(startTime).toISOString();
-    const resolvedIncidents = resolveRecoveredAgentSilentIncidents(
-      state.incidents,
-      healthyAgents,
-      timestamp,
+    await sendSlackAlert(
+      'CRITICAL',
+      snapshot.systemStatus ?? 'unknown',
+      incidents,
+      0,
     );
-    const result: AgentResult = {
-      agent: AGENT,
-      timestamp,
-      durationMs: durationMs || (Date.now() - startTime),
-      issuesFound: stale.length,
-      // The watchdog doesn't remediate stale agents; resolved incidents
-      // mean watched agents recovered on a later run.
-      issuesFixed: resolvedIncidents.length,
-      issuesEscalated: alertSent ? stale.length : 0,
-      incidents: [
-        ...stale.map((s) => makeAgentSilentIncident(s, timestamp)),
-        ...resolvedIncidents,
-      ],
-    };
+    alertSent = true;
+
+    log(AGENT, `alert sent for ${stale.length} stale agent(s) in ${durationMs}ms`);
+    process.exitCode = 1;
+  }
+
+  // Phase 3: locked read→merge→write (no I/O in between). Records the
+  // watchdog's own run so ops-state.json reflects it is alive, resolves any
+  // now-recovered agent-silent incidents against FRESH state, and releases the
+  // lock (writeOpsState always releases in its finally). Mutations are limited
+  // to lastRun + agentResults + watchdog-owned incidents via recordAgentRun.
+  const timestamp = new Date(startTime).toISOString();
+  try {
+    const state = readOpsState();
     try {
+      const resolvedIncidents = resolveRecoveredAgentSilentIncidents(
+        state.incidents,
+        healthyAgents,
+        timestamp,
+      );
+      const result: AgentResult = {
+        agent: AGENT,
+        timestamp,
+        durationMs: durationMs || (Date.now() - startTime),
+        issuesFound: stale.length,
+        // The watchdog doesn't remediate stale agents; resolved incidents
+        // mean watched agents recovered on a later run.
+        issuesFixed: resolvedIncidents.length,
+        issuesEscalated: alertSent ? stale.length : 0,
+        incidents: [
+          ...stale.map((s) => makeAgentSilentIncident(s, timestamp)),
+          ...resolvedIncidents,
+        ],
+      };
       recordAgentRun(state, result);
+    } finally {
       writeOpsState(state);
-    } catch (err) {
-      // Lock release is the priority. Log but don't suppress — if state
-      // I/O is broken, the next run will surface it via health-guardian.
-      log(AGENT, `state write failed (lock may be held): ${err instanceof Error ? err.message : err}`);
-      // Surface as fatal IF we hadn't already set a non-zero exit code,
-      // so cron alerting picks it up.
-      if (process.exitCode === 0 || process.exitCode === undefined) {
-        process.exitCode = 2;
-      }
+    }
+  } catch (err) {
+    // Lock release is the priority. Log but don't suppress — if state I/O is
+    // broken, the next run will surface it via health-guardian.
+    log(AGENT, `state write failed (lock may be held): ${err instanceof Error ? err.message : err}`);
+    // Surface as fatal IF we hadn't already set a non-zero exit code, so cron
+    // alerting picks it up.
+    if (process.exitCode === 0 || process.exitCode === undefined) {
+      process.exitCode = 2;
     }
   }
 }
