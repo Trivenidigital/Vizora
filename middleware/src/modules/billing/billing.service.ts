@@ -634,6 +634,25 @@ export class BillingService implements OnModuleInit {
     }
   }
 
+  /**
+   * Read the current idempotency marker for a claimed webhook: 'completed',
+   * 'pending', or null (key absent / Redis unavailable / read failed). Callers
+   * treat anything other than 'completed' as not-yet-finished (retryable) so a
+   * crashed-mid-processing claim is never mistaken for a done event.
+   */
+  private async getWebhookEventState(
+    idempotencyKey: string,
+  ): Promise<string | null> {
+    const client = this.redisService.getClient();
+    if (!client) return null;
+    try {
+      return await client.get(idempotencyKey);
+    } catch (err) {
+      this.logger.warn(`Failed to read webhook claim ${idempotencyKey}: ${err}`);
+      return null;
+    }
+  }
+
   async handleWebhookEvent(
     provider: 'stripe' | 'razorpay',
     rawEvent: { rawBody: Buffer; signature: string },
@@ -657,8 +676,31 @@ export class BillingService implements OnModuleInit {
     const idempotencyKey = `webhook:processed:${provider}:${event.id}`;
     const claim = await this.claimWebhookEvent(idempotencyKey);
     if (claim === 'duplicate') {
-      this.logger.debug(`Skipping duplicate webhook: ${event.id}`);
-      return { received: true };
+      // A key already exists — but 'duplicate' conflates two very different
+      // states, and acking 200 on the wrong one loses a money-path event:
+      //   completed → genuinely processed already. Safe to ack 200.
+      //   pending   → a prior delivery claimed the key then crashed BEFORE
+      //               completing (or a concurrent delivery is still in flight).
+      //               Acking 200 here tells the PSP "handled, stop retrying" and
+      //               the event is lost forever, because processing never
+      //               finished. Return 503 instead so the PSP keeps retrying;
+      //               the pending key self-heals via its short TTL and a later
+      //               retry re-enters cleanly.
+      const state = await this.getWebhookEventState(idempotencyKey);
+      if (state === 'completed') {
+        this.logger.debug(`Skipping already-completed webhook: ${event.id}`);
+        return { received: true };
+      }
+      // pending / expired-between-claim-and-read / redis-read-failed → retryable.
+      // ServiceUnavailableException is special-cased by WebhooksController so it
+      // surfaces as 503, NOT misclassified as a 401 "invalid signature".
+      this.logger.warn(
+        `Webhook ${event.id} is claimed-but-not-completed ('${state ?? 'expired'}'); ` +
+          `returning 503 so the PSP retries rather than silently dropping the event`,
+      );
+      throw new ServiceUnavailableException(
+        'Webhook is still being processed; please retry',
+      );
     }
 
     try {

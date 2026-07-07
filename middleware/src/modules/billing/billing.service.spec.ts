@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { NotFoundException, BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { BillingService } from './billing.service';
 import { DatabaseService } from '../database/database.service';
 import { StripeProvider } from './providers/stripe.provider';
@@ -144,7 +144,13 @@ describe('BillingService', () => {
 
     // getClient().set(key,'1','EX',ttl,'NX') — 'OK' = claim won (first time),
     // null = already processed (duplicate). Default: always win the claim.
-    mockRedisClient = { set: jest.fn().mockResolvedValue('OK'), del: jest.fn().mockResolvedValue(1) };
+    // get() reads the idempotency marker on the duplicate branch: 'completed'
+    // = truly processed (ack 200), 'pending' = crashed/in-flight (retry → 503).
+    mockRedisClient = {
+      set: jest.fn().mockResolvedValue('OK'),
+      del: jest.fn().mockResolvedValue(1),
+      get: jest.fn().mockResolvedValue('completed'),
+    };
     mockRedisService = {
       get: jest.fn().mockResolvedValue(null),
       set: jest.fn().mockResolvedValue(true),
@@ -672,9 +678,11 @@ describe('BillingService', () => {
       });
     });
 
-    it('should skip duplicate webhook events via idempotency (SETNX returns null)', async () => {
-      // Second delivery of the same event: the NX claim fails (key exists).
+    it('acks 200 for a COMPLETED duplicate (event genuinely already processed)', async () => {
+      // Second delivery of the same event: the NX claim fails (key exists) and
+      // the marker reads 'completed' → truly a duplicate → ack 200, skip work.
       mockRedisClient.set.mockResolvedValue(null);
+      mockRedisClient.get.mockResolvedValue('completed');
       mockStripeProvider.verifyWebhookSignature.mockReturnValue({
         id: 'evt_duplicate',
         type: 'customer.subscription.updated',
@@ -688,7 +696,34 @@ describe('BillingService', () => {
       expect(mockRedisClient.set).toHaveBeenCalledWith(
         'webhook:processed:stripe:evt_duplicate', 'pending', 'EX', 300, 'NX',
       );
+      // Read the marker to disambiguate completed-vs-pending before acking.
+      expect(mockRedisClient.get).toHaveBeenCalledWith('webhook:processed:stripe:evt_duplicate');
       expect(mockDatabaseService.organization.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('does NOT ack a PENDING duplicate — throws 503 so the PSP retries (audit S2-5)', async () => {
+      // Orphaned-pending money-path loss: a prior delivery claimed the key then
+      // hard-crashed before completing. The NX claim fails (key still exists)
+      // and the marker reads 'pending'. Acking 200 here would tell the PSP the
+      // event is handled and it would stop retrying → the event is lost forever.
+      // Must instead surface a retryable non-2xx (503) WITHOUT being reclassified
+      // as an "invalid signature" 401 by the controller.
+      mockRedisClient.set.mockResolvedValue(null);
+      mockRedisClient.get.mockResolvedValue('pending');
+      mockStripeProvider.verifyWebhookSignature.mockReturnValue({
+        id: 'evt_orphaned',
+        type: 'customer.subscription.updated',
+        data: { id: 'sub_orphan', customer: 'cus_stripe123', status: 'active' },
+      });
+
+      await expect(
+        service.handleWebhookEvent('stripe', { rawBody, signature }),
+      ).rejects.toThrow(ServiceUnavailableException);
+
+      // No processing happened, and the claim was NOT released (the pending key
+      // belongs to the crashed worker; it self-heals via TTL, we don't del it).
+      expect(mockDatabaseService.organization.findFirst).not.toHaveBeenCalled();
+      expect(mockRedisClient.del).not.toHaveBeenCalledWith('webhook:processed:stripe:evt_orphaned');
     });
 
     it('processes two DISTINCT events that share an object id (was wrongly deduped)', async () => {
