@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
+import { ThrottlerStorage } from '@nestjs/throttler';
 import request from 'supertest';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
@@ -38,7 +39,20 @@ describe('B12 multi-tenant pair→publish→playback→revoke (e2e)', () => {
   const DEVICE_SECRET = process.env.DEVICE_JWT_SECRET;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    // Neutralize rate limiting for this suite: b12 exercises revocation +
+    // cross-tenant isolation, not throttling. In-process supertest requests all
+    // originate from 127.0.0.1, so the IP-keyed global ThrottlerGuard collapses
+    // the repeated /devices/auth/check calls into one 2-per-30s bucket (see
+    // device-auth.controller.ts @Throttle) and returns 429. The global guard is
+    // an APP_GUARD, so overrideGuard() can't reach it; overriding the shared
+    // ThrottlerStorage with a non-blocking stub neutralizes every throttler
+    // (global + per-token) at the source without weakening what this suite verifies.
+    const nonBlockingThrottlerStorage: ThrottlerStorage = {
+      increment: async () => ({ totalHits: 1, timeToExpire: 0, isBlocked: false, timeToBlockExpire: 0 }),
+    };
+    const moduleFixture: TestingModule = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(ThrottlerStorage).useValue(nonBlockingThrottlerStorage)
+      .compile();
     app = moduleFixture.createNestApplication();
     app.use(cookieParser());
     app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
