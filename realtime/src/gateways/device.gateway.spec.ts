@@ -1196,16 +1196,24 @@ describe('DeviceGateway', () => {
       expect((gateway as any).lastHeartbeatDbWrites.has('device-1')).toBe(false);
     });
 
-    it('should return error response on failure', async () => {
+    it('gracefully degrades when Redis is down: heartbeat still succeeds via the Postgres fallback', async () => {
+      // Regression guard for the S2-2 fix: a Redis outage must NOT fail the
+      // heartbeat or disconnect the device. Before the fix, the unguarded
+      // setDeviceStatus throw returned an error ack AND skipped the DB write,
+      // so the middleware offline-scanner would mark the whole live fleet
+      // offline from a transient Redis blip. Now the gateway logs and continues
+      // to the durable Postgres write.
       mockRedisService.setDeviceStatus.mockRejectedValueOnce(new Error('Redis down'));
+      mockDatabaseService.display.updateMany.mockClear();
 
       const client = createMockSocket();
       const data = {};
 
       const result = await gateway.handleHeartbeat(client as any, data as any);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBeDefined();
+      expect(result.success).toBe(true);
+      // Fallback durability: the Postgres status refresh still ran despite Redis failing.
+      expect(mockDatabaseService.display.updateMany).toHaveBeenCalled();
     });
 
     it('should update metrics when device metrics are present', async () => {

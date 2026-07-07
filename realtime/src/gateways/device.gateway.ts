@@ -1026,13 +1026,24 @@ export class DeviceGateway
     // Join organization room
     await client.join(`org:${orgId}`);
 
-    // Update device status in Redis
-    await this.redisService.setDeviceStatus(deviceId, {
-      status: 'online',
-      lastHeartbeat: Date.now(),
-      socketId: client.id,
-      organizationId: orgId,
-    });
+    // Update device status in Redis. A Redis outage must NOT block the
+    // connect path: the DB write below is the durable source the dashboard
+    // and the offline-scanner read from. Without this guard, a rejected
+    // setex would propagate to handleConnection's catch → client.disconnect(),
+    // the device would never join rooms or get its playlist, and the DB
+    // status='online' write would never run — a Redis blip would take the
+    // whole fleet offline. Log and continue so Postgres is the real fallback.
+    try {
+      await this.redisService.setDeviceStatus(deviceId, {
+        status: 'online',
+        lastHeartbeat: Date.now(),
+        socketId: client.id,
+        organizationId: orgId,
+      });
+    } catch (redisError: unknown) {
+      const errorMessage = redisError instanceof Error ? redisError.message : 'Unknown error';
+      this.logger.warn(`Failed to set Redis status for device ${deviceId}, continuing to DB write: ${errorMessage}`);
+    }
 
     // 2.1: Only write to DB if status actually changed
     const previousStatus = this.deviceStatusCache.get(deviceId);
@@ -1311,13 +1322,20 @@ export class DeviceGateway
         this.deviceSockets.delete(deviceId);
         this.lastHeartbeatDbWrites.delete(deviceId);
 
-        // Update status in Redis
-        await this.redisService.setDeviceStatus(deviceId, {
-          status: 'offline',
-          lastHeartbeat: Date.now(),
-          socketId: null,
-          organizationId: client.data?.organizationId,
-        });
+        // Update status in Redis. Guarded so a Redis outage doesn't skip the
+        // durable DB offline write below (a disconnect must record offline in
+        // Postgres even if Redis is unavailable).
+        try {
+          await this.redisService.setDeviceStatus(deviceId, {
+            status: 'offline',
+            lastHeartbeat: Date.now(),
+            socketId: null,
+            organizationId: client.data?.organizationId,
+          });
+        } catch (redisError: unknown) {
+          const errorMessage = redisError instanceof Error ? redisError.message : 'Unknown error';
+          this.logger.warn(`Failed to set Redis offline status for device ${deviceId}, continuing to DB write: ${errorMessage}`);
+        }
 
         // 2.1: Update DB on disconnect (status transition) and clean up cache
         this.deviceStatusCache.delete(deviceId);
@@ -1402,20 +1420,30 @@ export class DeviceGateway
         });
       }
 
-      // Update heartbeat in Redis (cheap, always do this)
-      await this.redisService.setDeviceStatus(deviceId, {
-        status: 'online',
-        lastHeartbeat: Date.now(),
-        socketId: client.id,
-        organizationId: client.data.organizationId,
-        metrics: data.metrics,
-        currentContent: data.currentContent,
-        // Contract v1.1: surface dark-screen signals for the fleet view. A device
-        // that is connected but not (screenState=playing, playbackSource=live) is
-        // the "on but dark/stale" case the fleet view previously could not see.
-        screenState: data.screenState,
-        playbackSource: data.playbackSource,
-      });
+      // Update heartbeat in Redis (cheap, always do this). Guarded so a Redis
+      // outage does NOT skip the Postgres refresh below: if this threw, the
+      // handler's catch would return an error ack and the DB lastHeartbeat
+      // write would be skipped, and after HEARTBEAT_DB_REFRESH_INTERVAL_MS×… the
+      // middleware offline-scanner would mark the entire live fleet offline from
+      // a transient Redis blip. Log and continue so Postgres stays fresh.
+      try {
+        await this.redisService.setDeviceStatus(deviceId, {
+          status: 'online',
+          lastHeartbeat: Date.now(),
+          socketId: client.id,
+          organizationId: client.data.organizationId,
+          metrics: data.metrics,
+          currentContent: data.currentContent,
+          // Contract v1.1: surface dark-screen signals for the fleet view. A device
+          // that is connected but not (screenState=playing, playbackSource=live) is
+          // the "on but dark/stale" case the fleet view previously could not see.
+          screenState: data.screenState,
+          playbackSource: data.playbackSource,
+        });
+      } catch (redisError: unknown) {
+        const errorMessage = redisError instanceof Error ? redisError.message : 'Unknown error';
+        this.logger.warn(`Failed to set Redis heartbeat status for device ${deviceId}, continuing to DB refresh: ${errorMessage}`);
+      }
 
       // Keep Redis as the fast heartbeat path, but refresh Postgres often
       // enough that middleware's offline scanner does not see live devices as stale.
