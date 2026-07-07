@@ -760,8 +760,17 @@ export class BillingService implements OnModuleInit {
       return;
     }
 
-    // Map status
+    // Map status. A missing/unmapped status returns null → leave the org's
+    // last-known subscriptionStatus untouched (fail-closed) rather than flip
+    // entitlement on a webhook we don't understand. (audit S2-6)
     const status = this.mapSubscriptionStatus(provider, data.status || data.subscription?.status);
+
+    if (status === null) {
+      this.logger.warn(
+        `Skipping subscriptionStatus update for org ${org.id}: unmapped/missing ${provider} status`,
+      );
+      return;
+    }
 
     await this.db.organization.update({
       where: { id: org.id },
@@ -986,8 +995,20 @@ export class BillingService implements OnModuleInit {
    */
   private mapSubscriptionStatus(
     provider: string,
-    status: string,
-  ): 'trial' | 'active' | 'past_due' | 'canceled' {
+    status: string | undefined,
+  ): 'trial' | 'active' | 'past_due' | 'canceled' | null {
+    // Fail CLOSED on entitlement: a missing or unrecognized status must NEVER
+    // coerce to 'active'. Silently granting entitlement to a paused/unknown
+    // subscription is revenue leakage that defaults the wrong way. Returning
+    // null tells the caller to leave the last-known status untouched and log,
+    // rather than flip entitlement in either direction on a webhook we don't
+    // understand. (audit S2-6)
+    if (!status) {
+      this.logger.warn(
+        `Subscription webhook for ${provider} had no status field; leaving subscriptionStatus unchanged`,
+      );
+      return null;
+    }
     if (provider === 'stripe') {
       const statusMap: Record<string, 'trial' | 'active' | 'past_due' | 'canceled'> = {
         trialing: 'trial',
@@ -998,7 +1019,12 @@ export class BillingService implements OnModuleInit {
         incomplete_expired: 'canceled',
         unpaid: 'past_due',
       };
-      return statusMap[status] || 'active';
+      const mapped = statusMap[status];
+      if (!mapped) {
+        this.logger.warn(`Unmapped Stripe subscription status "${status}"; leaving subscriptionStatus unchanged`);
+        return null;
+      }
+      return mapped;
     } else {
       const statusMap: Record<string, 'trial' | 'active' | 'past_due' | 'canceled'> = {
         created: 'trial',
@@ -1010,7 +1036,12 @@ export class BillingService implements OnModuleInit {
         completed: 'canceled',
         expired: 'canceled',
       };
-      return statusMap[status] || 'active';
+      const mapped = statusMap[status];
+      if (!mapped) {
+        this.logger.warn(`Unmapped ${provider} subscription status "${status}"; leaving subscriptionStatus unchanged`);
+        return null;
+      }
+      return mapped;
     }
   }
 }

@@ -568,6 +568,29 @@ describe('BillingService', () => {
       });
     });
 
+    it('leaves subscriptionStatus unchanged on an unmapped status (fail-closed, audit S2-6)', async () => {
+      mockDatabaseService.organization.findFirst.mockResolvedValue(mockOrganization);
+      mockDatabaseService.organization.update.mockClear();
+      mockDatabaseService.organization.update.mockResolvedValue({});
+      mockStripeProvider.verifyWebhookSignature.mockReturnValue({
+        id: 'evt_paused',
+        type: 'customer.subscription.updated',
+        data: {
+          id: 'sub_paused',
+          customer: 'cus_stripe123',
+          // 'paused' is a real Stripe status we do not map. It must NOT coerce
+          // to 'active' (that would silently restore entitlement to a paused,
+          // non-paying subscription). Fail-closed: leave the org untouched.
+          status: 'paused',
+        },
+      });
+
+      const result = await service.handleWebhookEvent('stripe', { rawBody, signature });
+
+      expect(result).toEqual({ received: true });
+      expect(mockDatabaseService.organization.update).not.toHaveBeenCalled();
+    });
+
     it('should handle subscription.deleted and downgrade to free', async () => {
       mockDatabaseService.organization.findFirst.mockResolvedValue(mockOrganization);
       mockDatabaseService.organization.update.mockResolvedValue({});
