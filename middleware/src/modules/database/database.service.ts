@@ -8,13 +8,21 @@ export class DatabaseService extends PrismaClient implements OnModuleInit, OnMod
   private readonly logger = new Logger(DatabaseService.name);
 
   /**
-   * Tenant-guard mode. `off` in production until the log-mode soak + review
-   * clear enforce; `log` elsewhere (observe cross-tenant writes, never block).
+   * Tenant-guard mode — the DB-level cross-tenant-write backstop (defense in
+   * depth behind the service-layer org-scoped WHERE clauses). Modes:
+   *   `log`     observe + warn on cross-tenant ops; NEVER blocks or mutates.
+   *   `enforce` reject cross-tenant ops.
+   *   `off`     disable the $use hook entirely (no backstop).
+   * Default is now `log` in ALL environments (production included) so the
+   * backstop actually runs and the soak accumulates — previously it defaulted
+   * `off` in production, i.e. the backstop was inert exactly where it mattered
+   * (audit S1-1). Promotion to `enforce` in prod stays gated on REVIEWING the
+   * log-mode soak: a cross-tenant-looking-but-legitimate query wrongly rejected
+   * under enforce is a prod outage, so it must be observed in `log` first.
    * Override with TENANT_GUARD_MODE=off|log|enforce.
    */
   private readonly tenantGuardMode: TenantGuardMode =
-    (process.env.TENANT_GUARD_MODE as TenantGuardMode) ||
-    (process.env.NODE_ENV === 'production' ? 'off' : 'log');
+    (process.env.TENANT_GUARD_MODE as TenantGuardMode) || 'log';
 
   private reconnectAttempts = 0;
   private readonly maxReconnectAttempts = 5;
