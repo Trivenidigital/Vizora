@@ -20,6 +20,8 @@ describe('DataRetentionService', () => {
             auditLog: { deleteMany: mockDeleteMany },
             notification: { deleteMany: mockDeleteMany },
             passwordResetToken: { deleteMany: mockDeleteMany },
+            mcpAuditLog: { deleteMany: mockDeleteMany },
+            adminAuditLog: { deleteMany: mockDeleteMany },
           },
         },
       ],
@@ -95,6 +97,24 @@ describe('DataRetentionService', () => {
       expect(call.where.expiresAt.lt).toBeInstanceOf(Date);
     });
 
+    it('should purge MCP and admin audit logs older than 90 days (audit S2-7)', async () => {
+      const mcpDeleteMany = jest.fn().mockResolvedValue({ count: 7 });
+      const adminDeleteMany = jest.fn().mockResolvedValue({ count: 4 });
+      (db.mcpAuditLog as any).deleteMany = mcpDeleteMany;
+      (db.adminAuditLog as any).deleteMany = adminDeleteMany;
+
+      await service.runRetentionPolicy();
+
+      expect(mcpDeleteMany).toHaveBeenCalledTimes(1);
+      expect(adminDeleteMany).toHaveBeenCalledTimes(1);
+      const ninetyDaysMs = 90 * 24 * 60 * 60 * 1000;
+      for (const fn of [mcpDeleteMany, adminDeleteMany]) {
+        const cutoff = fn.mock.calls[0][0].where.createdAt.lt as Date;
+        expect(cutoff).toBeInstanceOf(Date);
+        expect(Math.abs(Date.now() - cutoff.getTime() - ninetyDaysMs)).toBeLessThan(5000);
+      }
+    });
+
     it('should handle errors gracefully without throwing', async () => {
       (db.auditLog as any).deleteMany = jest.fn().mockRejectedValue(new Error('DB down'));
 
@@ -119,7 +139,8 @@ describe('DataRetentionService', () => {
       expect(logSpy).toHaveBeenCalledWith('Purged 3 read notifications older than 30 days');
       expect(logSpy).toHaveBeenCalledWith('Purged 2 expired password reset tokens');
       expect(logSpy).toHaveBeenCalledWith(
-        'Data retention cleanup complete: 10 audit logs, 8 notifications, 2 tokens',
+        'Data retention cleanup complete: 10 audit logs, 0 MCP audit logs, ' +
+          '0 admin audit logs, 8 notifications, 2 tokens',
       );
     });
   });
