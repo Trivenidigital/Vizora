@@ -432,6 +432,27 @@ describe('AuthService', () => {
       expect(result).toHaveProperty('expiresIn', getAccessTokenTtlSeconds());
     });
 
+    it('normalizes email (lowercase + trim) for both user lookup and lockout key', async () => {
+      // Case-rotation must not create a separate account or a separate lockout
+      // counter: 'John@Example.com ' resolves to the same 'john@example.com'.
+      mockDatabaseService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        organization: mockOrganization,
+      });
+      mockDatabaseService.user.update.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.create.mockResolvedValue({});
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      await service.login({ email: '  John@Example.com ', password: 'SecurePass123!' });
+
+      expect(mockDatabaseService.user.findUnique).toHaveBeenCalledWith({
+        where: { email: 'john@example.com' },
+        include: { organization: true },
+      });
+      // Lockout counter is read on the normalized key, not the raw input.
+      expect(mockRedisService.get).toHaveBeenCalledWith('login_attempts:john@example.com');
+    });
+
     it('should throw UnauthorizedException for invalid email', async () => {
       mockDatabaseService.user.findUnique.mockResolvedValue(null);
 

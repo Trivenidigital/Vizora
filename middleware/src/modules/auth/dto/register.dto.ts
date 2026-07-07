@@ -1,4 +1,5 @@
 import { IsEmail, IsString, MinLength, MaxLength, Matches, IsOptional } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RegisterDto {
@@ -6,6 +7,12 @@ export class RegisterDto {
     description: 'User email address',
     example: 'user@example.com',
   })
+  // Store new accounts with a canonical lowercased+trimmed email so a later
+  // login (also normalized) always matches, and so two sign-ups differing only
+  // by case can't create two accounts for the same person.
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.toLowerCase().trim() : value,
+  )
   @IsEmail()
   email: string;
 
