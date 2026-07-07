@@ -699,6 +699,29 @@ describe('PlaylistsService', () => {
       expect(mockCircuitBreaker.executeWithFallback).toHaveBeenCalledTimes(1);
     });
 
+    it('emits a playlist.push_failed event when a push is dropped (audit S2-3)', async () => {
+      mockDatabaseService.display.findMany.mockResolvedValue([{ id: 'display-1' }]);
+      mockCircuitBreaker.executeWithFallback.mockImplementation(
+        async (_name: string, _fn: () => Promise<void>, fallback: (err?: Error) => void) => {
+          fallback(new Error('connection refused'));
+        },
+      );
+
+      await (service as any).notifyDisplaysOfPlaylistUpdate('org-123', 'playlist-123', updatedPlaylist);
+
+      // The dropped push must not stay silent: an event fires so the operator
+      // can see a display is stranded on stale content.
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        'playlist.push_failed',
+        expect.objectContaining({
+          organizationId: 'org-123',
+          displayId: 'display-1',
+          playlistId: 'playlist-123',
+          reason: 'connection refused',
+        }),
+      );
+    });
+
     it('should limit concurrent realtime notifications for large display fan-out', async () => {
       const displays = Array.from({ length: 45 }, (_, index) => ({ id: `display-${index + 1}` }));
       const concurrencyLimit = 20;

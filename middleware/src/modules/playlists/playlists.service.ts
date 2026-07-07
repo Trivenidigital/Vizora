@@ -555,15 +555,21 @@ export class PlaylistsService {
             this.logger.log(`Notified display ${display.id} of playlist update`);
           },
           (error) => {
-            if (error) {
-              this.logger.warn(
-                `Failed to notify realtime service for display ${display.id}: ${error.message}`,
-              );
-            } else {
-              this.logger.warn(
-                `Realtime service circuit is open, skipping notification for display ${display.id}`,
-              );
-            }
+            // The REST caller already received 200, so a dropped push here is
+            // operator-INVISIBLE without this: the display keeps showing OLD
+            // content until it happens to reconnect (which re-reads the DB).
+            // Escalate to ERROR and emit an event the alert-rules engine can act
+            // on, so a stale-content drift is observable rather than silent. (audit S2-3)
+            const reason = error ? error.message : 'circuit_open';
+            this.logger.error(
+              `playlist_push_failed: display ${display.id} did not receive playlist ${playlistId} update (${reason}) — it may show stale content until it reconnects`,
+            );
+            this.eventEmitter.emit('playlist.push_failed', {
+              organizationId,
+              displayId: display.id,
+              playlistId,
+              reason,
+            });
           },
           REALTIME_CIRCUIT_CONFIG,
         );
