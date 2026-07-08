@@ -1771,7 +1771,12 @@ describe('ContentService', () => {
 
       expect(result.processed).toBe(1);
       expect(mockDatabaseService.content.findFirst).toHaveBeenCalledWith({
-        where: { id: 'replacement-123', organizationId: 'org-123' },
+        where: {
+          id: 'replacement-123',
+          organizationId: 'org-123',
+          status: 'active',
+          OR: [{ expiresAt: null }, { expiresAt: { gt: expect.any(Date) } }],
+        },
       });
       expect(mockDatabaseService.playlistItem.updateMany).toHaveBeenCalledWith({
         where: { contentId: 'content-123' },
@@ -1780,6 +1785,44 @@ describe('ContentService', () => {
       expect(mockDatabaseService.content.update).toHaveBeenCalledWith({
         where: { id: 'content-123' },
         data: { status: 'expired' },
+      });
+    });
+
+    it('does NOT repoint to a replacement that is itself expired/archived (audit S3, status-guarded)', async () => {
+      // The replacement lookup now requires the replacement be active AND not
+      // itself expired. An expired/archived replacement matches nothing, so
+      // findFirst resolves null and items are removed rather than repointed to
+      // stale content that would then be pushed to devices.
+      const expiredContent = {
+        ...mockContent,
+        expiresAt: new Date('2020-01-01'),
+        replacementContentId: 'stale-replacement-789',
+        status: 'active',
+      };
+      mockDatabaseService.content.findMany.mockResolvedValue([expiredContent]);
+      mockDatabaseService.content.findFirst.mockResolvedValue(null);
+      mockDatabaseService.playlistItem.deleteMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.content.update.mockResolvedValue({
+        ...expiredContent,
+        status: 'expired',
+      });
+
+      const result = await service.checkExpiredContent();
+
+      expect(result.processed).toBe(1);
+      // The lookup carried the active + not-expired guard.
+      expect(mockDatabaseService.content.findFirst).toHaveBeenCalledWith({
+        where: {
+          id: 'stale-replacement-789',
+          organizationId: 'org-123',
+          status: 'active',
+          OR: [{ expiresAt: null }, { expiresAt: { gt: expect.any(Date) } }],
+        },
+      });
+      // No servable replacement → items removed, NOT repointed to the stale one.
+      expect(mockDatabaseService.playlistItem.updateMany).not.toHaveBeenCalled();
+      expect(mockDatabaseService.playlistItem.deleteMany).toHaveBeenCalledWith({
+        where: { contentId: 'content-123' },
       });
     });
 

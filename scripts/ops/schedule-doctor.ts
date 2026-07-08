@@ -112,7 +112,10 @@ async function main(): Promise<void> {
 
   log(AGENT, `Fetched ${schedules.length} schedules, ${displays.length} displays, ${playlists.length} playlists`);
 
-  const state = readOpsState();
+  // State is read at the very END (after all detection I/O), so the file lock
+  // is held only for the brief read→merge→write below — not across the
+  // api.patch / sendInlineAlert calls in the checks. This agent does no
+  // existing-incident dedup during detection, so no snapshot read is needed.
   const incidents: Incident[] = [];
   const remediations: RemediationAction[] = [];
   let issuesFound = 0;
@@ -327,13 +330,17 @@ async function main(): Promise<void> {
     incidents,
   };
 
-  recordAgentRun(state, result);
+  // Brief locked read→merge→write with no I/O in between.
+  const state = readOpsState();
+  try {
+    recordAgentRun(state, result);
 
-  for (const r of remediations) {
-    addRemediation(state, r);
+    for (const r of remediations) {
+      addRemediation(state, r);
+    }
+  } finally {
+    writeOpsState(state);
   }
-
-  writeOpsState(state);
 
   // ─── Summary ───────────────────────────────────────────────────────────────
 

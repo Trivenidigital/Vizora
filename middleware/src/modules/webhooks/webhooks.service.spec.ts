@@ -25,6 +25,8 @@ describe('WebhooksService', () => {
   beforeEach(() => {
     db = {
       webhook: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
         create: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
@@ -176,12 +178,13 @@ describe('WebhooksService', () => {
 
     it('flipping isActive false→true resets failureCount (re-arm after manual fix)', async () => {
       db.webhook.findFirst.mockResolvedValue({ id: 'hook-1', organizationId: orgId });
-      db.webhook.update.mockResolvedValue({ id: 'hook-1' });
 
       await service.update(orgId, 'hook-1', { isActive: true });
 
-      expect(db.webhook.update).toHaveBeenCalledWith(
+      // Org-scoped write via updateMany; the entity is then re-fetched.
+      expect(db.webhook.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
+          where: { id: 'hook-1', organizationId: orgId },
           data: expect.objectContaining({ isActive: true, failureCount: 0 }),
         }),
       );
@@ -196,19 +199,20 @@ describe('WebhooksService', () => {
 
     it('update response does NOT include the secret field', async () => {
       db.webhook.findFirst.mockResolvedValue({ id: 'hook-1', organizationId: orgId });
-      db.webhook.update.mockResolvedValue({ id: 'hook-1' });
 
       await service.update(orgId, 'hook-1', { name: 'renamed' });
 
-      const call = db.webhook.update.mock.calls[0][0];
-      expect(call.select.secret).toBeUndefined();
+      // The response now comes from the org-scoped re-fetch (findFirst with RESPONSE_SELECT).
+      const refetch = db.webhook.findFirst.mock.calls.find((c: any[]) => c[0]?.select);
+      expect(refetch?.[0].select.secret).toBeUndefined();
     });
   });
 
   describe('remove', () => {
-    it('throws NotFound on cross-org DELETE', async () => {
-      db.webhook.findFirst.mockResolvedValue(null);
+    it('throws NotFound on cross-org DELETE (deleteMany affects zero rows)', async () => {
+      db.webhook.deleteMany.mockResolvedValue({ count: 0 });
       await expect(service.remove(orgId, 'hook-x')).rejects.toThrow(NotFoundException);
+      expect(db.webhook.deleteMany).toHaveBeenCalledWith({ where: { id: 'hook-x', organizationId: orgId } });
       expect(db.webhook.delete).not.toHaveBeenCalled();
     });
   });

@@ -2,6 +2,7 @@ import { ArgumentMetadata } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
 import { IsString, IsNumber, IsOptional, Min } from 'class-validator';
 import { WsValidationPipe } from './ws-validation.pipe';
+import { HeartbeatMessageDto } from '../dto';
 
 class TestDto {
   @IsString()
@@ -103,6 +104,39 @@ describe('WsValidationPipe', () => {
     it('should reject unknown properties (forbidNonWhitelisted)', async () => {
       const value = { name: 'test', value: 1, unknown: 'field' };
       await expect(pipe.transform(value, metadata)).rejects.toThrow(WsException);
+    });
+  });
+
+  describe('Contract v1.1 enriched heartbeat (B2 cross-repo compat gate)', () => {
+    const hbMeta: ArgumentMetadata = { type: 'body', metatype: HeartbeatMessageDto };
+
+    it('ACCEPTS an enriched heartbeat with screenState + playbackSource', async () => {
+      // The shipped Android TV app sends these top-level fields. Before widening
+      // the DTO, forbidNonWhitelisted rejected the whole heartbeat → the device
+      // looked offline. This asserts the enriched payload now validates.
+      const enriched = {
+        uptime: 3600,
+        appVersion: '1.0.1',
+        metrics: { cpuUsage: 10, memoryUsage: 40 },
+        currentContent: { contentId: 'c1' },
+        screenState: 'playing',
+        playbackSource: 'live',
+      };
+      const result = await pipe.transform(enriched, hbMeta);
+      expect(result.screenState).toBe('playing');
+      expect(result.playbackSource).toBe('live');
+    });
+
+    it('accepts a legacy heartbeat without the new fields (backward compatible)', async () => {
+      const legacy = { uptime: 10, appVersion: '1.0.0', metrics: { cpuUsage: 1 } };
+      const result = await pipe.transform(legacy, hbMeta);
+      expect(result.screenState).toBeUndefined();
+      expect(result.playbackSource).toBeUndefined();
+    });
+
+    it('still rejects a genuinely unknown field (whitelist stays tight)', async () => {
+      const bogus = { uptime: 10, notAContractField: 'x' };
+      await expect(pipe.transform(bogus, hbMeta)).rejects.toThrow(WsException);
     });
   });
 

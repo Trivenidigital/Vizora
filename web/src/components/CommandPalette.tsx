@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/theme/icons';
+import { SCHEDULES_ENABLED } from '@/lib/feature-flags';
 
 export interface Command {
   id: string;
@@ -249,15 +250,18 @@ export function getDefaultCommands(router: any): Command[] {
       onExecute: () => router.push('/dashboard/playlists'),
       keywords: ['playlists', 'schedule', 'content'],
     },
-    {
-      id: 'nav-schedules',
-      title: 'Go to Schedules',
-      description: 'Manage your schedules',
-      category: 'navigation',
-      icon: 'schedules',
-      onExecute: () => router.push('/dashboard/schedules'),
-      keywords: ['schedules', 'automation', 'timing'],
-    },
+    // Schedules hidden while SCHEDULES_ENABLED is off (interim C-7 mitigation).
+    ...(SCHEDULES_ENABLED
+      ? ([{
+          id: 'nav-schedules',
+          title: 'Go to Schedules',
+          description: 'Manage your schedules',
+          category: 'navigation',
+          icon: 'schedules',
+          onExecute: () => router.push('/dashboard/schedules'),
+          keywords: ['schedules', 'automation', 'timing'],
+        }] as Command[])
+      : []),
     {
       id: 'nav-analytics',
       title: 'Go to Analytics',

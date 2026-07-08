@@ -10,6 +10,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { APP_GUARD } from '@nestjs/core';
+import { getAccessTokenTtlSeconds } from './jwt-expiry';
 
 @Module({
   imports: [
@@ -31,7 +32,10 @@ import { APP_GUARD } from '@nestjs/core';
         return {
           secret,
           signOptions: {
-            expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+            // Resolved to a bounded whole-seconds NUMBER (never a unitless string,
+            // which jsonwebtoken would read as milliseconds). See
+            // resolveAccessTokenTtlSeconds — capped at the revocation-marker TTL.
+            expiresIn: getAccessTokenTtlSeconds(),
             algorithm: 'HS256' as const,
           },
           verifyOptions: {

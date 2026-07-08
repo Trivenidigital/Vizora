@@ -17,6 +17,7 @@ import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { AUTH_CONSTANTS } from './constants/auth.constants';
+import { getAccessTokenTtlMs } from './jwt-expiry';
 import { AuthenticatedUser } from './strategies/jwt.strategy';
 
 /**
@@ -58,7 +59,9 @@ export class AuthController {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? 'strict' : 'lax',
-      maxAge: AUTH_CONSTANTS.TOKEN_EXPIRY_MS,
+      // Match the token's real lifetime so the cookie doesn't outlive the JWT
+      // (a stale cookie = a "logged-in" UI that 401s on every call).
+      maxAge: getAccessTokenTtlMs(),
       path: '/',
     };
 

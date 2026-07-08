@@ -17,6 +17,7 @@
   },
   "scripts": {
     "postbuild": "cp -r src/generated dist/ || xcopy /E /I /Y src\\generated dist\\generated",
+    "db:generate": "prisma generate && node -e \"require('fs').cpSync('src/generated','dist/generated',{recursive:true})\"",
     "test": "jest --config jest.config.cjs"
   },
   "dependencies": {

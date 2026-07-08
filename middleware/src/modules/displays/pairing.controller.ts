@@ -37,7 +37,11 @@ export class PairingController {
    * Display checks pairing status (Public endpoint)
    */
   @Public()
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  // Device polls this every 2s during pairing = 30 req/min. NOW that the 'default'
+  // throttler is registered (PD-4), this override actually fires — so it MUST clear
+  // the poll rate or pairing 429s after ~20s. 40/min = headroom over the poll +
+  // retries; safe (unauthenticated status read on an ephemeral 32^6 code, 5-15min TTL).
+  @Throttle({ default: { limit: 40, ttl: 60000 } })
   @Get('status/:code')
   async checkPairingStatus(@Param('code') code: string) {
     return this.pairingService.checkPairingStatus(code);

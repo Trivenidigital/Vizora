@@ -31,7 +31,20 @@
       "koa@>=3.0.0 <3.1.2": "3.1.2",
       "svgo@>=3.0.0 <3.3.3": "3.3.3",
       "immutable@>=5.0.0 <5.1.5": "5.1.5",
-      "multer@<2.1.1": "2.1.1"
+      "multer@<2.2.0": "2.2.0",
+      "undici@>=7.0.0 <7.28.0": "7.28.0",
+      "socket.io-parser@>=4.0.0 <4.2.6": "4.2.6",
+      "fast-xml-parser@<5.7.3": "5.7.3",
+      "fast-xml-builder@<=1.1.6": "1.1.7",
+      "path-to-regexp@<0.1.13": "0.1.13",
+      "path-to-regexp@>=8.0.0 <8.4.0": "8.4.0",
+      "picomatch@>=4.0.0 <4.0.4": "4.0.4",
+      "lodash@>=4.0.0 <4.18.0": "4.18.0",
+      "lodash-es@>=4.0.0 <4.18.0": "4.18.0",
+      "fast-uri@<3.1.2": "3.1.2",
+      "ws@>=8.0.0 <8.21.0": "8.21.0",
+      "form-data@>=4.0.0 <4.0.6": "4.0.6",
+      "hono@<4.12.25": "4.12.25"
     },
     "onlyBuiltDependencies": [
       "@prisma/client",
@@ -45,7 +58,8 @@
       "msgpackr-extract",
       "unrs-resolver",
       "puppeteer"
-    ]
+    ],
+    "auditConfig": {}
   },
   "devDependencies": {
     "@nestjs/schematics": "^11.0.0",
@@ -62,7 +76,7 @@
     "@swc/core": "~1.5.7",
     "@swc/helpers": "~0.5.11",
     "@types/node": "20.19.9",
-    "@types/nodemailer": "^7.0.11",
+    "@types/nodemailer": "^8.0.1",
     "@types/passport-jwt": "^4.0.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
@@ -71,7 +85,7 @@
     "@typescript-eslint/parser": "^8.55.0",
     "electron": "^28.3.3",
     "eslint": "^9.39.2",
-    "nodemailer": "^8.0.1",
+    "nodemailer": "^9.0.1",
     "nx": "22.4.2",
     "playwright": "^1.58.0",
     "prettier": "~3.6.2",
@@ -83,7 +97,6 @@
     "webpack-cli": "^5.1.4"
   },
   "dependencies": {
-    "@vizora/database": "workspace:*",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
@@ -93,7 +106,8 @@
     "@nestjs/platform-socket.io": "^11.1.12",
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/websockets": "^11.1.12",
-    "axios": "^1.13.6",
+    "@vizora/database": "workspace:*",
+    "axios": "^1.18.1",
     "dotenv": "^17.2.3",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",

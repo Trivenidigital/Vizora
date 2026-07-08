@@ -1,6 +1,7 @@
 import { JwtService } from '@nestjs/jwt';
 import { ConflictException, UnauthorizedException, ForbiddenException, HttpException, HttpStatus, ServiceUnavailableException } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { getAccessTokenTtlSeconds } from './jwt-expiry';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
 import { MailService } from '../mail/mail.service';
@@ -227,7 +228,7 @@ describe('AuthService', () => {
       expect(result).toHaveProperty('user');
       expect(result).toHaveProperty('organization');
       expect(result).toHaveProperty('token', 'mock-jwt-token');
-      expect(result).toHaveProperty('expiresIn', 604800);
+      expect(result).toHaveProperty('expiresIn', getAccessTokenTtlSeconds());
       expect(result.user).not.toHaveProperty('passwordHash');
       expect(mockDatabaseService.user.findUnique).toHaveBeenCalledWith({
         where: { email: registerDto.email },
@@ -429,7 +430,28 @@ describe('AuthService', () => {
 
       expect(result).toHaveProperty('user');
       expect(result).toHaveProperty('token', 'mock-jwt-token');
-      expect(result).toHaveProperty('expiresIn', 604800);
+      expect(result).toHaveProperty('expiresIn', getAccessTokenTtlSeconds());
+    });
+
+    it('normalizes email (lowercase + trim) for both user lookup and lockout key', async () => {
+      // Case-rotation must not create a separate account or a separate lockout
+      // counter: 'John@Example.com ' resolves to the same 'john@example.com'.
+      mockDatabaseService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        organization: mockOrganization,
+      });
+      mockDatabaseService.user.update.mockResolvedValue(mockUser);
+      mockDatabaseService.auditLog.create.mockResolvedValue({});
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+
+      await service.login({ email: '  John@Example.com ', password: 'SecurePass123!' });
+
+      expect(mockDatabaseService.user.findUnique).toHaveBeenCalledWith({
+        where: { email: 'john@example.com' },
+        include: { organization: true },
+      });
+      // Lockout counter is read on the normalized key, not the raw input.
+      expect(mockRedisService.get).toHaveBeenCalledWith('login_attempts:john@example.com');
     });
 
     it('should throw UnauthorizedException for invalid email', async () => {
@@ -913,7 +935,7 @@ describe('AuthService', () => {
       const result = await service.refresh(mockUser.id);
 
       expect(result).toHaveProperty('token', 'mock-jwt-token');
-      expect(result).toHaveProperty('expiresIn', 604800);
+      expect(result).toHaveProperty('expiresIn', getAccessTokenTtlSeconds());
     });
 
     it('should throw UnauthorizedException for non-existent user', async () => {

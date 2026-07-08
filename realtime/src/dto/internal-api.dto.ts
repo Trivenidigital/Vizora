@@ -69,3 +69,27 @@ export class BroadcastNotificationDto {
   @IsNotEmpty()
   notification!: Record<string, unknown>;
 }
+
+// Contract v1.1 item 3
+export class DeviceRevokedDto {
+  @IsString()
+  @IsNotEmpty()
+  deviceId!: string;
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}
+
+export class TenantEntitlementDto {
+  @IsString()
+  @IsNotEmpty()
+  organizationId!: string;
+
+  @IsEnum(['suspended', 'resumed'])
+  state!: 'suspended' | 'resumed';
+
+  @IsOptional()
+  @IsString()
+  reason?: string;
+}

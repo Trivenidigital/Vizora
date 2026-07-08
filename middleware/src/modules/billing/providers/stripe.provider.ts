@@ -1,5 +1,6 @@
 import { Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'node:crypto';
 import Stripe from 'stripe';
 import {
   PaymentProvider,
@@ -8,6 +9,7 @@ import {
   Subscription,
   Invoice,
   WebhookEvent,
+  WebhookEventData,
 } from './payment-provider.interface';
 import { CircuitBreakerService } from '../../common/services/circuit-breaker.service';
 
@@ -60,8 +62,14 @@ export class StripeProvider implements PaymentProvider {
     metadata?: Record<string, unknown>,
   ): Promise<Customer> {
     this.ensureConfigured();
+    // Idempotency key derived from the org id (one Stripe customer per org).
+    // Stripe caches idempotent responses for 24h, so a network retry of this
+    // create returns the SAME customer instead of minting a duplicate — without
+    // permanently locking the key (it frees after the retry window).
+    const orgId = typeof metadata?.organizationId === 'string' ? metadata.organizationId : undefined;
+    const requestOptions = orgId ? { idempotencyKey: `customer:${orgId}` } : undefined;
     const customer = await this.withCircuitBreaker(() =>
-      this.stripe!.customers.create({ email, name, metadata }),
+      this.stripe!.customers.create({ email, name, metadata }, requestOptions),
     );
     return {
       id: customer.id,
@@ -93,15 +101,23 @@ export class StripeProvider implements PaymentProvider {
     params: CheckoutParams,
   ): Promise<{ url: string; sessionId: string }> {
     this.ensureConfigured();
+    // B6: a per-invocation idempotency key makes THIS create call retry-safe —
+    // if the SDK/network retries it, Stripe returns the same session instead of
+    // a duplicate. Generated once per call (not deterministic per org/plan), so
+    // it never collides across distinct user-initiated checkouts.
+    const idempotencyKey = randomUUID();
     const session = await this.withCircuitBreaker(() =>
-      this.stripe!.checkout.sessions.create({
-        customer: params.customerId,
-        mode: 'subscription',
-        line_items: [{ price: params.priceId, quantity: 1 }],
-        success_url: params.successUrl,
-        cancel_url: params.cancelUrl,
-        metadata: params.metadata,
-      }),
+      this.stripe!.checkout.sessions.create(
+        {
+          customer: params.customerId,
+          mode: 'subscription',
+          line_items: [{ price: params.priceId, quantity: 1 }],
+          success_url: params.successUrl,
+          cancel_url: params.cancelUrl,
+          metadata: params.metadata,
+        },
+        { idempotencyKey },
+      ),
     );
     if (!session.url) {
       throw new ServiceUnavailableException('Stripe checkout session did not return a URL');
@@ -208,8 +224,11 @@ export class StripeProvider implements PaymentProvider {
       this.webhookSecret,
     );
     return {
+      // The Stripe EVENT id (evt_...) — stable per event, distinct across
+      // events even when they share an object id. This is the dedup key.
+      id: event.id,
       type: event.type,
-      data: event.data.object,
+      data: event.data.object as unknown as WebhookEventData,
     };
   }
 

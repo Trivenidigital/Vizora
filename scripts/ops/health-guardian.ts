@@ -25,6 +25,7 @@ import { execSync } from 'node:child_process';
 import type { Incident, AgentResult, RemediationAction } from './lib/types.js';
 import {
   readOpsState,
+  readOpsStateSnapshot,
   writeOpsState,
   recordAgentRun,
   addRemediation,
@@ -175,7 +176,11 @@ async function main(): Promise<void> {
   const startTime = Date.now();
   log(AGENT, 'Starting health check cycle');
 
-  const state = readOpsState();
+  // Lock-free snapshot for existing-incident lookups (attempt counts +
+  // detected timestamps) during detection, which does slow I/O: pm2 restarts,
+  // 30s restart cooldowns, health-endpoint fetches. The real locked
+  // read→merge→write is at the very end. See scripts/ops/lib/state.ts.
+  const priorState = readOpsStateSnapshot();
   const services = getServiceDefs();
   const incidents: Incident[] = [];
   const remediations: RemediationAction[] = [];
@@ -187,7 +192,7 @@ async function main(): Promise<void> {
 
   for (const svc of services) {
     const incidentId = makeIncidentId(AGENT, 'service-down', svc.name);
-    const existingIncident = state.incidents.find(i => i.id === incidentId);
+    const existingIncident = priorState.incidents.find(i => i.id === incidentId);
 
     log(AGENT, `Checking ${svc.name}: ${svc.healthUrl}`);
     const result = await checkEndpoint(svc.healthUrl);
@@ -348,7 +353,7 @@ async function main(): Promise<void> {
       const memoryPct = svc.memoryLimitBytes > 0 ? (memoryBytes / svc.memoryLimitBytes) * 100 : 0;
       const procLabel = `${svc.pm2Name}:${proc.pm_id}`;
       const pm2ErroredIncidentId = makeIncidentId(AGENT, 'pm2-errored', procLabel);
-      const existingPm2ErroredIncident = state.incidents.find(
+      const existingPm2ErroredIncident = priorState.incidents.find(
         i => i.id === pm2ErroredIncidentId,
       );
 
@@ -524,13 +529,18 @@ async function main(): Promise<void> {
     incidents,
   };
 
-  recordAgentRun(state, result);
+  // Brief locked read→merge→write with no I/O in between. recordAgentRun
+  // upserts our incidents by id, preserving other agents' concurrent updates.
+  const state = readOpsState();
+  try {
+    recordAgentRun(state, result);
 
-  for (const r of remediations) {
-    addRemediation(state, r);
+    for (const r of remediations) {
+      addRemediation(state, r);
+    }
+  } finally {
+    writeOpsState(state);
   }
-
-  writeOpsState(state);
 
   // ─── 4. Summary ──────────────────────────────────────────────────────────
 

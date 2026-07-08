@@ -4,7 +4,7 @@ import { RedisService } from '../services/redis.service';
 import { DatabaseService } from '../database/database.service';
 import { InternalApiGuard } from '../guards/internal-api.guard';
 import { PushPlaylistRequest, PushContentRequest, DeviceCommandType } from '../types';
-import { PushPlaylistDto, PushContentDto, BroadcastCommandDto, InternalCommandDto, BroadcastNotificationDto } from '../dto/internal-api.dto';
+import { PushPlaylistDto, PushContentDto, BroadcastCommandDto, InternalCommandDto, BroadcastNotificationDto, DeviceRevokedDto, TenantEntitlementDto } from '../dto/internal-api.dto';
 
 interface DependencyHealth {
   status: 'healthy' | 'unhealthy' | 'degraded';
@@ -300,5 +300,35 @@ export class AppController {
       success: true,
       message: `Command ${data.command.type} sent to device`,
     };
+  }
+
+  // Contract v1.1 item 3 — revoke a specific device (delete/block).
+  @Post('internal/device-revoked')
+  @UseGuards(InternalApiGuard)
+  async deviceRevoked(@Body() data: DeviceRevokedDto): Promise<PushResponse> {
+    const notified = this.deviceGateway.revokeDevice(
+      data.deviceId,
+      data.reason ?? 'revoked',
+    );
+    return {
+      success: true,
+      message: notified
+        ? 'device:revoked emitted and device disconnected'
+        : 'Device not connected (will confirm via auth/check on next contact)',
+    };
+  }
+
+  // Contract v1.1 item 3 — tenant entitlement suspend/resume (org-wide).
+  @Post('internal/tenant-entitlement')
+  @UseGuards(InternalApiGuard)
+  async tenantEntitlement(
+    @Body() data: TenantEntitlementDto,
+  ): Promise<PushResponse> {
+    this.deviceGateway.emitTenantEntitlement(
+      data.organizationId,
+      data.state === 'suspended',
+      data.reason,
+    );
+    return { success: true, message: `tenant:${data.state} emitted` };
   }
 }

@@ -3,6 +3,7 @@ import {
   Logger,
   BadRequestException,
   NotFoundException,
+  ServiceUnavailableException,
   OnModuleInit,
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
@@ -30,6 +31,7 @@ import {
 import { MailService } from '../mail/mail.service';
 import { RedisService } from '../redis/redis.service';
 import { resolvePublicAppUrl } from '../common/utils/public-app-url';
+import { EntitlementService } from './entitlement.service';
 
 /** Webhook event data from Stripe/Razorpay — deeply nested untyped objects */
 interface WebhookData {
@@ -46,6 +48,7 @@ export class BillingService implements OnModuleInit {
     private readonly razorpayProvider: RazorpayProvider,
     private readonly mailService: MailService,
     private readonly redisService: RedisService,
+    private readonly entitlementService: EntitlementService,
   ) {}
 
   /**
@@ -570,6 +573,83 @@ export class BillingService implements OnModuleInit {
    * Handle webhook events from payment providers.
    * Verifies the webhook signature before processing events.
    */
+  // Idempotency state machine (webhook dedup):
+  //   absent   → claim it (write 'pending', short TTL), process
+  //   pending  → someone else is processing (or crashed); skip this delivery.
+  //              The short TTL means a crashed 'pending' auto-expires so a later
+  //              PSP retry can re-enter — no permanent silent drop.
+  //   completed→ genuinely processed; skip (true duplicate).
+  // On a processing THROW we release the claim immediately so the retry re-enters
+  // without waiting for the TTL. This closes the claim-then-crash silent-drop that
+  // bare SET-NX-before-processing has (key set, processing fails, retry sees the
+  // key and drops the event forever).
+  private static readonly WEBHOOK_PENDING_TTL_S = 300; // 5 min — > max handler time
+  private static readonly WEBHOOK_COMPLETED_TTL_S = 172800; // 48h — outlives retry burst
+
+  private async claimWebhookEvent(
+    idempotencyKey: string,
+  ): Promise<'claimed' | 'duplicate'> {
+    const client = this.redisService.getClient();
+    if (!client) {
+      // Fail-CLOSED: cannot guarantee idempotency → 5xx → PSP retries.
+      throw new ServiceUnavailableException(
+        'Idempotency store unavailable; webhook will be retried',
+      );
+    }
+    const result = await client.set(
+      idempotencyKey,
+      'pending',
+      'EX',
+      BillingService.WEBHOOK_PENDING_TTL_S,
+      'NX',
+    );
+    if (result === 'OK') return 'claimed';
+    // Key exists: completed → real duplicate; pending → concurrent/crashed worker.
+    // Either way we skip THIS delivery; a crashed pending self-heals via TTL.
+    return 'duplicate';
+  }
+
+  private async completeWebhookEvent(idempotencyKey: string): Promise<void> {
+    const client = this.redisService.getClient();
+    if (!client) return; // best-effort; a stuck 'pending' expires and allows re-process
+    await client.set(
+      idempotencyKey,
+      'completed',
+      'EX',
+      BillingService.WEBHOOK_COMPLETED_TTL_S,
+    );
+  }
+
+  private async releaseWebhookClaim(idempotencyKey: string): Promise<void> {
+    const client = this.redisService.getClient();
+    if (!client) return;
+    try {
+      await client.del(idempotencyKey);
+    } catch (err) {
+      // Non-fatal: the pending TTL will expire and allow the retry to re-enter.
+      this.logger.warn(`Failed to release webhook claim ${idempotencyKey}: ${err}`);
+    }
+  }
+
+  /**
+   * Read the current idempotency marker for a claimed webhook: 'completed',
+   * 'pending', or null (key absent / Redis unavailable / read failed). Callers
+   * treat anything other than 'completed' as not-yet-finished (retryable) so a
+   * crashed-mid-processing claim is never mistaken for a done event.
+   */
+  private async getWebhookEventState(
+    idempotencyKey: string,
+  ): Promise<string | null> {
+    const client = this.redisService.getClient();
+    if (!client) return null;
+    try {
+      return await client.get(idempotencyKey);
+    } catch (err) {
+      this.logger.warn(`Failed to read webhook claim ${idempotencyKey}: ${err}`);
+      return null;
+    }
+  }
+
   async handleWebhookEvent(
     provider: 'stripe' | 'razorpay',
     rawEvent: { rawBody: Buffer; signature: string },
@@ -583,18 +663,41 @@ export class BillingService implements OnModuleInit {
       rawEvent.signature,
     );
 
-    this.logger.log(`Processing ${provider} webhook: ${event.type}`);
+    this.logger.log(`Processing ${provider} webhook: ${event.type} (${event.id})`);
 
-    // Idempotency: skip duplicate events
-    const eventId = event.data?.id || event.data?.object?.id;
-    if (eventId) {
-      const idempotencyKey = `webhook:processed:${provider}:${eventId}`;
-      const alreadyProcessed = await this.redisService.get(idempotencyKey);
-      if (alreadyProcessed) {
-        this.logger.debug(`Skipping duplicate webhook: ${eventId}`);
+    // Idempotency: skip duplicate events. Keyed on the provider EVENT id
+    // (event.id) — NOT the object id, which is shared across distinct events for
+    // the same subscription/invoice and would wrongly drop the second one.
+    // Claimed atomically with SET NX so two concurrent deliveries of the same
+    // event cannot both pass the check (the previous get-then-set had a race).
+    const idempotencyKey = `webhook:processed:${provider}:${event.id}`;
+    const claim = await this.claimWebhookEvent(idempotencyKey);
+    if (claim === 'duplicate') {
+      // A key already exists — but 'duplicate' conflates two very different
+      // states, and acking 200 on the wrong one loses a money-path event:
+      //   completed → genuinely processed already. Safe to ack 200.
+      //   pending   → a prior delivery claimed the key then crashed BEFORE
+      //               completing (or a concurrent delivery is still in flight).
+      //               Acking 200 here tells the PSP "handled, stop retrying" and
+      //               the event is lost forever, because processing never
+      //               finished. Return 503 instead so the PSP keeps retrying;
+      //               the pending key self-heals via its short TTL and a later
+      //               retry re-enters cleanly.
+      const state = await this.getWebhookEventState(idempotencyKey);
+      if (state === 'completed') {
+        this.logger.debug(`Skipping already-completed webhook: ${event.id}`);
         return { received: true };
       }
-      await this.redisService.set(idempotencyKey, '1', 172800); // 48h TTL
+      // pending / expired-between-claim-and-read / redis-read-failed → retryable.
+      // ServiceUnavailableException is special-cased by WebhooksController so it
+      // surfaces as 503, NOT misclassified as a 401 "invalid signature".
+      this.logger.warn(
+        `Webhook ${event.id} is claimed-but-not-completed ('${state ?? 'expired'}'); ` +
+          `returning 503 so the PSP retries rather than silently dropping the event`,
+      );
+      throw new ServiceUnavailableException(
+        'Webhook is still being processed; please retry',
+      );
     }
 
     try {
@@ -611,7 +714,7 @@ export class BillingService implements OnModuleInit {
 
         case 'invoice.payment_succeeded':
         case 'payment.captured':
-          await this.handlePaymentSucceeded(provider, event.data);
+          await this.handlePaymentSucceeded(provider, event.data, event.id);
           break;
 
         case 'invoice.payment_failed':
@@ -627,10 +730,15 @@ export class BillingService implements OnModuleInit {
           this.logger.debug(`Unhandled webhook event: ${event.type}`);
       }
     } catch (error) {
+      // Release the pending claim so the PSP's retry re-enters immediately
+      // rather than being dropped as a "duplicate" of a never-completed claim.
+      await this.releaseWebhookClaim(idempotencyKey);
       this.logger.error(`Error processing webhook: ${error}`);
       throw error;
     }
 
+    // Mark completed only after the work succeeded (flips 'pending' → 'completed').
+    await this.completeWebhookEvent(idempotencyKey);
     return { received: true };
   }
 
@@ -691,8 +799,17 @@ export class BillingService implements OnModuleInit {
       return;
     }
 
-    // Map status
+    // Map status. A missing/unmapped status returns null → leave the org's
+    // last-known subscriptionStatus untouched (fail-closed) rather than flip
+    // entitlement on a webhook we don't understand. (audit S2-6)
     const status = this.mapSubscriptionStatus(provider, data.status || data.subscription?.status);
+
+    if (status === null) {
+      this.logger.warn(
+        `Skipping subscriptionStatus update for org ${org.id}: unmapped/missing ${provider} status`,
+      );
+      return;
+    }
 
     await this.db.organization.update({
       where: { id: org.id },
@@ -744,7 +861,7 @@ export class BillingService implements OnModuleInit {
   /**
    * Handle payment succeeded webhook
    */
-  private async handlePaymentSucceeded(provider: string, data: WebhookData): Promise<void> {
+  private async handlePaymentSucceeded(provider: string, data: WebhookData, eventId?: string): Promise<void> {
     const invoiceId = provider === 'stripe' ? data.id : data.invoice?.id;
     const amount = provider === 'stripe' ? data.amount_paid : data.payment?.amount;
     const currency = provider === 'stripe' ? data.currency : data.payment?.currency;
@@ -774,11 +891,15 @@ export class BillingService implements OnModuleInit {
 
     if (!org) return;
 
-    // Record the transaction
+    // Record the transaction. Fall back to the webhook EVENT id (stable across
+    // retries) rather than Date.now() (which changes per delivery and defeats the
+    // @@unique([provider, providerTransactionId]) dedup → duplicate rows on replay
+    // of a no-invoice-id payment). Only a genuinely id-less event uses a synthetic
+    // key, and that key is still replay-stable.
     await this.recordTransaction({
       organizationId: org.id,
       provider: provider as 'stripe' | 'razorpay',
-      providerTransactionId: invoiceId || `payment_${Date.now()}`,
+      providerTransactionId: invoiceId || eventId || `payment_${provider}_unknown`,
       type: 'subscription',
       status: 'succeeded',
       amount: amount || 0,
@@ -786,12 +907,11 @@ export class BillingService implements OnModuleInit {
       description: 'Subscription payment',
     });
 
-    // Update subscription status to active if it was past_due
-    if (org.subscriptionStatus === 'past_due') {
-      await this.db.organization.update({
-        where: { id: org.id },
-        data: { subscriptionStatus: 'active' },
-      });
+    // Recover from any degradation rung → active. EntitlementService clears the
+    // episode clock and emits tenant:resumed IFF the org had reached `suspended`
+    // (B3 ladder). Covers past_due / publish_locked / suspended uniformly.
+    if (['past_due', 'publish_locked', 'suspended'].includes(org.subscriptionStatus)) {
+      await this.entitlementService.recover(org.id);
     }
 
     // Send payment receipt email
@@ -845,10 +965,10 @@ export class BillingService implements OnModuleInit {
 
     if (!org) return;
 
-    await this.db.organization.update({
-      where: { id: org.id },
-      data: { subscriptionStatus: 'past_due' },
-    });
+    // Begin the degradation episode (past_due + episode clock). Idempotent — a
+    // repeat payment-failed while already past_due/publish_locked/suspended does
+    // NOT reset the clock or un-advance the ladder (B3).
+    await this.entitlementService.beginPastDue(org.id);
 
     // Send payment failed email
     const admin = org.users[0];
@@ -914,8 +1034,20 @@ export class BillingService implements OnModuleInit {
    */
   private mapSubscriptionStatus(
     provider: string,
-    status: string,
-  ): 'trial' | 'active' | 'past_due' | 'canceled' {
+    status: string | undefined,
+  ): 'trial' | 'active' | 'past_due' | 'canceled' | null {
+    // Fail CLOSED on entitlement: a missing or unrecognized status must NEVER
+    // coerce to 'active'. Silently granting entitlement to a paused/unknown
+    // subscription is revenue leakage that defaults the wrong way. Returning
+    // null tells the caller to leave the last-known status untouched and log,
+    // rather than flip entitlement in either direction on a webhook we don't
+    // understand. (audit S2-6)
+    if (!status) {
+      this.logger.warn(
+        `Subscription webhook for ${provider} had no status field; leaving subscriptionStatus unchanged`,
+      );
+      return null;
+    }
     if (provider === 'stripe') {
       const statusMap: Record<string, 'trial' | 'active' | 'past_due' | 'canceled'> = {
         trialing: 'trial',
@@ -926,7 +1058,12 @@ export class BillingService implements OnModuleInit {
         incomplete_expired: 'canceled',
         unpaid: 'past_due',
       };
-      return statusMap[status] || 'active';
+      const mapped = statusMap[status];
+      if (!mapped) {
+        this.logger.warn(`Unmapped Stripe subscription status "${status}"; leaving subscriptionStatus unchanged`);
+        return null;
+      }
+      return mapped;
     } else {
       const statusMap: Record<string, 'trial' | 'active' | 'past_due' | 'canceled'> = {
         created: 'trial',
@@ -938,7 +1075,12 @@ export class BillingService implements OnModuleInit {
         completed: 'canceled',
         expired: 'canceled',
       };
-      return statusMap[status] || 'active';
+      const mapped = statusMap[status];
+      if (!mapped) {
+        this.logger.warn(`Unmapped ${provider} subscription status "${status}"; leaving subscriptionStatus unchanged`);
+        return null;
+      }
+      return mapped;
     }
   }
 }
