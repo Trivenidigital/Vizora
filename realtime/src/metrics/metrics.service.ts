@@ -119,6 +119,23 @@ export class MetricsService {
   }
 
   /**
+   * Reconcile the devices_online gauge from an authoritative snapshot of the
+   * currently-connected devices, counted per organization.
+   *
+   * updateDeviceStatus inc/dec's this gauge, which drifts after a process
+   * restart or a missed disconnect (dec never fires). Periodically set()-ing
+   * the gauge from the gateway's in-memory presence map is the source of truth.
+   * reset() first so organizations that dropped to zero disappear instead of
+   * retaining a stale count.
+   */
+  reconcileDevicesOnline(onlineCountsByOrg: Map<string, number>) {
+    this.devicesOnline.reset();
+    for (const [organizationId, count] of onlineCountsByOrg) {
+      this.devicesOnline.set({ organization_id: organizationId }, count);
+    }
+  }
+
+  /**
    * Update device metrics - aggregated per organization
    */
   updateDeviceMetrics(organizationId: string, cpuUsage: number, memoryUsage: number) {

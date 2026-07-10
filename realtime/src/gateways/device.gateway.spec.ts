@@ -83,6 +83,7 @@ describe('DeviceGateway', () => {
     recordImpression: jest.fn(),
     recordContentError: jest.fn(),
     updateDeviceMetrics: jest.fn(),
+    reconcileDevicesOnline: jest.fn(),
   };
 
   const mockDatabaseService = {
