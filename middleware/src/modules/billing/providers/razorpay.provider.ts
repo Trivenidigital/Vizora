@@ -9,6 +9,7 @@ import {
   Subscription,
   Invoice,
   WebhookEvent,
+  WebhookEventData,
 } from './payment-provider.interface';
 import { CircuitBreakerService } from '../../common/services/circuit-breaker.service';
 
@@ -195,13 +196,27 @@ export class RazorpayProvider implements PaymentProvider {
     }
 
     const event = JSON.parse(payload.toString());
+    // Razorpay nests each entity under payload.<entity>.entity (e.g.
+    // payload.subscription.entity, payload.payment.entity, payload.invoice.entity),
+    // whereas the billing webhook handlers read data.subscription.customer_id /
+    // data.payment.amount / data.invoice.customer_id directly. Unwrap the .entity
+    // layer here — otherwise customerId/amount resolve to undefined and every
+    // Razorpay money event is silently dropped (billing #6).
+    const rawPayload: Record<string, unknown> = event.payload ?? {};
+    const data: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(rawPayload)) {
+      data[key] =
+        value && typeof value === 'object' && 'entity' in value
+          ? (value as { entity: unknown }).entity
+          : value;
+    }
     return {
       // Razorpay has no top-level event id in the body; derive a stable id from
       // the signed payload. Retries of the same event carry an identical body →
       // identical hash → deduped; genuinely different events differ → not deduped.
       id: `rzp_${crypto.createHash('sha256').update(payload).digest('hex').slice(0, 40)}`,
       type: event.event,
-      data: event.payload,
+      data: data as WebhookEventData,
     };
   }
 
