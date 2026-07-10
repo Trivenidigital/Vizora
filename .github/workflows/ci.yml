@@ -151,6 +151,19 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
 
+      - name: Neutralize CONCURRENTLY for the clean CI replay (committed files untouched)
+        run: |
+          # `CREATE INDEX CONCURRENTLY` cannot run inside migrate deploy's transaction
+          # (Postgres 25001 / Prisma P3018). On an EMPTY CI database the CONCURRENTLY
+          # lock-avoidance is irrelevant to correctness, so strip it in the ephemeral CI
+          # checkout only — the committed migration files (and their prod checksums) stay
+          # byte-identical. This lets `migrate deploy` replay the full history and still
+          # catch bad migration SQL (wrong table/column names — the #227 class).
+          # NOTE: a true disaster-recovery `migrate deploy` from empty still needs these
+          # CONCURRENTLY migrations handled manually; tracked as a follow-up.
+          find packages/database/prisma/migrations -name migration.sql \
+            -exec sed -i 's/INDEX CONCURRENTLY/INDEX/g' {} +
+
       - name: Apply all migrations from empty (fails on bad migration SQL)
         run: pnpm --filter @vizora/database exec prisma migrate deploy
 
