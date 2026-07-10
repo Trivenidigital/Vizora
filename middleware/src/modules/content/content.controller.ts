@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   Query,
+  Res,
   HttpCode,
   HttpStatus,
   UploadedFile,
@@ -15,6 +16,7 @@ import {
   BadRequestException,
   NotFoundException,
   ServiceUnavailableException,
+  InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
@@ -43,6 +45,10 @@ import {
 import { ReviewContentDto } from './dto/review-content.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { getOwnedMinioObjectKey, MINIO_URL_PREFIX } from '../storage/minio-object-key';
+import { SkipEnvelope } from '../common/interceptors/response-envelope.interceptor';
+import { SkipOutputSanitize } from '../common/interceptors/sanitize.interceptor';
+import type { Response } from 'express';
+import { pipeline } from 'node:stream/promises';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
@@ -398,47 +404,97 @@ export class ContentController {
   }
 
   /**
-   * Get a download URL for content
-   * For MinIO-stored content, generates a presigned URL
-   * For local content, returns the direct URL
+   * Download a content file.
+   *
+   * MinIO-stored content is proxied through the middleware: the object is
+   * fetched server-side (MinIO is only reachable from the server — in prod its
+   * endpoint is bound to localhost and not publicly exposed) and streamed to
+   * the caller as an attachment. This replaces the previous presigned-URL
+   * response, which handed the browser an unreachable
+   * `http://localhost:9000/...` URL in production (PR-7b).
+   *
+   * Local (`/uploads`) and external URLs are already browser-reachable, so we
+   * redirect to them instead of streaming.
+   *
+   * Auth + org-scoping are enforced by the controller-level RolesGuard /
+   * @RequiresSubscription plus the org-prefixed object-key check
+   * (getOwnedMinioObjectKey throws if the key is outside the caller's org).
    */
   @Get(':id/download')
-  async getDownloadUrl(
+  @SkipEnvelope()
+  @SkipOutputSanitize()
+  async downloadContent(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id', ParseIdPipe) id: string,
-    @Query('expirySeconds') expirySeconds?: string,
-  ): Promise<{ url: string; expiresIn: number }> {
+    @Res() res: Response,
+  ): Promise<void> {
     const content = await this.contentService.findOne(organizationId, id);
 
     if (!content.url) {
       throw new NotFoundException('Content has no associated file');
     }
 
+    // Throws BadRequestException if the object key is outside the caller's org.
     const objectKey = getOwnedMinioObjectKey(organizationId, content.url);
-    if (objectKey) {
-      const expiry = Math.min(parseInt(expirySeconds, 10) || 3600, 86400);
 
-      if (!this.storageService.isMinioAvailable()) {
-        throw new BadRequestException('Storage service is currently unavailable');
-      }
-
-      try {
-        const presignedUrl = await this.storageService.getPresignedUrl(objectKey, expiry);
-        return {
-          url: presignedUrl,
-          expiresIn: expiry,
-        };
-      } catch (error) {
-        this.logger.error(`Failed to generate presigned URL for ${id}: ${error}`);
-        throw new BadRequestException('Failed to generate download URL');
-      }
+    if (!objectKey) {
+      // Local (/uploads) or external URL — reachable by the browser directly.
+      res.redirect(content.url);
+      return;
     }
 
-    // For local/external URLs, return directly (no expiration)
-    return {
-      url: content.url,
-      expiresIn: 0, // 0 indicates no expiration
-    };
+    if (!this.storageService.isMinioAvailable()) {
+      throw new ServiceUnavailableException('Storage service is currently unavailable');
+    }
+
+    const metadata = await this.storageService.getFileMetadata(objectKey);
+    if (!metadata) {
+      throw new NotFoundException('Content file not found');
+    }
+
+    const stream = await this.storageService.getObject(objectKey);
+
+    res.set({
+      'Content-Type': content.mimeType || metadata.contentType || 'application/octet-stream',
+      'Content-Disposition': `attachment; filename="${this.buildDownloadFilename(content.name)}"`,
+      'Content-Length': String(metadata.size),
+      'Cache-Control': 'private, no-cache',
+    });
+
+    await this.streamToResponse(stream, res, id);
+  }
+
+  /**
+   * Build a header-safe filename for Content-Disposition. Strips quotes,
+   * backslashes, and CR/LF so a caller-controlled content name cannot inject
+   * response headers.
+   */
+  private buildDownloadFilename(name?: string | null): string {
+    const cleaned = (name || 'download').replace(/[\r\n"\\]/g, '').trim();
+    return cleaned.length > 0 ? cleaned : 'download';
+  }
+
+  private async streamToResponse(
+    stream: NodeJS.ReadableStream,
+    res: Response,
+    contentId: string,
+  ): Promise<void> {
+    try {
+      await pipeline(stream, res);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'unknown stream error';
+      this.logger.error(`Failed to stream content ${contentId}: ${message}`);
+
+      if (!res.headersSent) {
+        res.removeHeader('Content-Type');
+        res.removeHeader('Content-Disposition');
+        res.removeHeader('Content-Length');
+        res.removeHeader('Cache-Control');
+        throw new InternalServerErrorException('Failed to stream content file');
+      }
+
+      res.destroy(error instanceof Error ? error : undefined);
+    }
   }
 
   @Patch(':id')

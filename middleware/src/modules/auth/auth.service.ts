@@ -865,7 +865,7 @@ export class AuthService {
     return updated;
   }
 
-  async uploadAvatar(userId: string, file: { buffer: Buffer; mimetype: string }): Promise<{ avatarUrl: string }> {
+  async uploadAvatar(userId: string, file: { buffer: Buffer; mimetype: string }): Promise<void> {
     const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
     if (!allowedMimes.includes(file.mimetype)) {
       throw new HttpException('Only JPEG, PNG, and WebP images are allowed', HttpStatus.BAD_REQUEST);
@@ -915,10 +915,11 @@ export class AuthService {
     // Invalidate user cache
     await this.redisService.del(`user_auth:${userId}`);
 
-    // Generate a presigned URL for immediate use
-    const avatarUrl = await this.storageService.getPresignedUrl(objectKey, 86400); // 24h
-
-    return { avatarUrl };
+    // The avatar is served through the authenticated middleware proxy
+    // (GET /auth/me/avatar), not a presigned MinIO URL — in prod MinIO is only
+    // reachable server-side, so a presigned localhost URL is dead in the
+    // browser. The controller builds the stable proxied URL from the stored
+    // object key (PR-7b).
   }
 
   async deleteAvatar(userId: string): Promise<void> {
@@ -944,14 +945,46 @@ export class AuthService {
     }
   }
 
-  async getAvatarUrl(avatarKey: string | null): Promise<string | null> {
-    if (!avatarKey) return null;
+  /**
+   * Open a readable stream for a user's avatar so it can be proxied through the
+   * authenticated middleware (GET /auth/me/avatar). Returns null when the user
+   * has no avatar, storage is unavailable, or the object is missing — the
+   * controller maps null to a 404.
+   *
+   * Replaces the old getAvatarUrl presigned-URL path: in prod MinIO is bound to
+   * localhost and not publicly reachable, so a presigned URL was dead in the
+   * browser (PR-7b).
+   */
+  async getAvatarStream(userId: string): Promise<{
+    stream: NodeJS.ReadableStream;
+    contentType: string;
+    contentLength?: number;
+  } | null> {
+    const user = await this.databaseService.user.findUnique({
+      where: { id: userId },
+      select: { avatar: true },
+    });
+
+    if (!user?.avatar) return null;
     if (!this.storageService.isMinioAvailable()) return null;
+
     try {
-      return await this.storageService.getPresignedUrl(avatarKey, 86400); // 24h
+      const metadata = await this.storageService.getFileMetadata(user.avatar);
+      const stream = await this.storageService.getObject(user.avatar);
+      return {
+        stream,
+        contentType: metadata?.contentType || this.inferAvatarContentType(user.avatar),
+        contentLength: metadata?.size,
+      };
     } catch {
       return null;
     }
+  }
+
+  private inferAvatarContentType(objectKey: string): string {
+    if (objectKey.endsWith('.png')) return 'image/png';
+    if (objectKey.endsWith('.webp')) return 'image/webp';
+    return 'image/jpeg';
   }
 
   async deleteAccount(userId: string, password: string): Promise<void> {

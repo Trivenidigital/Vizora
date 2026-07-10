@@ -7,7 +7,11 @@ jest.mock('isomorphic-dompurify', () => ({
 }));
 
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ContentController } from './content.controller';
 import { ContentService } from './content.service';
 import { ThumbnailService } from './thumbnail.service';
@@ -16,7 +20,7 @@ import { StorageService } from '../storage/storage.service';
 import { StorageQuotaService } from '../storage/storage-quota.service';
 import { SubscriptionActiveGuard } from '../billing/guards/subscription-active.guard';
 import { DatabaseService } from '../database/database.service';
-import { Readable } from 'stream';
+import { Readable, Writable } from 'stream';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -531,25 +535,55 @@ describe('ContentController', () => {
     });
   });
 
-  describe('getDownloadUrl', () => {
-    it('should generate a presigned URL for same-organization MinIO content', async () => {
+  describe('downloadContent', () => {
+    const createMockResponse = () => {
+      const chunks: Buffer[] = [];
+      let res: any;
+      res = new Writable({
+        write(chunk, _encoding, callback) {
+          res.headersSent = true;
+          chunks.push(Buffer.from(chunk));
+          callback();
+        },
+      });
+      res.headersSent = false;
+      res.set = jest.fn().mockReturnValue(res);
+      res.redirect = jest.fn();
+      res.removeHeader = jest.fn();
+      res.getBody = () => Buffer.concat(chunks);
+      return res;
+    };
+
+    it('should stream same-organization MinIO content as an attachment', async () => {
       mockContentService.findOne.mockResolvedValue({
         id: 'content-123',
+        name: 'My File.jpg',
         url: 'minio://org-123/uploads/file.jpg',
+        mimeType: 'image/jpeg',
       } as any);
       mockStorageService.isMinioAvailable.mockReturnValue(true);
-      mockStorageService.getPresignedUrl.mockResolvedValue('https://minio.example/signed');
-
-      const result = await controller.getDownloadUrl(organizationId, 'content-123');
-
-      expect(result).toEqual({
-        url: 'https://minio.example/signed',
-        expiresIn: 3600,
-      });
-      expect(mockStorageService.getPresignedUrl).toHaveBeenCalledWith(
-        'org-123/uploads/file.jpg',
-        3600,
+      mockStorageService.getFileMetadata.mockResolvedValue({
+        size: 5,
+        lastModified: new Date('2026-05-31T00:00:00.000Z'),
+        contentType: 'image/jpeg',
+      } as any);
+      mockStorageService.getObject.mockResolvedValue(
+        Readable.from([Buffer.from('image')]) as any,
       );
+
+      const res = createMockResponse();
+      await controller.downloadContent(organizationId, 'content-123', res);
+
+      expect(mockStorageService.getObject).toHaveBeenCalledWith('org-123/uploads/file.jpg');
+      expect(res.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          'Content-Type': 'image/jpeg',
+          'Content-Disposition': 'attachment; filename="My File.jpg"',
+          'Content-Length': '5',
+          'Cache-Control': 'private, no-cache',
+        }),
+      );
+      expect(res.getBody().toString()).toBe('image');
     });
 
     it('should reject MinIO content whose object key is outside the organization prefix', async () => {
@@ -558,13 +592,53 @@ describe('ContentController', () => {
         url: 'minio://other-org/uploads/secret.jpg',
       } as any);
       mockStorageService.isMinioAvailable.mockReturnValue(true);
-      mockStorageService.getPresignedUrl.mockResolvedValue('https://minio.example/signed');
 
+      const res = createMockResponse();
       await expect(
-        controller.getDownloadUrl(organizationId, 'content-123'),
+        controller.downloadContent(organizationId, 'content-123', res),
       ).rejects.toThrow(BadRequestException);
 
-      expect(mockStorageService.getPresignedUrl).not.toHaveBeenCalled();
+      expect(mockStorageService.getObject).not.toHaveBeenCalled();
+    });
+
+    it('should redirect to local/external URLs instead of streaming', async () => {
+      mockContentService.findOne.mockResolvedValue({
+        id: 'content-123',
+        url: 'https://cdn.example/video.mp4',
+      } as any);
+
+      const res = createMockResponse();
+      await controller.downloadContent(organizationId, 'content-123', res);
+
+      expect(res.redirect).toHaveBeenCalledWith('https://cdn.example/video.mp4');
+      expect(mockStorageService.getObject).not.toHaveBeenCalled();
+    });
+
+    it('should 503 when MinIO is unavailable for MinIO-stored content', async () => {
+      mockContentService.findOne.mockResolvedValue({
+        id: 'content-123',
+        url: 'minio://org-123/uploads/file.jpg',
+      } as any);
+      mockStorageService.isMinioAvailable.mockReturnValue(false);
+
+      const res = createMockResponse();
+      await expect(
+        controller.downloadContent(organizationId, 'content-123', res),
+      ).rejects.toThrow(ServiceUnavailableException);
+
+      expect(mockStorageService.getObject).not.toHaveBeenCalled();
+    });
+
+    it('should 404 when content has no associated file', async () => {
+      mockContentService.findOne.mockResolvedValue({
+        id: 'content-123',
+        url: null,
+      } as any);
+
+      const res = createMockResponse();
+      await expect(
+        controller.downloadContent(organizationId, 'content-123', res),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
