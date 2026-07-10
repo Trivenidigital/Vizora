@@ -67,6 +67,7 @@ describe('BillingService', () => {
     currentPeriodEnd: new Date('2024-02-01'),
     cancelAtPeriodEnd: false,
     priceId: 'price_basic',
+    interval: 'monthly' as const,
   };
 
   const mockInvoices = [
@@ -93,6 +94,9 @@ describe('BillingService', () => {
       billingTransaction: {
         create: jest.fn(),
       },
+      // updateSubscription wraps its local write in $transaction — run the
+      // callback against the same mock so tx.organization.update is captured.
+      $transaction: jest.fn(async (cb: any) => cb(mockDatabaseService)),
     };
 
     mockStripeProvider = {
@@ -491,7 +495,10 @@ describe('BillingService', () => {
   });
 
   describe('cancelSubscription', () => {
-    it('should cancel subscription at period end', async () => {
+    it('cancel-at-period-end (Stripe) does NOT revoke paid access — status stays active', async () => {
+      // Fix #3: Stripe keeps the sub active through the paid period
+      // (cancel_at_period_end=true). We must NOT flip local status to 'canceled'
+      // or SubscriptionActiveGuard would block writes the customer paid for.
       mockDatabaseService.organization.findUnique.mockResolvedValue(mockOrganization);
       mockStripeProvider.cancelSubscription.mockResolvedValue(undefined);
       mockDatabaseService.organization.update.mockResolvedValue({});
@@ -503,11 +510,36 @@ describe('BillingService', () => {
       const result = await service.cancelSubscription('org-123', false);
 
       expect(mockStripeProvider.cancelSubscription).toHaveBeenCalledWith('sub_stripe123', false);
+      // No local status write on the Stripe grace path — status is untouched.
+      expect(mockDatabaseService.organization.update).not.toHaveBeenCalled();
+      // getSubscriptionStatus reflects the still-active sub + cancelAtPeriodEnd.
+      expect(result.subscriptionStatus).toBe('active');
+      expect(result.cancelAtPeriodEnd).toBe(true);
+    });
+
+    it('cancel-at-period-end (Razorpay) finalizes immediately — provider cancels now, no grace', async () => {
+      // Razorpay's cancel(id, false) cancels IMMEDIATELY, so we mirror the
+      // provider by finalizing local status to 'canceled' (documented behavior).
+      const razorpayOrg = {
+        ...mockOrganization,
+        stripeCustomerId: null,
+        stripeSubscriptionId: null,
+        razorpayCustomerId: 'cust_razorpay123',
+        razorpaySubscriptionId: 'sub_razorpay123',
+        paymentProvider: 'razorpay',
+      };
+      mockDatabaseService.organization.findUnique.mockResolvedValue(razorpayOrg);
+      mockRazorpayProvider.cancelSubscription.mockResolvedValue(undefined);
+      mockRazorpayProvider.getSubscription.mockResolvedValue(null);
+      mockDatabaseService.organization.update.mockResolvedValue({});
+
+      await service.cancelSubscription('org-123', false);
+
+      expect(mockRazorpayProvider.cancelSubscription).toHaveBeenCalledWith('sub_razorpay123', false);
       expect(mockDatabaseService.organization.update).toHaveBeenCalledWith({
         where: { id: 'org-123' },
         data: { subscriptionStatus: 'canceled' },
       });
-      expect(result).toBeDefined();
     });
 
     it('should cancel subscription immediately and downgrade to free', async () => {
@@ -538,6 +570,88 @@ describe('BillingService', () => {
       });
 
       await expect(service.cancelSubscription('org-123')).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('updateSubscription', () => {
+    it('preserves a YEARLY subscriber interval on plan change (no silent monthly re-bill)', async () => {
+      // Fix #4: a yearly subscriber changing plans must stay yearly. The interval
+      // is read from the live Stripe subscription, not hardcoded to monthly.
+      mockDatabaseService.organization.findUnique.mockResolvedValue(mockOrganization);
+      mockStripeProvider.getSubscription.mockResolvedValue({
+        ...mockSubscription,
+        interval: 'yearly',
+      });
+      mockStripeProvider.updateSubscription.mockResolvedValue({
+        ...mockSubscription,
+        interval: 'yearly',
+      });
+      mockDatabaseService.organization.update.mockResolvedValue({});
+
+      await service.updateSubscription('org-123', { planId: 'pro' });
+
+      // STRIPE_PRO_YEARLY_PRICE_ID = 'price_pro_yearly' (set in beforeAll).
+      expect(mockStripeProvider.updateSubscription).toHaveBeenCalledWith(
+        'sub_stripe123',
+        'price_pro_yearly',
+      );
+    });
+
+    it('keeps a MONTHLY subscriber on monthly', async () => {
+      mockDatabaseService.organization.findUnique.mockResolvedValue(mockOrganization);
+      mockStripeProvider.getSubscription.mockResolvedValue({
+        ...mockSubscription,
+        interval: 'monthly',
+      });
+      mockStripeProvider.updateSubscription.mockResolvedValue({
+        ...mockSubscription,
+        interval: 'monthly',
+      });
+      mockDatabaseService.organization.update.mockResolvedValue({});
+
+      await service.updateSubscription('org-123', { planId: 'pro' });
+
+      expect(mockStripeProvider.updateSubscription).toHaveBeenCalledWith(
+        'sub_stripe123',
+        'price_pro_monthly',
+      );
+    });
+
+    it('refuses the plan change when the current interval cannot be determined (no wrong charge)', async () => {
+      mockDatabaseService.organization.findUnique.mockResolvedValue(mockOrganization);
+      // Live sub exposes no monthly/yearly interval (e.g. week/day price or a
+      // failed provider fetch). Must fail loudly rather than default to monthly.
+      mockStripeProvider.getSubscription.mockResolvedValue({
+        ...mockSubscription,
+        interval: undefined,
+      });
+
+      await expect(
+        service.updateSubscription('org-123', { planId: 'pro' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockStripeProvider.updateSubscription).not.toHaveBeenCalled();
+    });
+
+    it('uses the interval-agnostic Razorpay plan id on plan change', async () => {
+      const razorpayOrg = {
+        ...mockOrganization,
+        stripeSubscriptionId: null,
+        razorpaySubscriptionId: 'sub_razorpay123',
+        razorpayCustomerId: 'cust_razorpay123',
+        paymentProvider: 'razorpay',
+      };
+      mockDatabaseService.organization.findUnique.mockResolvedValue(razorpayOrg);
+      mockRazorpayProvider.updateSubscription.mockResolvedValue({});
+      mockRazorpayProvider.getSubscription.mockResolvedValue(null);
+      mockDatabaseService.organization.update.mockResolvedValue({});
+
+      await service.updateSubscription('org-123', { planId: 'pro' });
+
+      // RAZORPAY_PRO_PLAN_ID = 'plan_pro_inr' (set in beforeAll); no interval dimension.
+      expect(mockRazorpayProvider.updateSubscription).toHaveBeenCalledWith(
+        'sub_razorpay123',
+        'plan_pro_inr',
+      );
     });
   });
 

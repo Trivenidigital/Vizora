@@ -242,7 +242,21 @@ export class StripeProvider implements PaymentProvider {
       currentPeriodEnd: new Date(sub.current_period_end * 1000),
       cancelAtPeriodEnd: sub.cancel_at_period_end,
       priceId: sub.items.data[0]?.price.id || '',
+      interval: this.mapInterval(sub.items.data[0]?.price.recurring?.interval),
       metadata: sub.metadata,
     };
+  }
+
+  /**
+   * Normalize Stripe's price `recurring.interval` to our plan interval. Only
+   * month/year map; anything else (week/day/absent) returns undefined so callers
+   * on a re-bill path refuse rather than silently pick a wrong cadence.
+   */
+  private mapInterval(
+    interval: Stripe.Price.Recurring.Interval | undefined,
+  ): 'monthly' | 'yearly' | undefined {
+    if (interval === 'month') return 'monthly';
+    if (interval === 'year') return 'yearly';
+    return undefined;
   }
 }

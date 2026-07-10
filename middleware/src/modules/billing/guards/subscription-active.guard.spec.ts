@@ -201,10 +201,35 @@ describe('SubscriptionActiveGuard', () => {
       });
     });
 
-    describe('when subscription is past_due', () => {
-      it('should deny access', async () => {
+    describe('entitlement ladder (B3) — dunning rungs keep dashboard writes', () => {
+      it('should ALLOW past_due writes (7-day grace; one failed card must not lock the dashboard)', async () => {
+        mockRequest.method = 'POST';
         mockDatabaseService.organization.findUnique.mockResolvedValue({
           subscriptionStatus: 'past_due',
+          trialEndsAt: null,
+        } as any);
+
+        const result = await guard.canActivate(mockExecutionContext);
+
+        expect(result).toBe(true);
+      });
+
+      it('should ALLOW publish_locked writes (publishing is gated separately by EntitlementPublishGuard)', async () => {
+        mockRequest.method = 'POST';
+        mockDatabaseService.organization.findUnique.mockResolvedValue({
+          subscriptionStatus: 'publish_locked',
+          trialEndsAt: null,
+        } as any);
+
+        const result = await guard.canActivate(mockExecutionContext);
+
+        expect(result).toBe(true);
+      });
+
+      it('should BLOCK suspended writes (screens keep playing via tenant:suspended device signal)', async () => {
+        mockRequest.method = 'POST';
+        mockDatabaseService.organization.findUnique.mockResolvedValue({
+          subscriptionStatus: 'suspended',
           trialEndsAt: null,
         } as any);
 

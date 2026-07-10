@@ -20,6 +20,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CheckQuota } from '../billing/decorators/check-quota.decorator';
 import { RequiresSubscription } from '../billing/decorators/requires-subscription.decorator';
+import { EntitlementPublishGuard } from '../billing/guards/entitlement-publish.guard';
 import { DisplaysService } from './displays.service';
 import { CreateDisplayDto } from './dto/create-display.dto';
 import { UpdateDisplayDto } from './dto/update-display.dto';
@@ -74,8 +75,12 @@ export class DisplaysController {
     return this.displaysService.bulkDelete(organizationId, dto.displayIds);
   }
 
+  // Publishing NEW content to screens (assigning a playlist to displays) is
+  // gated at the publish_locked/suspended rungs — screens keep playing their
+  // current playlist, but a past-due tenant can't push new playlists out.
   @Post('bulk/assign-playlist')
   @Roles('admin', 'manager')
+  @UseGuards(EntitlementPublishGuard)
   bulkAssignPlaylist(
     @CurrentUser('organizationId') organizationId: string,
     @Body() dto: BulkAssignPlaylistDto,
@@ -189,8 +194,11 @@ export class DisplaysController {
     return this.displaysService.enableDevice(id, organizationId);
   }
 
+  // Pushing NEW content to a display is a publish action — gated at
+  // publish_locked/suspended. The screen keeps playing its current content.
   @Post(':id/push-content')
   @Roles('admin', 'manager')
+  @UseGuards(EntitlementPublishGuard)
   pushContent(
     @CurrentUser('organizationId') organizationId: string,
     @Param('id', ParseUUIDPipe) id: string,

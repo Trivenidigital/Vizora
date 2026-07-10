@@ -338,11 +338,30 @@ export class BillingService implements OnModuleInit {
         throw new BadRequestException('Invalid plan');
       }
 
-      // Get price ID from environment at runtime
-      const priceId =
-        org.paymentProvider === 'stripe'
-          ? getStripePriceId(dto.planId, 'monthly') // Default to monthly for upgrades
-          : getRazorpayPlanId(dto.planId);
+      // Resolve the new price ID, preserving the subscriber's CURRENT billing
+      // interval. A yearly subscriber changing plans must stay yearly —
+      // hardcoding 'monthly' here silently re-bills them at the wrong amount and
+      // cadence. The interval isn't stored locally, so read it from the live
+      // provider subscription (Stripe price recurring.interval).
+      let priceId: string | undefined;
+      if (org.paymentProvider === 'stripe') {
+        const currentSub = await provider.getSubscription(subscriptionId);
+        const interval = currentSub?.interval;
+        if (!interval) {
+          // Never fall back to a concrete interval on a re-bill path: an unknown
+          // interval must fail loudly rather than risk an incorrect charge.
+          throw new BadRequestException(
+            'Unable to determine the current billing interval for this subscription; ' +
+              'refusing to change plans to avoid an incorrect charge.',
+          );
+        }
+        priceId = getStripePriceId(dto.planId, interval);
+      } else {
+        // Razorpay plan IDs are interval-agnostic (getRazorpayPlanId resolves one
+        // plan id per tier, with no monthly/yearly dimension), so there is no
+        // interval to preserve on this path.
+        priceId = getRazorpayPlanId(dto.planId);
+      }
 
       if (!priceId) {
         throw new BadRequestException(`Price not configured for ${dto.planId}`);
@@ -433,8 +452,21 @@ export class BillingService implements OnModuleInit {
             org.paymentProvider === 'razorpay' ? null : org.razorpaySubscriptionId,
         },
       });
+    } else if (org.paymentProvider === 'stripe') {
+      // "Cancel at period end": provider.cancelSubscription(id, false) set
+      // Stripe's cancel_at_period_end=true and the subscription stays ACTIVE
+      // through the paid period. Do NOT flip the local status to 'canceled' —
+      // that would revoke dashboard write access the customer already paid for.
+      // Leave subscriptionStatus untouched; getSubscriptionStatus derives
+      // cancelAtPeriodEnd from the live sub, so the UI shows "access until
+      // {periodEnd}" + a Reactivate action. Finalization to free/canceled happens
+      // on the customer.subscription.deleted webhook (handleSubscriptionCanceled)
+      // when Stripe actually ends the subscription at period end.
     } else {
-      // Mark as pending cancellation
+      // Razorpay: provider.cancelSubscription(id, false) maps to the SDK's
+      // cancel_at_cycle_end=false, which cancels the subscription IMMEDIATELY —
+      // there is no period-end grace to honor. Finalize locally to match the
+      // provider rather than fake a grace it won't keep. (Existing behavior.)
       await this.db.organization.update({
         where: { id: organizationId },
         data: {
