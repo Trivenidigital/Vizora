@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "license": "MIT",
   "packageManager": "pnpm@10.28.2",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "build": "nx build @vizora/middleware && nx build @vizora/realtime && cd web && npx next build",
     "build:middleware": "nx build @vizora/middleware",
