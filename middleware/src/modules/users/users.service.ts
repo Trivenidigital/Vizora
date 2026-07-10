@@ -80,9 +80,13 @@ export class UsersService {
   }
 
   async invite(organizationId: string, dto: InviteUserDto, invitedByUserId: string) {
+    // Normalize so a mixed-case invite can't create an account that later
+    // (lowercased) logins never match, and so the duplicate check catches
+    // case-variants. Defense-in-depth alongside the DTO @Transform.
+    const email = dto.email.toLowerCase().trim();
     // Check if email already exists
     const existingUser = await this.db.user.findUnique({
-      where: { email: dto.email },
+      where: { email },
     });
 
     if (existingUser) {
@@ -96,7 +100,7 @@ export class UsersService {
 
     const user = await this.db.user.create({
       data: {
-        email: dto.email,
+        email,
         firstName: dto.firstName,
         lastName: dto.lastName,
         role: dto.role,

@@ -628,8 +628,12 @@ export class AuthService {
   }
 
   async forgotPassword(email: string): Promise<void> {
+    // Normalize so a case-variant address can't bypass the per-email rate limit
+    // or miss the (lowercased) stored account. Defense-in-depth alongside the
+    // DTO @Transform, for any non-HTTP caller.
+    const normalizedEmail = email.toLowerCase().trim();
     // Rate limit: 3 per hour per email
-    const rateLimitKey = `password_reset:${email}`;
+    const rateLimitKey = `password_reset:${normalizedEmail}`;
     const attempts = await this.redisService.get(rateLimitKey);
     if (attempts && parseInt(attempts, 10) >= 3) {
       // Don't throw — always return success to prevent enumeration
@@ -644,7 +648,7 @@ export class AuthService {
 
     // Find user
     const user = await this.databaseService.user.findUnique({
-      where: { email },
+      where: { email: normalizedEmail },
     });
 
     if (!user || !user.isActive) {
