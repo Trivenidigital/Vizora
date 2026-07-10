@@ -121,8 +121,9 @@ export class WebhooksService {
     await this.findOne(organizationId, id);
     if (dto.url !== undefined) await this.assertUrlSafe(dto.url);
 
-    return this.db.webhook.update({
-      where: { id },
+    // Org-scoped in the write (tenant-guard enforce prereq).
+    const scoped = await this.db.webhook.updateMany({
+      where: { id, organizationId },
       data: {
         ...(dto.name !== undefined ? { name: dto.name } : {}),
         ...(dto.url !== undefined ? { url: dto.url } : {}),
@@ -130,13 +131,22 @@ export class WebhooksService {
         ...(dto.events !== undefined ? { events: dto.events } : {}),
         ...(dto.isActive !== undefined ? { isActive: dto.isActive, failureCount: 0 } : {}),
       },
+    });
+    if (scoped.count === 0) {
+      throw new NotFoundException(`Webhook ${id} not found`);
+    }
+    return this.db.webhook.findFirst({
+      where: { id, organizationId },
       select: this.RESPONSE_SELECT,
     });
   }
 
   async remove(organizationId: string, id: string): Promise<void> {
-    await this.findOne(organizationId, id);
-    await this.db.webhook.delete({ where: { id } });
+    // Org-scoped in the write (tenant-guard enforce prereq).
+    const result = await this.db.webhook.deleteMany({ where: { id, organizationId } });
+    if (result.count === 0) {
+      throw new NotFoundException('Webhook not found');
+    }
   }
 
   // ---------------------------------------------------------------------------

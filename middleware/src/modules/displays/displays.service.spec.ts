@@ -20,6 +20,7 @@ import { PaginationDto } from '../common/dto/pagination.dto';
 describe('DisplaysService', () => {
   let service: DisplaysService;
   let databaseService: jest.Mocked<DatabaseService>;
+  let jwtService: jest.Mocked<JwtService>;
   let httpService: jest.Mocked<HttpService>;
 
   const mockOrganizationId = 'org-123';
@@ -155,6 +156,7 @@ describe('DisplaysService', () => {
 
     service = module.get<DisplaysService>(DisplaysService);
     databaseService = module.get(DatabaseService);
+    jwtService = module.get(JwtService);
     httpService = module.get(HttpService);
   });
 
@@ -692,20 +694,36 @@ describe('DisplaysService', () => {
       httpService.post.mockReturnValue(of({ data: { success: true } }) as any);
     });
 
-    it('should send disable commands using realtime internal command DTO shape', async () => {
+    it('disable emits device:revoked (Contract v1.1 item 3: block == DEVICE_REVOKED)', async () => {
       databaseService.display.updateMany.mockResolvedValue({ count: 1 } as any);
 
       await service.disableDevice(mockDisplayId, mockOrganizationId);
 
+      // Block now routes through the revocation path (device confirms via
+      // auth/check 410 and purges), NOT the legacy 'disable' command.
       expect(httpService.post).toHaveBeenCalledWith(
-        expect.stringContaining('/internal/command'),
-        {
-          deviceId: mockDisplayId,
-          command: {
-            type: 'disable',
-            payload: undefined,
-          },
-        },
+        expect.stringContaining('/internal/device-revoked'),
+        { deviceId: mockDisplayId, reason: 'blocked' },
+        expect.objectContaining({
+          headers: expect.objectContaining({ 'x-internal-api-key': expect.any(String) }),
+          timeout: 15000,
+        }),
+      );
+    });
+
+    it('delete emits device:revoked for the removed device', async () => {
+      // findOne succeeds, deleteMany removes the row
+      databaseService.display.findFirst.mockResolvedValue({
+        id: mockDisplayId,
+        organizationId: mockOrganizationId,
+      } as any);
+      databaseService.display.deleteMany.mockResolvedValue({ count: 1 } as any);
+
+      await service.remove(mockOrganizationId, mockDisplayId);
+
+      expect(httpService.post).toHaveBeenCalledWith(
+        expect.stringContaining('/internal/device-revoked'),
+        { deviceId: mockDisplayId, reason: 'deleted' },
         expect.objectContaining({
           headers: expect.objectContaining({ 'x-internal-api-key': expect.any(String) }),
           timeout: 15000,
@@ -1154,6 +1172,28 @@ describe('DisplaysService', () => {
         service.pushContent(mockOrganizationId, mockDisplayId, mockContent.id, 5),
       ).rejects.toThrow(ServiceUnavailableException);
       expect(httpService.post).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('generatePairingToken (B10 — token must expire)', () => {
+    beforeEach(() => {
+      process.env.DEVICE_JWT_SECRET = 'x'.repeat(32);
+      databaseService.display.findFirst.mockResolvedValue(mockDisplay as any);
+      databaseService.display.updateMany.mockResolvedValue({ count: 1 } as any);
+      (jwtService.sign as jest.Mock).mockReturnValue('signed.device.token');
+    });
+
+    it('signs the device token WITH a 90d expiry (not a non-expiring token)', async () => {
+      const result = await service.generatePairingToken(mockOrganizationId, mockDisplayId);
+
+      // The explicit signOptions overrides the module default, so expiresIn must
+      // be set here or the token has no exp claim (the B10 bug).
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'device' }),
+        expect.objectContaining({ algorithm: 'HS256', expiresIn: '90d' }),
+      );
+      // Returned value is now truthful.
+      expect(result.expiresIn).toBe('90d');
     });
   });
 });

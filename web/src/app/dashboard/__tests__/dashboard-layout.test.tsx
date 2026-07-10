@@ -53,6 +53,7 @@ jest.mock('@/lib/api', () => ({
     getDisplays: jest.fn().mockResolvedValue({ data: [] }),
     getNotifications: jest.fn().mockResolvedValue({ data: [] }),
     getUnreadNotificationCount: jest.fn().mockResolvedValue({ count: 0 }),
+    getEntitlementBanner: jest.fn().mockResolvedValue(null),
     setAuthenticated: jest.fn(),
   },
 }));

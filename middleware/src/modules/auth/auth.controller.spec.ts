@@ -3,6 +3,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { Request, Response } from 'express';
 import { AUTH_CONSTANTS } from './constants/auth.constants';
+import { getAccessTokenTtlMs } from './jwt-expiry';
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
 
 describe('AuthController', () => {
@@ -401,7 +402,7 @@ describe('AuthController', () => {
         expect.any(String),
         expect.any(String),
         expect.objectContaining({
-          maxAge: AUTH_CONSTANTS.TOKEN_EXPIRY_MS,
+          maxAge: getAccessTokenTtlMs(),
         }),
       );
     });

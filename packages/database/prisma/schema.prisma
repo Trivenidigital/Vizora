@@ -30,7 +30,13 @@ model Organization {
   gstin                  String? // GST Identification Number (India only)
   billingEmail           String?
   trialEndsAt            DateTime?
-  subscriptionStatus     String    @default("trial") // trial, active, past_due, canceled
+  // Entitlement ladder (B3): trial, active, past_due, publish_locked, suspended, canceled.
+  // publish_locked/suspended are degrade rungs — screens keep playing at publish_locked;
+  // only suspended shows a holding screen (emits tenant:suspended).
+  subscriptionStatus     String    @default("trial")
+  // Timestamp of the last entitlement-rung transition. The ladder clock keys on THIS,
+  // not updatedAt (which any unrelated org write resets — B8 grace-reset bug).
+  entitlementStateSince  DateTime?
   storageUsedBytes       BigInt    @default(0) // Current storage usage in bytes
   storageQuotaBytes      BigInt    @default(1073741824) // 1GB default quota in bytes (trial)
   settings               Json?     @db.JsonB

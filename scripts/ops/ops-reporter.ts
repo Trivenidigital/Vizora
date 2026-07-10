@@ -24,9 +24,10 @@
  */
 
 import 'dotenv/config';
-import type { SystemStatus, Incident, RemediationAction } from './lib/types.js';
+import type { SystemStatus, Incident } from './lib/types.js';
 import {
   readOpsState,
+  readOpsStateSnapshot,
   writeOpsState,
   determineSystemStatus,
   isActiveIncident,
@@ -184,11 +185,11 @@ function pruneOldIncidents(incidents: Incident[]): { pruned: number; remaining: 
  * Remove remediations older than 24 hours.
  * Returns the number of remediations pruned.
  */
-function pruneOldRemediations(
-  remediations: RemediationAction[],
-): { pruned: number; remaining: RemediationAction[] } {
+function pruneOldRemediations<T extends { timestamp: string }>(
+  remediations: T[],
+): { pruned: number; remaining: T[] } {
   const cutoff = Date.now() - PRUNE_AGE_MS;
-  const remaining: RemediationAction[] = [];
+  const remaining: T[] = [];
   let pruned = 0;
 
   for (const r of remediations) {
@@ -208,40 +209,49 @@ async function main(): Promise<void> {
   const startTime = Date.now();
   log(AGENT, 'Starting ops reporting cycle');
 
-  // ─── 1. Read State ────────────────────────────────────────────────────────
+  // ─── 1. Read State (lock-free snapshot) ───────────────────────────────────
 
-  const state = readOpsState();
-  const previousStatus = state.systemStatus;
+  // ops-reporter does slow network I/O (Slack, email, login, dashboard) that
+  // must NOT run under the state lock. Phase 1 reads a lock-free snapshot to
+  // decide what to alert on; phase 2 does the I/O with no lock held; phase 3
+  // takes the lock briefly to persist the deterministic mutations (status
+  // recompute, prune, lastRun) against FRESH state.
+  const snapshot = readOpsStateSnapshot();
+  const previousStatus = snapshot.systemStatus;
 
-  log(AGENT, `Current state: status=${previousStatus}, incidents=${state.incidents.length}, remediations=${state.recentRemediations.length}`);
+  log(AGENT, `Current state: status=${previousStatus}, incidents=${snapshot.incidents.length}, remediations=${snapshot.recentRemediations.length}`);
 
   // ─── 2. Determine Status ──────────────────────────────────────────────────
 
-  const currentStatus = determineSystemStatus(state);
-  state.systemStatus = currentStatus;
+  const currentStatus = determineSystemStatus(snapshot);
+  snapshot.systemStatus = currentStatus; // for the dashboard payload below
 
   log(AGENT, `System status: ${previousStatus} -> ${currentStatus}`);
 
   // ─── 3. Agent Freshness Check ─────────────────────────────────────────────
 
   log(AGENT, 'Checking agent freshness');
-  checkAgentFreshness(state.lastRun);
+  checkAgentFreshness(snapshot.lastRun);
 
   // ─── 4. Alert Decision ────────────────────────────────────────────────────
 
   // Track last alert time in lastRun under our own agent name
-  const lastAlertIso = state.lastRun[`${AGENT}:last-alert`];
+  const lastAlertIso = snapshot.lastRun[`${AGENT}:last-alert`];
   const decision = shouldSendAlert(previousStatus, currentStatus, lastAlertIso);
 
   log(AGENT, `Alert decision: shouldAlert=${decision.shouldAlert}, reason="${decision.reason}"`);
 
-  // ─── 5. Send Alerts ───────────────────────────────────────────────────────
+  // ─── 5. Send Alerts (no lock held) ────────────────────────────────────────
 
-  const activeIncidents = state.incidents.filter(isActiveIncident);
-  const fixedCount = Object.values(state.agentResults).reduce(
+  const activeIncidents = snapshot.incidents.filter(isActiveIncident);
+  const fixedCount = Object.values(snapshot.agentResults).reduce(
     (sum, r) => sum + r.issuesFixed,
     0,
   );
+
+  // Captured for phase 3 so the suppression timestamp reflects when the alert
+  // actually went out.
+  let alertTimestamp: string | null = null;
 
   if (decision.shouldAlert) {
     if (decision.isRecovery) {
@@ -255,13 +265,13 @@ async function main(): Promise<void> {
       await sendEmailAlert(currentStatus, activeIncidents, fixedCount);
     }
 
-    // Record alert timestamp for suppression tracking
-    state.lastRun[`${AGENT}:last-alert`] = new Date().toISOString();
+    // Record alert timestamp for suppression tracking (persisted in phase 3)
+    alertTimestamp = new Date().toISOString();
   } else {
     log(AGENT, 'Alert suppressed — no notification sent');
   }
 
-  // ─── 6. Update Dashboard ──────────────────────────────────────────────────
+  // ─── 6. Update Dashboard (no lock held) ───────────────────────────────────
 
   const dashEmail = process.env.OPS_EMAIL || process.env.VALIDATOR_EMAIL;
   const dashPassword = process.env.OPS_PASSWORD || process.env.VALIDATOR_PASSWORD;
@@ -271,7 +281,7 @@ async function main(): Promise<void> {
     log(AGENT, 'Updating dashboard');
     try {
       const token = await login(baseUrl, dashEmail, dashPassword);
-      await updateDashboard(state, token);
+      await updateDashboard(snapshot, token);
       log(AGENT, 'Dashboard updated successfully');
     } catch (err) {
       log(AGENT, `Dashboard update failed: ${err instanceof Error ? err.message : err}`);
@@ -288,42 +298,59 @@ async function main(): Promise<void> {
     );
   }
 
-  // ─── 7. Prune Old Data ────────────────────────────────────────────────────
+  // ─── 7. Persist: locked read → prune → write (no I/O in between) ──────────
 
-  const incidentPrune = pruneOldIncidents(state.incidents);
-  state.incidents = incidentPrune.remaining;
+  let finalStatus: SystemStatus = currentStatus;
+  let activeCount = 0;
+  let criticalCount = 0;
+  let warningCount = 0;
 
-  const remediationPrune = pruneOldRemediations(state.recentRemediations);
-  state.recentRemediations = remediationPrune.remaining;
+  const state = readOpsState();
+  try {
+    // Recompute status from FRESH incidents — other agents may have added or
+    // resolved incidents during our I/O above.
+    finalStatus = determineSystemStatus(state);
+    state.systemStatus = finalStatus;
 
-  if (incidentPrune.pruned > 0 || remediationPrune.pruned > 0) {
-    log(AGENT, `Pruned: ${incidentPrune.pruned} old incidents, ${remediationPrune.pruned} old remediations`);
+    if (alertTimestamp) {
+      state.lastRun[`${AGENT}:last-alert`] = alertTimestamp;
+    }
+
+    const incidentPrune = pruneOldIncidents(state.incidents);
+    state.incidents = incidentPrune.remaining;
+
+    const remediationPrune = pruneOldRemediations(state.recentRemediations);
+    state.recentRemediations = remediationPrune.remaining;
+
+    if (incidentPrune.pruned > 0 || remediationPrune.pruned > 0) {
+      log(AGENT, `Pruned: ${incidentPrune.pruned} old incidents, ${remediationPrune.pruned} old remediations`);
+    }
+
+    state.lastRun[AGENT] = new Date().toISOString();
+
+    activeCount = state.incidents.filter(isActiveIncident).length;
+    criticalCount = state.incidents.filter(
+      i => isActiveIncident(i) && i.severity === 'critical',
+    ).length;
+    warningCount = state.incidents.filter(
+      i => isActiveIncident(i) && i.severity === 'warning',
+    ).length;
+  } finally {
+    writeOpsState(state);
   }
-
-  // ─── 8. Save State ────────────────────────────────────────────────────────
-
-  state.lastRun[AGENT] = new Date().toISOString();
-  writeOpsState(state);
 
   // ─── Summary ──────────────────────────────────────────────────────────────
 
   const durationMs = Date.now() - startTime;
-  const activeCount = state.incidents.filter(isActiveIncident).length;
-  const criticalCount = state.incidents.filter(
-    i => isActiveIncident(i) && i.severity === 'critical',
-  ).length;
-  const warningCount = state.incidents.filter(
-    i => isActiveIncident(i) && i.severity === 'warning',
-  ).length;
 
   log(
     AGENT,
-    `Cycle complete in ${durationMs}ms — status: ${currentStatus}, active: ${activeCount} (${criticalCount} critical, ${warningCount} warning), alerted: ${decision.shouldAlert}`,
+    `Cycle complete in ${durationMs}ms — status: ${finalStatus}, active: ${activeCount} (${criticalCount} critical, ${warningCount} warning), alerted: ${decision.shouldAlert}`,
   );
 
   // ─── Exit Code ────────────────────────────────────────────────────────────
 
-  if (currentStatus === 'HEALTHY') {
+  if (finalStatus === 'HEALTHY') {
     process.exitCode = 0;
   } else {
     process.exitCode = 1;

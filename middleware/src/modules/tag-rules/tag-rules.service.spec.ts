@@ -15,6 +15,7 @@ describe('TagRulesService', () => {
   beforeEach(() => {
     db = {
       tagAssignmentRule: {
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
         create: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
@@ -143,9 +144,10 @@ describe('TagRulesService', () => {
   });
 
   describe('remove', () => {
-    it('throws NotFound on cross-org DELETE', async () => {
-      db.tagAssignmentRule.findFirst.mockResolvedValue(null);
+    it('throws NotFound on cross-org DELETE (deleteMany affects zero rows)', async () => {
+      db.tagAssignmentRule.deleteMany.mockResolvedValue({ count: 0 });
       await expect(service.remove(orgId, 'rule-x')).rejects.toThrow(NotFoundException);
+      expect(db.tagAssignmentRule.deleteMany).toHaveBeenCalledWith({ where: { id: 'rule-x', organizationId: orgId } });
       expect(db.tagAssignmentRule.delete).not.toHaveBeenCalled();
     });
   });

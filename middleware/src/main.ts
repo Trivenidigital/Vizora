@@ -44,7 +44,13 @@ async function bootstrap() {
     }
   }
 
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // rawBody:true is REQUIRED for PSP webhook signature verification — the Stripe
+  // and Razorpay handlers read req.rawBody to verify the signature over the exact
+  // bytes. Without it req.rawBody is undefined and every webhook 400s before it is
+  // ever authenticated (billing was silently non-functional prior to this).
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+  });
 
   // Trust proxy — sets req.ip from X-Forwarded-For according to the
   // configured hop count. Without this, GeoService and the rate-

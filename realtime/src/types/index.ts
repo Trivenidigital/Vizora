@@ -95,6 +95,11 @@ export interface DeviceStatus {
   organizationId: string;
   metrics?: DeviceMetrics;
   currentContent?: CurrentContentState;
+  // Contract v1.1 dark-screen detection: the player's own view of what is on the
+  // glass. `screenState` ∈ boot|pairing|playing|holding|recovering;
+  // `playbackSource` ∈ live|cached|hold-last. Optional — legacy players omit them.
+  screenState?: string;
+  playbackSource?: string;
 }
 
 /**
@@ -105,6 +110,8 @@ export interface HeartbeatData {
   currentContent?: CurrentContentState;
   uptime?: number;
   appVersion?: string;
+  screenState?: string;
+  playbackSource?: string;
 }
 
 /**

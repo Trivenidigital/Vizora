@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { DatabaseService } from '../database/database.service';
 import { MailService } from '../mail/mail.service';
 import { PLAN_TIERS } from './constants/plans';
+import { EntitlementService } from './entitlement.service';
 
 @Injectable()
 export class BillingLifecycleService {
@@ -11,6 +12,7 @@ export class BillingLifecycleService {
   constructor(
     private readonly db: DatabaseService,
     private readonly mailService: MailService,
+    private readonly entitlementService: EntitlementService,
   ) {}
 
   /**
@@ -161,43 +163,32 @@ export class BillingLifecycleService {
    */
   @Cron('0 9 * * *')
   async handleGracePeriodExpiry(): Promise<void> {
-    this.logger.log('Checking grace period expirations...');
+    // B3: delegate to the entitlement degrade ladder. This advances rungs
+    // (past_due → publish_locked → suspended → canceled) keyed on
+    // entitlementStateSince in UTC days — NOT the old updatedAt cutoff (B8), and
+    // NOT a binary suspend-at-7-days. The ladder writes its own run heartbeat.
+    try {
+      const { advanced } = await this.entitlementService.advanceLadder();
+      this.logger.log(`Entitlement ladder run complete (${advanced} advanced)`);
+    } catch (error) {
+      // A dead ladder job must be observable — surface as error-level so alerting
+      // fires, and let the next run retry (the ladder is idempotent).
+      this.logger.error(`Entitlement ladder run FAILED: ${error}`);
+    }
+  }
 
-    // Find organizations that have been past_due for more than 7 days
-    const gracePeriodCutoff = new Date();
-    gracePeriodCutoff.setDate(gracePeriodCutoff.getDate() - 7);
-
-    const pastDueOrgs = await this.db.organization.findMany({
-      where: {
-        subscriptionStatus: 'past_due',
-        updatedAt: { lte: gracePeriodCutoff },
-      },
-      include: {
-        users: {
-          where: { role: 'admin' },
-          take: 1,
-          select: { email: true, firstName: true },
-        },
-      },
-    });
-
-    for (const org of pastDueOrgs) {
-      try {
-        await this.db.organization.update({
-          where: { id: org.id },
-          data: {
-            subscriptionStatus: 'canceled',
-            subscriptionTier: 'free',
-            screenQuota: 5,
-            stripeSubscriptionId: null,
-            razorpaySubscriptionId: null,
-          },
-        });
-
-        this.logger.log(`Grace period expired for org ${org.id}, downgraded to free`);
-      } catch (error) {
-        this.logger.error(`Failed to process grace period for org ${org.id}: ${error}`);
-      }
+  /**
+   * Watchdog (hourly): if the ladder job hasn't run within its staleness window,
+   * a rung is silently not advancing — customers who paid aren't being restored,
+   * or unpaid tenants aren't degrading. Surface loudly so ops notices a dead job.
+   */
+  @Cron(CronExpression.EVERY_HOUR)
+  async checkLadderFreshness(): Promise<void> {
+    if (await this.entitlementService.isLadderStale()) {
+      this.logger.error(
+        'ENTITLEMENT LADDER STALE: the daily rung-advancement job has not run within its ' +
+          'staleness window. Rungs are not advancing — investigate the billing cron.',
+      );
     }
   }
 }

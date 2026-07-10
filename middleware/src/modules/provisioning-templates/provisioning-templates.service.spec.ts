@@ -11,6 +11,7 @@ describe('ProvisioningTemplatesService', () => {
   beforeEach(() => {
     db = {
       provisioningTemplate: {
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
         create: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
@@ -112,9 +113,10 @@ describe('ProvisioningTemplatesService', () => {
   });
 
   describe('remove', () => {
-    it('throws NotFound on cross-org DELETE', async () => {
-      db.provisioningTemplate.findFirst.mockResolvedValue(null);
+    it('throws NotFound on cross-org DELETE (deleteMany affects zero rows)', async () => {
+      db.provisioningTemplate.deleteMany.mockResolvedValue({ count: 0 });
       await expect(service.remove(orgId, 'tpl-x')).rejects.toThrow(NotFoundException);
+      expect(db.provisioningTemplate.deleteMany).toHaveBeenCalledWith({ where: { id: 'tpl-x', organizationId: orgId } });
       expect(db.provisioningTemplate.delete).not.toHaveBeenCalled();
     });
   });

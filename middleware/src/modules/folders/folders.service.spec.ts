@@ -40,8 +40,9 @@ describe('FoldersService', () => {
         findMany: jest.fn(),
         findFirst: jest.fn(),
         update: jest.fn(),
-        updateMany: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         delete: jest.fn(),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
         count: jest.fn(),
       },
       content: {
@@ -251,13 +252,9 @@ describe('FoldersService', () => {
 
   describe('update', () => {
     it('should update folder name', async () => {
+      // findFirst backs both the findOne guard and the post-updateMany re-fetch,
+      // which returns the updated row.
       mockDatabaseService.contentFolder.findFirst.mockResolvedValue({
-        ...mockFolder,
-        parent: null,
-        children: [],
-        _count: { content: 0 },
-      });
-      mockDatabaseService.contentFolder.update.mockResolvedValue({
         ...mockFolder,
         name: 'Updated Name',
         parent: null,
@@ -267,24 +264,24 @@ describe('FoldersService', () => {
 
       const result = await service.update('org-123', 'folder-123', { name: 'Updated Name' });
 
-      expect(result.name).toBe('Updated Name');
+      expect(result?.name).toBe('Updated Name');
+      expect(mockDatabaseService.contentFolder.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'folder-123', organizationId: 'org-123' } }),
+      );
     });
 
     it('should update parent folder', async () => {
-      mockDatabaseService.contentFolder.findFirst
-        .mockResolvedValueOnce({ ...mockFolder, parent: null, children: [], _count: { content: 0 } }) // findOne
-        .mockResolvedValueOnce({ ...mockFolder, id: 'new-parent' }); // parent validation
-      mockDatabaseService.contentFolder.update.mockResolvedValue({
-        ...mockFolder,
-        parentId: 'new-parent',
-        parent: null,
-        children: [],
-        _count: { content: 0 },
+      // Keyed by id so it serves findOne + parent-validation + isDescendant's
+      // ancestor walk + the post-updateMany re-fetch consistently.
+      mockDatabaseService.contentFolder.findFirst.mockImplementation(({ where }: any) => {
+        if (where.id === 'new-parent') return Promise.resolve({ id: 'new-parent', parentId: null });
+        if (where.id === 'folder-123') return Promise.resolve({ ...mockFolder, parentId: 'new-parent', parent: null, children: [], _count: { content: 0 } });
+        return Promise.resolve(null);
       });
 
       const result = await service.update('org-123', 'folder-123', { parentId: 'new-parent' });
 
-      expect(result.parentId).toBe('new-parent');
+      expect(result?.parentId).toBe('new-parent');
     });
 
     it('should throw BadRequestException when setting folder as its own parent', async () => {

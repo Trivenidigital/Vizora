@@ -84,11 +84,15 @@ describe('StripeProvider', () => {
         { organizationId: 'org_123' },
       );
 
-      expect(mockStripe.customers.create).toHaveBeenCalledWith({
-        email: 'test@example.com',
-        name: 'Test User',
-        metadata: { organizationId: 'org_123' },
-      });
+      expect(mockStripe.customers.create).toHaveBeenCalledWith(
+        {
+          email: 'test@example.com',
+          name: 'Test User',
+          metadata: { organizationId: 'org_123' },
+        },
+        // Org-derived idempotency key: a retry returns the same customer.
+        { idempotencyKey: 'customer:org_123' },
+      );
       expect(result).toEqual({
         id: 'cus_123',
         email: 'test@example.com',
@@ -174,14 +178,18 @@ describe('StripeProvider', () => {
 
       const result = await provider.createCheckoutSession(params);
 
-      expect(mockStripe.checkout.sessions.create).toHaveBeenCalledWith({
-        customer: 'cus_123',
-        mode: 'subscription',
-        line_items: [{ price: 'price_123', quantity: 1 }],
-        success_url: 'https://example.com/success',
-        cancel_url: 'https://example.com/cancel',
-        metadata: { plan: 'pro' },
-      });
+      expect(mockStripe.checkout.sessions.create).toHaveBeenCalledWith(
+        {
+          customer: 'cus_123',
+          mode: 'subscription',
+          line_items: [{ price: 'price_123', quantity: 1 }],
+          success_url: 'https://example.com/success',
+          cancel_url: 'https://example.com/cancel',
+          metadata: { plan: 'pro' },
+        },
+        // B6: per-invocation idempotency key makes the create retry-safe.
+        { idempotencyKey: expect.any(String) },
+      );
       expect(result).toEqual({
         url: 'https://checkout.stripe.com/session/123',
         sessionId: 'cs_123',

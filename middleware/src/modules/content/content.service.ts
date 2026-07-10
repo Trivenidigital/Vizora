@@ -652,11 +652,19 @@ export class ContentService {
         const distinctPlaylistIds = Array.from(new Set(items.map((i) => i.playlistId)));
 
         if (content.replacementContentId) {
-          // Validate replacement content belongs to same organization
+          // Validate the replacement is (a) same-organization AND (b) itself
+          // still servable — status 'active' and not itself expired. Without the
+          // status/expiry guard, an expired or archived replacement would be
+          // repointed onto devices, defeating the expiration entirely (a
+          // replacement chain could push already-dead content). A non-servable
+          // replacement falls through to the delete-items branch, exactly as if
+          // no replacement had been configured.
           const replacement = await tx.content.findFirst({
             where: {
               id: content.replacementContentId,
               organizationId: content.organizationId,
+              status: 'active',
+              OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
             },
           });
 
@@ -666,9 +674,10 @@ export class ContentService {
               data: { contentId: content.replacementContentId },
             });
           } else {
-            // Cross-org or missing replacement -- remove playlist items
+            // Cross-org, missing, or not-itself-active replacement -- remove
+            // playlist items rather than serve stale content.
             this.logger.warn(
-              `Expired content ${content.id} has invalid replacementContentId ${content.replacementContentId} (org mismatch or not found). Removing playlist items.`,
+              `Expired content ${content.id} has unusable replacementContentId ${content.replacementContentId} (org mismatch, not found, or itself expired/archived). Removing playlist items.`,
             );
             await tx.playlistItem.deleteMany({
               where: { contentId: content.id },

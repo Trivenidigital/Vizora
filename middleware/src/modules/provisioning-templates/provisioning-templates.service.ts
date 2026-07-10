@@ -78,8 +78,11 @@ export class ProvisioningTemplatesService {
   }
 
   async remove(organizationId: string, id: string): Promise<void> {
-    await this.findOne(organizationId, id);
-    await this.db.provisioningTemplate.delete({ where: { id } });
+    // Org-scoped in the write (tenant-guard enforce prereq).
+    const result = await this.db.provisioningTemplate.deleteMany({ where: { id, organizationId } });
+    if (result.count === 0) {
+      throw new NotFoundException('Provisioning template not found');
+    }
   }
 
   /**

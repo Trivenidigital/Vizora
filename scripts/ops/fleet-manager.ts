@@ -23,6 +23,7 @@ import type { Incident, AgentResult, RemediationAction } from './lib/types.js';
 import { login, OpsApiClient } from './lib/api-client.js';
 import {
   readOpsState,
+  readOpsStateSnapshot,
   writeOpsState,
   recordAgentRun,
   addRemediation,
@@ -155,7 +156,11 @@ async function main(): Promise<void> {
       .map(s => s.displayId!),
   );
 
-  const state = readOpsState();
+  // Lock-free snapshot for dedup lookups (existing-incident attempt counts +
+  // detected timestamps) during the detection phase below, which does network
+  // I/O. The real locked read→merge→write happens at the very end, with no I/O
+  // under the lock. See scripts/ops/lib/state.ts.
+  const priorState = readOpsStateSnapshot();
   const incidents: Incident[] = [];
   const remediations: RemediationAction[] = [];
   let issuesFound = 0;
@@ -178,7 +183,7 @@ async function main(): Promise<void> {
       // Persistent offline (>1hr) — escalate
       issuesFound++;
       const incidentId = makeIncidentId(AGENT, 'display_offline_persistent', display.id);
-      const existing = state.incidents.find(i => i.id === incidentId);
+      const existing = priorState.incidents.find(i => i.id === incidentId);
 
       if (existing?.status === 'escalated') {
         incidents.push(existing);
@@ -205,7 +210,7 @@ async function main(): Promise<void> {
       // Recent offline (15min–1hr) — attempt ping/reconnect
       issuesFound++;
       const incidentId = makeIncidentId(AGENT, 'display_offline', display.id);
-      const existing = state.incidents.find(i => i.id === incidentId);
+      const existing = priorState.incidents.find(i => i.id === incidentId);
 
       log(AGENT, `${label}: offline for ${Math.round(mins)}min — attempting ping`);
 
@@ -266,7 +271,7 @@ async function main(): Promise<void> {
 
     const label = display.name || display.id;
     const incidentId = makeIncidentId(AGENT, 'display_error', display.id);
-    const existing = state.incidents.find(i => i.id === incidentId);
+    const existing = priorState.incidents.find(i => i.id === incidentId);
 
     issuesFound++;
     log(AGENT, `${label}: in error state (status=${display.status}, error=${display.error || display.errorState || 'none'}) — resetting to inactive`);
@@ -341,7 +346,7 @@ async function main(): Promise<void> {
     if (!allOffline) continue;
 
     const incidentId = makeIncidentId(AGENT, 'cluster_offline', orgId);
-    const existing = state.incidents.find(i => i.id === incidentId);
+    const existing = priorState.incidents.find(i => i.id === incidentId);
 
     issuesFound++;
     issuesEscalated++;
@@ -376,7 +381,7 @@ async function main(): Promise<void> {
 
     const label = display.name || display.id;
     const incidentId = makeIncidentId(AGENT, 'no_content', display.id);
-    const existing = state.incidents.find(i => i.id === incidentId);
+    const existing = priorState.incidents.find(i => i.id === incidentId);
 
     issuesFound++;
     log(AGENT, `${label}: online but has no playlist and no active schedule`);
@@ -401,7 +406,7 @@ async function main(): Promise<void> {
   // If a display was previously offline but is now back, resolve the incident
   const currentIncidentIds = new Set(incidents.map(i => i.id));
 
-  for (const existing of state.incidents) {
+  for (const existing of priorState.incidents) {
     if (existing.agent !== AGENT) continue;
     if (existing.status !== 'open') continue;
     if (currentIncidentIds.has(existing.id)) continue;
@@ -430,17 +435,23 @@ async function main(): Promise<void> {
     incidents,
   };
 
-  recordAgentRun(state, result);
+  // Brief locked read→merge→write with no I/O in between. recordAgentRun
+  // upserts our incidents by id, so any concurrent updates from other agents
+  // (their incident ids are namespaced by agent) are preserved.
+  const state = readOpsState();
+  try {
+    recordAgentRun(state, result);
 
-  // Add API client audit log entries as remediations
-  for (const r of api.auditLog) {
-    addRemediation(state, r);
+    // Add API client audit log entries as remediations
+    for (const r of api.auditLog) {
+      addRemediation(state, r);
+    }
+    for (const r of remediations) {
+      addRemediation(state, r);
+    }
+  } finally {
+    writeOpsState(state);
   }
-  for (const r of remediations) {
-    addRemediation(state, r);
-  }
-
-  writeOpsState(state);
 
   // ─── Summary ───────────────────────────────────────────────────────────
 

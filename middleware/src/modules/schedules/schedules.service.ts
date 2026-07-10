@@ -238,6 +238,16 @@ export class SchedulesService {
         playlist: {
           include: {
             items: {
+              // S1-2 filter: a schedule must NOT serve expired/archived content.
+              // Drop items whose content isn't active-and-unexpired, so routing
+              // delivery through active schedules can never ship stale content
+              // (the gap that was harmless only while nothing consumed this).
+              where: {
+                content: {
+                  status: 'active',
+                  OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+                },
+              },
               include: {
                 content: true,
               },

@@ -464,10 +464,14 @@ describe('RazorpayProvider', () => {
 
       const result = provider.verifyWebhookSignature(payload, expectedSignature);
 
-      expect(result).toEqual({
+      expect(result).toMatchObject({
         type: 'subscription.activated',
         data: { subscription: { id: 'sub_123' } },
       });
+      // Content-derived stable event id for idempotency (Razorpay has no body id).
+      // Deterministic per payload → replay-stable; distinct payloads → distinct ids.
+      expect(result.id).toMatch(/^rzp_[a-f0-9]{40}$/);
+      expect(provider.verifyWebhookSignature(payload, expectedSignature).id).toBe(result.id);
     });
 
     it('should throw on invalid signature', () => {

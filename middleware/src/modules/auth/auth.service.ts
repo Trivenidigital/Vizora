@@ -21,6 +21,7 @@ import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { RegisterDto, LoginDto } from './dto';
 import { AUTH_CONSTANTS } from './constants/auth.constants';
+import { getAccessTokenTtlSeconds } from './jwt-expiry';
 import { GeoService } from '../common/services/geo.service';
 import { BillingService } from '../billing/billing.service';
 import { StorageService } from '../storage/storage.service';
@@ -191,7 +192,7 @@ export class AuthService {
         trialEndsAt: organization.trialEndsAt,
       },
       token,
-      expiresIn: 604800, // 7 days in seconds
+      expiresIn: getAccessTokenTtlSeconds(), // matches the token's real exp
     };
   }
 
@@ -351,7 +352,7 @@ export class AuthService {
         },
       },
       token,
-      expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
+      expiresIn: getAccessTokenTtlSeconds(),
       isNewUser,
     };
   }
@@ -491,8 +492,15 @@ export class AuthService {
   }
 
   async login(dto: LoginDto, context: LoginContext = {}) {
+    // Normalize defensively so the lockout counter and the user lookup share one
+    // canonical key. The DTO layer already lowercases+trims for HTTP callers;
+    // this covers direct service callers and guarantees case-rotation can't
+    // bypass the lockout or split the login into a different account.
+    const email =
+      typeof dto.email === 'string' ? dto.email.toLowerCase().trim() : dto.email;
+
     // Check account lockout — fail CLOSED if Redis is unreachable
-    const lockoutKey = `login_attempts:${dto.email}`;
+    const lockoutKey = `login_attempts:${email}`;
     let attempts = 0;
     try {
       const attemptsStr = await this.redisService.get(lockoutKey);
@@ -514,7 +522,7 @@ export class AuthService {
 
     // Find user with organization
     const user = await this.databaseService.user.findUnique({
-      where: { email: dto.email },
+      where: { email },
       include: { organization: true },
     });
 
@@ -565,7 +573,7 @@ export class AuthService {
         },
       },
       token,
-      expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
+      expiresIn: getAccessTokenTtlSeconds(),
     };
   }
 
@@ -588,7 +596,7 @@ export class AuthService {
 
     return {
       token,
-      expiresIn: 604800,
+      expiresIn: getAccessTokenTtlSeconds(),
     };
   }
 

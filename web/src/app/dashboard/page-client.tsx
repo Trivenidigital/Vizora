@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
+import { SCHEDULES_ENABLED } from '@/lib/feature-flags';
 import type { StorageInfo } from '@/lib/api/organizations';
 import { useDeviceStatus } from '@/lib/context/DeviceStatusContext';
 import UpgradeBanner from '@/components/UpgradeBanner';
@@ -567,6 +568,8 @@ export default function DashboardClient({
  </div>
  </button>
 
+ {/* Schedule quick-action hidden while SCHEDULES_ENABLED is off (interim C-7 mitigation). */}
+ {SCHEDULES_ENABLED && (
  <button
  onClick={() => router.push('/dashboard/schedules')}
  className="eh-dash-card eh-dash-card-interactive p-5 flex items-center gap-3 transition-all transform hover:scale-105"
@@ -577,6 +580,7 @@ export default function DashboardClient({
  <div className="text-xs text-[var(--foreground-secondary)]">Set up timing</div>
  </div>
  </button>
+ )}
  </div>
  </div>
 

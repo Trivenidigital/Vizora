@@ -14,11 +14,13 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import { Icon } from '@/theme/icons';
 import type { IconName } from '@/theme/icons';
 import TrialBanner from '@/components/TrialBanner';
+import EntitlementBanner from '@/components/EntitlementBanner';
 import { SupportChatProvider } from '@/components/support/SupportChatProvider';
 import { SupportChat } from '@/components/support/SupportChat';
 import { useCustomization } from '@/components/providers/CustomizationProvider';
+import { SCHEDULES_ENABLED } from '@/lib/feature-flags';
 
-const navigation: Array<{ name: string; href: string; icon: IconName; exactMatch?: boolean }> = [
+const allNavigation: Array<{ name: string; href: string; icon: IconName; exactMatch?: boolean }> = [
   { name: 'Overview', href: '/dashboard', icon: 'overview', exactMatch: true },
   { name: 'Devices', href: '/dashboard/devices', icon: 'devices' },
   { name: 'Content', href: '/dashboard/content', icon: 'content' },
@@ -26,11 +28,17 @@ const navigation: Array<{ name: string; href: string; icon: IconName; exactMatch
   { name: 'Widgets', href: '/dashboard/widgets', icon: 'widget' },
   { name: 'Layouts', href: '/dashboard/layouts', icon: 'layout' },
   { name: 'Playlists', href: '/dashboard/playlists', icon: 'playlists' },
+  // Schedules hidden from nav while SCHEDULES_ENABLED is off (interim C-7 mitigation).
   { name: 'Schedules', href: '/dashboard/schedules', icon: 'schedules' },
   { name: 'Analytics', href: '/dashboard/analytics', icon: 'analytics' },
   { name: 'Settings', href: '/dashboard/settings', icon: 'settings' },
   { name: 'Help', href: '/dashboard/help', icon: 'help' },
 ];
+
+// Schedules hidden from nav while SCHEDULES_ENABLED is off (interim C-7 mitigation).
+const navigation = allNavigation.filter(
+  (item) => SCHEDULES_ENABLED || item.href !== '/dashboard/schedules',
+);
 
 export default function DashboardLayout({
   children,
@@ -232,8 +240,11 @@ export default function DashboardLayout({
         </div>
       </header>
 
-      {/* Trial/Subscription Banner */}
+      {/* Trial/Subscription + entitlement-ladder banners. EntitlementBanner owns
+          the past_due→publish_locked→suspended ladder (paid tier); TrialBanner
+          owns trial + free-tier-expired. They do not overlap. */}
       <div className="fixed top-16 left-0 right-0 z-20 lg:left-56">
+        <EntitlementBanner />
         <TrialBanner />
       </div>
 

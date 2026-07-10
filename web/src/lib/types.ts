@@ -180,6 +180,14 @@ export interface SubscriptionStatus {
   paymentProvider: string | null;
 }
 
+// B3 entitlement ladder banner data (GET /billing/entitlement/banner).
+export interface EntitlementBanner {
+  status: string; // active | trial | past_due | publish_locked | suspended | canceled | unknown
+  publishLocked: boolean;
+  daysUntilNextRung: number | null;
+  nextRung: string | null; // publish_locked | suspended | canceled
+}
+
 export interface Plan {
   id: string;
   name: string;
