@@ -113,6 +113,25 @@ export class EntitlementService {
   async advanceLadder(now = new Date()): Promise<{ advanced: number }> {
     let advanced = 0;
 
+    // Heal un-stamped dunning orgs. An org can enter a dunning rung via a path
+    // that never stamps the episode clock: handleSubscriptionUpdated writes
+    // subscriptionStatus directly (billing.service), and Stripe does not
+    // guarantee webhook ordering — a `customer.subscription.updated(past_due)`
+    // can land BEFORE `invoice.payment_failed` runs beginPastDue, whose
+    // updateMany is guarded on status IN (active,trial) and so no-ops once the
+    // status is already past_due. Result: entitlementStateSince stays null, and
+    // advanceRung's `entitlementStateSince: { not: null }` filter never sees the
+    // org → it holds full (post-#6 SubscriptionActiveGuard) access in the rung
+    // FOREVER, and dunning never enforces. Stamp any un-stamped dunning org from
+    // first-sight (fail-closed; the grace clock simply starts now).
+    await this.db.organization.updateMany({
+      where: {
+        subscriptionStatus: { in: ['past_due', 'publish_locked', 'suspended'] },
+        entitlementStateSince: null,
+      },
+      data: { entitlementStateSince: now },
+    });
+
     // Rung 1: past_due → publish_locked (screens still play; no device signal)
     advanced += await this.advanceRung(
       'past_due',

@@ -63,7 +63,30 @@ describe('EntitlementService (B3 ladder)', () => {
     );
     const { advanced } = await service.advanceLadder(NOW);
     expect(advanced).toBe(0);
-    expect(db.organization.updateMany).not.toHaveBeenCalled();
+    // No RUNG ADVANCE (a status flip). The unconditional heal updateMany
+    // (data: { entitlementStateSince }) may run; assert only that no status
+    // transition happened.
+    expect(db.organization.updateMany).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ subscriptionStatus: expect.anything() }),
+      }),
+    );
+  });
+
+  it('heals an un-stamped dunning org so it is never invisible to the ladder', async () => {
+    // Regression for the webhook-ordering leak: an org set to past_due via
+    // handleSubscriptionUpdated (out-of-order Stripe events) has
+    // entitlementStateSince=null and would otherwise never be advanced —
+    // holding full access forever. advanceLadder stamps it from first-sight.
+    db.organization.findMany.mockResolvedValue([]);
+    await service.advanceLadder(NOW);
+    expect(db.organization.updateMany).toHaveBeenCalledWith({
+      where: {
+        subscriptionStatus: { in: ['past_due', 'publish_locked', 'suspended'] },
+        entitlementStateSince: null,
+      },
+      data: { entitlementStateSince: NOW },
+    });
   });
 
   it('advances past_due → publish_locked at exactly day 7, and emits NO device signal', async () => {
