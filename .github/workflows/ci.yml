@@ -119,6 +119,57 @@ jobs:
           directory: middleware/coverage
           fail_ci_if_error: false
 
+  # Apply the hand-written migration SQL against an EMPTY database, exactly as
+  # `prisma migrate deploy` does on prod. The test/e2e jobs seed via
+  # `prisma db push` (schema-direct), which NEVER executes migrations/*.sql — so
+  # a broken migration (e.g. the #227 wrong-table-name) passed CI green and only
+  # detonated on the prod deploy. This job closes that gap.
+  migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_pass
+          POSTGRES_DB: migrate_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgresql://test_user:test_pass@localhost:5432/migrate_db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+
+      - name: Neutralize CONCURRENTLY for the clean CI replay (committed files untouched)
+        run: |
+          # `CREATE INDEX CONCURRENTLY` cannot run inside migrate deploy's transaction
+          # (Postgres 25001 / Prisma P3018). On an EMPTY CI database the CONCURRENTLY
+          # lock-avoidance is irrelevant to correctness, so strip it in the ephemeral CI
+          # checkout only — the committed migration files (and their prod checksums) stay
+          # byte-identical. This lets `migrate deploy` replay the full history and still
+          # catch bad migration SQL (wrong table/column names — the #227 class).
+          # NOTE: a true disaster-recovery `migrate deploy` from empty still needs these
+          # CONCURRENTLY migrations handled manually; tracked as a follow-up.
+          find packages/database/prisma/migrations -name migration.sql \
+            -exec sed -i 's/INDEX CONCURRENTLY/INDEX/g' {} +
+
+      - name: Apply all migrations from empty (fails on bad migration SQL)
+        run: pnpm --filter @vizora/database exec prisma migrate deploy
+
+      - name: Assert migration state is clean (all applied, none pending/failed)
+        run: pnpm --filter @vizora/database exec prisma migrate status
+
   e2e:
     runs-on: ubuntu-latest
     needs: [build]
