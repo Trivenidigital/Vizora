@@ -90,7 +90,7 @@ export class AdminController {
   @Post('plans')
   async createPlan(
     @Body() dto: CreatePlanDto,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const plan = await this.plansService.create(dto);
@@ -112,7 +112,7 @@ export class AdminController {
   async updatePlan(
     @Param('id', ParseIdPipe) id: string,
     @Body() dto: UpdatePlanDto,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const plan = await this.plansService.update(id, dto);
@@ -133,7 +133,7 @@ export class AdminController {
   @Delete('plans/:id')
   async deletePlan(
     @Param('id', ParseIdPipe) id: string,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const result = await this.plansService.delete(id);
@@ -154,7 +154,7 @@ export class AdminController {
   @HttpCode(HttpStatus.OK)
   async duplicatePlan(
     @Param('id', ParseIdPipe) id: string,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const plan = await this.plansService.duplicate(id);
@@ -175,7 +175,7 @@ export class AdminController {
   @Put('plans/reorder')
   async reorderPlans(
     @Body() dto: ReorderPlansDto,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const ids = dto.plans.map((p) => p.id);
@@ -209,7 +209,7 @@ export class AdminController {
   @Post('promotions')
   async createPromotion(
     @Body() dto: CreatePromotionDto,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const promotion = await this.promotionsService.create({
@@ -235,7 +235,7 @@ export class AdminController {
   async updatePromotion(
     @Param('id', ParseIdPipe) id: string,
     @Body() dto: UpdatePromotionDto,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const promotion = await this.promotionsService.update(id, dto);
@@ -256,7 +256,7 @@ export class AdminController {
   @Delete('promotions/:id')
   async deletePromotion(
     @Param('id', ParseIdPipe) id: string,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const result = await this.promotionsService.delete(id);
@@ -283,7 +283,7 @@ export class AdminController {
   @HttpCode(HttpStatus.OK)
   async bulkGeneratePromotions(
     @Body() dto: BulkGeneratePromotionsDto,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const codes = await this.promotionsService.bulkGenerate(dto.prefix, dto.count);
@@ -333,7 +333,7 @@ export class AdminController {
   async updateOrganization(
     @Param('id', ParseIdPipe) id: string,
     @Body() dto: UpdateOrgAdminDto,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const org = await this.organizationsAdminService.update(id, {
@@ -362,7 +362,7 @@ export class AdminController {
   @Delete('organizations/:id')
   async deleteOrganization(
     @Param('id', ParseIdPipe) id: string,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const result = await this.organizationsAdminService.delete(id);
@@ -385,7 +385,7 @@ export class AdminController {
   async extendTrial(
     @Param('id', ParseIdPipe) id: string,
     @Body() dto: ExtendTrialDto,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const org = await this.organizationsAdminService.extendTrial(id, dto.days);
@@ -408,7 +408,7 @@ export class AdminController {
   async suspendOrganization(
     @Param('id', ParseIdPipe) id: string,
     @Body() body: SuspendOrgDto,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const org = await this.organizationsAdminService.suspend(id, body.reason);
@@ -430,7 +430,7 @@ export class AdminController {
   @HttpCode(HttpStatus.OK)
   async unsuspendOrganization(
     @Param('id', ParseIdPipe) id: string,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const org = await this.organizationsAdminService.unsuspend(id);
@@ -457,9 +457,23 @@ export class AdminController {
   async addOrganizationNote(
     @Param('id', ParseIdPipe) id: string,
     @Body() dto: OrgNotesDto,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
+    @Req() req: Request,
   ) {
-    return this.organizationsAdminService.addNote(id, dto.notes, adminId);
+    const result = await this.organizationsAdminService.addNote(id, dto.notes, adminId);
+
+    // Every other admin mutation writes an audit row; notes was the lone
+    // exception. Record it too so admin-applied notes are traceable.
+    await this.adminAuditService.log({
+      adminUserId: adminId,
+      action: 'organization.add_note',
+      targetType: 'organization',
+      targetId: id,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    });
+
+    return result;
   }
 
   // ============================================================================
@@ -490,7 +504,7 @@ export class AdminController {
   async updateUser(
     @Param('id', ParseIdPipe) id: string,
     @Body() dto: UpdateUserAdminDto,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const user = await this.usersAdminService.update(id, dto);
@@ -512,7 +526,7 @@ export class AdminController {
   @HttpCode(HttpStatus.OK)
   async disableUser(
     @Param('id', ParseIdPipe) id: string,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const user = await this.usersAdminService.disable(id);
@@ -534,7 +548,7 @@ export class AdminController {
   @HttpCode(HttpStatus.OK)
   async enableUser(
     @Param('id', ParseIdPipe) id: string,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const user = await this.usersAdminService.enable(id);
@@ -556,7 +570,7 @@ export class AdminController {
   @HttpCode(HttpStatus.OK)
   async resetUserPassword(
     @Param('id', ParseIdPipe) id: string,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const result = await this.usersAdminService.resetPassword(id);
@@ -577,7 +591,7 @@ export class AdminController {
   @HttpCode(HttpStatus.OK)
   async grantSuperAdmin(
     @Param('id', ParseIdPipe) id: string,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     // Block self-elevation. SuperAdminGuard guarantees the caller is
@@ -611,7 +625,7 @@ export class AdminController {
   @HttpCode(HttpStatus.OK)
   async revokeSuperAdmin(
     @Param('id', ParseIdPipe) id: string,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const user = await this.usersAdminService.revokeSuperAdmin(id);
@@ -732,7 +746,7 @@ export class AdminController {
   async setConfig(
     @Param('key') key: string,
     @Body() dto: UpdateConfigDto,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const config = await this.systemConfigService.set(key, dto.value, adminId, {
@@ -758,7 +772,7 @@ export class AdminController {
   @Delete('config/:key')
   async deleteConfig(
     @Param('key') key: string,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const result = await this.systemConfigService.delete(key);
@@ -779,7 +793,7 @@ export class AdminController {
   @HttpCode(HttpStatus.OK)
   async bulkUpdateConfig(
     @Body() dto: BulkConfigDto,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const result = await this.systemConfigService.bulkUpdate(
@@ -825,7 +839,7 @@ export class AdminController {
   @HttpCode(HttpStatus.CREATED)
   async blockIp(
     @Body() dto: BlockIpDto,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const entry = await this.securityAdminService.blockIp(
@@ -853,7 +867,7 @@ export class AdminController {
   @Delete('security/ip-blocklist/:id')
   async unblockIp(
     @Param('id', ParseIdPipe) id: string,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const entry = await this.securityAdminService.unblockIp(id);
@@ -880,7 +894,7 @@ export class AdminController {
   @HttpCode(HttpStatus.OK)
   async revokeApiKey(
     @Param('id', ParseIdPipe) id: string,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const result = await this.securityAdminService.revokeApiKey(id);
@@ -914,7 +928,7 @@ export class AdminController {
   @Post('announcements')
   async createAnnouncement(
     @Body() dto: CreateAnnouncementDto,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const announcement = await this.announcementsService.create(
@@ -950,7 +964,7 @@ export class AdminController {
   async updateAnnouncement(
     @Param('id', ParseIdPipe) id: string,
     @Body() dto: UpdateAnnouncementDto,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const announcement = await this.announcementsService.update(id, dto);
@@ -971,7 +985,7 @@ export class AdminController {
   @Delete('announcements/:id')
   async deleteAnnouncement(
     @Param('id', ParseIdPipe) id: string,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const result = await this.announcementsService.delete(id);
@@ -992,7 +1006,7 @@ export class AdminController {
   @HttpCode(HttpStatus.OK)
   async publishAnnouncement(
     @Param('id', ParseIdPipe) id: string,
-    @CurrentUser('userId') adminId: string,
+    @CurrentUser('id') adminId: string,
     @Req() req: Request,
   ) {
     const announcement = await this.announcementsService.publish(id);

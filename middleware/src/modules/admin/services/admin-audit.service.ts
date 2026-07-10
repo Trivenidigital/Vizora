@@ -34,23 +34,38 @@ export class AdminAuditService {
   async log(params: LogActionParams) {
     const { adminUserId, action, targetType, targetId, details, ipAddress, userAgent } = params;
 
-    const auditLog = await this.db.adminAuditLog.create({
-      data: {
-        adminUserId,
-        action,
-        targetType,
-        targetId,
-        details,
-        ipAddress,
-        userAgent,
-      },
-    });
+    // The audit write must NEVER fail the already-committed admin mutation.
+    // Callers invoke log() AFTER the mutation has run, so a throw here would
+    // 500 the request on a change that already happened (and — before the
+    // @CurrentUser('id') fix — a missing adminUserId did exactly that on every
+    // admin write). Surface failures loudly (this is a §12 silent-failure
+    // surface) but return null instead of throwing.
+    try {
+      const auditLog = await this.db.adminAuditLog.create({
+        data: {
+          adminUserId,
+          action,
+          targetType,
+          targetId,
+          details,
+          ipAddress,
+          userAgent,
+        },
+      });
 
-    this.logger.debug(
-      `Admin action: ${action} by ${adminUserId}${targetType ? ` on ${targetType}:${targetId}` : ''}`
-    );
+      this.logger.debug(
+        `Admin action: ${action} by ${adminUserId}${targetType ? ` on ${targetType}:${targetId}` : ''}`
+      );
 
-    return auditLog;
+      return auditLog;
+    } catch (error) {
+      this.logger.error(
+        `Failed to write admin audit log for action="${action}" by admin="${adminUserId}"` +
+          `${targetType ? ` on ${targetType}:${targetId}` : ''}: ` +
+          `${error instanceof Error ? error.message : String(error)}`,
+      );
+      return null;
+    }
   }
 
   /**

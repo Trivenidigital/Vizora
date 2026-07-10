@@ -57,7 +57,7 @@ export class PairingController {
   @Post('complete')
   async completePairing(
     @CurrentUser('organizationId') organizationId: string,
-    @CurrentUser('userId') userId: string,
+    @CurrentUser('id') userId: string,
     @Body() completeDto: CompletePairingDto,
   ) {
     return this.pairingService.completePairing(

@@ -42,8 +42,8 @@ export default function AdminSecurityPage() {
         apiClient.getAdminAuditLogs(),
         apiClient.getIpBlocklist(),
       ]);
-      setAuditLogs(auditData);
-      setBlocklist(blocklistData);
+      setAuditLogs(auditData.data);
+      setBlocklist(blocklistData.data);
     } catch (error: any) {
       toast.error(error.message || 'Failed to load security data');
     } finally {
