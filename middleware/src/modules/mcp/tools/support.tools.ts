@@ -1,4 +1,5 @@
 import { ForbiddenException } from '@nestjs/common';
+import sanitizeHtml from 'sanitize-html';
 import { SupportService } from '../../support/support.service';
 import {
   hasScope,
@@ -220,10 +221,21 @@ export async function createSupportMessageTool(
   const input = CreateSupportMessageInput.parse(
     rawInput,
   ) as CreateSupportMessageInputT;
+  // MCP endpoints carry @SkipInputSanitize() (the JSON-RPC envelope must not
+  // be HTML-mangled), so the global SanitizeInterceptor never touches this
+  // content. This message is later rendered in the support thread, so strip
+  // HTML here with the SAME config the interceptor uses for plain string
+  // fields — stored-XSS defense at the one write site that bypasses the
+  // interceptor. Only `content` is sanitized; request_id is not user prose.
+  const sanitizedContent = sanitizeHtml(input.content, {
+    allowedTags: [],
+    allowedAttributes: {},
+    disallowedTagsMode: 'discard',
+  });
   const created = await supportService.createAgentMessage(
     orgId,
     input.request_id,
-    input.content,
+    sanitizedContent,
   );
   return CreateSupportMessageResult.parse({
     request_id: input.request_id,
