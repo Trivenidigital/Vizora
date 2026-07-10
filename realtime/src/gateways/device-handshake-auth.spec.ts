@@ -1,5 +1,5 @@
 import { authenticateDeviceHandshake, DeviceHandshakeDeps } from './device-handshake-auth';
-import { hashDeviceToken } from './device-token-hash';
+import { hashDeviceToken, deviceTokenGraceKey } from './device-token-hash';
 
 /**
  * Contract v1.1 item 2 — handshake auth decision. Asserts the transport-vs-
@@ -20,6 +20,7 @@ describe('authenticateDeviceHandshake', () => {
   const makeDeps = (over: {
     verify?: jest.Mock;
     findUnique?: jest.Mock;
+    redisGet?: jest.Mock;
   } = {}): DeviceHandshakeDeps => ({
     jwtService: { verify: over.verify ?? jest.fn() } as any,
     databaseService: {
@@ -27,6 +28,7 @@ describe('authenticateDeviceHandshake', () => {
     } as any,
     deviceSecret: DEVICE_SECRET,
     userSecret: USER_SECRET,
+    ...(over.redisGet ? { redis: { get: over.redisGet } } : {}),
   });
 
   const currentDisplay = (o: Record<string, unknown> = {}) => ({
@@ -157,6 +159,108 @@ describe('authenticateDeviceHandshake', () => {
     const findUnique = jest.fn().mockRejectedValue(new Error('DB down'));
     const r = await authenticateDeviceHandshake(TOKEN, makeDeps({ verify, findUnique }));
     expect(r).toEqual({ action: 'pass' }); // device sees a plain connect error → transient
+  });
+
+  // ── PR-8: device-JWT 90d refresh — old-token grace during rotation ──────────
+  describe('refresh-rotation grace window', () => {
+    const OLD_TOKEN = 'old.device.token';
+    const NEW_TOKEN = 'new.device.token';
+    // After a refresh the DB stores hash(NEW_TOKEN) and Redis holds a grace
+    // record { prev: hash(OLD_TOKEN), next: hash(NEW_TOKEN) }.
+    const rotatedDisplay = (o: Record<string, unknown> = {}) =>
+      currentDisplay({ jwtToken: hashDeviceToken(NEW_TOKEN), ...o });
+    const graceRecord = JSON.stringify({
+      prev: hashDeviceToken(OLD_TOKEN),
+      next: hashDeviceToken(NEW_TOKEN),
+    });
+
+    it('accepts the just-rotated NEW token directly (no grace needed)', async () => {
+      const verify = jest.fn().mockReturnValue(devicePayload);
+      const findUnique = jest.fn().mockResolvedValue(rotatedDisplay());
+      const r = await authenticateDeviceHandshake(NEW_TOKEN, makeDeps({ verify, findUnique }));
+      expect(r).toEqual({
+        action: 'accept',
+        payload: devicePayload,
+        tokenHash: hashDeviceToken(NEW_TOKEN),
+      });
+    });
+
+    it('accepts the OLD token during the grace window and reports the stored (new) hash', async () => {
+      const verify = jest.fn().mockReturnValue(devicePayload);
+      const findUnique = jest.fn().mockResolvedValue(rotatedDisplay());
+      const redisGet = jest.fn().mockResolvedValue(graceRecord);
+      const r = await authenticateDeviceHandshake(
+        OLD_TOKEN,
+        makeDeps({ verify, findUnique, redisGet }),
+      );
+      // Delivery checks must compare against Display.jwtToken, so the reported
+      // hash is the rotated-to (new) hash, not the presented (old) one.
+      expect(r).toEqual({
+        action: 'accept',
+        payload: devicePayload,
+        tokenHash: hashDeviceToken(NEW_TOKEN),
+      });
+      expect(redisGet).toHaveBeenCalledWith(deviceTokenGraceKey('display-1'));
+    });
+
+    it('rejects the OLD token once the grace record is gone (post-window)', async () => {
+      const verify = jest.fn().mockReturnValue(devicePayload);
+      const findUnique = jest.fn().mockResolvedValue(rotatedDisplay());
+      const redisGet = jest.fn().mockResolvedValue(null); // grace expired
+      const r = await authenticateDeviceHandshake(
+        OLD_TOKEN,
+        makeDeps({ verify, findUnique, redisGet }),
+      );
+      expect((r as any).code).toBe('DEVICE_REVOKED');
+    });
+
+    it('does NOT revive the old token after a re-pair (grace next ≠ stored hash)', async () => {
+      // Re-pairing set a brand-new stored hash; the stale grace still points at
+      // the prior rotation, but its `next` no longer matches Display.jwtToken.
+      const verify = jest.fn().mockReturnValue(devicePayload);
+      const findUnique = jest.fn().mockResolvedValue(
+        currentDisplay({ jwtToken: hashDeviceToken('repaired.token') }),
+      );
+      const redisGet = jest.fn().mockResolvedValue(graceRecord);
+      const r = await authenticateDeviceHandshake(
+        OLD_TOKEN,
+        makeDeps({ verify, findUnique, redisGet }),
+      );
+      expect((r as any).code).toBe('DEVICE_REVOKED');
+    });
+
+    it('a deleted device is still rejected even with a grace record present', async () => {
+      const verify = jest.fn().mockReturnValue(devicePayload);
+      const findUnique = jest.fn().mockResolvedValue(null); // row gone (unpaired)
+      const redisGet = jest.fn().mockResolvedValue(graceRecord);
+      const r = await authenticateDeviceHandshake(
+        OLD_TOKEN,
+        makeDeps({ verify, findUnique, redisGet }),
+      );
+      expect((r as any).code).toBe('DEVICE_REVOKED');
+    });
+
+    it('a disabled device is still rejected even with a grace record present', async () => {
+      const verify = jest.fn().mockReturnValue(devicePayload);
+      const findUnique = jest.fn().mockResolvedValue(rotatedDisplay({ isDisabled: true }));
+      const redisGet = jest.fn().mockResolvedValue(graceRecord);
+      const r = await authenticateDeviceHandshake(
+        OLD_TOKEN,
+        makeDeps({ verify, findUnique, redisGet }),
+      );
+      expect((r as any).code).toBe('DEVICE_REVOKED');
+    });
+
+    it('fails closed (DEVICE_REVOKED) when the grace lookup throws', async () => {
+      const verify = jest.fn().mockReturnValue(devicePayload);
+      const findUnique = jest.fn().mockResolvedValue(rotatedDisplay());
+      const redisGet = jest.fn().mockRejectedValue(new Error('redis down'));
+      const r = await authenticateDeviceHandshake(
+        OLD_TOKEN,
+        makeDeps({ verify, findUnique, redisGet }),
+      );
+      expect((r as any).code).toBe('DEVICE_REVOKED');
+    });
   });
 
   it('passes a valid USER token sent via auth.token to the user path (no false device reject)', async () => {

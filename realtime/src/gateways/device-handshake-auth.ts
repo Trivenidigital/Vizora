@@ -1,6 +1,11 @@
 import { JwtService } from '@nestjs/jwt';
 import { DatabaseService } from '../database/database.service';
-import { hashDeviceToken, isCurrentDeviceToken } from './device-token-hash';
+import {
+  hashDeviceToken,
+  isCurrentDeviceToken,
+  isGraceAcceptedDeviceToken,
+  deviceTokenGraceKey,
+} from './device-token-hash';
 
 /**
  * Device Revocation Contract v1.1 item 2 — device handshake authentication.
@@ -32,6 +37,11 @@ export interface DeviceHandshakeDeps {
   databaseService: DatabaseService;
   deviceSecret: string | undefined;
   userSecret: string | undefined;
+  // Optional grace lookup (PR-8). When provided, a device presenting the
+  // immediately-previous token during a 90d-refresh rotation is accepted via
+  // the grace record instead of being rejected DEVICE_REVOKED. Omitted in unit
+  // contexts that don't exercise refresh — behaviour is then unchanged.
+  redis?: { get(key: string): Promise<string | null> };
 }
 
 export type DeviceHandshakeResult =
@@ -56,6 +66,10 @@ export interface DeviceHandshakePayload {
   deviceIdentifier: string;
   organizationId: string;
   type: 'device';
+  // Standard JWT expiry claim (epoch seconds), present on all 90d device tokens.
+  // Carried through so the gateway can decide whether to mint a fresh token
+  // without having to re-decode the raw handshake token (PR-8).
+  exp?: number;
 }
 
 export async function authenticateDeviceHandshake(
@@ -114,21 +128,50 @@ export async function authenticateDeviceHandshake(
     return { action: 'pass' };
   }
 
-  const tokenHash = hashDeviceToken(token);
+  // Revocation checks that are independent of which token the device holds run
+  // FIRST and are never softened by the grace window: a deleted row, an
+  // org-reassignment, or an operator disable is always DEVICE_REVOKED.
   if (
     !display ||
     display.organizationId !== payload.organizationId ||
-    display.isDisabled ||
-    !isCurrentDeviceToken(display.jwtToken, tokenHash)
+    display.isDisabled
   ) {
     return { action: 'reject', message: 'device_token_stale', code: 'DEVICE_REVOKED' };
+  }
+
+  const tokenHash = hashDeviceToken(token);
+  // Hash reported back to the gateway for the live socket's delivery-time checks.
+  // Normally the presented hash (which equals the stored hash); on grace accept
+  // it is overridden to the stored (rotated-to) hash so delivery keeps matching
+  // Display.jwtToken.
+  let resolvedHash = tokenHash;
+
+  if (!isCurrentDeviceToken(display.jwtToken, tokenHash)) {
+    // Not the current stored token. Accept ONLY if this is the immediately-
+    // previous token of an in-flight 90d refresh rotation (PR-8) — i.e. the
+    // device reconnected on its old token before it persisted the new one.
+    // `isGraceAcceptedDeviceToken` additionally requires the DB to still hold
+    // the rotation's `next` hash, so a re-paired/revoked device's old token is
+    // NOT revived. A missing/failed grace lookup fails closed (DEVICE_REVOKED).
+    let graceRaw: string | null = null;
+    if (deps.redis) {
+      try {
+        graceRaw = await deps.redis.get(deviceTokenGraceKey(payload.sub));
+      } catch {
+        graceRaw = null; // fail closed — device confirms via auth/check 410 backstop
+      }
+    }
+    if (!isGraceAcceptedDeviceToken(graceRaw, tokenHash, display.jwtToken)) {
+      return { action: 'reject', message: 'device_token_stale', code: 'DEVICE_REVOKED' };
+    }
+    resolvedHash = display.jwtToken ?? tokenHash;
   }
 
   if (display.organization?.subscriptionStatus === 'suspended') {
     return { action: 'reject', message: 'tenant_suspended', code: 'TENANT_SUSPENDED' };
   }
 
-  return { action: 'accept', payload, tokenHash };
+  return { action: 'accept', payload, tokenHash: resolvedHash };
 }
 
 function isValidUserToken(token: string, deps: DeviceHandshakeDeps): boolean {

@@ -1,4 +1,9 @@
 // Mock for @vizora/database
+// Non-Prisma value exports that production code imports from this package must
+// be mirrored here (jest maps the whole '@vizora/database' module to this file).
+// Keep in sync with packages/database/src/lib/device-constants.ts.
+export const DEVICE_OFFLINE_THRESHOLD_MS = 120_000;
+
 export class PrismaClient {
   user = {
     findUnique: jest.fn(),

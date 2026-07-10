@@ -42,7 +42,13 @@ import { createHash } from 'node:crypto';
 import { WsAllExceptionsFilter } from './filters/ws-exception.filter';
 import { WsAuthGuard, WsDeviceGuard } from './guards/ws-auth.guard';
 import { redactSensitiveTokens } from '../utils/redact-sensitive-url';
-import { hashDeviceToken, isCurrentDeviceToken } from './device-token-hash';
+import {
+  hashDeviceToken,
+  isCurrentDeviceToken,
+  deviceTokenGraceKey,
+  DEVICE_TOKEN_GRACE_TTL_SECONDS,
+  DeviceTokenGrace,
+} from './device-token-hash';
 import {
   authenticateDeviceHandshake,
   DeviceHandshakePayload,
@@ -59,6 +65,7 @@ interface DevicePayload {
   organizationId: string;
   type: 'device';
   jti?: string;
+  exp?: number; // JWT expiry (epoch seconds) — drives the 90d refresh (PR-8)
 }
 
 interface UserPayload {
@@ -98,6 +105,21 @@ const HEARTBEAT_REPLAY_BASE_DELAY_MS = 15000;
 const HEARTBEAT_REPLAY_MAX_DELAY_MS = 300000;
 const HEARTBEAT_REPLAY_MAX_FAILURES = 5;
 const HEARTBEAT_DB_REFRESH_INTERVAL_MS = 60_000;
+
+// PR-8 — server-side device-JWT 90d refresh. Device tokens are signed 90d and
+// nothing previously re-issued them, so every device hard-expired 90 days after
+// pairing and could never re-auth (latent fleet-wide outage). When a device
+// connects/heartbeats within DEVICE_TOKEN_REFRESH_WITHIN_DAYS of expiry we mint
+// a fresh 90d token with the same claims and push it over `token:refresh`.
+const DEVICE_TOKEN_REFRESH_WITHIN_DAYS = 14;
+const DEVICE_TOKEN_REFRESH_WITHIN_MS =
+  DEVICE_TOKEN_REFRESH_WITHIN_DAYS * 24 * 60 * 60 * 1000;
+const DEVICE_TOKEN_TTL = '90d';
+// Cooldown so rapid reconnects near expiry mint at most one new token per device
+// (prevents multiple in-flight tokens racing the single stored hash). Far larger
+// than the grace window; a successful refresh pushes exp 90d out so no re-mint
+// happens on the next connection regardless.
+const DEVICE_TOKEN_REFRESH_COOLDOWN_SECONDS = 60 * 60; // 1 hour
 
 @WebSocketGateway({
   cors: {
@@ -141,6 +163,9 @@ export class DeviceGateway
         databaseService: this.databaseService,
         deviceSecret: process.env.DEVICE_JWT_SECRET,
         userSecret: process.env.JWT_SECRET,
+        // PR-8: lets the handshake accept a device that reconnected on its old
+        // token during an in-flight 90d refresh rotation (grace record).
+        redis: this.redisService,
       });
 
       if (result.action === 'reject') {
@@ -806,6 +831,11 @@ export class DeviceGateway
 
       // Step 6: Status broadcast + metrics + notifications
       await this.broadcastDeviceOnline(client, deviceId, orgId);
+
+      // Step 7: PR-8 — mint + push a fresh 90d token if this one is near expiry.
+      // Runs last so a refresh hiccup can never block the connect path (it also
+      // has its own try/catch and never throws).
+      await this.maybeRefreshDeviceToken(client);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Connection error: ${errorMessage}`);
@@ -897,6 +927,7 @@ export class DeviceGateway
       client.data.capabilities = client.handshake.auth?.capabilities;
       client.data.deliveryAckCapable = this.supportsDeliveryAck(client);
       client.data.deviceTokenHash = client.data.deviceAuthTokenHash;
+      client.data.deviceTokenExp = preVerified.exp; // PR-8 refresh trigger
 
       return { kind: 'device', payload: preVerified as DevicePayload };
     }
@@ -972,6 +1003,7 @@ export class DeviceGateway
         client.data.capabilities = client.handshake.auth?.capabilities;
         client.data.deliveryAckCapable = this.supportsDeliveryAck(client);
         client.data.deviceTokenHash = presentedTokenHash;
+        client.data.deviceTokenExp = payload.exp; // PR-8 refresh trigger
 
         return { kind: 'device', payload };
       }
@@ -1263,6 +1295,159 @@ export class DeviceGateway
   }
 
   /**
+   * PR-8 — server-side device-JWT 90d refresh.
+   *
+   * Device tokens are signed with a 90d expiry and nothing on the server used to
+   * re-issue them, so every device hard-expired 90 days after pairing and could
+   * never re-auth (the handshake returns AUTH_EXPIRED and the screen is stuck on
+   * cache) — a latent fleet-wide outage. When a device connects or heartbeats
+   * within DEVICE_TOKEN_REFRESH_WITHIN_DAYS of expiry we mint a fresh 90d token
+   * with the SAME claims and push it via `token:refresh` (the Electron client
+   * persists it and swaps `socket.auth.token`, so its NEXT reconnect uses it).
+   *
+   * Revocation-hash ordering — why this cannot lock a device out:
+   *   1. Publish a short-lived grace record { prev: oldHash, next: newHash }
+   *      FIRST, so the old token stays acceptable across the rotation.
+   *   2. Rotate Display.jwtToken oldHash -> newHash, GUARDED on the stored hash
+   *      still being oldHash — a concurrent re-pair/revoke makes the update
+   *      no-op and we do NOT emit.
+   *   3. Update this live socket's cached hash to newHash so delivery-time
+   *      checks keep matching the DB.
+   *   4. Emit the new token to the device.
+   * During the grace window the handshake accepts EITHER token (new via the
+   * rotated DB hash, old via the grace record — see authenticateDeviceHandshake).
+   * After grace, only the new token (DB) is accepted, which the device already
+   * holds in the normal case. Genuine revocation is unaffected: delete / disable
+   * / org-reassign are checked before the token hash, and a re-pair changes the
+   * stored hash so the grace's `next` no longer matches and the old token is
+   * rejected.
+   *
+   * Residual (documented, bounded, self-healing): if the socket drops in the
+   * ~RTT window before the client processes `token:refresh` AND the device then
+   * stays offline past the grace window, its next reconnect on the old token is
+   * rejected. The old token is still cryptographically valid so the screen keeps
+   * playing cached content, and Socket.IO auto-reconnect (seconds) almost always
+   * lands inside the grace window, self-healing it. This trades a *certain*
+   * 90-day fleet-wide outage for a rare, graceful, per-device degradation.
+   */
+  private async maybeRefreshDeviceToken(client: Socket): Promise<void> {
+    try {
+      // Idempotent per socket — one mint per connection at most.
+      if (client.data?.tokenRefreshIssued) return;
+
+      const deviceId = client.data?.deviceId as string | undefined;
+      const orgId = client.data?.organizationId as string | undefined;
+      const deviceIdentifier = client.data?.deviceIdentifier as string | undefined;
+      const currentHash = client.data?.deviceTokenHash as string | undefined;
+      const exp = client.data?.deviceTokenExp as number | undefined;
+      if (!deviceId || !orgId || !currentHash || typeof exp !== 'number') return;
+
+      const msUntilExpiry = exp * 1000 - Date.now();
+      // Far from expiry, or already expired (can't happen on a live socket) → skip.
+      if (msUntilExpiry <= 0 || msUntilExpiry > DEVICE_TOKEN_REFRESH_WITHIN_MS) return;
+
+      const deviceSecret = process.env.DEVICE_JWT_SECRET;
+      if (!deviceSecret || deviceSecret.length < 32) {
+        this.logger.warn(
+          `Cannot refresh near-expiry token for device ${deviceId}: DEVICE_JWT_SECRET is missing or too short`,
+        );
+        return;
+      }
+
+      // Throttle: claim a per-device cooldown so a reconnect storm near expiry
+      // mints exactly one new token (multiple in-flight tokens would race the
+      // single stored hash). A claim failure means another connection just
+      // refreshed — nothing to do on this socket.
+      let claimed = false;
+      try {
+        claimed = await this.redisService.setNx(
+          `device:token:refresh-cooldown:${deviceId}`,
+          '1',
+          DEVICE_TOKEN_REFRESH_COOLDOWN_SECONDS,
+        );
+      } catch {
+        // Redis unavailable: fall back to the per-socket flag alone (bounded to
+        // one mint on this socket). Better to refresh than to strand near expiry.
+        claimed = true;
+      }
+      if (!claimed) {
+        client.data.tokenRefreshIssued = true;
+        return;
+      }
+
+      const newToken = this.jwtService.sign(
+        {
+          sub: deviceId,
+          deviceIdentifier,
+          organizationId: orgId,
+          type: 'device',
+        },
+        { secret: deviceSecret, algorithm: 'HS256', expiresIn: DEVICE_TOKEN_TTL },
+      );
+      const newHash = hashDeviceToken(newToken);
+
+      // 1) Grace FIRST — the old token stays valid across the rotation.
+      const graceKey = deviceTokenGraceKey(deviceId);
+      const grace: DeviceTokenGrace = { prev: currentHash, next: newHash };
+      try {
+        await this.redisService.set(
+          graceKey,
+          JSON.stringify(grace),
+          DEVICE_TOKEN_GRACE_TTL_SECONDS,
+        );
+      } catch (err) {
+        // Without the grace record a reconnect on the old token during the
+        // rotation could be rejected — abort rather than risk a lockout.
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        this.logger.warn(
+          `Skipping token refresh for device ${deviceId}: failed to set grace record (${msg})`,
+        );
+        return;
+      }
+
+      // 2) Rotate the stored hash, guarded so a concurrent re-pair/revoke aborts.
+      let rotatedCount = 0;
+      try {
+        const rotated = await this.databaseService.display.updateMany({
+          where: { id: deviceId, organizationId: orgId, jwtToken: currentHash },
+          data: { jwtToken: newHash },
+        });
+        rotatedCount = rotated?.count ?? 0;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        this.logger.warn(`Token refresh DB rotation failed for device ${deviceId}: ${msg}`);
+        await this.redisService.delete(graceKey).catch(() => undefined);
+        return;
+      }
+      if (rotatedCount === 0) {
+        // Stored hash changed under us (re-pair / revoke / disable). Do not emit
+        // a token bound to a hash the DB no longer holds; drop the stale grace.
+        await this.redisService.delete(graceKey).catch(() => undefined);
+        this.logger.warn(
+          `Token refresh aborted for device ${deviceId}: stored hash changed (re-pair/revoke)`,
+        );
+        return;
+      }
+
+      // 3) Keep this live socket delivering under the rotated hash.
+      client.data.deviceTokenHash = newHash;
+      client.data.tokenRefreshIssued = true;
+
+      // 4) Push the new token to this device socket. Payload shape is what the
+      // Electron client consumes: { token } (device-client.ts on 'token:refresh').
+      client.emit('token:refresh', { token: newToken });
+      this.logger.log(
+        `Refreshed device token for ${deviceId} (was within ${DEVICE_TOKEN_REFRESH_WITHIN_DAYS}d of expiry)`,
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      this.logger.warn(
+        `maybeRefreshDeviceToken failed for device ${client.data?.deviceId}: ${msg}`,
+      );
+    }
+  }
+
+  /**
    * Send current device statuses to a newly connected dashboard client.
    * This ensures the dashboard has accurate online/offline state immediately,
    * even if the devices connected before the dashboard did.
@@ -1514,6 +1699,11 @@ export class DeviceGateway
       // Record successful heartbeat with duration
       const duration = (Date.now() - startTime) / 1000;
       this.metricsService.recordHeartbeat(deviceId, true, duration);
+
+      // PR-8 — also refresh near-expiry tokens on heartbeat so a device that
+      // stays connected continuously (never reconnects) still gets a fresh token
+      // before its 90d expiry. Idempotent per socket + throttled via cooldown.
+      await this.maybeRefreshDeviceToken(client);
 
       void this.replayPendingDeliveries(client, deviceId);
 
