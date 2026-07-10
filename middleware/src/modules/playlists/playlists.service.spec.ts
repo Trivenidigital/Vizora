@@ -343,6 +343,20 @@ describe('PlaylistsService', () => {
         }),
       );
     });
+
+    it('should bump parent Playlist.updatedAt to keep device version monotonic', async () => {
+      mockDatabaseService.playlist.findFirst.mockResolvedValue(mockPlaylist);
+      mockDatabaseService.content.findFirst.mockResolvedValue({ id: 'content-123' });
+      mockDatabaseService.playlistItem.findFirst.mockResolvedValue({ order: 0 });
+      mockDatabaseService.playlistItem.create.mockResolvedValue(mockPlaylistItem);
+
+      await service.addItem('org-123', 'playlist-123', 'content-123', 10);
+
+      expect(mockDatabaseService.playlist.updateMany).toHaveBeenCalledWith({
+        where: { id: 'playlist-123', organizationId: 'org-123' },
+        data: { updatedAt: expect.any(Date) },
+      });
+    });
   });
 
   describe('updateItem', () => {
@@ -370,6 +384,20 @@ describe('PlaylistsService', () => {
         service.updateItem('org-123', 'playlist-123', 'item-999', { duration: 60 }),
       ).rejects.toThrow(NotFoundException);
     });
+
+    it('should bump parent Playlist.updatedAt to keep device version monotonic', async () => {
+      mockDatabaseService.playlist.findFirst.mockResolvedValue(mockPlaylist);
+      mockDatabaseService.playlistItem.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.playlistItem.findFirst.mockResolvedValue({ id: 'item-123', duration: 60, content: {} });
+      mockDatabaseService.playlist.findUnique.mockResolvedValue(mockPlaylist);
+
+      await service.updateItem('org-123', 'playlist-123', 'item-123', { duration: 60 });
+
+      expect(mockDatabaseService.playlist.updateMany).toHaveBeenCalledWith({
+        where: { id: 'playlist-123', organizationId: 'org-123' },
+        data: { updatedAt: expect.any(Date) },
+      });
+    });
   });
 
   describe('removeItem', () => {
@@ -382,6 +410,20 @@ describe('PlaylistsService', () => {
       expect(result).toEqual({ id: 'item-123', playlistId: 'playlist-123' });
       expect(mockDatabaseService.playlistItem.deleteMany).toHaveBeenCalledWith({
         where: { id: 'item-123', playlistId: 'playlist-123' },
+      });
+    });
+
+    it('should bump parent Playlist.updatedAt to keep device version monotonic', async () => {
+      mockDatabaseService.playlist.findFirst.mockResolvedValue(mockPlaylist);
+      mockDatabaseService.playlistItem.deleteMany.mockResolvedValue({ count: 1 });
+
+      await service.removeItem('org-123', 'playlist-123', 'item-123');
+
+      // A deleted item can't refresh itself, so the parent touch is the only
+      // thing that moves the device content version on removal.
+      expect(mockDatabaseService.playlist.updateMany).toHaveBeenCalledWith({
+        where: { id: 'playlist-123', organizationId: 'org-123' },
+        data: { updatedAt: expect.any(Date) },
       });
     });
   });
@@ -599,6 +641,33 @@ describe('PlaylistsService', () => {
       await expect(
         service.reorder('org-123', 'nonexistent', ['item-1'])
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should bump parent Playlist.updatedAt inside the transaction to keep device version monotonic', async () => {
+      const playlistWithItems = {
+        ...mockPlaylist,
+        items: [
+          { id: 'item-1', contentId: 'c-1', order: 0, duration: 10, content: null },
+          { id: 'item-2', contentId: 'c-2', order: 1, duration: 20, content: null },
+        ],
+        itemCount: 2,
+        totalDuration: 30,
+        totalSize: 0,
+      };
+
+      mockDatabaseService.playlist.findFirst
+        .mockResolvedValueOnce(playlistWithItems)
+        .mockResolvedValueOnce(playlistWithItems);
+
+      // tx client is the mock itself, so tx.playlist.updateMany is the same spy.
+      mockDatabaseService.$transaction.mockImplementation(async (fn) => fn(mockDatabaseService));
+
+      await service.reorder('org-123', 'playlist-123', ['item-2', 'item-1']);
+
+      expect(mockDatabaseService.playlist.updateMany).toHaveBeenCalledWith({
+        where: { id: 'playlist-123', organizationId: 'org-123' },
+        data: { updatedAt: expect.any(Date) },
+      });
     });
   });
 
