@@ -3,15 +3,26 @@ import {
   NestInterceptor,
   ExecutionContext,
   CallHandler,
+  Optional,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import type { Request, Response } from 'express';
 import { MetricsService } from './metrics.service';
+import { ContinuousHealthMonitorService } from '../health/continuous-health-monitor.service';
 
 @Injectable()
 export class MetricsInterceptor implements NestInterceptor {
-  constructor(private readonly metricsService: MetricsService) {}
+  constructor(
+    private readonly metricsService: MetricsService,
+    // Optional so unit tests that construct the interceptor directly (and the
+    // DI graph) never hard-fail if the health monitor is unavailable. When
+    // present, 5xx responses feed the continuous-health error-rate check —
+    // without this wiring recordError() was never called, so checkErrorRate()
+    // always saw 0 5xx.
+    @Optional()
+    private readonly healthMonitor?: ContinuousHealthMonitorService,
+  ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest<Request>();
@@ -34,14 +45,21 @@ export class MetricsInterceptor implements NestInterceptor {
           if (response.statusCode >= 400) {
             this.metricsService.httpErrorsTotal.inc({ method, path, status });
           }
+          if (response.statusCode >= 500) {
+            this.healthMonitor?.recordError(response.statusCode);
+          }
         },
         error: (error) => {
-          const status = String(error.status || 500);
+          const statusCode = error.status || 500;
+          const status = String(statusCode);
           const duration = (Date.now() - startTime) / 1000;
 
           this.metricsService.httpRequestsTotal.inc({ method, path, status });
           this.metricsService.httpRequestDuration.observe({ method, path, status }, duration);
           this.metricsService.httpErrorsTotal.inc({ method, path, status });
+          if (statusCode >= 500) {
+            this.healthMonitor?.recordError(statusCode);
+          }
         },
       }),
     );

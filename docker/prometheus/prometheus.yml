@@ -4,10 +4,10 @@ global:
 
 scrape_configs:
   - job_name: 'middleware'
-    metrics_path: '/api/internal/metrics'
+    metrics_path: '/api/v1/internal/metrics'
     static_configs:
       - targets: ['host.docker.internal:3000']
   - job_name: 'realtime'
-    metrics_path: '/metrics'
+    metrics_path: '/internal/metrics'
     static_configs:
       - targets: ['host.docker.internal:3002']

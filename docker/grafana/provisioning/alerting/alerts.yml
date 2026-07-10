@@ -31,42 +31,12 @@ groups:
     folder: Vizora
     interval: 1m
     rules:
-      # Device offline for more than 5 minutes
-      - uid: device-offline
-        title: Device Offline > 5 minutes
-        condition: C
-        data:
-          - refId: A
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: prometheus
-            model:
-              expr: 'time() - vizora_device_last_heartbeat_timestamp > 300'
-              intervalMs: 60000
-              maxDataPoints: 43200
-          - refId: C
-            relativeTimeRange:
-              from: 0
-              to: 0
-            datasourceUid: '-100'
-            model:
-              conditions:
-                - evaluator:
-                    type: gt
-                    params: [0]
-                  operator:
-                    type: and
-                  query:
-                    params: [A]
-              type: classic_conditions
-        noDataState: OK
-        execErrState: Alerting
-        for: 5m
-        annotations:
-          summary: 'A display device has been offline for more than 5 minutes'
-        labels:
-          severity: warning
+      # NOTE: The "Device Offline > 5 minutes" rule was removed. Its expr
+      # referenced `vizora_device_last_heartbeat_timestamp`, a metric no
+      # service exports, so the rule could never fire (dead alert). Device-
+      # offline paging is owned by the in-app O7 alert-rules evaluator
+      # (event-driven, per-tenant), NOT by Prometheus. Do not re-add a
+      # Prometheus device-offline rule unless that metric is actually exported.
 
       # Error rate spike > 5% over 5 minute window
       - uid: error-rate-spike

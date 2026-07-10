@@ -531,6 +531,31 @@ export class DeviceGateway
     // Periodically tear down dashboard sockets whose session was invalidated
     // mid-connection (password change / deactivation) — see sweepInvalidatedSessions.
     this.cleanupIntervals.push(setInterval(() => this.sweepInvalidatedSessions(), 60000));
+    // Periodically reconcile the devices_online metric from the authoritative
+    // presence map (deviceSockets). The inc/dec in MetricsService drifts after a
+    // missed disconnect; this snapshot re-syncs it. Realtime runs single-instance
+    // (PM2 instances:1) so a plain setInterval is safe — no leader election.
+    this.cleanupIntervals.push(setInterval(() => this.reconcileDeviceMetrics(), 60000));
+  }
+
+  /**
+   * Reconcile the devices_online gauge from the in-memory presence map.
+   * deviceSockets (deviceId -> active socketId) is the authoritative set of
+   * currently-connected devices; each socket carries its organizationId on
+   * socket.data. Tally per org and hand the snapshot to MetricsService, which
+   * reset()s and set()s the gauge. Sockets missing from the server (already
+   * gone) are skipped so a stale map entry never inflates the count.
+   */
+  private reconcileDeviceMetrics(): void {
+    const countsByOrg = new Map<string, number>();
+    for (const socketId of this.deviceSockets.values()) {
+      const socket = this.server?.sockets?.sockets?.get(socketId);
+      const orgId = socket?.data?.organizationId;
+      if (typeof orgId === 'string' && orgId) {
+        countsByOrg.set(orgId, (countsByOrg.get(orgId) ?? 0) + 1);
+      }
+    }
+    this.metricsService.reconcileDevicesOnline(countsByOrg);
   }
 
   async onModuleDestroy() {

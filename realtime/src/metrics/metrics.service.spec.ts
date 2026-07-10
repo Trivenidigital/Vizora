@@ -5,7 +5,7 @@ describe('MetricsService', () => {
 
   // Factory functions to create fresh mock instances per test
   const createCounter = () => ({ inc: jest.fn() });
-  const createGauge = () => ({ inc: jest.fn(), dec: jest.fn(), set: jest.fn() });
+  const createGauge = () => ({ inc: jest.fn(), dec: jest.fn(), set: jest.fn(), reset: jest.fn() });
   const createHistogram = () => ({ observe: jest.fn() });
 
   beforeEach(() => {
@@ -134,6 +134,28 @@ describe('MetricsService', () => {
       expect(service.devicesOnline.dec).toHaveBeenCalledWith({
         organization_id: 'org-1',
       });
+    });
+  });
+
+  describe('reconcileDevicesOnline', () => {
+    it('should reset the gauge and set per-org counts from the snapshot', () => {
+      service.reconcileDevicesOnline(
+        new Map([
+          ['org-1', 3],
+          ['org-2', 1],
+        ]),
+      );
+
+      expect(service.devicesOnline.reset).toHaveBeenCalled();
+      expect(service.devicesOnline.set).toHaveBeenCalledWith({ organization_id: 'org-1' }, 3);
+      expect(service.devicesOnline.set).toHaveBeenCalledWith({ organization_id: 'org-2' }, 1);
+    });
+
+    it('should reset the gauge even when the snapshot is empty', () => {
+      service.reconcileDevicesOnline(new Map());
+
+      expect(service.devicesOnline.reset).toHaveBeenCalled();
+      expect(service.devicesOnline.set).not.toHaveBeenCalled();
     });
   });
 
