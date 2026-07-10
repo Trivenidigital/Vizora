@@ -474,6 +474,36 @@ describe('RazorpayProvider', () => {
       expect(provider.verifyWebhookSignature(payload, expectedSignature).id).toBe(result.id);
     });
 
+    it('unwraps the real payload.<entity>.entity nesting so handlers read fields directly (billing #6)', () => {
+      // Real Razorpay webhook shape: each entity is nested under `.entity`.
+      const payload = Buffer.from(
+        JSON.stringify({
+          event: 'subscription.charged',
+          payload: {
+            subscription: { entity: { id: 'sub_1', customer_id: 'cust_9', status: 'active' } },
+            payment: { entity: { id: 'pay_1', amount: 379900, currency: 'INR' } },
+          },
+        }),
+      );
+      const signature = crypto
+        .createHmac('sha256', 'webhook_secret_123')
+        .update(payload)
+        .digest('hex');
+
+      const { data } = provider.verifyWebhookSignature(payload, signature) as unknown as {
+        data: {
+          subscription: { customer_id: string; status: string };
+          payment: { amount: number };
+        };
+      };
+
+      // The .entity layer is unwrapped: without this, data.subscription.customer_id
+      // and data.payment.amount would be undefined and the event silently dropped.
+      expect(data.subscription).toEqual({ id: 'sub_1', customer_id: 'cust_9', status: 'active' });
+      expect(data.subscription.customer_id).toBe('cust_9');
+      expect(data.payment.amount).toBe(379900);
+    });
+
     it('should throw on invalid signature', () => {
       const payload = Buffer.from(
         JSON.stringify({
