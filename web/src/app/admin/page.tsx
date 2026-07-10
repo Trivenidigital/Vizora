@@ -6,7 +6,7 @@ export default async function AdminDashboardPage() {
   let stats: PlatformStats | null = null;
 
   try {
-    stats = await serverFetch<PlatformStats>('/admin/stats');
+    stats = await serverFetch<PlatformStats>('/admin/stats/overview');
   } catch {
     // Will render with null stats, client handles gracefully
   }

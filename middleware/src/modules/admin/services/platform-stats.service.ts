@@ -6,6 +6,11 @@ export interface PlatformOverview {
   totalUsers: number;
   totalDisplays: number;
   onlineDisplays: number;
+  // Frontend-facing aliases — Vizora's product/UI calls displays "screens".
+  // The admin dashboard's PlatformStats contract reads totalScreens/onlineScreens;
+  // kept alongside the display-named fields so existing consumers still resolve.
+  totalScreens: number;
+  onlineScreens: number;
   totalContent: number;
   totalStorageBytes: number;
   totalRevenue: number;
@@ -102,6 +107,8 @@ export class PlatformStatsService {
       totalUsers,
       totalDisplays,
       onlineDisplays,
+      totalScreens: totalDisplays,
+      onlineScreens: onlineDisplays,
       totalContent,
       totalStorageBytes: contentStorage._sum.fileSize || 0,
       totalRevenue: revenueData._sum.amount || 0,

@@ -84,6 +84,25 @@ describe('AdminAuditService', () => {
         }),
       });
     });
+
+    it('is fail-safe: swallows a DB write failure so the already-committed mutation is not 500ed', async () => {
+      const dbError = new Error('connection terminated');
+      mockDb.adminAuditLog.create.mockRejectedValue(dbError);
+      const errorSpy = jest
+        .spyOn((service as any).logger, 'error')
+        .mockImplementation(() => undefined);
+
+      const result = await service.log({
+        adminUserId: 'admin-123',
+        action: 'plan.delete',
+        targetType: 'plan',
+        targetId: 'plan-456',
+      });
+
+      expect(result).toBeNull();
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      errorSpy.mockRestore();
+    });
   });
 
   describe('findAll', () => {

@@ -43,8 +43,8 @@ declare module './client' {
     getSystemConfigs(): Promise<SystemConfig[]>;
     updateSystemConfig(key: string, value: string | number | boolean): Promise<void>;
     // Admin - Security
-    getAdminAuditLogs(): Promise<AdminAuditLog[]>;
-    getIpBlocklist(): Promise<IpBlocklistEntry[]>;
+    getAdminAuditLogs(): Promise<{ data: AdminAuditLog[]; total: number }>;
+    getIpBlocklist(): Promise<{ data: IpBlocklistEntry[]; meta: { page: number; limit: number; total: number; totalPages: number } }>;
     blockIp(ip: string, reason: string): Promise<void>;
     unblockIp(id: string): Promise<void>;
     // Admin - Announcements
@@ -69,7 +69,7 @@ ApiClient.prototype.createPlan = async function (data: Partial<AdminPlan>): Prom
 
 ApiClient.prototype.updatePlan = async function (id: string, data: Partial<AdminPlan>): Promise<AdminPlan> {
   return this.request<AdminPlan>(`/admin/plans/${id}`, {
-    method: 'PATCH',
+    method: 'PUT',
     body: JSON.stringify(data),
   });
 };
@@ -94,7 +94,7 @@ ApiClient.prototype.createPromotion = async function (data: Partial<Promotion>):
 
 ApiClient.prototype.updatePromotion = async function (id: string, data: Partial<Promotion>): Promise<Promotion> {
   return this.request<Promotion>(`/admin/promotions/${id}`, {
-    method: 'PATCH',
+    method: 'PUT',
     body: JSON.stringify(data),
   });
 };
@@ -162,7 +162,7 @@ ApiClient.prototype.enableUser = async function (id: string): Promise<void> {
 
 // Admin - Stats & Health
 ApiClient.prototype.getPlatformStats = async function (): Promise<PlatformStats> {
-  return this.request<PlatformStats>('/admin/stats');
+  return this.request<PlatformStats>('/admin/stats/overview');
 };
 
 ApiClient.prototype.getPlatformHealth = async function (): Promise<PlatformHealth> {
@@ -193,18 +193,18 @@ ApiClient.prototype.getSystemConfigs = async function (): Promise<SystemConfig[]
 
 ApiClient.prototype.updateSystemConfig = async function (key: string, value: string | number | boolean): Promise<void> {
   await this.request<void>(`/admin/config/${encodeURIComponent(key)}`, {
-    method: 'PATCH',
+    method: 'PUT',
     body: JSON.stringify({ value }),
   });
 };
 
 // Admin - Security
-ApiClient.prototype.getAdminAuditLogs = async function (): Promise<AdminAuditLog[]> {
-  return this.request<AdminAuditLog[]>('/admin/audit-logs');
+ApiClient.prototype.getAdminAuditLogs = async function (): Promise<{ data: AdminAuditLog[]; total: number }> {
+  return this.request<{ data: AdminAuditLog[]; total: number }>('/admin/security/audit-log');
 };
 
-ApiClient.prototype.getIpBlocklist = async function (): Promise<IpBlocklistEntry[]> {
-  return this.request<IpBlocklistEntry[]>('/admin/security/ip-blocklist');
+ApiClient.prototype.getIpBlocklist = async function (): Promise<{ data: IpBlocklistEntry[]; meta: { page: number; limit: number; total: number; totalPages: number } }> {
+  return this.request<{ data: IpBlocklistEntry[]; meta: { page: number; limit: number; total: number; totalPages: number } }>('/admin/security/ip-blocklist');
 };
 
 ApiClient.prototype.blockIp = async function (ip: string, reason: string): Promise<void> {
@@ -234,7 +234,7 @@ ApiClient.prototype.createAnnouncement = async function (data: Partial<SystemAnn
 
 ApiClient.prototype.updateAnnouncement = async function (id: string, data: Partial<SystemAnnouncement>): Promise<SystemAnnouncement> {
   return this.request<SystemAnnouncement>(`/admin/announcements/${id}`, {
-    method: 'PATCH',
+    method: 'PUT',
     body: JSON.stringify(data),
   });
 };
