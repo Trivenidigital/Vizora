@@ -15,6 +15,18 @@ import { IS_PUBLIC_KEY } from '../../auth/decorators/public.decorator';
  * Free tier: Users whose trial has expired retain limited write access for core
  * operations (device pairing, content push, content upload within quota).
  * The free tier is subject to quota limits enforced separately by QuotaGuard.
+ *
+ * Entitlement ladder (B3) — dashboard WRITE access per subscription rung:
+ *   active / trial (not expired) / free → FULL write access.
+ *   past_due       → FULL write access (7-day dunning grace; banner only, no
+ *                    enforcement — one failed card must NOT lock the dashboard).
+ *   publish_locked → FULL write access EXCEPT publishing NEW content, which is
+ *                    gated separately by EntitlementPublishGuard on the
+ *                    push/assign endpoints. Screens keep playing.
+ *   suspended      → all writes blocked (screens keep playing via the separate
+ *                    tenant:suspended device signal).
+ *   canceled / any other inactive state → all writes blocked.
+ * Publishing itself is NOT gated here — that is EntitlementPublishGuard's job.
  */
 @Injectable()
 export class SubscriptionActiveGuard implements CanActivate {
@@ -76,6 +88,21 @@ export class SubscriptionActiveGuard implements CanActivate {
     // basic operations like pairing devices, pushing content, and uploading
     // within their quota limits. Premium features are gated separately.
     if (org.subscriptionTier === 'free') {
+      return true;
+    }
+
+    // Dunning rungs that KEEP dashboard write access (B3 ladder):
+    //   past_due       → 7-day grace; a single failed charge must not lock the
+    //                    dashboard. Banner-only; no write enforcement yet.
+    //   publish_locked → general dashboard writes stay allowed; only publishing
+    //                    NEW content to screens is blocked, and that is enforced
+    //                    by EntitlementPublishGuard on the publish/assign/push
+    //                    endpoints — NOT here.
+    // suspended / canceled / any other inactive state fall through to the throw.
+    if (
+      org.subscriptionStatus === 'past_due' ||
+      org.subscriptionStatus === 'publish_locked'
+    ) {
       return true;
     }
 

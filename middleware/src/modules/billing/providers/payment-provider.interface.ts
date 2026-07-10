@@ -21,6 +21,15 @@ export interface Subscription {
   currentPeriodEnd: Date;
   cancelAtPeriodEnd: boolean;
   priceId: string;
+  /**
+   * Normalized billing interval of the subscription's price
+   * (Stripe price `recurring.interval`: month → 'monthly', year → 'yearly').
+   * Undefined when the provider does not expose it or the interval is neither
+   * monthly nor yearly. Consumers must NOT default a missing interval to a
+   * concrete value on a re-bill path — an unknown interval means "refuse and
+   * surface" rather than "assume monthly".
+   */
+  interval?: 'monthly' | 'yearly';
   metadata?: Record<string, unknown>;
 }
 

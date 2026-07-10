@@ -4,8 +4,8 @@ import { EntitlementPublishGuard } from './entitlement-publish.guard';
 /** B3 — publish-lock gate. Blocks NEW publishing at publish_locked/suspended;
  *  allows everything else; fails OPEN on infra error (dunning tool, not security). */
 describe('EntitlementPublishGuard', () => {
-  const makeCtx = (organizationId?: string) => ({
-    switchToHttp: () => ({ getRequest: () => ({ user: { organizationId } }) }),
+  const makeCtx = (organizationId?: string, body?: Record<string, unknown>) => ({
+    switchToHttp: () => ({ getRequest: () => ({ user: { organizationId }, body }) }),
   }) as any;
 
   const guard = (status: string | null, throwOnRead = false) => {
@@ -41,5 +41,25 @@ describe('EntitlementPublishGuard', () => {
 
   it('defers to the auth guard when there is no organization on the request', async () => {
     expect(await guard('publish_locked').canActivate(makeCtx(undefined))).toBe(true);
+  });
+
+  // Fleet command carve-out: POST /fleet/commands multiplexes device commands.
+  // Only `push_content` is a publish; the rest stay available while locked.
+  it('allows a non-publish fleet command (reboot) even when publish_locked', async () => {
+    expect(
+      await guard('publish_locked').canActivate(makeCtx('o1', { command: 'reboot' })),
+    ).toBe(true);
+  });
+
+  it('BLOCKS the fleet push_content command when publish_locked', async () => {
+    await expect(
+      guard('publish_locked').canActivate(makeCtx('o1', { command: 'push_content' })),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('allows the fleet push_content command when active', async () => {
+    expect(
+      await guard('active').canActivate(makeCtx('o1', { command: 'push_content' })),
+    ).toBe(true);
   });
 });

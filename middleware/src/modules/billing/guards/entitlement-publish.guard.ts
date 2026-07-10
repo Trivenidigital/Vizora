@@ -20,12 +20,29 @@ import { DatabaseService } from '../../database/database.service';
  */
 const PUBLISH_BLOCKED_STATUSES = new Set(['publish_locked', 'suspended']);
 
+// The fleet command endpoint (POST /fleet/commands) multiplexes several device
+// commands through a single handler. Only `push_content` publishes NEW content
+// to a screen; the others (reload/restart/reboot/clear_cache/update) are device
+// management that must stay available at the publish_locked rung. When this guard
+// runs on a request carrying a fleet command envelope, it enforces ONLY for the
+// publish command. Requests to the dedicated push/assign endpoints carry no
+// `command` field, so this carve-out never affects them.
+const FLEET_PUBLISH_COMMAND = 'push_content';
+
 @Injectable()
 export class EntitlementPublishGuard implements CanActivate {
   constructor(private readonly db: DatabaseService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
+
+    // Fleet carve-out: a non-publish fleet command is not a "publish" and stays
+    // allowed while publishing is locked. Only `push_content` is gated.
+    const command = request.body?.command;
+    if (typeof command === 'string' && command !== FLEET_PUBLISH_COMMAND) {
+      return true;
+    }
+
     const organizationId = request.user?.organizationId;
     if (!organizationId) return true; // auth guard owns the unauthenticated case
 
