@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DatabaseService } from '../../database/database.service';
+import { CronLeaderService } from '../../common/services/cron-leader.service';
 import { CreateAlertRuleDto } from './dto/create-alert-rule.dto';
 import { UpdateAlertRuleDto } from './dto/update-alert-rule.dto';
 import { CreateRecipientDto } from './dto/create-recipient.dto';
@@ -34,7 +35,10 @@ import {
 export class AlertRulesService {
   private readonly logger = new Logger(AlertRulesService.name);
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly cronLeader: CronLeaderService,
+  ) {}
 
   // ---------------------------------------------------------------------------
   // CRUD
@@ -310,66 +314,68 @@ export class AlertRulesService {
    */
   @Cron(CronExpression.EVERY_HOUR)
   async healMissingDefaultRules(): Promise<void> {
-    // R10 alert-rules scout: page through orgs in batches instead of
-    // loading the entire set into memory. At a few thousand orgs the
-    // unpaginated findMany would spike memory + force a long-running
-    // transaction; at tens of thousands it's an OOM risk every hour.
-    // Per-batch processing also lets us interleave Prisma + heal work
-    // so a single bad org doesn't gate the rest.
-    const PAGE_SIZE = 100;
-    let cursor: string | undefined;
-    let healed = 0;
-    let failed = 0;
-    let totalSeen = 0;
+    await this.cronLeader.runExclusive('alert-rules-heal-defaults', async () => {
+      // R10 alert-rules scout: page through orgs in batches instead of
+      // loading the entire set into memory. At a few thousand orgs the
+      // unpaginated findMany would spike memory + force a long-running
+      // transaction; at tens of thousands it's an OOM risk every hour.
+      // Per-batch processing also lets us interleave Prisma + heal work
+      // so a single bad org doesn't gate the rest.
+      const PAGE_SIZE = 100;
+      let cursor: string | undefined;
+      let healed = 0;
+      let failed = 0;
+      let totalSeen = 0;
 
-    /* eslint-disable no-constant-condition */
-    while (true) {
-      const orgsNeedingRule = await this.db.organization.findMany({
-        where: {
-          alertRules: {
-            none: { name: 'Default offline alert (auto-migrated)' },
+      /* eslint-disable no-constant-condition */
+      while (true) {
+        const orgsNeedingRule = await this.db.organization.findMany({
+          where: {
+            alertRules: {
+              none: { name: 'Default offline alert (auto-migrated)' },
+            },
           },
-        },
-        select: { id: true, name: true },
-        orderBy: { id: 'asc' },
-        take: PAGE_SIZE,
-        ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
-      });
+          select: { id: true, name: true },
+          orderBy: { id: 'asc' },
+          take: PAGE_SIZE,
+          ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+        });
 
-      if (orgsNeedingRule.length === 0) break;
-      totalSeen += orgsNeedingRule.length;
+        if (orgsNeedingRule.length === 0) break;
+        totalSeen += orgsNeedingRule.length;
 
-      for (const org of orgsNeedingRule) {
-        try {
-          const admins = await this.db.user.findMany({
-            where: { organizationId: org.id, role: 'admin' },
-            select: { id: true },
-          });
-          await this.seedDefaultRuleForOrg(
-            org.id,
-            admins.map((a) => a.id),
-          );
-          healed++;
-        } catch (err) {
-          failed++;
-          this.logger.error(
-            `Heal cron: failed to seed default alert rule for org ${org.id}: ${err instanceof Error ? err.message : err}`,
-          );
+        for (const org of orgsNeedingRule) {
+          try {
+            const admins = await this.db.user.findMany({
+              where: { organizationId: org.id, role: 'admin' },
+              select: { id: true },
+            });
+            await this.seedDefaultRuleForOrg(
+              org.id,
+              admins.map((a) => a.id),
+            );
+            healed++;
+          } catch (err) {
+            failed++;
+            this.logger.error(
+              `Heal cron: failed to seed default alert rule for org ${org.id}: ${err instanceof Error ? err.message : err}`,
+            );
+          }
         }
+
+        cursor = orgsNeedingRule[orgsNeedingRule.length - 1].id;
+        if (orgsNeedingRule.length < PAGE_SIZE) break;
       }
+      /* eslint-enable no-constant-condition */
 
-      cursor = orgsNeedingRule[orgsNeedingRule.length - 1].id;
-      if (orgsNeedingRule.length < PAGE_SIZE) break;
-    }
-    /* eslint-enable no-constant-condition */
-
-    if (totalSeen === 0) {
-      this.logger.debug('Heal cron: all orgs have the default downtime alert rule');
-      return;
-    }
-    this.logger.log(
-      `Heal cron: healed ${healed}, failed ${failed} of ${totalSeen} orgs needing default downtime alert rule`,
-    );
+      if (totalSeen === 0) {
+        this.logger.debug('Heal cron: all orgs have the default downtime alert rule');
+        return;
+      }
+      this.logger.log(
+        `Heal cron: healed ${healed}, failed ${failed} of ${totalSeen} orgs needing default downtime alert rule`,
+      );
+    });
   }
 
   // ---------------------------------------------------------------------------

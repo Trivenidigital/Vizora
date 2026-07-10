@@ -9,6 +9,7 @@ jest.mock('isomorphic-dompurify', () => ({
 import { TemplateRefreshService } from './template-refresh.service';
 import { TemplateRenderingService } from './template-rendering.service';
 import { DatabaseService } from '../database/database.service';
+import { CronLeaderService } from '../common/services/cron-leader.service';
 import { TemplateMetadata } from './content.service';
 
 describe('TemplateRefreshService', () => {
@@ -60,6 +61,7 @@ describe('TemplateRefreshService', () => {
     service = new TemplateRefreshService(
       mockDb as DatabaseService,
       mockTemplateRendering,
+      { runExclusive: (_n: string, fn: () => Promise<void>) => fn() } as unknown as CronLeaderService,
     );
   });
 

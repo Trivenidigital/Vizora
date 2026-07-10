@@ -16,6 +16,7 @@ import { firstValueFrom } from 'rxjs';
 import * as crypto from 'crypto';
 import { DatabaseService } from '../database/database.service';
 import { CircuitBreakerService } from '../common/services/circuit-breaker.service';
+import { CronLeaderService } from '../common/services/cron-leader.service';
 import { StorageService } from '../storage/storage.service';
 import { CreateDisplayDto } from './dto/create-display.dto';
 import { UpdateDisplayDto } from './dto/update-display.dto';
@@ -55,6 +56,7 @@ export class DisplaysService {
     private readonly circuitBreaker: CircuitBreakerService,
     private readonly storageService: StorageService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly cronLeader: CronLeaderService,
   ) {}
 
   /** Returns internal API secret headers, or null if secret is not configured */
@@ -303,31 +305,33 @@ export class DisplaysService {
    */
   @Cron(CronExpression.EVERY_MINUTE)
   async detectOfflineDevices(): Promise<void> {
-    const threshold = new Date(Date.now() - 2 * 60 * 1000); // 2 minutes ago
-    const staleDevices = await this.db.display.findMany({
-      where: {
-        status: 'online',
-        lastHeartbeat: { lt: threshold },
-      },
-      select: { id: true, nickname: true, deviceIdentifier: true, organizationId: true },
-    });
-
-    if (staleDevices.length === 0) return;
-
-    await this.db.display.updateMany({
-      where: { id: { in: staleDevices.map(d => d.id) } },
-      data: { status: 'offline' },
-    });
-
-    for (const device of staleDevices) {
-      this.eventEmitter.emit('device.offline', {
-        deviceId: device.id,
-        deviceName: device.nickname || device.deviceIdentifier,
-        organizationId: device.organizationId,
+    await this.cronLeader.runExclusive('displays-detect-offline', async () => {
+      const threshold = new Date(Date.now() - 2 * 60 * 1000); // 2 minutes ago
+      const staleDevices = await this.db.display.findMany({
+        where: {
+          status: 'online',
+          lastHeartbeat: { lt: threshold },
+        },
+        select: { id: true, nickname: true, deviceIdentifier: true, organizationId: true },
       });
-    }
 
-    this.logger.log(`Marked ${staleDevices.length} device(s) as offline (stale heartbeat)`);
+      if (staleDevices.length === 0) return;
+
+      await this.db.display.updateMany({
+        where: { id: { in: staleDevices.map(d => d.id) } },
+        data: { status: 'offline' },
+      });
+
+      for (const device of staleDevices) {
+        this.eventEmitter.emit('device.offline', {
+          deviceId: device.id,
+          deviceName: device.nickname || device.deviceIdentifier,
+          organizationId: device.organizationId,
+        });
+      }
+
+      this.logger.log(`Marked ${staleDevices.length} device(s) as offline (stale heartbeat)`);
+    });
   }
 
   /**
@@ -350,28 +354,30 @@ export class DisplaysService {
    */
   @Cron(CronExpression.EVERY_HOUR)
   async resetStalePairingDevices(): Promise<void> {
-    const threshold = new Date(Date.now() - 30 * 60 * 1000); // 30 minutes ago
-    const stale = await this.db.display.findMany({
-      where: {
-        status: 'pairing',
-        // Use updatedAt — that's when generatePairingToken touched the row.
-        // lastHeartbeat is the wrong field here because a pairing-state
-        // device by definition has never heartbeated.
-        updatedAt: { lt: threshold },
-      },
-      select: { id: true, nickname: true, deviceIdentifier: true, organizationId: true },
+    await this.cronLeader.runExclusive('displays-hourly', async () => {
+      const threshold = new Date(Date.now() - 30 * 60 * 1000); // 30 minutes ago
+      const stale = await this.db.display.findMany({
+        where: {
+          status: 'pairing',
+          // Use updatedAt — that's when generatePairingToken touched the row.
+          // lastHeartbeat is the wrong field here because a pairing-state
+          // device by definition has never heartbeated.
+          updatedAt: { lt: threshold },
+        },
+        select: { id: true, nickname: true, deviceIdentifier: true, organizationId: true },
+      });
+
+      if (stale.length === 0) return;
+
+      await this.db.display.updateMany({
+        where: { id: { in: stale.map((d) => d.id) } },
+        data: { status: 'offline' },
+      });
+
+      this.logger.log(
+        `Reset ${stale.length} stale 'pairing'-state device(s) to 'offline' (>30min in pairing)`,
+      );
     });
-
-    if (stale.length === 0) return;
-
-    await this.db.display.updateMany({
-      where: { id: { in: stale.map((d) => d.id) } },
-      data: { status: 'offline' },
-    });
-
-    this.logger.log(
-      `Reset ${stale.length} stale 'pairing'-state device(s) to 'offline' (>30min in pairing)`,
-    );
   }
 
   async generatePairingToken(organizationId: string, id: string) {
