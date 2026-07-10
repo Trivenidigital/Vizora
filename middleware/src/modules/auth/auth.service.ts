@@ -1113,7 +1113,7 @@ export class AuthService {
 
     // 7. Send confirmation email (best-effort)
     try {
-      await this.mailService.sendAccountDeletionEmail?.(originalEmail, user.firstName);
+      await this.mailService.sendAccountDeletionEmail(originalEmail, user.firstName);
     } catch (err) {
       this.logger.warn(`Failed to send account deletion email to ${originalEmail}: ${err instanceof Error ? err.message : 'Unknown'}`);
     }

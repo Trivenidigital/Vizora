@@ -205,6 +205,7 @@ export class McpService implements OnModuleInit {
     tool: {
       name: string;
       description: string;
+      scope: string;
       inputSchema: { shape: Record<string, unknown> };
       handler: (
         input: TIn,
@@ -235,6 +236,7 @@ export class McpService implements OnModuleInit {
             agentName: context.agentName,
             organizationId: context.organizationId,
             tool: tool.name,
+            scope: tool.scope,
             paramsRaw: input,
             status: 'success',
             latencyMs: Date.now() - startedAt,
@@ -250,6 +252,7 @@ export class McpService implements OnModuleInit {
             agentName: context.agentName,
             organizationId: context.organizationId,
             tool: tool.name,
+            scope: tool.scope,
             paramsRaw: input,
             status: 'error',
             errorCode: mapped.code,

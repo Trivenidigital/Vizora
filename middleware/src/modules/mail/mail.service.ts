@@ -504,6 +504,30 @@ export class MailService {
   }
 
   /**
+   * Confirmation sent after a user deletes their Vizora account. Contains no
+   * secrets — only the display name + static copy confirming the deletion, plus
+   * a support contact for anyone who didn't initiate it. firstName is
+   * user-controlled, so it's escaped before interpolation. Non-critical: a
+   * failed confirmation must never roll back the deletion that already happened.
+   */
+  async sendAccountDeletionEmail(to: string, firstName: string): Promise<void> {
+    const subject = 'Your Vizora account has been deleted';
+    const html = this.wrapInTemplate(`
+          <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">Your account has been deleted</h1>
+          <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
+            Hi ${MailService.escapeHtml(firstName)},<br><br>
+            This is a confirmation that your Vizora account and its associated data have been deleted.
+            We're sorry to see you go.
+          </p>
+          <p style="color:#5A6B73;font-size:12px;line-height:1.5;margin:16px 0 0 0;">
+            If you did <strong style="color:#F0ECE8;">not</strong> request this, contact support@vizora.cloud
+            immediately — your account may have been compromised.
+          </p>
+    `);
+    await this.sendMail(to, subject, html, 'Account deletion', 'auth');
+  }
+
+  /**
    * Security notification sent after a successful login from a new context.
    * This is intentionally framed as "new login context" rather than a durable
    * trusted-device system: IPs and browser User-Agent strings can legitimately

@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// Pages that don't require authentication
-const publicPaths = ['/login', '/register', '/', '/display', '/backlog'];
+// Pages that don't require authentication.
+// NOTE: /backlog is intentionally NOT public — it renders the same internal
+// roadmap component as the superadmin-only /admin/backlog page (launch gates,
+// budget notes, competitor gaps) and is gated below like an /admin route.
+const publicPaths = ['/login', '/register', '/', '/display'];
 
 function base64UrlDecode(str: string): string {
   // Convert Base64url to standard Base64
@@ -62,17 +65,31 @@ export function middleware(request: NextRequest) {
   const tokenFromHeader = request.headers.get('authorization')?.replace('Bearer ', '');
   const token = tokenFromCookie || tokenFromHeader;
 
-  // Redirect to login if no valid token and trying to access protected route
-  if ((!token || !isValidJwtFormat(token)) && (pathname.startsWith('/dashboard') || pathname.startsWith('/admin'))) {
+  // Redirect to login if no valid token and trying to access protected route.
+  // /backlog is treated as a protected superadmin route (see publicPaths note).
+  if (
+    (!token || !isValidJwtFormat(token)) &&
+    (pathname.startsWith('/dashboard') ||
+      pathname.startsWith('/admin') ||
+      pathname === '/backlog' ||
+      pathname.startsWith('/backlog/'))
+  ) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('redirect', pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Defense-in-depth: block non-superadmin users from accessing /admin routes.
-  // This decodes the JWT payload (without signature verification) to check for
-  // superadmin privileges. Actual auth verification happens at the API level.
-  if (token && (pathname === '/admin' || pathname.startsWith('/admin/'))) {
+  // Defense-in-depth: block non-superadmin users from accessing /admin routes
+  // (and the equivalent internal /backlog roadmap). This decodes the JWT
+  // payload (without signature verification) to check for superadmin
+  // privileges. Actual auth verification happens at the API level.
+  if (
+    token &&
+    (pathname === '/admin' ||
+      pathname.startsWith('/admin/') ||
+      pathname === '/backlog' ||
+      pathname.startsWith('/backlog/'))
+  ) {
     const payload = decodeJwtPayload(token);
     if (!payload || !isSuperAdminFromPayload(payload)) {
       const dashboardUrl = new URL('/dashboard', request.url);
