@@ -43,8 +43,8 @@ describe('AuthController', () => {
       resetPassword: jest.fn(),
       changePassword: jest.fn(),
       deleteAccount: jest.fn(),
-      getAvatarUrl: jest.fn().mockResolvedValue(null),
-      uploadAvatar: jest.fn(),
+      getAvatarStream: jest.fn().mockResolvedValue(null),
+      uploadAvatar: jest.fn().mockResolvedValue(undefined),
       deleteAvatar: jest.fn(),
     };
 
@@ -345,11 +345,38 @@ describe('AuthController', () => {
   });
 
   describe('getMe', () => {
-    it('should return current user data', async () => {
+    it('should return current user data with null avatarUrl when no avatar is set', async () => {
       const result = await controller.getMe(mockUser);
 
       expect(result.success).toBe(true);
       expect(result.data.user).toEqual({ ...mockUser, avatarUrl: null });
+    });
+
+    it('should return the stable proxied avatar URL when an avatar is set', async () => {
+      const result = await controller.getMe({
+        ...mockUser,
+        avatar: 'avatars/user-123.jpg',
+      } as any);
+
+      expect(result.data.user.avatarUrl).toBe('/api/v1/auth/me/avatar');
+    });
+  });
+
+  describe('uploadAvatar', () => {
+    it('should return a cache-busted proxied avatar URL', async () => {
+      const file = {
+        buffer: Buffer.from('img'),
+        mimetype: 'image/png',
+      } as Express.Multer.File;
+
+      const result = await controller.uploadAvatar('user-123', file);
+
+      expect(authService.uploadAvatar).toHaveBeenCalledWith('user-123', {
+        buffer: file.buffer,
+        mimetype: 'image/png',
+      });
+      expect(result.success).toBe(true);
+      expect(result.data.avatarUrl).toMatch(/^\/api\/v1\/auth\/me\/avatar\?v=\d+$/);
     });
   });
 

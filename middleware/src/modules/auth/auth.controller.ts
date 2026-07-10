@@ -1,6 +1,9 @@
-import { Controller, Post, Patch, Body, UseGuards, Get, Delete, Res, Req, HttpCode, HttpStatus, BadRequestException, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Post, Patch, Body, UseGuards, Get, Delete, Res, Req, HttpCode, HttpStatus, BadRequestException, NotFoundException, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Request, Response } from 'express';
+import { pipeline } from 'node:stream/promises';
+import { SkipEnvelope } from '../common/interceptors/response-envelope.interceptor';
+import { SkipOutputSanitize } from '../common/interceptors/sanitize.interceptor';
 import { Throttle } from '@nestjs/throttler';
 import {
   ApiTags,
@@ -39,6 +42,14 @@ const RATE_LIMIT_TTL_MS = 60_000;
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
+
+  /**
+   * Stable, browser-reachable avatar URL. Relative so it flows through the
+   * Next.js `/api/v1` rewrite proxy (same-origin cookies) and is served by the
+   * authenticated middleware proxy (GET /auth/me/avatar) — not a presigned
+   * MinIO URL, which is unreachable from the browser in prod (PR-7b).
+   */
+  private static readonly AVATAR_URL_PATH = '/api/v1/auth/me/avatar';
 
   /**
    * Set auth token as httpOnly cookie.
@@ -290,12 +301,43 @@ export class AuthController {
   @Get('me')
   async getMe(@CurrentUser() user: AuthenticatedUser) {
     const { passwordHash, password, ...safeUser } = user || {} as any;
-    // Resolve avatar storage key to a presigned URL
-    const avatarUrl = await this.authService.getAvatarUrl(safeUser.avatar || null);
+    // A stored avatar key resolves to the authenticated proxy URL; the actual
+    // bytes are streamed by GET /auth/me/avatar (PR-7b).
+    const avatarUrl = safeUser.avatar ? AuthController.AVATAR_URL_PATH : null;
     return {
       success: true,
       data: { user: { ...safeUser, avatarUrl } },
     };
+  }
+
+  @ApiOperation({ summary: 'Stream the authenticated user avatar image' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth()
+  @ApiResponse({ status: 200, description: 'Avatar image stream.' })
+  @ApiResponse({ status: 404, description: 'No avatar set.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @UseGuards(JwtAuthGuard)
+  @Get('me/avatar')
+  @SkipEnvelope()
+  @SkipOutputSanitize()
+  async getAvatar(
+    @CurrentUser('id') userId: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const avatar = await this.authService.getAvatarStream(userId);
+    if (!avatar) {
+      throw new NotFoundException('No avatar set');
+    }
+
+    res.set({
+      'Content-Type': avatar.contentType,
+      ...(avatar.contentLength ? { 'Content-Length': String(avatar.contentLength) } : {}),
+      // Same-origin (via the Next proxy); revalidate so a logged-out→logged-in
+      // switch on a shared browser can't show the previous user's avatar.
+      'Cache-Control': 'private, no-cache',
+    });
+
+    await pipeline(avatar.stream, res);
   }
 
   @ApiOperation({ summary: 'Update profile (name) for authenticated user' })
@@ -334,11 +376,14 @@ export class AuthController {
     if (!file) {
       throw new BadRequestException('No file provided');
     }
-    const result = await this.authService.uploadAvatar(userId, {
+    await this.authService.uploadAvatar(userId, {
       buffer: file.buffer,
       mimetype: file.mimetype,
     });
-    return { success: true, data: result };
+    // Cache-buster so the freshly-uploaded image reloads immediately even
+    // though the proxy URL path is stable.
+    const avatarUrl = `${AuthController.AVATAR_URL_PATH}?v=${Date.now()}`;
+    return { success: true, data: { avatarUrl } };
   }
 
   @ApiOperation({ summary: 'Delete avatar for authenticated user' })
