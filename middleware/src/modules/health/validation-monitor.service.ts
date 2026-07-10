@@ -3,6 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { RedisService } from '../redis/redis.service';
 import { DatabaseService } from '../database/database.service';
+import { CronLeaderService } from '../common/services/cron-leader.service';
 
 /**
  * Tier 2 — Event-Driven Validation Monitor
@@ -56,6 +57,7 @@ export class ValidationMonitorService {
 
   constructor(
     private readonly db: DatabaseService,
+    private readonly cronLeader: CronLeaderService,
     @Optional() private readonly redis?: RedisService,
   ) {}
 
@@ -85,20 +87,22 @@ export class ValidationMonitorService {
 
   @Cron(CronExpression.EVERY_HOUR)
   async handleHourlyValidation() {
-    this.logger.log('Running hourly full validation scan');
-    try {
-      // Get all orgs with active content
-      const orgs = await this.db.organization.findMany({
-        select: { id: true },
-        where: { subscriptionStatus: { not: 'canceled' } },
-        take: 50,
-      });
-      for (const org of orgs) {
-        await this.runValidation(org.id, 'scheduled.hourly');
+    await this.cronLeader.runExclusive('health-validation-monitor', async () => {
+      this.logger.log('Running hourly full validation scan');
+      try {
+        // Get all orgs with active content
+        const orgs = await this.db.organization.findMany({
+          select: { id: true },
+          where: { subscriptionStatus: { not: 'canceled' } },
+          take: 50,
+        });
+        for (const org of orgs) {
+          await this.runValidation(org.id, 'scheduled.hourly');
+        }
+      } catch (err) {
+        this.logger.error(`Hourly validation failed: ${err instanceof Error ? err.message : err}`);
       }
-    } catch (err) {
-      this.logger.error(`Hourly validation failed: ${err instanceof Error ? err.message : err}`);
-    }
+    });
   }
 
   // ─── Debounced Trigger ───────────────────────────────────────────────────

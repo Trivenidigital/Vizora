@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataRetentionService } from './data-retention.service';
 import { DatabaseService } from '../database/database.service';
+import { CronLeaderService } from './services/cron-leader.service';
 
 describe('DataRetentionService', () => {
   let service: DataRetentionService;
@@ -14,6 +15,10 @@ describe('DataRetentionService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DataRetentionService,
+        {
+          provide: CronLeaderService,
+          useValue: { runExclusive: (_n: string, fn: () => Promise<void>) => fn() },
+        },
         {
           provide: DatabaseService,
           useValue: {

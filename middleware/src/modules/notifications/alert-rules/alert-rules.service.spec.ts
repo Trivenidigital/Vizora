@@ -1,6 +1,7 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { AlertRulesService } from './alert-rules.service';
 import { DatabaseService } from '../../database/database.service';
+import { CronLeaderService } from '../../common/services/cron-leader.service';
 import { DEDUP_WINDOW_MS, MIN_OFFLINE_SEC_FLOOR } from './alert-rule.types';
 
 describe('AlertRulesService', () => {
@@ -42,7 +43,10 @@ describe('AlertRulesService', () => {
         findFirst: jest.fn(),
       },
     };
-    service = new AlertRulesService(db as unknown as DatabaseService);
+    service = new AlertRulesService(
+      db as unknown as DatabaseService,
+      { runExclusive: (_n: string, fn: () => Promise<void>) => fn() } as unknown as CronLeaderService,
+    );
   });
 
   afterEach(() => jest.clearAllMocks());

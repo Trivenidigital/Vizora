@@ -10,6 +10,7 @@ import { SubscriptionActiveGuard } from './guards/subscription-active.guard';
 import { DatabaseService } from '../database/database.service';
 import { MailModule } from '../mail/mail.module';
 import { RedisModule } from '../redis/redis.module';
+import { CommonModule } from '../common/common.module';
 import { DisplayGroupsModule } from '../display-groups/display-groups.module';
 import { DisplayGroupsController } from '../display-groups/display-groups.controller';
 import { FoldersModule } from '../folders/folders.module';
@@ -114,7 +115,7 @@ describe('dashboard subscription write gates', () => {
       };
 
       const moduleRef = await Test.createTestingModule({
-        imports: [MailModule, RedisModule, moduleType],
+        imports: [CommonModule, MailModule, RedisModule, moduleType],
       })
         .overrideProvider(DatabaseService)
         .useValue(databaseService)

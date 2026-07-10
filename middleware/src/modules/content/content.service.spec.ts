@@ -9,6 +9,7 @@ jest.mock('isomorphic-dompurify', () => ({
 import { NotFoundException, BadRequestException, BadGatewayException } from '@nestjs/common';
 import { ContentService, TemplateMetadata } from './content.service';
 import { DatabaseService } from '../database/database.service';
+import { CronLeaderService } from '../common/services/cron-leader.service';
 import { TemplateRenderingService } from './template-rendering.service';
 import { DataSourceRegistryService } from './data-source-registry.service';
 import { StorageQuotaService } from '../storage/storage-quota.service';
@@ -142,6 +143,7 @@ describe('ContentService', () => {
       mockStorageService,
       mockEventEmitter as any,
       mockNotificationsService as any,
+      { runExclusive: (_n: string, fn: () => Promise<void>) => fn() } as unknown as CronLeaderService,
     );
   });
 

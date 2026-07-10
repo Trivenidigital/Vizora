@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { DatabaseService } from '../database/database.service';
+import { CronLeaderService } from '../common/services/cron-leader.service';
 import type {
   DeviceMetricDataPoint,
   ContentPerformanceItem,
@@ -19,7 +20,10 @@ import type {
 export class AnalyticsService {
   private readonly logger = new Logger(AnalyticsService.name);
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly cronLeader: CronLeaderService,
+  ) {}
 
   private getRangeDays(range: string): number {
     switch (range) {
@@ -509,35 +513,37 @@ export class AnalyticsService {
    */
   @Cron('0 2 * * *')
   async cleanupOldImpressions() {
-    const ninetyDaysAgo = new Date();
-    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    await this.cronLeader.runExclusive('analytics-daily', async () => {
+      const ninetyDaysAgo = new Date();
+      ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
-    try {
-      const batchSize = 10000;
-      let totalDeleted = 0;
-      let batchDeleted: number;
+      try {
+        const batchSize = 10000;
+        let totalDeleted = 0;
+        let batchDeleted: number;
 
-      do {
-        // Find IDs to delete in batches to avoid long-running transactions
-        const batch = await this.db.contentImpression.findMany({
-          where: { timestamp: { lt: ninetyDaysAgo } },
-          select: { id: true },
-          take: batchSize,
-        });
+        do {
+          // Find IDs to delete in batches to avoid long-running transactions
+          const batch = await this.db.contentImpression.findMany({
+            where: { timestamp: { lt: ninetyDaysAgo } },
+            select: { id: true },
+            take: batchSize,
+          });
 
-        if (batch.length === 0) break;
+          if (batch.length === 0) break;
 
-        const result = await this.db.contentImpression.deleteMany({
-          where: { id: { in: batch.map(b => b.id) } },
-        });
-        batchDeleted = result.count;
-        totalDeleted += batchDeleted;
-      } while (batchDeleted === batchSize);
+          const result = await this.db.contentImpression.deleteMany({
+            where: { id: { in: batch.map(b => b.id) } },
+          });
+          batchDeleted = result.count;
+          totalDeleted += batchDeleted;
+        } while (batchDeleted === batchSize);
 
-      this.logger.log(`Cleaned up ${totalDeleted} old impressions`);
-    } catch (error) {
-      this.logger.error('Failed to cleanup old impressions:', error);
-    }
+        this.logger.log(`Cleaned up ${totalDeleted} old impressions`);
+      } catch (error) {
+        this.logger.error('Failed to cleanup old impressions:', error);
+      }
+    });
   }
 
   /**

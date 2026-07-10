@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { DisplaysService } from './displays.service';
 import { DatabaseService } from '../database/database.service';
 import { CircuitBreakerService, CircuitState } from '../common/services/circuit-breaker.service';
+import { CronLeaderService } from '../common/services/cron-leader.service';
 import { StorageService } from '../storage/storage.service';
 import {
   NotFoundException,
@@ -150,6 +151,10 @@ describe('DisplaysService', () => {
         {
           provide: EventEmitter2,
           useValue: { emit: jest.fn() },
+        },
+        {
+          provide: CronLeaderService,
+          useValue: { runExclusive: (_n: string, fn: () => Promise<void>) => fn() },
         },
       ],
     }).compile();
@@ -1148,6 +1153,7 @@ describe('DisplaysService', () => {
           resolveUrl: jest.fn().mockImplementation((url) => url),
         } as any,
         { emit: jest.fn() } as any,
+        { runExclusive: (_n: string, fn: () => Promise<void>) => fn() } as unknown as CronLeaderService,
       );
 
       httpService.post.mockReturnValue(

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@vizora/database';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DatabaseService } from '../database/database.service';
+import { CronLeaderService } from '../common/services/cron-leader.service';
 import { TemplateRenderingService } from './template-rendering.service';
 import { TemplateMetadata } from './content.service';
 
@@ -15,6 +16,7 @@ export class TemplateRefreshService {
   constructor(
     private readonly db: DatabaseService,
     private readonly templateRendering: TemplateRenderingService,
+    private readonly cronLeader: CronLeaderService,
   ) {}
 
   /**
@@ -22,56 +24,59 @@ export class TemplateRefreshService {
    */
   @Cron(CronExpression.EVERY_MINUTE)
   async processTemplateRefresh(): Promise<{ processed: number; errors: number }> {
-    const now = new Date();
     let processed = 0;
     let errors = 0;
 
-    try {
-      // Find all template content with refresh enabled
-      const templates = await this.db.content.findMany({
-        where: {
-          type: 'template',
-          status: 'active',
-        },
-      });
+    await this.cronLeader.runExclusive('content-template-refresh', async () => {
+      const now = new Date();
 
-      for (const template of templates) {
-        const metadata = template.metadata as TemplateMetadata | null;
+      try {
+        // Find all template content with refresh enabled
+        const templates = await this.db.content.findMany({
+          where: {
+            type: 'template',
+            status: 'active',
+          },
+        });
 
-        if (!metadata || !metadata.refreshConfig?.enabled) {
-          continue;
-        }
+        for (const template of templates) {
+          const metadata = template.metadata as TemplateMetadata | null;
 
-        // Check if refresh is due
-        const lastRefresh = metadata.refreshConfig.lastRefresh
-          ? new Date(metadata.refreshConfig.lastRefresh)
-          : null;
+          if (!metadata || !metadata.refreshConfig?.enabled) {
+            continue;
+          }
 
-        const intervalMs = metadata.refreshConfig.intervalMinutes * 60 * 1000;
-        const nextRefresh = lastRefresh
-          ? new Date(lastRefresh.getTime() + intervalMs)
-          : new Date(0); // If never refreshed, refresh now
+          // Check if refresh is due
+          const lastRefresh = metadata.refreshConfig.lastRefresh
+            ? new Date(metadata.refreshConfig.lastRefresh)
+            : null;
 
-        if (now >= nextRefresh) {
-          try {
-            await this.refreshTemplate(template.id, template);
-            processed++;
-            this.logger.debug(`Refreshed template: ${template.name} (${template.id})`);
-          } catch (error) {
-            errors++;
-            const message = error instanceof Error ? error.message : 'Unknown error';
-            this.logger.error(`Failed to refresh template ${template.id}: ${message}`);
+          const intervalMs = metadata.refreshConfig.intervalMinutes * 60 * 1000;
+          const nextRefresh = lastRefresh
+            ? new Date(lastRefresh.getTime() + intervalMs)
+            : new Date(0); // If never refreshed, refresh now
+
+          if (now >= nextRefresh) {
+            try {
+              await this.refreshTemplate(template.id, template);
+              processed++;
+              this.logger.debug(`Refreshed template: ${template.name} (${template.id})`);
+            } catch (error) {
+              errors++;
+              const message = error instanceof Error ? error.message : 'Unknown error';
+              this.logger.error(`Failed to refresh template ${template.id}: ${message}`);
+            }
           }
         }
-      }
 
-      if (processed > 0 || errors > 0) {
-        this.logger.log(`Template refresh completed: ${processed} processed, ${errors} errors`);
+        if (processed > 0 || errors > 0) {
+          this.logger.log(`Template refresh completed: ${processed} processed, ${errors} errors`);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.error(`Template refresh job failed: ${message}`);
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(`Template refresh job failed: ${message}`);
-    }
+    });
 
     return { processed, errors };
   }

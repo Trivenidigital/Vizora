@@ -4,6 +4,7 @@ import { DatabaseService } from '../database/database.service';
 import { MailService } from '../mail/mail.service';
 import { PLAN_TIERS } from './constants/plans';
 import { EntitlementService } from './entitlement.service';
+import { CronLeaderService } from '../common/services/cron-leader.service';
 
 @Injectable()
 export class BillingLifecycleService {
@@ -13,6 +14,7 @@ export class BillingLifecycleService {
     private readonly db: DatabaseService,
     private readonly mailService: MailService,
     private readonly entitlementService: EntitlementService,
+    private readonly cronLeader: CronLeaderService,
   ) {}
 
   /**
@@ -38,16 +40,21 @@ export class BillingLifecycleService {
    */
   @Cron('0 8 * * *')
   async handleTrialLifecycle(): Promise<void> {
-    this.logger.log('Running trial lifecycle check...');
+    // Cluster-safe: without this, both PM2 instances run it and every trial
+    // reminder / expiry email goes out twice (expireTrials + sendTrialReminders
+    // have no dedup of their own — unlike the B3 ladder).
+    await this.cronLeader.runExclusive('billing-trial-lifecycle', async () => {
+      this.logger.log('Running trial lifecycle check...');
 
-    await Promise.allSettled([
-      this.expireTrials(),
-      this.sendTrialReminders(10),
-      this.sendTrialReminders(5),
-      this.sendTrialReminders(2),
-    ]);
+      await Promise.allSettled([
+        this.expireTrials(),
+        this.sendTrialReminders(10),
+        this.sendTrialReminders(5),
+        this.sendTrialReminders(2),
+      ]);
 
-    this.logger.log('Trial lifecycle check complete');
+      this.logger.log('Trial lifecycle check complete');
+    });
   }
 
   /**
@@ -167,14 +174,20 @@ export class BillingLifecycleService {
     // (past_due → publish_locked → suspended → canceled) keyed on
     // entitlementStateSince in UTC days — NOT the old updatedAt cutoff (B8), and
     // NOT a binary suspend-at-7-days. The ladder writes its own run heartbeat.
-    try {
-      const { advanced } = await this.entitlementService.advanceLadder();
-      this.logger.log(`Entitlement ladder run complete (${advanced} advanced)`);
-    } catch (error) {
-      // A dead ladder job must be observable — surface as error-level so alerting
-      // fires, and let the next run retry (the ladder is idempotent).
-      this.logger.error(`Entitlement ladder run FAILED: ${error}`);
-    }
+    //
+    // Cluster-safe leader lock. advanceLadder is already idempotent (status-guarded
+    // CAS + SET NX dunning claim), so this is belt-and-suspenders for the ladder —
+    // but it keeps the run (and its logs/heartbeat) to a single instance.
+    await this.cronLeader.runExclusive('billing-grace-period-expiry', async () => {
+      try {
+        const { advanced } = await this.entitlementService.advanceLadder();
+        this.logger.log(`Entitlement ladder run complete (${advanced} advanced)`);
+      } catch (error) {
+        // A dead ladder job must be observable — surface as error-level so alerting
+        // fires, and let the next run retry (the ladder is idempotent).
+        this.logger.error(`Entitlement ladder run FAILED: ${error}`);
+      }
+    });
   }
 
   /**
@@ -184,11 +197,16 @@ export class BillingLifecycleService {
    */
   @Cron(CronExpression.EVERY_HOUR)
   async checkLadderFreshness(): Promise<void> {
-    if (await this.entitlementService.isLadderStale()) {
-      this.logger.error(
-        'ENTITLEMENT LADDER STALE: the daily rung-advancement job has not run within its ' +
-          'staleness window. Rungs are not advancing — investigate the billing cron.',
-      );
-    }
+    // Leader-guarded so a stale ladder logs ONCE per hour, not once per instance
+    // (the double STALE line — one per PID — was the tell that crons fan out
+    // across the cluster).
+    await this.cronLeader.runExclusive('billing-ladder-freshness-watchdog', async () => {
+      if (await this.entitlementService.isLadderStale()) {
+        this.logger.error(
+          'ENTITLEMENT LADDER STALE: the daily rung-advancement job has not run within its ' +
+            'staleness window. Rungs are not advancing — investigate the billing cron.',
+        );
+      }
+    });
   }
 }

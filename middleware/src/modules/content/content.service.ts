@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, Logger, ServiceUnav
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
+import { CronLeaderService } from '../common/services/cron-leader.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateContentDto } from './dto/create-content.dto';
 import { UpdateContentDto } from './dto/update-content.dto';
@@ -83,6 +84,7 @@ export class ContentService {
     private readonly storageService: StorageService,
     private readonly eventEmitter: EventEmitter2,
     private readonly notificationsService: NotificationsService,
+    private readonly cronLeader: CronLeaderService,
   ) {}
 
   // Map database content to API response format
@@ -625,108 +627,117 @@ export class ContentService {
 
   @Cron(CronExpression.EVERY_HOUR)
   async checkExpiredContent() {
-    const now = new Date();
+    let result: { processed: number; playlistsRefreshed: number } = {
+      processed: 0,
+      playlistsRefreshed: 0,
+    };
 
-    // Find all expired content that is still active
-    const expiredContent = await this.db.content.findMany({
-      where: {
-        expiresAt: { lte: now },
-        status: 'active',
-      },
-    });
+    await this.cronLeader.runExclusive('content-expiration', async () => {
+      const now = new Date();
 
-    // Collect (playlistId, organizationId) pairs that need a device-fleet
-    // push after the transaction commits — without this, device clients
-    // continue serving the expired content (or the now-deleted playlist
-    // slot) until they reconnect, sometimes hours later.
-    const affectedPlaylists: Array<{ playlistId: string; organizationId: string }> = [];
+      // Find all expired content that is still active
+      const expiredContent = await this.db.content.findMany({
+        where: {
+          expiresAt: { lte: now },
+          status: 'active',
+        },
+      });
 
-    for (const content of expiredContent) {
-      await this.db.$transaction(async (tx) => {
-        // Snapshot playlistIds BEFORE the updateMany / deleteMany — we
-        // can't read them after the contentId rewrite or row deletion.
-        const items = await tx.playlistItem.findMany({
-          where: { contentId: content.id },
-          select: { playlistId: true },
-        });
-        const distinctPlaylistIds = Array.from(new Set(items.map((i) => i.playlistId)));
+      // Collect (playlistId, organizationId) pairs that need a device-fleet
+      // push after the transaction commits — without this, device clients
+      // continue serving the expired content (or the now-deleted playlist
+      // slot) until they reconnect, sometimes hours later.
+      const affectedPlaylists: Array<{ playlistId: string; organizationId: string }> = [];
 
-        if (content.replacementContentId) {
-          // Validate the replacement is (a) same-organization AND (b) itself
-          // still servable — status 'active' and not itself expired. Without the
-          // status/expiry guard, an expired or archived replacement would be
-          // repointed onto devices, defeating the expiration entirely (a
-          // replacement chain could push already-dead content). A non-servable
-          // replacement falls through to the delete-items branch, exactly as if
-          // no replacement had been configured.
-          const replacement = await tx.content.findFirst({
-            where: {
-              id: content.replacementContentId,
-              organizationId: content.organizationId,
-              status: 'active',
-              OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
-            },
+      for (const content of expiredContent) {
+        await this.db.$transaction(async (tx) => {
+          // Snapshot playlistIds BEFORE the updateMany / deleteMany — we
+          // can't read them after the contentId rewrite or row deletion.
+          const items = await tx.playlistItem.findMany({
+            where: { contentId: content.id },
+            select: { playlistId: true },
           });
+          const distinctPlaylistIds = Array.from(new Set(items.map((i) => i.playlistId)));
 
-          if (replacement) {
-            await tx.playlistItem.updateMany({
-              where: { contentId: content.id },
-              data: { contentId: content.replacementContentId },
+          if (content.replacementContentId) {
+            // Validate the replacement is (a) same-organization AND (b) itself
+            // still servable — status 'active' and not itself expired. Without the
+            // status/expiry guard, an expired or archived replacement would be
+            // repointed onto devices, defeating the expiration entirely (a
+            // replacement chain could push already-dead content). A non-servable
+            // replacement falls through to the delete-items branch, exactly as if
+            // no replacement had been configured.
+            const replacement = await tx.content.findFirst({
+              where: {
+                id: content.replacementContentId,
+                organizationId: content.organizationId,
+                status: 'active',
+                OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+              },
             });
+
+            if (replacement) {
+              await tx.playlistItem.updateMany({
+                where: { contentId: content.id },
+                data: { contentId: content.replacementContentId },
+              });
+            } else {
+              // Cross-org, missing, or not-itself-active replacement -- remove
+              // playlist items rather than serve stale content.
+              this.logger.warn(
+                `Expired content ${content.id} has unusable replacementContentId ${content.replacementContentId} (org mismatch, not found, or itself expired/archived). Removing playlist items.`,
+              );
+              await tx.playlistItem.deleteMany({
+                where: { contentId: content.id },
+              });
+            }
           } else {
-            // Cross-org, missing, or not-itself-active replacement -- remove
-            // playlist items rather than serve stale content.
-            this.logger.warn(
-              `Expired content ${content.id} has unusable replacementContentId ${content.replacementContentId} (org mismatch, not found, or itself expired/archived). Removing playlist items.`,
-            );
             await tx.playlistItem.deleteMany({
               where: { contentId: content.id },
             });
           }
-        } else {
-          await tx.playlistItem.deleteMany({
-            where: { contentId: content.id },
-          });
-        }
 
-        await tx.content.update({
-          where: { id: content.id },
-          data: { status: 'expired' },
+          await tx.content.update({
+            where: { id: content.id },
+            data: { status: 'expired' },
+          });
+
+          for (const playlistId of distinctPlaylistIds) {
+            affectedPlaylists.push({
+              playlistId,
+              organizationId: content.organizationId,
+            });
+          }
         });
+      }
 
-        for (const playlistId of distinctPlaylistIds) {
-          affectedPlaylists.push({
-            playlistId,
-            organizationId: content.organizationId,
-          });
-        }
-      });
-    }
+      // Notify device fleet AFTER the transactions commit so the realtime
+      // gateway pushes the up-to-date playlist (with replacement content
+      // swapped in OR with the expired slot removed). De-dup by playlistId
+      // — a single playlist with N expired items only needs one push.
+      const distinctAffected = new Map<string, string>();
+      for (const a of affectedPlaylists) {
+        distinctAffected.set(a.playlistId, a.organizationId);
+      }
+      for (const [playlistId, organizationId] of distinctAffected) {
+        // playlist.updated is already listened-to by PlaylistsService's
+        // notifyDisplaysOfPlaylistUpdate plumbing (via the @OnEvent
+        // handler that triggers off this event), so the device push
+        // pipeline is reused exactly. action='expired_content_replaced'
+        // tags the event so downstream consumers (audit log, ops
+        // dashboards) can distinguish a system-driven push from an
+        // operator-driven edit.
+        this.eventEmitter.emit('playlist.updated', {
+          entityId: playlistId,
+          organizationId,
+          action: 'expired_content_replaced',
+        });
+      }
 
-    // Notify device fleet AFTER the transactions commit so the realtime
-    // gateway pushes the up-to-date playlist (with replacement content
-    // swapped in OR with the expired slot removed). De-dup by playlistId
-    // — a single playlist with N expired items only needs one push.
-    const distinctAffected = new Map<string, string>();
-    for (const a of affectedPlaylists) {
-      distinctAffected.set(a.playlistId, a.organizationId);
-    }
-    for (const [playlistId, organizationId] of distinctAffected) {
-      // playlist.updated is already listened-to by PlaylistsService's
-      // notifyDisplaysOfPlaylistUpdate plumbing (via the @OnEvent
-      // handler that triggers off this event), so the device push
-      // pipeline is reused exactly. action='expired_content_replaced'
-      // tags the event so downstream consumers (audit log, ops
-      // dashboards) can distinguish a system-driven push from an
-      // operator-driven edit.
-      this.eventEmitter.emit('playlist.updated', {
-        entityId: playlistId,
-        organizationId,
-        action: 'expired_content_replaced',
-      });
-    }
+      result = { processed: expiredContent.length, playlistsRefreshed: distinctAffected.size };
+    });
 
-    return { processed: expiredContent.length, playlistsRefreshed: distinctAffected.size };
+    return result;
   }
 
 
