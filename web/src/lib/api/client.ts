@@ -267,6 +267,13 @@ export class ApiClient {
         throw await buildApiError(response, 'Request failed');
       }
 
+      // 204 No Content (e.g. DELETE endpoints with @HttpCode(204)) and 205
+      // carry no body — calling response.json() would throw on the empty
+      // stream. Return undefined for these successful-but-bodyless responses.
+      if (response.status === 204 || response.status === 205) {
+        return undefined as T;
+      }
+
       const data = await response.json();
       if (process.env.NODE_ENV === 'development') {
         devLog('[API] Response received');

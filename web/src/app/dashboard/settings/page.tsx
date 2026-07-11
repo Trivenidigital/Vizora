@@ -759,6 +759,23 @@ export default function SettingsPage() {
  </div>
  </div>
 
+ {/* Alerts */}
+ <div className="eh-dash-card bg-[var(--surface)] rounded-lg shadow-md p-6">
+ <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)] mb-4">Alerts</h3>
+ <div className="space-y-3">
+ <Link
+ href="/dashboard/settings/alerts"
+ className="w-full px-4 py-3 text-sm bg-[var(--background)] text-[var(--foreground-secondary)] rounded-lg hover:bg-[var(--surface-hover)] transition font-medium text-left flex items-center gap-2"
+ >
+ <Icon name="bell" size="md" className="text-[var(--foreground-secondary)]" />
+ Alert Rules
+ <span className="ml-auto text-[var(--foreground-tertiary)]">
+ <Icon name="chevronRight" size="md" />
+ </span>
+ </Link>
+ </div>
+ </div>
+
  {/* Billing Settings */}
  <div className="eh-dash-card bg-[var(--surface)] rounded-lg shadow-md p-6">
  <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)] mb-4">Billing</h3>

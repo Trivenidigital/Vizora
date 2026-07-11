@@ -163,6 +163,36 @@ export interface AppNotification {
   createdAt: string;
 }
 
+// ─── Alert Rules (O7 — configurable downtime alert rules) ───────────────────
+
+export type AlertChannel = 'in_app' | 'email' | 'slack_webhook';
+export type AlertScope = 'all' | 'tag' | 'group' | 'display';
+export type AlertTriggerEvent = 'device.offline';
+
+export interface AlertRuleRecipient {
+  id: string;
+  alertRuleId: string;
+  channel: AlertChannel;
+  target: string;
+  createdAt: string;
+}
+
+export interface AlertRule {
+  id: string;
+  organizationId: string;
+  name: string;
+  triggerEvent: AlertTriggerEvent | string;
+  isActive: boolean;
+  scope: AlertScope;
+  scopeTagId: string | null;
+  scopeGroupId: string | null;
+  scopeDisplayId: string | null;
+  minOfflineSec: number;
+  recipients: AlertRuleRecipient[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ScreenshotResponse {
   url: string;
   capturedAt: string;
