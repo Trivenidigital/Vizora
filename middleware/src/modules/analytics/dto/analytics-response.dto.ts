@@ -1,10 +1,16 @@
 export interface DeviceMetricDataPoint {
   date: string;
-  mobile: number;
-  tablet: number;
-  desktop: number;
+  /**
+   * Availability %, measured from the durable `device_health_samples`
+   * time-series (ClickHouse) as the share of 5-min windows that day with ≥1
+   * heartbeat. This is NOT a per-form-factor uptime — Vizora has no
+   * per-form-factor (mobile/tablet/desktop) telemetry, so no such split is
+   * reported. A single measured availability series only; when there is no
+   * telemetry the endpoint returns an empty array, never a fabricated line.
+   */
+  availabilityEstimate: number;
   isEstimated?: boolean;
-  metricSource?: 'display_inventory_estimate';
+  metricSource?: 'clickhouse_health_samples';
   unit?: 'percent';
 }
 
@@ -40,12 +46,18 @@ export interface DeviceDistributionItem {
 
 export interface BandwidthDataPoint {
   time: string;
-  current: number;
-  average: number;
-  peak: number;
+  /**
+   * Cumulative stored-content footprint in MB as of this date, summed from
+   * REAL per-content `fileSize` values. This is a storage footprint, NOT a
+   * measured network-transfer/bandwidth number (Vizora does not meter
+   * per-device transfer). Content deleted before "now" is not represented,
+   * so early-window points are a lower-bound reconstruction — hence
+   * `isEstimated`.
+   */
+  storageMb: number;
   isEstimated?: boolean;
-  metricSource?: 'content_size_device_count_estimate';
-  unit?: 'MB/day';
+  metricSource?: 'content_file_size_sum';
+  unit?: 'MB';
 }
 
 export interface PlaylistPerformanceItem {

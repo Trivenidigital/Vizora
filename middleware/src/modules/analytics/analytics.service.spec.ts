@@ -12,6 +12,7 @@ describe('AnalyticsService', () => {
       // Default: ClickHouse has no history → uptime reads are "insufficient data".
       getDeviceUptimeAggregate: jest.fn().mockResolvedValue(null),
       getOrgUptimeAggregates: jest.fn().mockResolvedValue(null),
+      getOrgDailyAvailability: jest.fn().mockResolvedValue(null),
       getLatestSampleTime: jest.fn().mockResolvedValue({ available: false, lastSample: null }),
       isHealthy: jest.fn().mockResolvedValue(false),
       ensureSchema: jest.fn().mockResolvedValue(undefined),
@@ -52,40 +53,56 @@ describe('AnalyticsService', () => {
     expect(service).toBeDefined();
   });
 
-  describe('getDeviceMetrics', () => {
-    it('should return empty array when no devices', async () => {
-      const result = await service.getDeviceMetrics('org-123', 'month');
+  describe('getDeviceMetrics (ClickHouse-measured availability)', () => {
+    // 'YYYY-MM-DD' UTC key `offset` days before now — matches ClickHouse
+    // toDate(event_time, 'UTC') day grouping.
+    const utcDayKey = (offset: number) => {
+      const d = new Date();
+      d.setUTCDate(d.getUTCDate() - offset);
+      return d.toISOString().slice(0, 10);
+    };
+
+    it('returns per-day availability measured from ClickHouse health samples', async () => {
+      // Two full past days inside a 7-day window: 288 up-buckets ⇒ 100%,
+      // 144 ⇒ 50%. The other five days have no samples ⇒ measured 0%.
+      mockClickhouse.getOrgDailyAvailability.mockResolvedValue([
+        { day: utcDayKey(2), upBuckets: 288 },
+        { day: utcDayKey(4), upBuckets: 144 },
+      ]);
+
+      const result = await service.getDeviceMetrics('org-123', 'week');
+
+      expect(result.length).toBe(7);
+      const values = result.map((p: any) => p.availabilityEstimate);
+      expect(values).toContain(100);
+      expect(values).toContain(50);
+      expect(values.filter((v: number) => v === 0).length).toBe(5);
+      expect(result[0]).toEqual(expect.objectContaining({
+        isEstimated: true,
+        metricSource: 'clickhouse_health_samples',
+        unit: 'percent',
+      }));
+      // No fabricated per-form-factor split is reported.
+      expect(result[0]).not.toHaveProperty('mobile');
+      expect(result[0]).not.toHaveProperty('tablet');
+      expect(result[0]).not.toHaveProperty('desktop');
+    });
+
+    it('returns honest-empty [] when ClickHouse is unavailable (never a fabricated line)', async () => {
+      mockClickhouse.getOrgDailyAvailability.mockResolvedValue(null);
+      const result = await service.getDeviceMetrics('org-123', 'week');
       expect(result).toEqual([]);
     });
 
-    it('should return data points when devices exist', async () => {
-      mockDb.display.findMany.mockResolvedValue([
-        { id: '1', status: 'online', lastHeartbeat: new Date(), createdAt: new Date('2025-01-01') },
-      ]);
-
+    it('returns honest-empty [] when the org has no samples in the window', async () => {
+      mockClickhouse.getOrgDailyAvailability.mockResolvedValue([]);
       const result = await service.getDeviceMetrics('org-123', 'week');
-      expect(result.length).toBeGreaterThan(0);
-      expect(result[0]).toHaveProperty('date');
-      expect(result[0]).toHaveProperty('mobile');
+      expect(result).toEqual([]);
     });
 
-    it('marks inventory-derived device metrics as estimated availability', async () => {
-      mockDb.display.findMany.mockResolvedValue([
-        { id: '1', status: 'online', lastHeartbeat: new Date(), createdAt: new Date('2025-01-01') },
-      ]);
-
-      const result = await service.getDeviceMetrics('org-123', 'week');
-
-      expect(result[0]).toEqual(expect.objectContaining({
-        isEstimated: true,
-        metricSource: 'display_inventory_estimate',
-        unit: 'percent',
-      }));
-    });
-
-    it('should respect range parameter', async () => {
-      mockDb.display.findMany.mockResolvedValue([
-        { id: '1', status: 'online', lastHeartbeat: new Date(), createdAt: new Date('2025-01-01') },
+    it('respects the range window length when telemetry exists', async () => {
+      mockClickhouse.getOrgDailyAvailability.mockResolvedValue([
+        { day: utcDayKey(1), upBuckets: 288 },
       ]);
 
       const weekResult = await service.getDeviceMetrics('org-123', 'week');
@@ -225,39 +242,43 @@ describe('AnalyticsService', () => {
     });
   });
 
-  describe('getBandwidthUsage', () => {
-    it('should return bandwidth data points', async () => {
-      mockDb.content.aggregate.mockResolvedValue({ _sum: { fileSize: 1048576 }, _count: { id: 1 } });
-      mockDb.display.count.mockResolvedValue(5);
+  describe('getBandwidthUsage (storage footprint)', () => {
+    it('should return storage-footprint data points from real content sizes', async () => {
+      mockDb.content.findMany.mockResolvedValue([
+        { fileSize: 1048576, createdAt: new Date('2025-01-01') },
+      ]);
 
       const result = await service.getBandwidthUsage('org-123', 'week');
       expect(result.length).toBe(7);
       expect(result[0]).toHaveProperty('time');
-      expect(result[0]).toHaveProperty('current');
-      expect(result[0]).toHaveProperty('average');
-      expect(result[0]).toHaveProperty('peak');
+      expect(result[0]).toHaveProperty('storageMb');
+      // 1 MB of content created before the window ⇒ cumulative 1 MB each day.
+      expect(result[0].storageMb).toBe(1);
+      // The fabricated bandwidth fields are gone.
+      expect(result[0]).not.toHaveProperty('current');
+      expect(result[0]).not.toHaveProperty('average');
+      expect(result[0]).not.toHaveProperty('peak');
     });
 
-    it('marks bandwidth as estimated daily transfer volume', async () => {
-      mockDb.content.aggregate.mockResolvedValue({ _sum: { fileSize: 1048576 }, _count: { id: 1 } });
-      mockDb.display.count.mockResolvedValue(5);
+    it('marks the footprint as an estimated storage metric derived from file sizes', async () => {
+      mockDb.content.findMany.mockResolvedValue([
+        { fileSize: 1048576, createdAt: new Date('2025-01-01') },
+      ]);
 
       const result = await service.getBandwidthUsage('org-123', 'week');
 
       expect(result[0]).toEqual(expect.objectContaining({
         isEstimated: true,
-        metricSource: 'content_size_device_count_estimate',
-        unit: 'MB/day',
+        metricSource: 'content_file_size_sum',
+        unit: 'MB',
       }));
     });
 
-    it('should return zero bandwidth when no devices', async () => {
-      mockDb.content.aggregate.mockResolvedValue({ _sum: { fileSize: 1048576 }, _count: { id: 1 } });
-      mockDb.display.count.mockResolvedValue(0);
+    it('should return empty array when no content exists', async () => {
+      mockDb.content.findMany.mockResolvedValue([]);
 
       const result = await service.getBandwidthUsage('org-123', 'week');
-      expect(result.length).toBe(7);
-      expect(result[0].average).toBe(0);
+      expect(result).toEqual([]);
     });
   });
 
@@ -396,8 +417,9 @@ describe('AnalyticsService', () => {
 
   describe('deterministic output', () => {
     it('getDeviceMetrics should return same values on repeated calls', async () => {
-      mockDb.display.findMany.mockResolvedValue([
-        { id: '1', status: 'online', lastHeartbeat: new Date(), createdAt: new Date('2025-01-01') },
+      const dayKey = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      mockClickhouse.getOrgDailyAvailability.mockResolvedValue([
+        { day: dayKey, upBuckets: 288 },
       ]);
 
       const result1 = await service.getDeviceMetrics('org-123', 'week');
@@ -420,8 +442,9 @@ describe('AnalyticsService', () => {
     });
 
     it('getBandwidthUsage should return same values on repeated calls', async () => {
-      mockDb.content.aggregate.mockResolvedValue({ _sum: { fileSize: 1048576 }, _count: { id: 1 } });
-      mockDb.display.count.mockResolvedValue(5);
+      mockDb.content.findMany.mockResolvedValue([
+        { fileSize: 1048576, createdAt: new Date('2025-01-01') },
+      ]);
 
       const result1 = await service.getBandwidthUsage('org-123', 'week');
       const result2 = await service.getBandwidthUsage('org-123', 'week');
@@ -443,13 +466,17 @@ describe('AnalyticsService', () => {
       expect(todayEntry?.image).toBe(0);
     });
 
-    it('getBandwidthUsage current should equal average', async () => {
-      mockDb.content.aggregate.mockResolvedValue({ _sum: { fileSize: 1048576 }, _count: { id: 1 } });
-      mockDb.display.count.mockResolvedValue(5);
+    it('getBandwidthUsage footprint is non-decreasing (cumulative) across the window', async () => {
+      mockDb.content.findMany.mockResolvedValue([
+        { fileSize: 1048576, createdAt: new Date('2025-01-01') },
+        { fileSize: 2097152, createdAt: new Date() },
+      ]);
 
       const result = await service.getBandwidthUsage('org-123', 'week');
-      // Current should now equal average (no random jitter)
-      expect(result[0].current).toBe(result[0].average);
+      // Cumulative footprint never decreases day-over-day.
+      for (let i = 1; i < result.length; i++) {
+        expect(result[i].storageMb).toBeGreaterThanOrEqual(result[i - 1].storageMb);
+      }
     });
   });
 
@@ -665,12 +692,15 @@ describe('AnalyticsService', () => {
       expect(result).toHaveProperty('bandwidthUsage');
       expect(result).toHaveProperty('playlistPerformance');
       expect(result.summary.uptimePercentSource).toBe('current_online_ratio');
-      expect(result.bandwidthUsage[0]?.metricSource).toBe('content_size_device_count_estimate');
+      // With no content, the storage-footprint series is empty (no fabricated points).
+      expect(result.bandwidthUsage).toEqual([]);
     });
 
     it('should respect range parameter', async () => {
-      mockDb.display.findMany.mockResolvedValue([
-        { id: '1', status: 'online', lastHeartbeat: new Date(), createdAt: new Date('2025-01-01') },
+      // Device-metrics length now comes from ClickHouse-measured availability;
+      // one row with samples ⇒ the full window is emitted (7 vs 30 days).
+      mockClickhouse.getOrgDailyAvailability.mockResolvedValue([
+        { day: new Date().toISOString().slice(0, 10), upBuckets: 288 },
       ]);
       mockDb.display.count.mockResolvedValue(1);
       mockDb.content.findMany.mockResolvedValue([]);

@@ -361,11 +361,10 @@ export interface AnalyticsSummary {
 
 export interface DeviceMetric {
   date: string;
-  mobile: number;
-  tablet: number;
-  desktop: number;
+  /** Availability %, measured from device health check-ins (ClickHouse); NOT a per-form-factor uptime. */
+  availabilityEstimate: number;
   isEstimated?: boolean;
-  metricSource?: 'display_inventory_estimate';
+  metricSource?: 'clickhouse_health_samples';
   unit?: 'percent';
 }
 
@@ -401,12 +400,11 @@ export interface DeviceDistribution {
 
 export interface BandwidthUsage {
   time: string;
-  current: number;
-  average: number;
-  peak: number;
+  /** Cumulative stored-content footprint in MB as of this date, from real file sizes (NOT measured transfer). */
+  storageMb: number;
   isEstimated?: boolean;
-  metricSource?: 'content_size_device_count_estimate';
-  unit?: 'MB/day';
+  metricSource?: 'content_file_size_sum';
+  unit?: 'MB';
 }
 
 export interface PlaylistPerformance {

@@ -13,8 +13,6 @@ import {
   Building2,
   Monitor,
   DollarSign,
-  ArrowUp,
-  ArrowDown,
   Calendar,
 } from 'lucide-react';
 
@@ -63,14 +61,6 @@ export default function AdminAnalyticsClient({ initialStats }: AdminAnalyticsCli
     );
   }
 
-  // Mock growth data for display purposes
-  const mockGrowth = {
-    organizations: { current: stats?.totalOrganizations || 0, growth: 12 },
-    users: { current: stats?.totalUsers || 0, growth: 8 },
-    screens: { current: stats?.totalScreens || 0, growth: 15 },
-    mrr: { current: stats?.mrr || 0, growth: 22 },
-  };
-
   return (
     <div className="space-y-6">
       <toast.ToastContainer />
@@ -98,33 +88,30 @@ export default function AdminAnalyticsClient({ initialStats }: AdminAnalyticsCli
         </div>
       </div>
 
-      {/* Key Metrics */}
+      {/* Key Metrics — real platform stats. Month-over-month growth is not
+          tracked, so no fabricated trend badges are shown. */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Organizations"
-          value={mockGrowth.organizations.current}
-          trend={{ value: mockGrowth.organizations.growth, isPositive: true }}
+          value={stats?.totalOrganizations ?? 0}
           icon={<Building2 className="w-6 h-6" />}
           color="blue"
         />
         <StatCard
           title="Total Users"
-          value={mockGrowth.users.current}
-          trend={{ value: mockGrowth.users.growth, isPositive: true }}
+          value={stats?.totalUsers ?? 0}
           icon={<Users className="w-6 h-6" />}
           color="green"
         />
         <StatCard
           title="Active Screens"
-          value={mockGrowth.screens.current}
-          trend={{ value: mockGrowth.screens.growth, isPositive: true }}
+          value={stats?.totalScreens ?? 0}
           icon={<Monitor className="w-6 h-6" />}
           color="purple"
         />
         <StatCard
           title="Monthly Revenue"
-          value={formatCurrency(mockGrowth.mrr.current)}
-          trend={{ value: mockGrowth.mrr.growth, isPositive: true }}
+          value={formatCurrency(stats?.mrr ?? 0)}
           icon={<DollarSign className="w-6 h-6" />}
           color="orange"
         />
@@ -143,19 +130,11 @@ export default function AdminAnalyticsClient({ initialStats }: AdminAnalyticsCli
                 <p className="text-sm text-[var(--foreground-tertiary)]">Monthly Recurring Revenue</p>
                 <p className="text-2xl font-bold text-[var(--foreground)] mt-1">{formatCurrency(stats?.mrr || 0)}</p>
               </div>
-              <div className="flex items-center gap-1 text-green-600">
-                <ArrowUp className="w-4 h-4" />
-                <span className="text-sm font-medium">+22%</span>
-              </div>
             </div>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-[var(--foreground-tertiary)]">Annual Recurring Revenue</p>
                 <p className="text-2xl font-bold text-[var(--foreground)] mt-1">{formatCurrency(stats?.arr || 0)}</p>
-              </div>
-              <div className="flex items-center gap-1 text-green-600">
-                <ArrowUp className="w-4 h-4" />
-                <span className="text-sm font-medium">+18%</span>
               </div>
             </div>
             <div className="flex items-center justify-between">
@@ -164,10 +143,6 @@ export default function AdminAnalyticsClient({ initialStats }: AdminAnalyticsCli
                 <p className="text-2xl font-bold text-[var(--foreground)] mt-1">
                   {stats?.totalOrganizations ? formatCurrency((stats.mrr || 0) / stats.totalOrganizations) : '$0'}
                 </p>
-              </div>
-              <div className="flex items-center gap-1 text-green-600">
-                <ArrowUp className="w-4 h-4" />
-                <span className="text-sm font-medium">+5%</span>
               </div>
             </div>
           </div>
@@ -193,26 +168,9 @@ export default function AdminAnalyticsClient({ initialStats }: AdminAnalyticsCli
                 />
               </div>
             </div>
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-[var(--foreground-secondary)]">Active Organizations</span>
-                <span className="text-sm font-medium text-[var(--foreground)]">
-                  {Math.round((stats?.totalOrganizations || 0) * 0.85)} / {stats?.totalOrganizations || 0}
-                </span>
-              </div>
-              <div className="h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
-                <div className="h-full bg-[#00E5A0] rounded-full" style={{ width: '85%' }} />
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-[var(--foreground-secondary)]">Content Engagement</span>
-                <span className="text-sm font-medium text-[var(--foreground)]">High</span>
-              </div>
-              <div className="h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
-                <div className="h-full bg-purple-500 rounded-full" style={{ width: '78%' }} />
-              </div>
-            </div>
+            {/* "Active Organizations" (a fabricated 85% of total) and
+                "Content Engagement" (a fabricated "High"/78%) were removed —
+                neither is a tracked metric. Screen Utilization above is real. */}
           </div>
         </div>
       </div>
