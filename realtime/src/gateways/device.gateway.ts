@@ -46,7 +46,8 @@ import {
   hashDeviceToken,
   isCurrentDeviceToken,
   deviceTokenGraceKey,
-  DEVICE_TOKEN_GRACE_TTL_SECONDS,
+  DEVICE_TOKEN_GRACE_MIN_TTL_SECONDS,
+  DEVICE_TOKEN_GRACE_MAX_TTL_SECONDS,
   DeviceTokenGrace,
 } from './device-token-hash';
 import {
@@ -1322,13 +1323,16 @@ export class DeviceGateway
    * stored hash so the grace's `next` no longer matches and the old token is
    * rejected.
    *
-   * Residual (documented, bounded, self-healing): if the socket drops in the
-   * ~RTT window before the client processes `token:refresh` AND the device then
-   * stays offline past the grace window, its next reconnect on the old token is
-   * rejected. The old token is still cryptographically valid so the screen keeps
-   * playing cached content, and Socket.IO auto-reconnect (seconds) almost always
-   * lands inside the grace window, self-healing it. This trades a *certain*
-   * 90-day fleet-wide outage for a rare, graceful, per-device degradation.
+   * Residual (documented, now self-healing across the old token's whole
+   * validity): F1 sets the grace TTL to the OLD token's remaining validity, so
+   * if the socket drops in the ~RTT window before the client persists the new
+   * token, the device is still accepted on its old token at ANY reconnect while
+   * that token remains cryptographically valid — and is re-refreshed then. The
+   * only unrecoverable case is a device that never receives the new token AND
+   * stays offline until the old token itself hard-expires — the pre-existing 90d
+   * expiry this refresh is designed to pre-empt (surfaces as AUTH_EXPIRED, screen
+   * keeps cached content, re-pair restores it). This trades a *certain* 90-day
+   * fleet-wide outage for a rare, graceful, per-device degradation.
    */
   private async maybeRefreshDeviceToken(client: Socket): Promise<void> {
     try {
@@ -1365,10 +1369,18 @@ export class DeviceGateway
           '1',
           DEVICE_TOKEN_REFRESH_COOLDOWN_SECONDS,
         );
-      } catch {
-        // Redis unavailable: fall back to the per-socket flag alone (bounded to
-        // one mint on this socket). Better to refresh than to strand near expiry.
-        claimed = true;
+      } catch (err) {
+        // F2(a) — fail CLOSED. If the cooldown claim can't be confirmed we do
+        // NOT know whether another connection is concurrently rotating; letting
+        // this refresh proceed unthrottled could mint racing tokens against the
+        // single stored hash. Skip entirely and let the next reconnect retry
+        // (matching the security-critical handshake reads, which also fail
+        // closed on a Redis error).
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        this.logger.warn(
+          `Skipping token refresh for device ${deviceId}: cooldown claim failed (${msg})`,
+        );
+        return;
       }
       if (!claimed) {
         client.data.tokenRefreshIssued = true;
@@ -1387,13 +1399,25 @@ export class DeviceGateway
       const newHash = hashDeviceToken(newToken);
 
       // 1) Grace FIRST — the old token stays valid across the rotation.
+      // F1 — TTL equals the OLD token's remaining validity (`oldTokenExp - now`)
+      // rather than a fixed 300s, so the old token stays grace-acceptable for
+      // exactly as long as it is still cryptographically valid. A device that
+      // never received/persisted the new token can then reconnect on the old one
+      // at any point before it truly expires and be re-refreshed — closing the
+      // permanent lockout tail. Floored so a near-zero remainder still yields a
+      // usable window; capped at the 90d token lifetime.
+      const nowSeconds = Math.floor(Date.now() / 1000);
+      const graceTtlSeconds = Math.min(
+        DEVICE_TOKEN_GRACE_MAX_TTL_SECONDS,
+        Math.max(DEVICE_TOKEN_GRACE_MIN_TTL_SECONDS, exp - nowSeconds),
+      );
       const graceKey = deviceTokenGraceKey(deviceId);
       const grace: DeviceTokenGrace = { prev: currentHash, next: newHash };
       try {
         await this.redisService.set(
           graceKey,
           JSON.stringify(grace),
-          DEVICE_TOKEN_GRACE_TTL_SECONDS,
+          graceTtlSeconds,
         );
       } catch (err) {
         // Without the grace record a reconnect on the old token during the
@@ -1416,13 +1440,16 @@ export class DeviceGateway
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Unknown error';
         this.logger.warn(`Token refresh DB rotation failed for device ${deviceId}: ${msg}`);
-        await this.redisService.delete(graceKey).catch(() => undefined);
+        await this.deleteOwnedGraceRecord(graceKey, grace);
         return;
       }
       if (rotatedCount === 0) {
-        // Stored hash changed under us (re-pair / revoke / disable). Do not emit
-        // a token bound to a hash the DB no longer holds; drop the stale grace.
-        await this.redisService.delete(graceKey).catch(() => undefined);
+        // Stored hash changed under us (re-pair / revoke / disable, or a
+        // concurrent refresh already won). Do not emit a token bound to a hash
+        // the DB no longer holds; drop OUR stale grace — F2(b): only if the key
+        // still holds the record THIS invocation wrote, so we never collapse a
+        // concurrent winner's grace window.
+        await this.deleteOwnedGraceRecord(graceKey, grace);
         this.logger.warn(
           `Token refresh aborted for device ${deviceId}: stored hash changed (re-pair/revoke)`,
         );
@@ -1444,6 +1471,37 @@ export class DeviceGateway
       this.logger.warn(
         `maybeRefreshDeviceToken failed for device ${client.data?.deviceId}: ${msg}`,
       );
+    }
+  }
+
+  /**
+   * F2(b) — delete a grace record only if it is still the exact {prev,next} this
+   * refresh invocation wrote. On the abort paths (guarded rotation returned 0, or
+   * the rotation update threw) a concurrent re-pair/refresh may already have
+   * overwritten the grace key with ITS OWN record; blindly deleting would collapse
+   * that winner's grace window and re-open the very lockout tail F1 closes. So we
+   * re-read and compare before deleting; if it differs (or is gone/unparseable),
+   * we leave it. Best-effort — a leftover grace whose `next` no longer equals
+   * Display.jwtToken is rejected by isGraceAcceptedDeviceToken anyway.
+   */
+  private async deleteOwnedGraceRecord(
+    graceKey: string,
+    owned: DeviceTokenGrace,
+  ): Promise<void> {
+    try {
+      const current = await this.redisService.get(graceKey);
+      if (!current) return;
+      let parsed: DeviceTokenGrace;
+      try {
+        parsed = JSON.parse(current) as DeviceTokenGrace;
+      } catch {
+        return; // Not parseable — not safely ours; leave it.
+      }
+      if (parsed?.prev === owned.prev && parsed?.next === owned.next) {
+        await this.redisService.delete(graceKey);
+      }
+    } catch {
+      // Swallow — cleanup is best-effort and must never fail the refresh path.
     }
   }
 

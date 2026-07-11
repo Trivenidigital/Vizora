@@ -621,6 +621,10 @@ describe('DeviceGateway', () => {
       afterEach(() => {
         if (prevSecret === undefined) delete process.env.DEVICE_JWT_SECRET;
         else process.env.DEVICE_JWT_SECRET = prevSecret;
+        // Some tests below override get() with a persistent mockImplementation
+        // (grace-key reads); clearAllMocks does NOT reset implementations, so
+        // restore the null default to avoid leaking into other suites.
+        mockRedisService.get.mockResolvedValue(null);
       });
 
       const nearExpiryPayload = () => ({
@@ -645,10 +649,12 @@ describe('DeviceGateway', () => {
           expect.objectContaining({ algorithm: 'HS256', expiresIn: '90d' }),
         );
         // Grace record published BEFORE the rotation (old hash stays valid).
+        // TTL is the old token's remaining validity (asserted precisely in the
+        // dedicated F1 test below), not a fixed 300s.
         expect(mockRedisService.set).toHaveBeenCalledWith(
           'device:token:grace:device-1',
           JSON.stringify({ prev: hashToken(oldToken), next: hashToken('new-token') }),
-          300,
+          expect.any(Number),
         );
         // Stored hash rotated old→new, guarded on the stored hash still being old.
         expect(mockDatabaseService.display.updateMany).toHaveBeenCalledWith({
@@ -698,6 +704,16 @@ describe('DeviceGateway', () => {
         mockDatabaseService.display.updateMany.mockImplementation((args: any) =>
           Promise.resolve({ count: args?.where?.jwtToken ? 0 : 1 }),
         );
+        // The grace key still holds THIS invocation's record (a re-pair does not
+        // write a grace), so the F2(b) ownership check passes and the stale grace
+        // is cleaned up.
+        mockRedisService.get.mockImplementation((key: string) =>
+          Promise.resolve(
+            key === 'device:token:grace:device-1'
+              ? JSON.stringify({ prev: hashToken(oldToken), next: hashToken('new-token') })
+              : null,
+          ),
+        );
         const client = createMockSocket({
           handshake: { auth: { token: oldToken }, address: '127.0.0.1' },
         });
@@ -706,7 +722,111 @@ describe('DeviceGateway', () => {
 
         expect(mockJwtService.sign).toHaveBeenCalled(); // minted…
         expect(client.emit).not.toHaveBeenCalledWith('token:refresh', expect.anything()); // …but not pushed
-        expect(mockRedisService.delete).toHaveBeenCalledWith('device:token:grace:device-1'); // stale grace dropped
+        expect(mockRedisService.delete).toHaveBeenCalledWith('device:token:grace:device-1'); // OUR stale grace dropped
+      });
+
+      // F1 — the grace record's TTL is the OLD token's remaining validity, not a
+      // fixed 300s. This is what lets a device that never received/persisted the
+      // new token reconnect on its still-valid old token long after the rotation
+      // and be accepted (and re-refreshed) instead of hard-locked out.
+      it('writes the grace record with a TTL equal to the old token remaining validity (not 300s)', async () => {
+        const remainingSeconds = 3 * 86400; // 3d out → within the 14d refresh window
+        const exp = Math.floor(Date.now() / 1000) + remainingSeconds;
+        mockJwtService.verify.mockReturnValue({ ...nearExpiryPayload(), exp });
+        const client = createMockSocket({
+          handshake: { auth: { token: oldToken }, address: '127.0.0.1' },
+        });
+
+        await gateway.handleConnection(client as any);
+
+        const graceCall = mockRedisService.set.mock.calls.find(
+          (c: any[]) => c[0] === 'device:token:grace:device-1',
+        );
+        expect(graceCall).toBeDefined();
+        const ttl = graceCall![2] as number;
+        // ~3 days; allow a couple seconds of clock drift between the exp computed
+        // here and the gateway's own Date.now(). Emphatically not the old 300s.
+        expect(ttl).toBeGreaterThanOrEqual(remainingSeconds - 2);
+        expect(ttl).toBeLessThanOrEqual(remainingSeconds);
+        expect(ttl).not.toBe(300);
+      });
+
+      // F1 — a device that reconnects on its OLD token well after the rotation is
+      // still accepted while that token is cryptographically valid, because the
+      // grace record now lives for the token's full remaining validity. The
+      // acceptance path itself is authenticateDeviceHandshake + the grace helper;
+      // here we assert the record it depends on is present with a long TTL.
+      it('keeps the old token grace-acceptable for its full remaining validity', async () => {
+        const remainingSeconds = 10 * 86400; // 10d out
+        const exp = Math.floor(Date.now() / 1000) + remainingSeconds;
+        mockJwtService.verify.mockReturnValue({ ...nearExpiryPayload(), exp });
+        const client = createMockSocket({
+          handshake: { auth: { token: oldToken }, address: '127.0.0.1' },
+        });
+
+        await gateway.handleConnection(client as any);
+
+        const graceCall = mockRedisService.set.mock.calls.find(
+          (c: any[]) => c[0] === 'device:token:grace:device-1',
+        );
+        expect(graceCall).toBeDefined();
+        // prev must be the OLD token's hash so a reconnect on it matches.
+        expect(graceCall![1]).toBe(
+          JSON.stringify({ prev: hashToken(oldToken), next: hashToken('new-token') }),
+        );
+        expect(graceCall![2] as number).toBeGreaterThanOrEqual(remainingSeconds - 2);
+      });
+
+      // F2(a) — the cooldown claim fails CLOSED: a Redis error on setNx must skip
+      // the whole refresh (no mint, no grace write, no rotation), not proceed.
+      it('fails closed when the cooldown claim throws (no mint, no rotation)', async () => {
+        mockJwtService.verify.mockReturnValue(nearExpiryPayload());
+        mockRedisService.setNx.mockRejectedValueOnce(new Error('redis down'));
+        const client = createMockSocket({
+          handshake: { auth: { token: oldToken }, address: '127.0.0.1' },
+        });
+
+        await gateway.handleConnection(client as any);
+
+        expect(mockJwtService.sign).not.toHaveBeenCalled(); // no token minted
+        expect(mockRedisService.set).not.toHaveBeenCalledWith(
+          'device:token:grace:device-1',
+          expect.anything(),
+          expect.anything(),
+        ); // no grace written
+        expect(mockDatabaseService.display.updateMany).not.toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({ jwtToken: expect.anything() }),
+          }),
+        ); // no guarded rotation
+        expect(client.emit).not.toHaveBeenCalledWith('token:refresh', expect.anything());
+      });
+
+      // F2(b) — on the abort path, do NOT delete a grace record that a concurrent
+      // rotation now owns (its {prev,next} differs from ours), which would collapse
+      // the winner's grace window.
+      it('does not delete a grace record owned by a concurrent rotation on the abort path', async () => {
+        mockJwtService.verify.mockReturnValue(nearExpiryPayload());
+        // Guarded rotation matches nothing (a concurrent rotation moved the hash).
+        mockDatabaseService.display.updateMany.mockImplementation((args: any) =>
+          Promise.resolve({ count: args?.where?.jwtToken ? 0 : 1 }),
+        );
+        // The grace key now holds the OTHER (winning) rotation's record.
+        mockRedisService.get.mockImplementation((key: string) =>
+          Promise.resolve(
+            key === 'device:token:grace:device-1'
+              ? JSON.stringify({ prev: hashToken('other-old'), next: hashToken('other-new') })
+              : null,
+          ),
+        );
+        const client = createMockSocket({
+          handshake: { auth: { token: oldToken }, address: '127.0.0.1' },
+        });
+
+        await gateway.handleConnection(client as any);
+
+        expect(client.emit).not.toHaveBeenCalledWith('token:refresh', expect.anything());
+        expect(mockRedisService.delete).not.toHaveBeenCalledWith('device:token:grace:device-1');
       });
     });
 

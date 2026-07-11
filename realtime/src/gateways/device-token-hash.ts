@@ -21,8 +21,21 @@ export function hashDeviceToken(token: string): string {
  * honest: if the device is re-paired (new pairing token) or its stored hash is
  * otherwise changed, `next` no longer matches and the old token is rejected —
  * the grace only ever revives the exact prev→next rotation it recorded.
+ *
+ * TTL (F1) — the gateway writes this record with a TTL equal to the OLD token's
+ * remaining cryptographic validity (`oldTokenExp - now`), floored at
+ * DEVICE_TOKEN_GRACE_MIN_TTL_SECONDS and capped at
+ * DEVICE_TOKEN_GRACE_MAX_TTL_SECONDS. A fixed short TTL (previously 5 min) could
+ * strand a device that never received/persisted the new token and reconnected
+ * after the window on its still-valid old token — rejected DEVICE_REVOKED, a
+ * permanent lockout until manual re-pair. Matching the grace lifetime to the old
+ * token's own validity removes that tail without weakening security: the old
+ * token never grants more than its own JWT validity, and delete/disable/re-pair
+ * (which changes the stored `next` hash) still hard-reject it via the checks that
+ * run BEFORE the grace lookup.
  */
-export const DEVICE_TOKEN_GRACE_TTL_SECONDS = 300; // 5 minutes
+export const DEVICE_TOKEN_GRACE_MIN_TTL_SECONDS = 60; // floor for a non-positive / near-zero remainder
+export const DEVICE_TOKEN_GRACE_MAX_TTL_SECONDS = 90 * 24 * 60 * 60; // cap: full 90d token lifetime
 
 export interface DeviceTokenGrace {
   prev: string;
