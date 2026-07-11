@@ -20,14 +20,23 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
     try {
       this.client = new Redis(redisUrl, {
-        maxRetriesPerRequest: 3,
+        // Redis is a critical dependency (auth cache, session revocation,
+        // rate-limit, device-refresh cooldown). Do NOT give up reconnecting:
+        // returning null from retryStrategy fires 'end', after which every
+        // command fails and cascades into an unhandled rejection that crash-loops
+        // the process — this drove 4500+ PM2 restarts in prod against a perfectly
+        // healthy Redis. Retry forever with capped backoff so the connection
+        // self-heals whenever Redis is reachable again. maxRetriesPerRequest is
+        // raised from 3 → 20 (ioredis default) so in-flight commands ride out a
+        // brief reconnect via the offline queue instead of failing fast.
+        maxRetriesPerRequest: 20,
         retryStrategy: (times) => {
-          if (times > 10) {
-            this.logger.error('Redis max retry attempts (10) exceeded');
-            return null; // Stop retrying — triggers 'end' event
-          }
           const delay = Math.min(times * 200, 5000); // Exponential backoff, max 5s
-          this.logger.warn(`Redis reconnecting in ${delay}ms (attempt ${times}/10)`);
+          // Surface the first few attempts, then only periodically, so a
+          // prolonged outage stays visible without flooding the logs.
+          if (times <= 5 || times % 30 === 0) {
+            this.logger.warn(`Redis reconnecting in ${delay}ms (attempt ${times})`);
+          }
           return delay;
         },
         lazyConnect: true, // Don't connect immediately
