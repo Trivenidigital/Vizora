@@ -9,6 +9,7 @@ import './organizations';
 import './analytics';
 import './users';
 import './notifications';
+import './alert-rules';
 import './billing';
 import './admin';
 import './templates';

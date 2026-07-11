@@ -57,6 +57,21 @@ const PM2_FLUSH_TIMEOUT_MS = 10_000;
 const LOG_MAX_AGE_DAYS = 7;
 
 /**
+ * Retention window for `alert_rule_fires` dedup rows (notifications #18).
+ *
+ * These rows are per-(rule, device) MUTABLE dedup state, not an audit log
+ * (see the model comment in schema.prisma). A row older than the window
+ * means that rule/device pair hasn't fired an alert in that long, so
+ * deleting it is safe: the next offline event simply re-creates the row and
+ * alerts normally — well outside the 15-min dedup window. Overridable via
+ * RETENTION_DAYS; defaults to 90.
+ */
+const ALERT_RULE_FIRE_RETENTION_DAYS = (() => {
+  const parsed = parseInt(process.env.RETENTION_DAYS || '90', 10);
+  return Number.isNaN(parsed) || parsed < 1 ? 90 : parsed;
+})();
+
+/**
  * Logs directory — resolves to `<project-root>/logs/`.
  * The regex handles Windows drive-letter paths from `import.meta.url`
  * (e.g., `/C:/projects/...` → `C:/projects/...`).
@@ -108,6 +123,50 @@ function vacuumAnalyze(): VacuumResult[] {
   const fail = results.filter(r => !r.success).length;
   log(AGENT, `VACUUM ANALYZE complete: ${ok} OK, ${fail} failed`);
   return results;
+}
+
+// ─── Task 1b: Prune stale alert_rule_fires rows ──────────────────────────────
+
+interface AlertFirePruneResult {
+  deleted: number | null;
+  error?: string;
+}
+
+/**
+ * Delete `alert_rule_fires` rows whose `lastFiredAt` is older than the
+ * retention window (notifications #18). Bounds the table's rules×devices
+ * growth. Uses execFileSync psql (no shell) like the VACUUM task; the
+ * interval is a validated integer, so there is no injection surface.
+ */
+function pruneAlertRuleFires(): AlertFirePruneResult {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    log(AGENT, 'alert_rule_fires prune skipped — DATABASE_URL not set');
+    return { deleted: null };
+  }
+
+  const days = ALERT_RULE_FIRE_RETENTION_DAYS;
+  log(AGENT, `Pruning alert_rule_fires older than ${days} days`);
+  try {
+    const out = execFileSync(
+      'psql',
+      [
+        databaseUrl,
+        '-c',
+        `DELETE FROM alert_rule_fires WHERE "lastFiredAt" < NOW() - INTERVAL '${days} days';`,
+      ],
+      { timeout: VACUUM_TIMEOUT_MS, stdio: 'pipe', encoding: 'utf-8' },
+    );
+    // psql prints the command tag "DELETE <n>" to stdout.
+    const match = out.match(/DELETE\s+(\d+)/);
+    const deleted = match ? parseInt(match[1], 10) : 0;
+    log(AGENT, `  alert_rule_fires prune — OK (${deleted} deleted)`);
+    return { deleted };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log(AGENT, `  alert_rule_fires prune — FAILED: ${msg}`);
+    return { deleted: null, error: msg };
+  }
 }
 
 // ─── Task 2: Redis Cleanup / Status ──────────────────────────────────────────
@@ -310,6 +369,9 @@ async function main(): Promise<void> {
     // ── 1. PostgreSQL VACUUM ANALYZE ──
     const vacuumResults = vacuumAnalyze();
 
+    // ── 1b. Prune stale alert_rule_fires dedup rows ──
+    const alertFirePrune = pruneAlertRuleFires();
+
     // ── 2. Redis status ──
     const redisStatus = checkRedis();
 
@@ -345,6 +407,7 @@ async function main(): Promise<void> {
     log(AGENT, '=== DB Maintainer complete ===');
     log(AGENT, `  Duration: ${durationMs}ms`);
     log(AGENT, `  Vacuum: ${vacuumOk} OK, ${vacuumFail} failed`);
+    log(AGENT, `  alert_rule_fires pruned: ${alertFirePrune.deleted ?? 'n/a'}`);
     log(AGENT, `  Redis: memory=${redisStatus.memoryHuman}, keys=${redisStatus.dbSize}`);
     log(AGENT, `  Logs truncated: ${logRotation.truncated.length}`);
     log(AGENT, `  PM2 flush: ${pm2Ok ? 'OK' : 'FAILED'}`);
