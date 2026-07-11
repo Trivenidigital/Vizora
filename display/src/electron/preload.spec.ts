@@ -59,6 +59,8 @@ describe('preload.ts', () => {
         'onPlaylistUpdate',
         'onCommand',
         'onError',
+        'onOverride',
+        'notifyRendererAlive',
         'removeListener',
       ];
 
@@ -214,6 +216,33 @@ describe('preload.ts', () => {
       const callback = jest.fn();
       exposedApi.onError(callback);
       expect(mockOn).toHaveBeenCalledWith('error', callback);
+    });
+
+    it('onOverride should register listener on override channel', () => {
+      const callback = jest.fn();
+      exposedApi.onOverride(callback);
+      expect(mockOn).toHaveBeenCalledWith('override', expect.any(Function));
+    });
+
+    it('onOverride should forward the override payload and normalize undefined to null', () => {
+      const callback = jest.fn();
+      exposedApi.onOverride(callback);
+      const listener = mockOn.mock.calls.find((call) => call[0] === 'override')?.[1];
+
+      const override = { content: { url: 'https://example.com/promo' } };
+      listener({}, override);
+      expect(callback).toHaveBeenCalledWith({}, override);
+
+      // A clear (undefined/null payload) is normalized to null.
+      listener({}, undefined);
+      expect(callback).toHaveBeenCalledWith({}, null);
+    });
+  });
+
+  describe('Renderer liveness', () => {
+    it('notifyRendererAlive should send a renderer-heartbeat ping', () => {
+      exposedApi.notifyRendererAlive();
+      expect(mockSend).toHaveBeenCalledWith('renderer-heartbeat');
     });
   });
 

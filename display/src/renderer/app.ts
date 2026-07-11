@@ -5,6 +5,16 @@ import {
   shouldReadCachedContent,
   shouldPreloadContentType,
 } from './preload-policy';
+import { computeVideoSafetyTimeoutMs } from './video-safety';
+
+// Renderer liveness ping cadence (realtime #2). The renderer proves it is still
+// painting; the main process folds staleness into the heartbeat.
+const RENDERER_ALIVE_PING_INTERVAL_MS = 2000;
+// Advance watchdog (realtime #6): if rotation has not advanced within this window
+// while a multi-item / looping playlist is active, force a restart. Kept well
+// above the per-video safety ceiling so the two never fight.
+const ADVANCE_WATCHDOG_INTERVAL_MS = 30000;
+const ADVANCE_WATCHDOG_MAX_STALL_MS = 20 * 60 * 1000;
 
 declare global {
   interface Window {
@@ -34,6 +44,11 @@ declare global {
         ack?: (response?: { ok: boolean; error?: string }) => void,
       ) => void) => void;
       onError: (callback: (event: any, error: any) => void) => void;
+      onOverride?: (callback: (
+        event: any,
+        override: { content: any; commandId?: string } | null,
+      ) => void) => void;
+      notifyRendererAlive?: () => void;
       removeListener: (channel: string, callback: any) => void;
     };
   }
@@ -48,6 +63,14 @@ class DisplayApp {
   private contentStartTime: number = 0;
   private zoneTimers: Map<string, NodeJS.Timeout> = new Map();
   private zoneIndices: Map<string, number> = new Map();
+  // Reliability (realtime #6): per-video safety timer + a monotonic advance token
+  // that invalidates late timers/events from a superseded item (no double-advance).
+  private videoSafetyTimer: NodeJS.Timeout | null = null;
+  private advanceToken = 0;
+  private lastAdvanceAt = 0;
+  private advanceWatchdog: NodeJS.Timeout | null = null;
+  private playlistEnded = false;
+  private lastFrameAt = 0;
 
   constructor() {
     console.log('[App] Constructor: Creating DisplayApp instance');
@@ -123,9 +146,190 @@ class DisplayApp {
       this.showErrorScreen(error.message || 'Unknown error');
     });
 
+    // Emergency / push_content override rendered as an in-renderer overlay
+    // (realtime #9). A `null` payload clears the overlay and reveals the playlist.
+    window.electronAPI.onOverride?.((_, override) => {
+      try {
+        this.renderOverride(override);
+      } catch (error) {
+        console.error('[App] Failed to render override overlay:', error);
+      }
+    });
+
+    // Renderer liveness (realtime #2) + advance watchdog (realtime #6).
+    this.startRendererLivenessPing();
+    this.startAdvanceWatchdog();
+
     // Don't proactively show pairing screen - wait for main process to tell us
     // The main process will send 'pairing-required' if no token exists
     console.log('[App] Renderer ready, waiting for main process events...');
+  }
+
+  private startRendererLivenessPing() {
+    // Paint-gated liveness ping (realtime #2). requestAnimationFrame only fires
+    // while the compositor is actually painting, so if the renderer freezes the
+    // pings stop and the main process surfaces the device as on-but-dark. A hung
+    // renderer therefore reports staleness instead of a false "online".
+    const raf =
+      typeof requestAnimationFrame === 'function'
+        ? requestAnimationFrame
+        : (cb: FrameRequestCallback) => setTimeout(() => cb(Date.now()), 16) as unknown as number;
+
+    const frame = () => {
+      this.lastFrameAt = Date.now();
+      raf(frame);
+    };
+    frame();
+
+    setInterval(() => {
+      // Only ping if a frame painted recently — a frozen compositor stops raf,
+      // so we stop pinging and the device correctly reads as dark.
+      if (Date.now() - this.lastFrameAt < RENDERER_ALIVE_PING_INTERVAL_MS * 2) {
+        window.electronAPI.notifyRendererAlive?.();
+      }
+    }, RENDERER_ALIVE_PING_INTERVAL_MS);
+  }
+
+  private startAdvanceWatchdog() {
+    if (this.advanceWatchdog) {
+      clearInterval(this.advanceWatchdog);
+    }
+    this.advanceWatchdog = setInterval(
+      () => this.checkAdvanceWatchdog(),
+      ADVANCE_WATCHDOG_INTERVAL_MS,
+    );
+  }
+
+  private checkAdvanceWatchdog() {
+    // Backstop for a wedged rotation (realtime #6): if content has not advanced
+    // for far longer than any legitimate item duration while a rotating playlist
+    // is active, restart rotation. Skips a legitimately-ended non-looping playlist
+    // and single static holds so it never thrashes intended behavior.
+    if (this.playlistEnded) return;
+    const items = this.currentPlaylist?.items;
+    if (!Array.isArray(items) || items.length === 0) return;
+    if (items.length < 2 && !this.currentPlaylist.loopPlaylist) return;
+    if (this.lastAdvanceAt === 0) return;
+
+    if (Date.now() - this.lastAdvanceAt > ADVANCE_WATCHDOG_MAX_STALL_MS) {
+      console.warn('[App] Advance watchdog: rotation stalled — restarting');
+      this.clearVideoSafetyTimer();
+      if (this.playbackTimer) {
+        clearTimeout(this.playbackTimer);
+        this.playbackTimer = null;
+      }
+      this.nextContent();
+    }
+  }
+
+  private clearVideoSafetyTimer() {
+    if (this.videoSafetyTimer) {
+      clearTimeout(this.videoSafetyTimer);
+      this.videoSafetyTimer = null;
+    }
+  }
+
+  private armVideoSafetyTimer(item: any, token: number, probedDurationSec?: number) {
+    // Force-advance a stalled/hung video that fires neither `ended` nor `error`
+    // (realtime #6). Re-armed with the probed duration once metadata loads.
+    if (token !== this.advanceToken) return;
+    this.clearVideoSafetyTimer();
+    const timeoutMs = computeVideoSafetyTimeoutMs(
+      item?.duration ?? item?.content?.duration,
+      probedDurationSec,
+    );
+    this.videoSafetyTimer = setTimeout(() => {
+      console.warn('[App] Video safety timer fired — force-advancing (no ended/error)');
+      this.advance(token);
+    }, timeoutMs);
+  }
+
+  private advance(token: number) {
+    // Single guarded advance path (realtime #6). A late `ended`/`error`/safety
+    // timer from a superseded item carries a stale token and is ignored, so the
+    // playlist can never double-advance.
+    if (token !== this.advanceToken) return;
+    this.clearVideoSafetyTimer();
+    this.nextContent();
+  }
+
+  private renderOverride(override: { content?: any } | null) {
+    // In-renderer overlay for push_content / emergency overrides (realtime #9).
+    // Rendered above the playlist so the socket + app survive; a null payload
+    // removes it and reveals the still-running playlist underneath.
+    const existing = document.getElementById('override-overlay');
+
+    if (!override || !override.content) {
+      if (existing) {
+        existing.innerHTML = '';
+        existing.remove();
+      }
+      return;
+    }
+
+    const overlay = existing ?? document.createElement('div');
+    overlay.id = 'override-overlay';
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
+    overlay.style.zIndex = '2000';
+    overlay.style.background = '#000';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.innerHTML = '';
+    if (!existing) {
+      document.body.appendChild(overlay);
+    }
+
+    const content = override.content;
+    const source = content.url || content.source;
+
+    switch (content.type) {
+      case 'image': {
+        const img = document.createElement('img');
+        img.src = source;
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = '100%';
+        img.style.objectFit = 'contain';
+        overlay.appendChild(img);
+        break;
+      }
+      case 'video': {
+        const video = document.createElement('video');
+        video.src = source;
+        video.autoplay = true;
+        video.loop = true;
+        video.muted = false;
+        video.style.maxWidth = '100%';
+        video.style.maxHeight = '100%';
+        overlay.appendChild(video);
+        break;
+      }
+      case 'html':
+      case 'template': {
+        const htmlIframe = document.createElement('iframe');
+        htmlIframe.sandbox.add('allow-scripts');
+        htmlIframe.srcdoc = source;
+        htmlIframe.style.width = '100%';
+        htmlIframe.style.height = '100%';
+        htmlIframe.style.border = 'none';
+        overlay.appendChild(htmlIframe);
+        break;
+      }
+      default: {
+        // url / webpage / unspecified — load in an iframe.
+        const iframe = document.createElement('iframe');
+        iframe.src = source;
+        iframe.allow = 'autoplay';
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+        iframe.style.border = 'none';
+        overlay.appendChild(iframe);
+      }
+    }
   }
 
   private async showPairingScreen() {
@@ -389,11 +593,16 @@ class DisplayApp {
   private updatePlaylist(playlist: any) {
     this.currentPlaylist = playlist;
     this.currentIndex = 0;
+    this.playlistEnded = false;
 
-    // Stop current playback
+    // Stop current playback (both the non-video rotation timer and the video
+    // safety timer) and invalidate any in-flight advance from the old item.
     if (this.playbackTimer) {
       clearTimeout(this.playbackTimer);
+      this.playbackTimer = null;
     }
+    this.clearVideoSafetyTimer();
+    this.advanceToken++;
 
     // Clear content container
     const container = document.getElementById('content-container');
@@ -426,6 +635,12 @@ class DisplayApp {
     if (!container || !currentItem) {
       return;
     }
+
+    // New item on the glass — invalidate any pending advance from the prior item
+    // and record the advance time for the watchdog (realtime #6).
+    const token = ++this.advanceToken;
+    this.clearVideoSafetyTimer();
+    this.lastAdvanceAt = Date.now();
 
     // Create content element
     const contentDiv = document.createElement('div');
@@ -467,15 +682,32 @@ class DisplayApp {
         contentDiv.appendChild(img);
         break;
 
-      case 'video':
+      case 'video': {
         const video = document.createElement('video');
         video.src = contentSource;
         video.autoplay = true;
         video.muted = false;
-        video.onerror = () => this.handleContentError(currentItem, 'Video load failed');
-        video.onended = () => this.nextContent();
+        // Guarded, single-advance handlers (realtime #6).
+        video.onerror = () => {
+          if (token !== this.advanceToken) return;
+          this.clearVideoSafetyTimer();
+          this.handleContentError(currentItem, 'Video load failed');
+        };
+        video.onended = () => this.advance(token);
+        // `stalled` / `waiting` are recoverable buffering signals — log only and
+        // let the safety timer escalate to a force-advance if playback never
+        // resumes. This avoids skipping content on a transient network hiccup.
+        video.onstalled = () => console.warn('[App] Video stalled (buffering)');
+        video.onwaiting = () => console.warn('[App] Video waiting (buffering)');
+        // Re-arm the safety timer with the true clip length once known.
+        video.onloadedmetadata = () =>
+          this.armVideoSafetyTimer(currentItem, token, video.duration);
         contentDiv.appendChild(video);
+        // Arm an initial safety timer immediately in case metadata never loads
+        // (a hung load fires neither loadedmetadata nor error).
+        this.armVideoSafetyTimer(currentItem, token, undefined);
         break;
+      }
 
       case 'webpage':
       case 'url':
@@ -535,7 +767,7 @@ class DisplayApp {
           timestamp: Date.now(),
         });
 
-        this.nextContent();
+        this.advance(token);
       }, expectedDuration);
     }
   }
@@ -568,7 +800,15 @@ class DisplayApp {
       if (this.currentPlaylist.loopPlaylist) {
         this.currentIndex = 0;
       } else {
-        // Stop playback
+        // Non-looping playlist finished — intentionally hold the last frame.
+        // Mark ended so the advance watchdog does not thrash it, and clear any
+        // pending timers so nothing fires against a stopped playlist (realtime #6).
+        this.playlistEnded = true;
+        this.clearVideoSafetyTimer();
+        if (this.playbackTimer) {
+          clearTimeout(this.playbackTimer);
+          this.playbackTimer = null;
+        }
         return;
       }
     }

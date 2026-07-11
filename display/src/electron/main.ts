@@ -22,6 +22,23 @@ const COMMAND_RENDERER_ACK_TIMEOUT_MS = 5000;
 const LINUX_AUTOSTART_FILE = 'vizora-display.desktop';
 const PROCESS_ERROR_HANDLERS_REGISTERED = '__vizoraDisplayProcessErrorHandlersRegistered';
 
+// Renderer crash-recovery reload with capped exponential backoff (realtime #2).
+// The delay doubles per consecutive failure up to the cap and resets to 0 on a
+// successful load, and only one reload is ever scheduled at a time — so a
+// renderer that keeps dying backs off to 30s instead of hot-looping.
+const RENDERER_RELOAD_BASE_DELAY_MS = 1000;
+const RENDERER_RELOAD_MAX_DELAY_MS = 30000;
+// Renderer is considered dark/frozen if it has not posted a paint ping within
+// this window (it pings every ~2s; heartbeat cadence is 15s) (realtime #2).
+const RENDERER_LIVENESS_TIMEOUT_MS = 10000;
+const LAST_PLAYLIST_STORE_KEY = 'lastPlaylist';
+
+let deviceClientInitialized = false;
+let rendererReloadAttempts = 0;
+let rendererReloadTimer: NodeJS.Timeout | null = null;
+let lastRendererPaintAt = 0;
+let hasLivePlaylist = false;
+
 function shouldEnableRuntimeGuards(): boolean {
   return app.isPackaged;
 }
@@ -212,6 +229,102 @@ function sendCommandToRenderer(command: any): Promise<void> {
   });
 }
 
+function persistLastKnownGoodPlaylist(playlist: any): void {
+  // Persist the last non-empty playlist to disk so the screen can render content
+  // offline on the next boot, before the socket connects (realtime #3). Never
+  // overwrite a good cache with an empty playlist.
+  try {
+    if (playlist && Array.isArray(playlist.items) && playlist.items.length > 0) {
+      store.set(LAST_PLAYLIST_STORE_KEY, playlist);
+    }
+  } catch (error) {
+    console.error('[Main] Failed to persist last-known-good playlist:', error);
+  }
+}
+
+function getStoredDeviceToken(): string | undefined {
+  const stored = store.get('deviceToken') as string | undefined;
+  return stored || process.env.DEVICE_TOKEN || undefined;
+}
+
+function computeRendererStatus(): { screenState?: string; playbackSource?: string } {
+  // Fold renderer liveness into the heartbeat (realtime #2). A connected device
+  // whose renderer is not painting reads as on-but-dark (screenState != playing)
+  // instead of a false green.
+  const playbackSource = hasLivePlaylist ? 'live' : 'cached';
+  if (lastRendererPaintAt === 0) {
+    // Renderer has not yet reported a paint (early boot / pre-first-frame).
+    return { screenState: 'boot', playbackSource };
+  }
+  const stale = Date.now() - lastRendererPaintAt > RENDERER_LIVENESS_TIMEOUT_MS;
+  return { screenState: stale ? 'recovering' : 'playing', playbackSource };
+}
+
+function restoreRendererState(): void {
+  // Runs on every renderer load (first boot AND every reload). Renders the
+  // last-known-good playlist immediately from cache and restores the paired /
+  // pairing / override state, so a reloaded or offline-booted renderer never
+  // sits blank waiting for the socket (realtime #2 + #3).
+  if (!mainWindow) {
+    return;
+  }
+
+  const deviceToken = getStoredDeviceToken();
+  if (!deviceToken) {
+    mainWindow.webContents.send('pairing-required');
+    return;
+  }
+
+  mainWindow.webContents.send('paired', deviceToken);
+
+  const cached = store.get(LAST_PLAYLIST_STORE_KEY) as any;
+  if (cached && Array.isArray(cached.items) && cached.items.length > 0) {
+    // Fire-and-forget (no requestId): the renderer applies it without an ack.
+    mainWindow.webContents.send('playlist-update', { playlist: cached });
+  }
+
+  // Re-show an active override overlay after a renderer reload (realtime #9).
+  const activeOverride = deviceClient?.getActiveOverride?.();
+  if (activeOverride) {
+    mainWindow.webContents.send('override', activeOverride);
+  }
+}
+
+function cancelRendererReload(): void {
+  if (rendererReloadTimer) {
+    clearTimeout(rendererReloadTimer);
+    rendererReloadTimer = null;
+  }
+}
+
+function scheduleRendererReload(reason: string): void {
+  if (!mainWindow) {
+    return;
+  }
+  // Only one reload in flight — never stack timers (prevents hot-loop) (realtime #2).
+  if (rendererReloadTimer) {
+    return;
+  }
+
+  const delay = Math.min(
+    RENDERER_RELOAD_MAX_DELAY_MS,
+    RENDERER_RELOAD_BASE_DELAY_MS * Math.pow(2, rendererReloadAttempts),
+  );
+  rendererReloadAttempts++;
+  console.error(`[Main] Renderer ${reason} — reloading in ${delay}ms (attempt ${rendererReloadAttempts})`);
+
+  rendererReloadTimer = setTimeout(() => {
+    rendererReloadTimer = null;
+    try {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.reload();
+      }
+    } catch (error) {
+      console.error('[Main] Renderer reload failed:', error);
+    }
+  }, delay);
+}
+
 function createWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const { width, height } = primaryDisplay.workAreaSize;
@@ -311,6 +424,21 @@ function createWindow() {
     mainWindow = null;
   });
 
+  // Renderer crash / hang recovery (realtime #2). An OOM, GPU crash or hung
+  // decode whites out the window with nothing to reload it — while the main
+  // process keeps heartbeating "online". Reload with capped backoff so a dead
+  // renderer comes back instead of staying blank forever.
+  mainWindow.webContents.on('render-process-gone', (_event, details) => {
+    scheduleRendererReload(`render-process-gone (${details?.reason ?? 'unknown'})`);
+  });
+  mainWindow.webContents.on('unresponsive', () => {
+    scheduleRendererReload('unresponsive');
+  });
+  mainWindow.webContents.on('responsive', () => {
+    // Renderer recovered on its own — cancel any pending reload.
+    cancelRendererReload();
+  });
+
   // Hide cursor in production
   if (process.env.NODE_ENV === 'production') {
     mainWindow.webContents.on('did-finish-load', () => {
@@ -318,20 +446,37 @@ function createWindow() {
     });
   }
 
-  // Wait for renderer to be ready before initializing device client
+  // On every renderer load (first boot AND crash-recovery reloads):
   mainWindow.webContents.on('did-finish-load', () => {
-    console.log('[Main] Renderer loaded, initializing device client...');
-    // Give renderer a moment to set up event listeners
-    setTimeout(() => {
-      initializeDeviceClient();
-    }, 500);
+    console.log('[Main] Renderer loaded');
+    // A successful load means the renderer is healthy again — reset crash backoff
+    // and renderer-liveness (the renderer will re-post paint pings) (realtime #2).
+    rendererReloadAttempts = 0;
+    cancelRendererReload();
+    lastRendererPaintAt = 0;
+
+    // Render last-known-good playlist + restore paired/pairing/override state
+    // immediately, before (and independent of) the socket (realtime #2/#3/#9).
+    restoreRendererState();
+
+    // Initialize the device client exactly once — NOT on every reload — so a
+    // renderer reload never tears down the live socket (realtime #9).
+    if (!deviceClientInitialized) {
+      deviceClientInitialized = true;
+      // Give renderer a moment to set up event listeners.
+      setTimeout(() => {
+        initializeDeviceClient();
+      }, 500);
+    }
   });
 }
 
 function initializeDeviceClient() {
+  // Init exactly once (realtime #9). A renderer reload must never tear down the
+  // live socket; the renderer's post-reload state is restored via
+  // restoreRendererState() instead.
   if (deviceClient) {
-    deviceClient.disconnect();
-    deviceClient = null;
+    return;
   }
 
   let deviceToken = store.get('deviceToken') as string | undefined;
@@ -363,6 +508,9 @@ function initializeDeviceClient() {
       mainWindow?.webContents.send('paired', token);
     },
     onPlaylistUpdate: (playlist) => {
+      // Persist the last-known-good playlist for offline boot (realtime #3).
+      persistLastKnownGoodPlaylist(playlist);
+      hasLivePlaylist = true;
       return sendPlaylistToRenderer(playlist);
     },
     onCommand: async (command) => {
@@ -374,21 +522,34 @@ function initializeDeviceClient() {
     onError: (error) => {
       mainWindow?.webContents.send('error', error);
     },
+    // Emergency / push_content override rendered as an in-renderer overlay,
+    // and cleared back to the playlist — no top-level navigation (realtime #9).
+    onOverride: (override) => {
+      mainWindow?.webContents.send('override', override);
+    },
+    onClearOverride: () => {
+      mainWindow?.webContents.send('override', null);
+    },
+    // Renderer-liveness folded into the heartbeat (realtime #2).
+    getRendererStatus: () => computeRendererStatus(),
   }, store);
 
   if (deviceToken) {
     console.log('[Main] Device token exists, connecting...');
     deviceClient.connect(deviceToken);
-    // Send paired event to renderer so it shows content screen instead of pairing
-    console.log('[Main] Sending paired event to renderer (existing token)');
-    mainWindow?.webContents.send('paired', deviceToken);
   } else {
-    // Request pairing
-    console.log('[Main] *** SENDING PAIRING-REQUIRED EVENT TO RENDERER ***');
-    mainWindow?.webContents.send('pairing-required');
-    console.log('[Main] pairing-required event sent');
+    // No token — the renderer was already told to show the pairing screen by
+    // restoreRendererState(); the device client is now ready to serve codes.
+    console.log('[Main] No device token — awaiting pairing');
   }
 }
+
+// Renderer liveness ping (realtime #2). The renderer posts this on a paint-gated
+// timer; the main process tracks the last paint time and folds it into the
+// heartbeat so a frozen renderer is visible server-side.
+ipcMain.on('renderer-heartbeat', () => {
+  lastRendererPaintAt = Date.now();
+});
 
 // IPC Handlers
 ipcMain.handle('get-pairing-code', async () => {
