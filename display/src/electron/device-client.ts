@@ -9,6 +9,14 @@ interface DeviceClientConfig {
   onPlaylistUpdate: (playlist: any) => void | Promise<void>;
   onCommand: (command: any) => void | Promise<void>;
   onError: (error: any) => void;
+  // Emergency / push_content override rendered as an in-renderer overlay
+  // (realtime #9). `onOverride` shows it; `onClearOverride` reverts to the
+  // normal playlist. Both are wired to the renderer over IPC by the main process.
+  onOverride?: (override: { content: any; commandId?: string }) => void;
+  onClearOverride?: () => void;
+  // Renderer-liveness / playback-source signal folded into the heartbeat so a
+  // dead or frozen renderer is visible server-side, not just "online" (realtime #2).
+  getRendererStatus?: () => { screenState?: string; playbackSource?: string };
 }
 
 type SocketAck = (response?: { ok: boolean; error?: string }) => void;
@@ -48,7 +56,7 @@ export class DeviceClient {
   private readonly heartbeatIntervalMs = 15000; // 15 seconds
   private cachedDeviceIdentifier: string | null = null;
   private previousCpuTimes: { idle: number; total: number } | null = null;
-  private overrideState: { previousUrl?: string; revertTimer: any; commandId?: string } | null = null;
+  private overrideState: { content: any; revertTimer: any; commandId?: string; expiresAt?: number } | null = null;
   private deviceToken: string | null = null;
 
   private mainWindow: any = null;
@@ -72,18 +80,17 @@ export class DeviceClient {
       if (fs.existsSync(stateFile)) {
         const state = JSON.parse(fs.readFileSync(stateFile, 'utf-8'));
         const remaining = state.expiresAt - Date.now();
-        if (remaining > 0) {
-          // Override still active — set revert timer for remaining duration
+        // Overlay model (realtime #9): recovery re-shows the pushed content as an
+        // overlay for the remaining duration. Old-format files (pre-overlay, no
+        // `content`) can no longer be reconstructed — clean them up.
+        if (remaining > 0 && state.content?.url) {
           this.overrideState = {
-            previousUrl: state.previousUrl,
+            content: state.content,
             commandId: state.commandId,
+            expiresAt: state.expiresAt,
             revertTimer: setTimeout(() => {
               try {
-                const { BrowserWindow: BWRecover } = require('electron');
-                const win = BWRecover.getAllWindows()[0];
-                if (win && state.previousUrl) {
-                  win.loadURL(state.previousUrl);
-                }
+                this.config.onClearOverride?.();
                 this.overrideState = null;
                 try { fs.unlinkSync(stateFile); } catch {}
               } catch (err) {
@@ -91,9 +98,12 @@ export class DeviceClient {
               }
             }, remaining),
           };
+          // Re-show the overlay (the renderer is already loaded by the time the
+          // device client is constructed on boot).
+          this.config.onOverride?.({ content: state.content, commandId: state.commandId });
           console.log(`[DeviceClient] Recovered override state, ${Math.round(remaining / 1000)}s remaining`);
         } else {
-          // Override expired during crash — clean up
+          // Override expired during crash, or unrecoverable old format — clean up
           fs.unlinkSync(stateFile);
         }
       }
@@ -108,6 +118,18 @@ export class DeviceClient {
         fs.unlinkSync(stateFile);
       } catch {}
     }
+  }
+
+  /**
+   * Current active override, if any — used by the main process to re-show the
+   * overlay after a renderer reload (crash recovery / reload command) without
+   * tearing down the socket (realtime #9).
+   */
+  getActiveOverride(): { content: any; commandId?: string } | null {
+    if (!this.overrideState) {
+      return null;
+    }
+    return { content: this.overrideState.content, commandId: this.overrideState.commandId };
   }
 
   private clearTokenAndRequestPairing(reason: string): void {
@@ -305,6 +327,10 @@ export class DeviceClient {
     this.socket.on('connect', () => {
       console.log('[DeviceClient] Connected to realtime gateway');
       this.startHeartbeat();
+      // Backstop (realtime #3): a device that booted offline renders its cached
+      // last-known-good playlist immediately, but may never receive a fresh push
+      // if nothing changed server-side. Explicitly reconcile once connected.
+      this.requestCurrentPlaylist();
     });
 
     this.socket.on('disconnect', () => {
@@ -425,6 +451,30 @@ export class DeviceClient {
     }
   }
 
+  private requestCurrentPlaylist() {
+    if (!this.socket?.connected) {
+      return;
+    }
+
+    try {
+      this.socket.emit('playlist:request', { forceRefresh: false }, (response: any) => {
+        try {
+          const playlist = response?.data?.playlist ?? response?.playlist;
+          // Only reconcile when the server actually has content to serve — never
+          // clobber the cached last-known-good playlist with an empty response.
+          if (playlist && Array.isArray(playlist.items) && playlist.items.length > 0) {
+            const withTokens = this.attachDeviceTokenToProtectedUrls(playlist);
+            void this.config.onPlaylistUpdate(withTokens);
+          }
+        } catch (err) {
+          console.error('[DeviceClient] Failed to apply backstop playlist:', err);
+        }
+      });
+    } catch (err) {
+      console.warn('[DeviceClient] playlist:request backstop failed:', err);
+    }
+  }
+
   private reconnectForPendingDelivery() {
     if (!this.socket?.connected) {
       return;
@@ -462,7 +512,7 @@ export class DeviceClient {
     }
 
     try {
-      const heartbeatData = {
+      const heartbeatData: Record<string, unknown> = {
         timestamp: Date.now(),
         metrics: {
           cpuUsage: this.getCpuUsage(),
@@ -472,6 +522,19 @@ export class DeviceClient {
         currentContent: data.currentContent || null,
         status: 'online',
       };
+
+      // Contract v1.1 dark-screen fields (realtime #2): surface renderer liveness
+      // so a frozen / crashed renderer reads as on-but-dark instead of green.
+      // Explicit values on `data` win over the polled renderer status.
+      const rendererStatus = this.config.getRendererStatus?.() ?? {};
+      const screenState = data.screenState ?? rendererStatus.screenState;
+      const playbackSource = data.playbackSource ?? rendererStatus.playbackSource;
+      if (screenState) {
+        heartbeatData.screenState = screenState;
+      }
+      if (playbackSource) {
+        heartbeatData.playbackSource = playbackSource;
+      }
 
       this.socket.emit('heartbeat', heartbeatData, () => {});
     } catch (error) {
@@ -666,38 +729,33 @@ export class DeviceClient {
             throw new Error(`push_content invalid URL: ${content.url}`);
           }
 
+          // Overlay model (realtime #9): render the pushed content as an
+          // in-renderer overlay instead of a top-level loadURL. The socket + app
+          // survive, so the override + revert no longer thrash the connection.
+          if (!this.config.onOverride) {
+            throw new Error('push_content overlay channel unavailable');
+          }
+
           // Clear any existing override timer (last-writer-wins)
           if (this.overrideState?.revertTimer) {
             clearTimeout(this.overrideState.revertTimer);
           }
 
-          const { BrowserWindow: BWPush } = require('electron');
-          const pushWindow = BWPush.getAllWindows()[0];
-          if (!pushWindow) {
-            throw new Error('push_content no window found');
-          }
-
-          // Save current URL for revert (only if not already in an override)
-          const previousUrl = this.overrideState?.previousUrl || pushWindow.webContents.getURL();
-
-          // Load the pushed content
-          await pushWindow.loadURL(content.url);
-          console.log(`[DeviceClient] Override active: loading ${this.redactDeviceTokenFromUrl(content.url)} (commandId: ${commandId})`);
+          this.config.onOverride({ content, commandId });
+          console.log(`[DeviceClient] Override active: overlaying ${this.redactDeviceTokenFromUrl(content.url)} (commandId: ${commandId})`);
 
           // Set auto-revert timer (duration is in minutes)
           const durationMs = (duration || 60) * 60 * 1000;
+          const expiresAt = Date.now() + durationMs;
 
-          // Persist override state for crash recovery
+          // Persist override state for crash recovery (stores the overlay content
+          // so it can be re-shown for the remaining duration after a restart).
           const fs = require('fs');
           const path = require('path');
           const { app: appPush } = require('electron');
           const stateFile = path.join(appPush.getPath('userData'), 'override-state.json');
           try {
-            fs.writeFileSync(stateFile, JSON.stringify({
-              previousUrl,
-              commandId,
-              expiresAt: Date.now() + durationMs,
-            }));
+            fs.writeFileSync(stateFile, JSON.stringify({ content, commandId, expiresAt }));
           } catch (writeErr) {
             console.error('[DeviceClient] Failed to persist override state:', writeErr);
           }
@@ -705,11 +763,7 @@ export class DeviceClient {
           const revertTimer = setTimeout(() => {
             try {
               console.log(`[DeviceClient] Override expired — reverting to playlist`);
-              const { BrowserWindow: BWRevert } = require('electron');
-              const revertWindow = BWRevert.getAllWindows()[0];
-              if (revertWindow && previousUrl) {
-                revertWindow.loadURL(previousUrl);
-              }
+              this.config.onClearOverride?.();
               this.overrideState = null;
               // Clean up persisted state
               try { fs.unlinkSync(stateFile); } catch {}
@@ -718,7 +772,7 @@ export class DeviceClient {
             }
           }, durationMs);
 
-          this.overrideState = { previousUrl, revertTimer, commandId };
+          this.overrideState = { content, revertTimer, commandId, expiresAt };
         } catch (err) {
           console.error('[DeviceClient] push_content failed:', err);
           throw err;
@@ -733,17 +787,9 @@ export class DeviceClient {
               clearTimeout(this.overrideState.revertTimer);
             }
 
-            // Restore the previous URL
-            if (this.overrideState.previousUrl) {
-              const { BrowserWindow: BWClear } = require('electron');
-              const clearWindow = BWClear.getAllWindows()[0];
-              if (clearWindow) {
-                await clearWindow.loadURL(this.overrideState.previousUrl);
-                console.log(`[DeviceClient] Override cleared, restored ${this.overrideState.previousUrl}`);
-              } else {
-                throw new Error('clear_override no window found');
-              }
-            }
+            // Hide the overlay and revert to the normal playlist (realtime #9).
+            this.config.onClearOverride?.();
+            console.log('[DeviceClient] Override cleared, reverted to playlist');
 
             this.overrideState = null;
 

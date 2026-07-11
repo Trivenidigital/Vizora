@@ -17,6 +17,10 @@ try {
   logImpression: (data: any) => ipcRenderer.invoke('log-impression', data),
   logError: (data: any) => ipcRenderer.invoke('log-error', data),
 
+  // Renderer liveness ping — proves the renderer is still painting so the main
+  // process can surface a dead / frozen renderer in the heartbeat (realtime #2).
+  notifyRendererAlive: () => ipcRenderer.send('renderer-heartbeat'),
+
   // Device info
   getDeviceInfo: () => ipcRenderer.invoke('get-device-info'),
 
@@ -74,6 +78,17 @@ try {
     }),
   onError: (callback: (event: any, error: any) => void) =>
     ipcRenderer.on('error', callback),
+
+  // Emergency / push_content override, rendered as an in-renderer overlay
+  // instead of a top-level navigation so the socket + app survive (realtime #9).
+  // A `null` payload clears the overlay and reverts to the normal playlist.
+  onOverride: (callback: (
+    event: any,
+    override: { content: any; commandId?: string } | null,
+  ) => void) =>
+    ipcRenderer.on('override', (event, payload) => {
+      callback(event, payload ?? null);
+    }),
 
   // Remove listeners
   removeListener: (channel: string, callback: any) =>

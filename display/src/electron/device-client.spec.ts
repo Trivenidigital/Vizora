@@ -91,6 +91,9 @@ describe('DeviceClient', () => {
       onPlaylistUpdate: jest.fn(),
       onCommand: jest.fn(),
       onError: jest.fn(),
+      onOverride: jest.fn(),
+      onClearOverride: jest.fn(),
+      getRendererStatus: jest.fn().mockReturnValue({ screenState: 'playing', playbackSource: 'live' }),
     };
 
     mockStore = {
@@ -641,17 +644,9 @@ describe('DeviceClient', () => {
       });
     });
 
-    it('should append the device token before loading protected push_content URLs', async () => {
-      const electron = require('electron');
+    it('should overlay push_content via onOverride (not a top-level loadURL) with the device token attached', async () => {
       const logSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined);
       try {
-        const mockWindow = {
-          webContents: {
-            getURL: jest.fn().mockReturnValue('file:///display/index.html'),
-          },
-          loadURL: jest.fn().mockResolvedValue(undefined),
-        };
-        electron.BrowserWindow.getAllWindows.mockReturnValue([mockWindow]);
         client.connect('device-token-123');
 
         const commandCall = mockSocket.on.mock.calls.find(
@@ -670,8 +665,14 @@ describe('DeviceClient', () => {
           },
         }, ack);
 
-        expect(mockWindow.loadURL).toHaveBeenCalledWith(
-          'http://localhost:3000/api/v1/device-content/content-1/file?token=device-token-123',
+        // Overlay model (realtime #9): the override is pushed to the renderer as
+        // an overlay, never navigated to at the top level.
+        expect(mockConfig.onOverride).toHaveBeenCalledWith(
+          expect.objectContaining({
+            content: expect.objectContaining({
+              url: 'http://localhost:3000/api/v1/device-content/content-1/file?token=device-token-123',
+            }),
+          }),
         );
         expect(logSpy.mock.calls.flat().join(' ')).not.toContain('device-token-123');
         expect(ack).toHaveBeenCalledWith({ ok: true });
@@ -680,15 +681,30 @@ describe('DeviceClient', () => {
       }
     });
 
-    it('should clear overrides in the main process even when the renderer command path is unavailable', async () => {
-      const electron = require('electron');
-      const mockWindow = {
-        webContents: {
-          getURL: jest.fn().mockReturnValue('file:///display/index.html'),
+    it('should negative-ack push_content when the overlay channel is unavailable', async () => {
+      mockConfig.onOverride = undefined;
+      client.connect('device-token-123');
+
+      const commandCall = mockSocket.on.mock.calls.find(
+        (call: any[]) => call[0] === 'command',
+      );
+      const ack = jest.fn();
+
+      await commandCall![1]({
+        type: 'push_content',
+        payload: {
+          content: { id: 'content-1', url: 'https://example.com/promo' },
+          duration: 1,
         },
-        loadURL: jest.fn().mockResolvedValue(undefined),
-      };
-      electron.BrowserWindow.getAllWindows.mockReturnValue([mockWindow]);
+      }, ack);
+
+      expect(ack).toHaveBeenCalledWith({
+        ok: false,
+        error: 'push_content overlay channel unavailable',
+      });
+    });
+
+    it('should clear overrides via onClearOverride even when the renderer command path is unavailable', async () => {
       mockConfig.onCommand.mockRejectedValue(new Error('renderer unavailable'));
       client.connect('device-token-123');
 
@@ -706,14 +722,104 @@ describe('DeviceClient', () => {
           duration: 1,
         },
       }, jest.fn());
-      mockWindow.loadURL.mockClear();
+
+      (mockConfig.onClearOverride as jest.Mock).mockClear();
 
       const ack = jest.fn();
       await commandCall![1]({ type: 'clear_override' }, ack);
 
       expect(mockConfig.onCommand).not.toHaveBeenCalled();
-      expect(mockWindow.loadURL).toHaveBeenCalledWith('file:///display/index.html');
+      expect(mockConfig.onClearOverride).toHaveBeenCalledTimes(1);
       expect(ack).toHaveBeenCalledWith({ ok: true });
+    });
+
+    it('auto-reverts the override via onClearOverride after the duration elapses', async () => {
+      client.connect('device-token-123');
+      const commandCall = mockSocket.on.mock.calls.find(
+        (call: any[]) => call[0] === 'command',
+      );
+
+      await commandCall![1]({
+        type: 'push_content',
+        payload: { content: { id: 'c1', url: 'https://example.com/promo' }, duration: 1 },
+      }, jest.fn());
+
+      expect(mockConfig.onOverride).toHaveBeenCalledTimes(1);
+      expect(mockConfig.onClearOverride).not.toHaveBeenCalled();
+
+      // duration is in minutes → 60_000ms
+      jest.advanceTimersByTime(60_000);
+      expect(mockConfig.onClearOverride).toHaveBeenCalledTimes(1);
+    });
+
+    it('applies last-writer-wins: a second push clears the first revert timer', async () => {
+      client.connect('device-token-123');
+      const commandCall = mockSocket.on.mock.calls.find(
+        (call: any[]) => call[0] === 'command',
+      );
+      const push = (id: string) => commandCall![1]({
+        type: 'push_content',
+        payload: { content: { id, url: `https://example.com/${id}` }, duration: 1 },
+      }, jest.fn());
+
+      await push('first');
+      await push('second');
+      expect(mockConfig.onOverride).toHaveBeenCalledTimes(2);
+
+      // Only the surviving (second) timer fires — a single revert, not two.
+      jest.advanceTimersByTime(60_000);
+      expect(mockConfig.onClearOverride).toHaveBeenCalledTimes(1);
+    });
+
+    it('folds renderer status (screenState/playbackSource) into the heartbeat', () => {
+      (mockConfig.getRendererStatus as jest.Mock).mockReturnValue({
+        screenState: 'recovering',
+        playbackSource: 'cached',
+      });
+      client.connect('test-token');
+
+      const connectCall = mockSocket.on.mock.calls.find((call: any[]) => call[0] === 'connect');
+      connectCall![1](); // triggers startHeartbeat → immediate heartbeat
+
+      const heartbeatEmit = mockSocket.emit.mock.calls.find(
+        (call: any[]) => call[0] === 'heartbeat',
+      );
+      expect(heartbeatEmit![1]).toEqual(
+        expect.objectContaining({ screenState: 'recovering', playbackSource: 'cached' }),
+      );
+    });
+
+    it('requests the current playlist on connect and applies a non-empty response', () => {
+      client.connect('test-token');
+      const connectCall = mockSocket.on.mock.calls.find((call: any[]) => call[0] === 'connect');
+      connectCall![1]();
+
+      const requestEmit = mockSocket.emit.mock.calls.find(
+        (call: any[]) => call[0] === 'playlist:request',
+      );
+      expect(requestEmit).toBeDefined();
+
+      // Server ack shape: createSuccessResponse({ playlist })
+      const ackCb = requestEmit![2];
+      ackCb({ data: { playlist: { items: [{ content: { id: 'x', type: 'image' } }] } } });
+
+      expect(mockConfig.onPlaylistUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ items: expect.any(Array) }),
+      );
+    });
+
+    it('ignores an empty playlist:request response so it never clobbers cached content', () => {
+      client.connect('test-token');
+      const connectCall = mockSocket.on.mock.calls.find((call: any[]) => call[0] === 'connect');
+      connectCall![1]();
+
+      const requestEmit = mockSocket.emit.mock.calls.find(
+        (call: any[]) => call[0] === 'playlist:request',
+      );
+      const ackCb = requestEmit![2];
+      ackCb({ data: { playlist: { items: [] } } });
+
+      expect(mockConfig.onPlaylistUpdate).not.toHaveBeenCalled();
     });
 
     it('should trigger display auto-update in the main process', async () => {

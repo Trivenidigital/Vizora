@@ -21,7 +21,7 @@ jest.mock('./cache-manager', () => ({
 }));
 
 // Mock the device-client module
-const mockDeviceClient = {
+const mockDeviceClient: any = {
   connect: jest.fn(),
   disconnect: jest.fn(),
   requestPairingCode: jest.fn().mockResolvedValue({ code: 'ABC123', qrCode: 'qr-data' }),
@@ -29,10 +29,18 @@ const mockDeviceClient = {
   sendHeartbeat: jest.fn(),
   logImpression: jest.fn(),
   logError: jest.fn(),
+  getActiveOverride: jest.fn().mockReturnValue(null),
+  __config: undefined,
 };
 
 jest.mock('./device-client', () => ({
-  DeviceClient: jest.fn().mockImplementation(() => mockDeviceClient),
+  // Capture the config on the shared instance so tests can exercise the
+  // main-side wiring (persist / override bridge / renderer status) regardless of
+  // which module registry (isolateModules) main.ts was loaded in.
+  DeviceClient: jest.fn().mockImplementation((...args: any[]) => {
+    mockDeviceClient.__config = args[2];
+    return mockDeviceClient;
+  }),
 }));
 
 const mockMkdirSync = jest.fn();
@@ -77,6 +85,7 @@ const mockMainWindow = {
   setFullScreen: jest.fn(),
   isFullScreen: jest.fn().mockReturnValue(false),
   reload: jest.fn(),
+  isDestroyed: jest.fn().mockReturnValue(false),
 };
 
 const mockSetLoginItemSettings = jest.fn();
@@ -322,7 +331,7 @@ describe('main.ts - Electron main process', () => {
       expect(powerSaveBlocker.stop).toHaveBeenCalledWith(42);
     });
 
-    it('disconnects an existing device client before reinitializing after renderer reload', () => {
+    it('initializes the device client once and never tears down the socket on renderer reload', () => {
       jest.useFakeTimers();
       mockStoreGet.mockImplementation((key: string) => (key === 'deviceToken' ? 'device-token' : null));
 
@@ -336,9 +345,204 @@ describe('main.ts - Electron main process', () => {
       didFinishLoad();
       jest.advanceTimersByTime(500);
 
-      expect(mockDeviceClient.connect).toHaveBeenCalledTimes(2);
-      expect(mockDeviceClient.disconnect).toHaveBeenCalledTimes(1);
+      // Init-once (realtime #9): a reload must not reconnect or disconnect the
+      // live socket — the renderer's post-reload state is restored separately.
+      expect(mockDeviceClient.connect).toHaveBeenCalledTimes(1);
+      expect(mockDeviceClient.disconnect).not.toHaveBeenCalled();
       jest.useRealTimers();
+    });
+  });
+
+  describe('renderer crash recovery (realtime #2)', () => {
+    beforeEach(() => {
+      jest.isolateModules(() => {
+        require('./main');
+      });
+    });
+
+    function createWindowViaReady() {
+      const thenMock = (app.whenReady as jest.Mock).mock.results[0].value.then;
+      thenMock.mock.calls[0][0]();
+    }
+
+    it('reloads the renderer with a backoff delay on render-process-gone (not immediately)', () => {
+      jest.useFakeTimers();
+      createWindowViaReady();
+
+      const gone = webContentsListeners['render-process-gone'][0];
+      gone({}, { reason: 'crashed' });
+
+      // Scheduled, not immediate — avoids reloading into the same crash.
+      expect(mockMainWindow.reload).not.toHaveBeenCalled();
+      jest.advanceTimersByTime(1000); // base delay
+      expect(mockMainWindow.reload).toHaveBeenCalledTimes(1);
+      jest.useRealTimers();
+    });
+
+    it('does not stack reloads and backs off exponentially instead of hot-looping', () => {
+      jest.useFakeTimers();
+      createWindowViaReady();
+      const gone = webContentsListeners['render-process-gone'][0];
+
+      // Two crashes before the first reload fires → only one reload scheduled.
+      gone({}, { reason: 'oom' });
+      gone({}, { reason: 'oom' });
+      jest.advanceTimersByTime(1000);
+      expect(mockMainWindow.reload).toHaveBeenCalledTimes(1);
+
+      // Next crash backs off to 2000ms (attempt 2), not another 1000ms.
+      gone({}, { reason: 'oom' });
+      jest.advanceTimersByTime(1000);
+      expect(mockMainWindow.reload).toHaveBeenCalledTimes(1);
+      jest.advanceTimersByTime(1000);
+      expect(mockMainWindow.reload).toHaveBeenCalledTimes(2);
+      jest.useRealTimers();
+    });
+
+    it('resets the backoff after a successful renderer load', () => {
+      jest.useFakeTimers();
+      mockStoreGet.mockImplementation((key: string) => (key === 'deviceToken' ? 'device-token' : null));
+      createWindowViaReady();
+      const gone = webContentsListeners['render-process-gone'][0];
+      const didFinishLoad = webContentsListeners['did-finish-load'][0];
+
+      gone({}, { reason: 'oom' });     // attempt 1 → delay 1000
+      jest.advanceTimersByTime(1000);  // reload #1
+      gone({}, { reason: 'oom' });     // attempt 2 → delay 2000
+      jest.advanceTimersByTime(2000);  // reload #2
+      didFinishLoad();                 // successful load resets backoff
+      jest.advanceTimersByTime(500);
+
+      (mockMainWindow.reload as jest.Mock).mockClear();
+      gone({}, { reason: 'oom' });     // attempt 1 again → delay 1000
+      jest.advanceTimersByTime(1000);
+      expect(mockMainWindow.reload).toHaveBeenCalledTimes(1);
+      jest.useRealTimers();
+    });
+
+    it('cancels a pending reload when the renderer becomes responsive again', () => {
+      jest.useFakeTimers();
+      createWindowViaReady();
+      const unresponsive = webContentsListeners['unresponsive'][0];
+      const responsive = webContentsListeners['responsive'][0];
+
+      unresponsive();
+      responsive(); // recovered on its own before the timer fired
+      jest.advanceTimersByTime(60000);
+      expect(mockMainWindow.reload).not.toHaveBeenCalled();
+      jest.useRealTimers();
+    });
+  });
+
+  describe('offline boot render + last-known-good playlist (realtime #3)', () => {
+    beforeEach(() => {
+      // Fake timers so the post-load 500ms device-client init timer never fires
+      // after the test — these tests only exercise the synchronous boot render.
+      jest.useFakeTimers();
+      jest.isolateModules(() => {
+        require('./main');
+      });
+    });
+
+    afterEach(() => {
+      jest.clearAllTimers();
+      jest.useRealTimers();
+    });
+
+    function createWindowViaReady() {
+      const thenMock = (app.whenReady as jest.Mock).mock.results[0].value.then;
+      thenMock.mock.calls[0][0]();
+    }
+
+    it('renders the cached playlist and paired state immediately on load', () => {
+      const cachedPlaylist = { id: 'p1', items: [{ content: { id: 'c1', type: 'image' } }] };
+      mockStoreGet.mockImplementation((key: string) => {
+        if (key === 'deviceToken') return 'device-token';
+        if (key === 'lastPlaylist') return cachedPlaylist;
+        return null;
+      });
+
+      createWindowViaReady();
+      const didFinishLoad = webContentsListeners['did-finish-load'][0];
+      didFinishLoad();
+
+      expect(mockWebContents.send).toHaveBeenCalledWith('paired', 'device-token');
+      expect(mockWebContents.send).toHaveBeenCalledWith('playlist-update', { playlist: cachedPlaylist });
+    });
+
+    it('shows pairing when no device token is stored', () => {
+      mockStoreGet.mockReturnValue(null);
+      createWindowViaReady();
+      const didFinishLoad = webContentsListeners['did-finish-load'][0];
+      didFinishLoad();
+      expect(mockWebContents.send).toHaveBeenCalledWith('pairing-required');
+    });
+
+    it('does not send a cached playlist when the store has none', () => {
+      mockStoreGet.mockImplementation((key: string) => (key === 'deviceToken' ? 'device-token' : null));
+      createWindowViaReady();
+      const didFinishLoad = webContentsListeners['did-finish-load'][0];
+      didFinishLoad();
+      const playlistSends = mockWebContents.send.mock.calls.filter((c: any[]) => c[0] === 'playlist-update');
+      expect(playlistSends).toHaveLength(0);
+    });
+  });
+
+  describe('device client wiring (realtime #2/#3/#9)', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      mockDeviceClient.__config = undefined;
+      jest.isolateModules(() => {
+        require('./main');
+      });
+    });
+
+    afterEach(() => {
+      jest.clearAllTimers();
+      jest.useRealTimers();
+    });
+
+    function initAndGetConfig() {
+      mockStoreGet.mockImplementation((key: string) => (key === 'deviceToken' ? 'device-token' : null));
+      const thenMock = (app.whenReady as jest.Mock).mock.results[0].value.then;
+      thenMock.mock.calls[0][0]();
+      const didFinishLoad = webContentsListeners['did-finish-load'][0];
+      didFinishLoad();
+      jest.advanceTimersByTime(500);
+      // Config captured on the shared mock instance by the DeviceClient factory.
+      return mockDeviceClient.__config;
+    }
+
+    it('persists a non-empty playlist to the store on receive', () => {
+      const config = initAndGetConfig();
+      const playlist = { id: 'p1', items: [{ content: { id: 'c1' } }] };
+      config.onPlaylistUpdate(playlist);
+      expect(mockStoreSet).toHaveBeenCalledWith('lastPlaylist', playlist);
+    });
+
+    it('does not persist an empty playlist (never clobbers the cache)', () => {
+      const config = initAndGetConfig();
+      mockStoreSet.mockClear();
+      config.onPlaylistUpdate({ id: 'p1', items: [] });
+      expect(mockStoreSet).not.toHaveBeenCalledWith('lastPlaylist', expect.anything());
+    });
+
+    it('bridges onOverride / onClearOverride to the renderer over IPC', () => {
+      const config = initAndGetConfig();
+      const override = { content: { url: 'https://example.com/promo' } };
+      config.onOverride(override);
+      expect(mockWebContents.send).toHaveBeenCalledWith('override', override);
+      config.onClearOverride();
+      expect(mockWebContents.send).toHaveBeenCalledWith('override', null);
+    });
+
+    it('reports renderer liveness via getRendererStatus (boot → playing after a paint ping)', () => {
+      const config = initAndGetConfig();
+      expect(config.getRendererStatus().screenState).toBe('boot');
+
+      const paintListener = ipcListeners['renderer-heartbeat'][0];
+      paintListener();
+      expect(config.getRendererStatus().screenState).toBe('playing');
     });
   });
 
