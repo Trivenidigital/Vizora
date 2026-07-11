@@ -8,6 +8,10 @@ scrape_configs:
     static_configs:
       - targets: ['host.docker.internal:3000']
   - job_name: 'realtime'
-    metrics_path: '/internal/metrics'
+    # Realtime sets a global prefix of `api`, which prepends to the
+    # @willsoto PrometheusModule path `/internal/metrics` → served at
+    # `/api/internal/metrics` (verified against the running service). The
+    # middleware prefix is `/api/v1`; realtime's is only `/api`.
+    metrics_path: '/api/internal/metrics'
     static_configs:
       - targets: ['host.docker.internal:3002']
