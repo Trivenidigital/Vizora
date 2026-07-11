@@ -2,6 +2,7 @@ import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import { SupportService } from './support.service';
 import { DatabaseService } from '../database/database.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { MailService } from '../mail/mail.service';
 import { SupportClassifierService } from './support-classifier.service';
 import { SupportKnowledgeService } from './support-knowledge.service';
 
@@ -9,6 +10,7 @@ describe('SupportService', () => {
   let service: SupportService;
   let db: any;
   let notificationsService: any;
+  let mailService: any;
   let classifier: any;
   let knowledgeBase: any;
 
@@ -60,11 +62,22 @@ describe('SupportService', () => {
         findFirst: jest.fn(),
         findMany: jest.fn(),
       },
+      user: {
+        findUnique: jest.fn().mockResolvedValue({
+          email: 'requester@example.com',
+          firstName: 'Req',
+        }),
+      },
       $queryRaw: jest.fn(),
     };
 
     notificationsService = {
-      create: jest.fn(),
+      create: jest.fn().mockResolvedValue({}),
+    };
+
+    mailService = {
+      sendSupportReplyEmail: jest.fn().mockResolvedValue(undefined),
+      sendSupportCustomerReplyOpsEmail: jest.fn().mockResolvedValue(undefined),
     };
 
     classifier = {
@@ -81,6 +94,7 @@ describe('SupportService', () => {
     service = new SupportService(
       db as unknown as DatabaseService,
       notificationsService as unknown as NotificationsService,
+      mailService as unknown as MailService,
       classifier as unknown as SupportClassifierService,
       knowledgeBase as unknown as SupportKnowledgeService,
     );
@@ -1041,11 +1055,13 @@ describe('SupportService', () => {
 
     it('omits the organization guard for platform-scope tokens', async () => {
       db.supportRequest.updateMany.mockResolvedValueOnce({ count: 1 });
-      const ok = await service.setRequestPriority(null, 'r1', 'urgent');
+      // The service takes canonical ladder values only — the MCP boundary
+      // maps urgent→critical before calling (see mcp/lib/priority-mapping.ts).
+      const ok = await service.setRequestPriority(null, 'r1', 'critical');
       expect(ok).toBe(true);
       expect(db.supportRequest.updateMany).toHaveBeenCalledWith({
         where: { id: 'r1' },
-        data: { priority: 'urgent' },
+        data: { priority: 'critical' },
       });
     });
   });
@@ -1136,6 +1152,170 @@ describe('SupportService', () => {
         },
         select: { id: true, createdAt: true },
       });
+    });
+
+    it('emails the requester (two-way loop) after an agent reply lands', async () => {
+      db.supportRequest.findFirst.mockResolvedValueOnce({
+        id: 'r1',
+        organizationId: orgId,
+        userId: 'u-original',
+      });
+      db.supportMessage.create.mockResolvedValueOnce({
+        id: 'msg-new',
+        createdAt: new Date('2026-05-04T12:00:00Z'),
+      });
+      db.user.findUnique.mockResolvedValueOnce({
+        email: 'owner@example.com',
+        firstName: 'Owner',
+      });
+
+      await service.createAgentMessage(orgId, 'r1', 'Triage: high urgency');
+
+      expect(db.user.findUnique).toHaveBeenCalledWith({
+        where: { id: 'u-original' },
+        select: { email: true, firstName: true },
+      });
+      expect(mailService.sendSupportReplyEmail).toHaveBeenCalledWith(
+        'owner@example.com',
+        'Owner',
+        'R1', // 'r1'.substring(0, 8).toUpperCase()
+      );
+    });
+
+    it('is fail-open — a mail failure does NOT fail the agent message-add', async () => {
+      db.supportRequest.findFirst.mockResolvedValueOnce({
+        id: 'r1',
+        organizationId: orgId,
+        userId: 'u-original',
+      });
+      db.supportMessage.create.mockResolvedValueOnce({
+        id: 'msg-new',
+        createdAt: new Date('2026-05-04T12:00:00Z'),
+      });
+      mailService.sendSupportReplyEmail.mockRejectedValueOnce(new Error('SMTP down'));
+
+      const out = await service.createAgentMessage(orgId, 'r1', 'hello');
+
+      expect(out).toEqual({ id: 'msg-new', createdAt: new Date('2026-05-04T12:00:00Z') });
+    });
+  });
+
+  describe('two-way notification loop (addMessage)', () => {
+    const requesterId = 'requester-1';
+    const requestOwnedByRequester = {
+      ...mockRequest,
+      userId: requesterId,
+    };
+
+    const otherAdmin = {
+      id: 'admin-999',
+      organizationId: orgId,
+      role: 'admin',
+      isSuperAdmin: false,
+    };
+
+    const requesterUser = {
+      id: requesterId,
+      organizationId: orgId,
+      role: 'viewer',
+      isSuperAdmin: false,
+    };
+
+    const requestNumber = mockRequest.id.substring(0, 8).toUpperCase();
+
+    it('admin reply emails the requester with a dashboard link', async () => {
+      db.supportRequest.findUnique.mockResolvedValue(requestOwnedByRequester);
+      db.supportMessage.create.mockResolvedValue({ ...mockMessage, role: 'admin' });
+      db.user.findUnique.mockResolvedValueOnce({
+        email: 'requester@example.com',
+        firstName: 'Req',
+      });
+
+      await service.addMessage(mockRequest.id, otherAdmin, 'We are on it.');
+
+      expect(mailService.sendSupportReplyEmail).toHaveBeenCalledWith(
+        'requester@example.com',
+        'Req',
+        requestNumber,
+      );
+      // Admin reply must NOT notify the support side.
+      expect(notificationsService.create).not.toHaveBeenCalled();
+    });
+
+    it('does NOT email when an admin replies to their OWN request (no self-notify)', async () => {
+      const adminOwner = {
+        id: requesterId,
+        organizationId: orgId,
+        role: 'admin',
+        isSuperAdmin: false,
+      };
+      db.supportRequest.findUnique.mockResolvedValue(requestOwnedByRequester);
+      db.supportMessage.create.mockResolvedValue({ ...mockMessage, role: 'admin' });
+
+      await service.addMessage(mockRequest.id, adminOwner, 'note to self');
+
+      expect(mailService.sendSupportReplyEmail).not.toHaveBeenCalled();
+      expect(db.user.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('customer reply creates an in-app notification for the support side', async () => {
+      db.supportRequest.findUnique.mockResolvedValue(requestOwnedByRequester);
+      db.supportMessage.create.mockResolvedValue({ ...mockMessage, role: 'user' });
+
+      await service.addMessage(mockRequest.id, requesterUser, 'still broken');
+
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'system',
+          organizationId: orgId,
+        }),
+      );
+      // Customer reply must NOT email the requester back.
+      expect(mailService.sendSupportReplyEmail).not.toHaveBeenCalled();
+    });
+
+    it('customer reply emails the ops mailbox when OPS_ALERT_EMAIL is set', async () => {
+      const prev = process.env.OPS_ALERT_EMAIL;
+      process.env.OPS_ALERT_EMAIL = 'ops@vizora.cloud';
+      try {
+        db.supportRequest.findUnique.mockResolvedValue(requestOwnedByRequester);
+        db.supportMessage.create.mockResolvedValue({ ...mockMessage, role: 'user' });
+
+        await service.addMessage(mockRequest.id, requesterUser, 'still broken');
+
+        expect(mailService.sendSupportCustomerReplyOpsEmail).toHaveBeenCalledWith(
+          'ops@vizora.cloud',
+          requestNumber,
+          orgId,
+        );
+      } finally {
+        if (prev === undefined) delete process.env.OPS_ALERT_EMAIL;
+        else process.env.OPS_ALERT_EMAIL = prev;
+      }
+    });
+
+    it('is fail-open — a notification failure does NOT fail the message-add', async () => {
+      db.supportRequest.findUnique.mockResolvedValue(requestOwnedByRequester);
+      const created = { ...mockMessage, role: 'user', content: 'still broken' };
+      db.supportMessage.create.mockResolvedValue(created);
+      notificationsService.create.mockRejectedValueOnce(new Error('notify down'));
+
+      const result = await service.addMessage(mockRequest.id, requesterUser, 'still broken');
+
+      expect(result).toEqual(created);
+    });
+
+    it('does NOT notify on the clientMutationId dedup early-return path', async () => {
+      db.supportRequest.findUnique.mockResolvedValue(requestOwnedByRequester);
+      db.supportMessage.findFirst.mockResolvedValueOnce({
+        ...mockMessage,
+        clientMutationId: 'dup-1',
+      });
+
+      await service.addMessage(mockRequest.id, requesterUser, 'retry', 'dup-1');
+
+      expect(notificationsService.create).not.toHaveBeenCalled();
+      expect(mailService.sendSupportReplyEmail).not.toHaveBeenCalled();
     });
   });
 });

@@ -7,6 +7,10 @@ import {
   type McpRequestContext,
 } from '../auth/mcp-context';
 import {
+  canonicalPriorityToMcp,
+  mcpPriorityToCanonical,
+} from '../lib/priority-mapping';
+import {
   CreateSupportMessageInput,
   type CreateSupportMessageInputT,
   ListOpenSupportRequestsInput,
@@ -82,7 +86,8 @@ function toTriageShape(r: Record<string, unknown>) {
     id: r.id as string,
     organization_id: r.organizationId as string,
     status: r.status as string,
-    priority: (r.priority as string | null) ?? null,
+    // Canonical DB ladder → MCP wire vocabulary (critical→urgent, medium→normal).
+    priority: canonicalPriorityToMcp(r.priority as string | null),
     category: (r.category as string | null) ?? null,
     ai_category: (r.aiCategory as string | null) ?? null,
     created_at:
@@ -136,10 +141,12 @@ export async function updateSupportRequestPriorityTool(
   const input = UpdateSupportRequestPriorityInput.parse(
     rawInput,
   ) as UpdateSupportRequestPriorityInputT;
+  // MCP wire vocabulary → canonical DB ladder (urgent→critical, normal→medium).
+  // The service only ever sees canonical values.
   const updated = await supportService.setRequestPriority(
     orgId,
     input.request_id,
-    input.priority,
+    mcpPriorityToCanonical(input.priority),
   );
   return UpdateSupportRequestResult.parse({
     request_id: input.request_id,
