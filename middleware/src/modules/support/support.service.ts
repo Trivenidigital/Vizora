@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { MailService } from '../mail/mail.service';
 import { SupportClassifierService } from './support-classifier.service';
 import { SupportKnowledgeService } from './support-knowledge.service';
 
@@ -48,6 +49,7 @@ export class SupportService {
   constructor(
     private readonly db: DatabaseService,
     private readonly notificationsService: NotificationsService,
+    private readonly mailService: MailService,
     private readonly classifier: SupportClassifierService,
     private readonly knowledgeBase: SupportKnowledgeService,
   ) {}
@@ -344,7 +346,10 @@ export class SupportService {
   async setRequestPriority(
     organizationId: SupportMcpScope,
     requestId: string,
-    priority: 'urgent' | 'high' | 'normal' | 'low',
+    // Canonical DB ladder only. The MCP boundary maps its wire vocabulary
+    // (urgent/normal) to this ladder before calling — see
+    // mcp/lib/priority-mapping.ts. The service never sees MCP terms.
+    priority: 'critical' | 'high' | 'medium' | 'low',
   ): Promise<boolean> {
     const where: Prisma.SupportRequestWhereInput = { id: requestId };
     if (organizationId != null) {
@@ -419,6 +424,20 @@ export class SupportService {
       },
       select: { id: true, createdAt: true },
     });
+
+    // Two-way loop: an agent-authored reply notifies the requester, exactly
+    // like an admin reply. Author is the agent (no user id) so it can never
+    // be the requester. Best-effort — see notifyOnNewMessage.
+    await this.notifyOnNewMessage(
+      {
+        id: req.id,
+        organizationId: req.organizationId ?? (organizationId as string),
+        userId: req.userId,
+      },
+      null,
+      'admin',
+    );
+
     return created;
   }
 
@@ -611,6 +630,19 @@ export class SupportService {
     // If the request was resolved/closed and user sends a new message, reopen it
     await reopenIfNeeded();
 
+    // Two-way loop: notify the OTHER party of the new message. Only reached
+    // for a genuinely new message — the clientMutationId dedup / P2002 race
+    // paths return early above and intentionally do NOT re-notify.
+    await this.notifyOnNewMessage(
+      {
+        id: request.id,
+        organizationId: request.organizationId,
+        userId: request.userId,
+      },
+      user.id,
+      role,
+    );
+
     this.logger.log(`Added ${role} message to support request ${requestId}`);
 
     return message;
@@ -675,6 +707,96 @@ export class SupportService {
       resolvedThisWeek,
       total: openCount + inProgressCount + resolvedCount + closedCount,
     };
+  }
+
+  /**
+   * Two-way support notification loop. Fired on every genuinely-new message
+   * (REST `addMessage` + MCP `createAgentMessage`), it tells the OTHER party:
+   *
+   *  - An **admin/agent** reply (`role === 'admin'`) emails the requester
+   *    (the user who opened the request) that there's a reply — UNLESS the
+   *    admin is replying to their own request (don't email a party for their
+   *    own message).
+   *  - A **customer** reply (`role === 'user'`) notifies the support side:
+   *    an in-app notification for the org plus an email to the ops/support
+   *    mailbox (`OPS_ALERT_EMAIL ?? SMTP_TO`).
+   *
+   * Fail-open: every side-effect is individually wrapped (`safeNotify`) so a
+   * mail/notification outage can NEVER fail the message-add. The message is
+   * the source of truth; the notification is best-effort (mirrors the
+   * impression-persist / broadcastNotification pattern elsewhere).
+   */
+  private async notifyOnNewMessage(
+    request: { id: string; organizationId: string; userId: string },
+    authorUserId: string | null,
+    role: 'admin' | 'user',
+  ): Promise<void> {
+    const requestNumber = request.id.substring(0, 8).toUpperCase();
+
+    if (role === 'admin') {
+      // Don't email an admin their own message when they reply to a request
+      // they opened themselves. Agent replies pass authorUserId=null, so the
+      // requester is always notified for those.
+      if (authorUserId !== null && authorUserId === request.userId) {
+        return;
+      }
+      await this.safeNotify(`support reply email for request ${request.id}`, async () => {
+        const requester = await this.db.user.findUnique({
+          where: { id: request.userId },
+          select: { email: true, firstName: true },
+        });
+        if (requester?.email) {
+          await this.mailService.sendSupportReplyEmail(
+            requester.email,
+            requester.firstName ?? 'there',
+            requestNumber,
+          );
+        }
+      });
+      return;
+    }
+
+    // Customer replied → notify the support side (in-app + ops mailbox).
+    await this.safeNotify(
+      `support in-app notification for request ${request.id}`,
+      () =>
+        this.notificationsService.create({
+          title: `New support reply #${requestNumber}`,
+          message: `A customer replied to support request #${requestNumber}.`,
+          type: 'system',
+          severity: 'info',
+          organizationId: request.organizationId,
+        }),
+    );
+
+    const opsRecipient = process.env.OPS_ALERT_EMAIL || process.env.SMTP_TO;
+    if (opsRecipient) {
+      await this.safeNotify(
+        `support ops email for request ${request.id}`,
+        () =>
+          this.mailService.sendSupportCustomerReplyOpsEmail(
+            opsRecipient,
+            requestNumber,
+            request.organizationId,
+          ),
+      );
+    }
+  }
+
+  /**
+   * Run a best-effort notification side-effect. Swallows + logs any failure
+   * so the caller (message-add) is never broken by a mail/notification
+   * outage. Each side-effect gets its own guard so one failure doesn't block
+   * the others.
+   */
+  private async safeNotify(label: string, fn: () => Promise<unknown>): Promise<void> {
+    try {
+      await fn();
+    } catch (error) {
+      this.logger.warn(
+        `Failed to send ${label}: ${error instanceof Error ? error.message : error}`,
+      );
+    }
   }
 
   /**

@@ -423,6 +423,68 @@ export class MailService {
     await this.sendMail(to, subject, html, 'Device offline alert', 'noreply');
   }
 
+  // ---------------------------------------------------------------------------
+  // Support two-way notification loop
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Notify the requester (customer) that support — an admin or an automated
+   * agent — replied to their support request. Templated (no model-generated
+   * body). Non-critical: the SupportService caller wraps this fail-open, so a
+   * mail failure never blocks the message-add. `firstName` is user-controlled
+   * and is escaped before interpolation.
+   */
+  async sendSupportReplyEmail(
+    to: string,
+    firstName: string,
+    requestNumber: string,
+  ): Promise<void> {
+    const safeFirstName = MailService.escapeHtml(firstName);
+    const safeNumber = MailService.escapeHtml(requestNumber);
+    const subject = `New reply on your support request #${safeNumber}`;
+    const html = this.wrapInTemplate(`
+          <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">You have a new reply</h1>
+          <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
+            Hi ${safeFirstName},<br><br>
+            The Vizora support team replied to your support request
+            <strong style="color:#F0ECE8;">#${safeNumber}</strong>. Open the dashboard
+            and use the support chat to read the reply and continue the conversation.
+          </p>
+          ${this.ctaButton('View Conversation', this.dashboardUrl)}
+          <p style="color:#5A6B73;font-size:12px;line-height:1.5;margin:16px 0 0 0;">
+            You're receiving this because you opened a support request with Vizora.
+          </p>
+    `);
+    await this.sendMail(to, subject, html, 'Support reply', 'support');
+  }
+
+  /**
+   * Notify the ops/support mailbox that a customer added a message to a
+   * support request (the inbound leg of the two-way loop). Templated,
+   * non-critical. `requestNumber` and `organizationId` are internal ids
+   * (safe), but are escaped defensively for consistency.
+   */
+  async sendSupportCustomerReplyOpsEmail(
+    to: string,
+    requestNumber: string,
+    organizationId: string,
+  ): Promise<void> {
+    const safeNumber = MailService.escapeHtml(requestNumber);
+    const safeOrg = MailService.escapeHtml(organizationId);
+    const subject = `New customer reply on support request #${safeNumber}`;
+    const html = this.wrapInTemplate(`
+          <h1 style="color:#F0ECE8;font-size:22px;font-weight:700;margin:0 0 8px 0;">New customer reply</h1>
+          <p style="color:#8A9BA3;font-size:14px;line-height:1.6;margin:0 0 24px 0;">
+            A customer added a message to support request
+            <strong style="color:#F0ECE8;">#${safeNumber}</strong>
+            (organization <span style="color:#F0ECE8;">${safeOrg}</span>).
+            Open the support dashboard to respond.
+          </p>
+          ${this.ctaButton('Open Support Dashboard', `${this.appUrl}/admin/support`)}
+    `);
+    await this.sendMail(to, subject, html, 'Support customer reply', 'support');
+  }
+
   /**
    * Escape HTML-special characters so user-controlled input (e.g. device
    * nickname) cannot break out of the surrounding markup or inject script.

@@ -185,6 +185,26 @@ describe('listOpenSupportRequestsTool', () => {
     ).rejects.toThrow(/100/);
   });
 
+  it('maps canonical DB priority to the MCP wire vocabulary on output', async () => {
+    const out = await listOpenSupportRequestsTool(
+      {},
+      ctx(['support:read']),
+      makeSupport([
+        { id: 'r1', priority: 'critical' },
+        { id: 'r2', priority: 'medium' },
+        { id: 'r3', priority: 'high' },
+        { id: 'r4', priority: 'low' },
+      ]) as never,
+    );
+    // critical→urgent, medium→normal, high→high, low→low.
+    expect(out.support_requests.map((r) => r.priority)).toEqual([
+      'urgent',
+      'normal',
+      'high',
+      'low',
+    ]);
+  });
+
   it('serializes Date createdAt as ISO string on the wire', async () => {
     const ts = new Date('2026-05-04T12:34:56Z');
     const out = await listOpenSupportRequestsTool(
@@ -209,7 +229,7 @@ describe('updateSupportRequestPriorityTool', () => {
     expect(svc.setRequestPriority).not.toHaveBeenCalled();
   });
 
-  it('returns { updated: true } when service confirms the update', async () => {
+  it('maps the MCP wire vocabulary to the canonical ladder before calling the service', async () => {
     const svc = { setRequestPriority: jest.fn().mockResolvedValue(true) };
     const out = await updateSupportRequestPriorityTool(
       { request_id: 'r1', priority: 'urgent' },
@@ -217,7 +237,18 @@ describe('updateSupportRequestPriorityTool', () => {
       svc as never,
     );
     expect(out).toEqual({ request_id: 'r1', updated: true });
-    expect(svc.setRequestPriority).toHaveBeenCalledWith('org_1', 'r1', 'urgent');
+    // urgent → critical (canonical). The service never sees MCP terms.
+    expect(svc.setRequestPriority).toHaveBeenCalledWith('org_1', 'r1', 'critical');
+  });
+
+  it('maps normal → medium on the inbound edge', async () => {
+    const svc = { setRequestPriority: jest.fn().mockResolvedValue(true) };
+    await updateSupportRequestPriorityTool(
+      { request_id: 'r1', priority: 'normal' },
+      ctx(['support:write']),
+      svc as never,
+    );
+    expect(svc.setRequestPriority).toHaveBeenCalledWith('org_1', 'r1', 'medium');
   });
 
   it('returns { updated: false } when no row matched (cross-org guard or deleted)', async () => {
@@ -262,7 +293,8 @@ describe('updateSupportRequestPriorityTool', () => {
     );
 
     expect(out).toEqual({ request_id: 'r1', updated: true });
-    expect(svc.setRequestPriority).toHaveBeenCalledWith(null, 'r1', 'urgent');
+    // urgent → critical (canonical) for platform-scope tokens too.
+    expect(svc.setRequestPriority).toHaveBeenCalledWith(null, 'r1', 'critical');
   });
 });
 
