@@ -240,7 +240,13 @@ async function bootstrap() {
     } else if (code === 'EACCES') {
       Logger.error(`Permission denied binding to port ${port}. Ports below 1024 require elevated privileges.`);
     } else {
+      // Log the full stack — a bare `.message` (e.g. a TypeError thrown from a
+      // bootstrap hook or the http stack) hides WHERE the failure is and makes
+      // a prod boot failure undiagnosable from logs alone.
       Logger.error(`Underlying error: ${(error as Error)?.message || error}`);
+      if ((error as Error)?.stack) {
+        Logger.error((error as Error).stack);
+      }
     }
     process.exit(1);
   }

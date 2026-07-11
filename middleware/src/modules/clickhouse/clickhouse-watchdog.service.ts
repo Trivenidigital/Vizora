@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { DEVICE_OFFLINE_THRESHOLD_MS } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
 import { ClickHouseService } from './clickhouse.service';
@@ -31,7 +31,13 @@ export class ClickHouseWatchdogService {
     private readonly clickhouse: ClickHouseService,
   ) {}
 
-  @Cron(CronExpression.EVERY_15_MINUTES)
+  // Every 15 minutes (second 0). NB: do NOT use `CronExpression.EVERY_15_MINUTES`
+  // — @nestjs/schedule's CronExpression enum has no such member (only 10/30),
+  // so it resolves to `undefined`, which makes ScheduleModule bootstrap hand an
+  // undefined expression to the cron parser and crash the whole app at
+  // `app.listen()` (a TypeError that unit tests, which call this method
+  // directly, never exercise). An explicit expression is unambiguous and safe.
+  @Cron('0 */15 * * * *')
   async checkDeviceHealthFreshness(): Promise<void> {
     try {
       if (!this.clickhouse.isEnabled) return;
