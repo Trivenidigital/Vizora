@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { DEVICE_OFFLINE_THRESHOLD_MS } from '@vizora/database';
 import { HeartbeatService } from './heartbeat.service';
 import { RedisService } from './redis.service';
+import { ClickHouseService } from './clickhouse.service';
 import { DatabaseService } from '../database/database.service';
 
 describe('HeartbeatService', () => {
@@ -11,6 +12,10 @@ describe('HeartbeatService', () => {
     set: jest.fn().mockResolvedValue(undefined),
     get: jest.fn().mockResolvedValue(null),
     increment: jest.fn().mockResolvedValue(1),
+  };
+
+  const mockClickHouseService = {
+    enqueueDeviceHealthSample: jest.fn(),
   };
 
   const mockDatabaseService = {
@@ -29,6 +34,7 @@ describe('HeartbeatService', () => {
       providers: [
         HeartbeatService,
         { provide: RedisService, useValue: mockRedisService },
+        { provide: ClickHouseService, useValue: mockClickHouseService },
         { provide: DatabaseService, useValue: mockDatabaseService },
       ],
     }).compile();
@@ -84,6 +90,49 @@ describe('HeartbeatService', () => {
       await expect(
         service.processHeartbeat('device-1', {} as any),
       ).resolves.not.toThrow();
+    });
+
+    it('enqueues a ClickHouse device-health sample when organizationId is provided', async () => {
+      const data = {
+        metrics: { cpuUsage: 42, memoryUsage: 71, temperature: 55 },
+        currentContent: { contentId: 'c-1' },
+      };
+
+      await service.processHeartbeat('device-1', data as any, 'org-1');
+
+      expect(mockClickHouseService.enqueueDeviceHealthSample).toHaveBeenCalledWith(
+        expect.objectContaining({
+          deviceId: 'device-1',
+          organizationId: 'org-1',
+          cpu: 42,
+          memory: 71,
+          temperature: 55,
+          status: 'online',
+        }),
+      );
+    });
+
+    it('does NOT enqueue a ClickHouse sample when organizationId is absent', async () => {
+      await service.processHeartbeat('device-1', {} as any);
+
+      expect(mockClickHouseService.enqueueDeviceHealthSample).not.toHaveBeenCalled();
+    });
+
+    it('still writes Redis + does not throw when the ClickHouse writer throws (fail-open)', async () => {
+      mockClickHouseService.enqueueDeviceHealthSample.mockImplementationOnce(() => {
+        throw new Error('clickhouse buffer error');
+      });
+
+      await expect(
+        service.processHeartbeat('device-1', {} as any, 'org-1'),
+      ).resolves.not.toThrow();
+
+      // Redis heartbeat still stored despite the ClickHouse writer throwing.
+      expect(mockRedisService.set).toHaveBeenCalledWith(
+        'heartbeat:device-1:latest',
+        expect.any(String),
+        300,
+      );
     });
   });
 

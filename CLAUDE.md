@@ -80,6 +80,8 @@ Playwright runs sequentially (1 worker) to avoid DB race conditions. Retries: 2 
 
 **Dual persistence for device status**: Device online/offline status writes to both Redis (fast reads) and PostgreSQL (persistence/dashboard queries).
 
+**Durable device time-series (ClickHouse)**: ClickHouse is now wired (was provisioned-but-dark). The realtime gateway batches a `device_health_samples` row on every heartbeat via `ClickHouseService` (`realtime/src/services/clickhouse.service.ts`) — buffered, async, fire-and-forget, **fail-open** (a ClickHouse outage never touches the heartbeat path). The middleware reads it (`middleware/src/modules/clickhouse/`) for **real** uptime: `AnalyticsService.getDeviceUptime`/`getUptimeSummary` compute uptime as the fraction of 5-min buckets holding ≥1 sample, and return a clearly-labelled `insufficient_data` (`uptimePercent: null`, `measured: false`) when there is no history or ClickHouse is unreachable — never a fabricated number. A `ClickHouseWatchdogService` @Cron (§12a) alerts via Sentry when displays are active but samples stop arriving. Config is `CLICKHOUSE_*` (see `.env.example`); reads/writes fail-open and never hard-fail boot. Canonical DDL: `docker/clickhouse/init.sql` (app also creates it idempotently on startup).
+
 **Content system**: Supports image/video/url/html types. Template rendering via Handlebars. File validation with magic number verification to prevent MIME spoofing. Expiration system with automatic replacement content.
 
 **Response envelope**: Global `ResponseEnvelopeInterceptor` wraps all responses in `{ success, data, meta }`. Skip with `@SkipEnvelope()` decorator on individual endpoints.

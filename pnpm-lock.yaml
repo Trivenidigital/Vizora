@@ -246,6 +246,9 @@ importers:
 
   middleware:
     dependencies:
+      '@clickhouse/client':
+        specifier: ^1.23.0
+        version: 1.23.1
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@3.25.76)
@@ -485,6 +488,9 @@ importers:
 
   realtime:
     dependencies:
+      '@clickhouse/client':
+        specifier: ^1.23.0
+        version: 1.23.1
       '@nestjs/common':
         specifier: ^11.0.0
         version: 11.1.12(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.1.14)(rxjs@7.8.2)
@@ -1441,6 +1447,10 @@ packages:
 
   '@bufbuild/protobuf@2.11.0':
     resolution: {integrity: sha512-sBXGT13cpmPR5BMgHE6UEEfEaShh5Ror6rfN3yEK5si7QVrtZg8LEPQb0VVhiLRUslD2yLnXtnRzG035J/mZXQ==}
+
+  '@clickhouse/client@1.23.1':
+    resolution: {integrity: sha512-vs3/Zc1dHvT171btW5nMoPsPCJ6QVJ5pp7obxzO5sjqwFx/jjz9wwCAqcFOdc2DhprugDBaVn+4dVY8hG3A9nw==}
+    engines: {node: '>=20'}
 
   '@codemirror/autocomplete@6.20.0':
     resolution: {integrity: sha512-bOwvTOIJcG5FVo5gUUupiwYh8MioPLQ4UcqbcRf7UQ98X90tCa9E1kZ3Z7tqwpZxYyOvh1YTYbmZE9RTfTp5hg==}
@@ -12138,6 +12148,8 @@ snapshots:
       css-tree: 3.2.1
 
   '@bufbuild/protobuf@2.11.0': {}
+
+  '@clickhouse/client@1.23.1': {}
 
   '@codemirror/autocomplete@6.20.0':
     dependencies:

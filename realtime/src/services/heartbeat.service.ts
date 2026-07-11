@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DEVICE_OFFLINE_THRESHOLD_MS } from '@vizora/database';
 import { RedisService } from './redis.service';
+import { ClickHouseService } from './clickhouse.service';
 import { DatabaseService } from '../database/database.service';
 import {
   HeartbeatData as HeartbeatPayload,
@@ -50,12 +51,22 @@ export class HeartbeatService {
   constructor(
     private redisService: RedisService,
     private readonly db: DatabaseService,
+    private readonly clickhouse: ClickHouseService,
   ) {}
 
   /**
    * Process device heartbeat
+   *
+   * @param organizationId Owning org, taken from the authenticated socket. Used
+   *   to key the durable ClickHouse time-series. Optional so legacy callers and
+   *   tests keep compiling; when absent the ClickHouse sample is skipped (Redis
+   *   write is unaffected).
    */
-  async processHeartbeat(deviceId: string, data: HeartbeatPayload): Promise<void> {
+  async processHeartbeat(
+    deviceId: string,
+    data: HeartbeatPayload,
+    organizationId?: string,
+  ): Promise<void> {
     try {
       const heartbeat: StoredHeartbeat = {
         deviceId,
@@ -64,16 +75,26 @@ export class HeartbeatService {
         currentContent: data.currentContent,
       };
 
-      // Store in Redis for quick access
+      // Store in Redis for quick access (fast, 5-min-TTL live view)
       await this.redisService.set(
         `heartbeat:${deviceId}:latest`,
         JSON.stringify(heartbeat),
         300, // 5 minutes
       );
 
-      // TODO: Queue for ClickHouse insertion
-      // This would be done via a job queue (BullMQ) in production
-      // await this.queueClickHouseInsert(heartbeat);
+      // Durable time-series: enqueue a sample for the batched, fire-and-forget
+      // ClickHouse writer. Non-blocking and fail-open — a ClickHouse outage
+      // never reaches this path (see ClickHouseService fail-open contract).
+      if (organizationId) {
+        this.clickhouse.enqueueDeviceHealthSample({
+          deviceId,
+          organizationId,
+          cpu: data.metrics?.cpuUsage,
+          memory: data.metrics?.memoryUsage,
+          temperature: data.metrics?.temperature ?? null,
+          status: 'online',
+        });
+      }
 
       this.logger.debug(`Processed heartbeat for device: ${deviceId}`);
     } catch (error) {

@@ -1,6 +1,11 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { DatabaseService } from '../database/database.service';
+import {
+  ClickHouseService,
+  type DeviceHealthUptimeAggregate,
+} from '../clickhouse/clickhouse.service';
+import { UPTIME_BUCKET_MS } from '../clickhouse/clickhouse.constants';
 import type {
   DeviceMetricDataPoint,
   ContentPerformanceItem,
@@ -12,6 +17,7 @@ import type {
   ContentMetrics,
   DeviceUptimeResult,
   UptimeSummaryResult,
+  UptimeSummaryDevice,
   ExportAnalyticsResult,
 } from './dto/analytics-response.dto';
 
@@ -19,7 +25,10 @@ import type {
 export class AnalyticsService {
   private readonly logger = new Logger(AnalyticsService.name);
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly clickhouse: ClickHouseService,
+  ) {}
 
   private getRangeDays(range: string): number {
     switch (range) {
@@ -418,90 +427,148 @@ export class AnalyticsService {
   }
 
   /**
-   * Device uptime for a specific device
-   * Returns uptime percentage and online/offline minutes
+   * Real device uptime, measured over the durable ClickHouse
+   * `device_health_samples` time-series (a device's heartbeats mark the
+   * time-buckets it was online). When ClickHouse has no history for the device
+   * — freshly wired, device idle, or ClickHouse unreachable — this returns a
+   * clearly-labelled "insufficient data" result (`uptimePercent: null`,
+   * `measured: false`), NEVER a fabricated percentage.
    */
   async getDeviceUptime(
     organizationId: string,
     deviceId: string,
     days: number = 30,
   ): Promise<DeviceUptimeResult> {
-    // Get device from DB
     const device = await this.db.display.findFirst({
       where: { id: deviceId, organizationId },
+      select: { id: true, lastHeartbeat: true },
     });
 
     if (!device) {
       throw new NotFoundException('Device not found');
     }
 
-    // Simple calculation based on current status and lastHeartbeat
-    // For now, if device has heartbeat within last 5 minutes, consider it online
     const now = new Date();
-    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
-    const isOnline = device.lastHeartbeat && device.lastHeartbeat > fiveMinutesAgo;
+    const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    const aggregate = await this.clickhouse.getDeviceUptimeAggregate(
+      organizationId,
+      deviceId,
+      since,
+    );
 
-    // For a more realistic calculation, we'd query audit logs or a heartbeat history table
-    // For now, return a simplified response based on current state
-    const totalMinutes = days * 24 * 60;
-    const uptimePercent = isOnline ? 95 : device.status === 'online' ? 80 : 20;
+    const computed = this.computeUptime(aggregate, since, now);
+
+    if (!computed) {
+      // No samples (or ClickHouse unavailable) → honest "insufficient data".
+      return {
+        deviceId,
+        measured: false,
+        uptimePercent: null,
+        sampleCount: aggregate?.sampleCount ?? 0,
+        totalOnlineMinutes: null,
+        totalOfflineMinutes: null,
+        lastHeartbeat: device.lastHeartbeat,
+        windowDays: days,
+        metricSource: 'insufficient_data',
+      };
+    }
 
     return {
       deviceId,
-      uptimePercent,
-      totalOnlineMinutes: Math.round((totalMinutes * uptimePercent) / 100),
-      totalOfflineMinutes: Math.round((totalMinutes * (100 - uptimePercent)) / 100),
+      measured: true,
+      uptimePercent: computed.uptimePercent,
+      sampleCount: aggregate!.sampleCount,
+      totalOnlineMinutes: computed.onlineMinutes,
+      totalOfflineMinutes: computed.offlineMinutes,
       lastHeartbeat: device.lastHeartbeat,
-      isEstimated: true,
-      metricSource: 'heartbeat_status_heuristic',
+      windowDays: days,
+      metricSource: 'clickhouse_health_samples',
     };
   }
 
   /**
-   * Uptime summary across all devices in an organization
+   * Uptime summary across all devices in an organization, measured over the
+   * ClickHouse time-series. Devices without samples are returned with
+   * `measured: false` / `uptimePercent: null`; the org average is taken over
+   * measured devices only (and is `null` when none have data). `onlineCount`
+   * remains a real live-status count from the Display table.
    */
   async getUptimeSummary(
     organizationId: string,
-    _days: number = 30,
+    days: number = 30,
   ): Promise<UptimeSummaryResult> {
     const devices = await this.db.display.findMany({
       where: { organizationId },
-      select: { id: true, nickname: true, status: true, lastHeartbeat: true },
+      select: { id: true, nickname: true, status: true },
     });
 
     const now = new Date();
-    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+    const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    const aggregates = await this.clickhouse.getOrgUptimeAggregates(organizationId, since);
+    const aggregateByDevice = new Map<string, DeviceHealthUptimeAggregate>(
+      (aggregates ?? []).map((a) => [a.deviceId, a]),
+    );
 
-    const deviceUptimes = devices.map((device) => {
-      const isOnline = device.lastHeartbeat && device.lastHeartbeat > fiveMinutesAgo;
-      const uptimePercent = isOnline ? 95 : device.status === 'online' ? 80 : 20;
+    const deviceResults: UptimeSummaryDevice[] = devices.map((device) => {
+      const computed = this.computeUptime(aggregateByDevice.get(device.id), since, now);
       return {
         id: device.id,
         nickname: device.nickname || 'Unnamed Device',
-        uptimePercent,
-        isOnline,
+        measured: computed !== null,
+        uptimePercent: computed ? computed.uptimePercent : null,
+        sampleCount: aggregateByDevice.get(device.id)?.sampleCount ?? 0,
       };
     });
 
-    const onlineCount = deviceUptimes.filter((d) => d.isOnline).length;
+    const measured = deviceResults.filter((d) => d.measured);
     const avgUptimePercent =
-      deviceUptimes.length > 0
-        ? deviceUptimes.reduce((sum, d) => sum + d.uptimePercent, 0) / deviceUptimes.length
-        : 0;
+      measured.length > 0
+        ? Math.round(
+            (measured.reduce((sum, d) => sum + (d.uptimePercent ?? 0), 0) / measured.length) * 10,
+          ) / 10
+        : null;
+
+    const onlineCount = devices.filter((d) => d.status === 'online').length;
 
     return {
-      avgUptimePercent: Math.round(avgUptimePercent * 10) / 10,
+      measured: measured.length > 0,
+      avgUptimePercent,
       deviceCount: devices.length,
+      measuredDeviceCount: measured.length,
       onlineCount,
       offlineCount: devices.length - onlineCount,
-      devices: deviceUptimes.map(({ id, nickname, uptimePercent }) => ({
-        id,
-        nickname,
-        uptimePercent,
-      })),
-      isEstimated: true,
-      metricSource: 'heartbeat_status_heuristic',
+      devices: deviceResults,
+      windowDays: days,
+      metricSource: measured.length > 0 ? 'clickhouse_health_samples' : 'insufficient_data',
     };
+  }
+
+  /**
+   * Turn a ClickHouse uptime aggregate into a percentage + online/offline
+   * minutes. Uptime% = up-buckets / total-buckets, where a bucket is "up" if it
+   * held ≥1 heartbeat sample. The observation window starts at the later of the
+   * requested window start and the device's first sample, so a device that
+   * only recently began reporting isn't unfairly scored against time before it
+   * existed. Returns null when there is no measurable history (0 samples or a
+   * null aggregate — the ClickHouse-unavailable case).
+   */
+  private computeUptime(
+    aggregate: DeviceHealthUptimeAggregate | null | undefined,
+    windowStart: Date,
+    now: Date,
+  ): { uptimePercent: number; onlineMinutes: number; offlineMinutes: number } | null {
+    if (!aggregate || aggregate.sampleCount === 0) return null;
+
+    const observedStartMs = Math.max(windowStart.getTime(), aggregate.firstSample.getTime());
+    const observedMs = Math.max(UPTIME_BUCKET_MS, now.getTime() - observedStartMs);
+    const totalBuckets = Math.max(1, Math.ceil(observedMs / UPTIME_BUCKET_MS));
+
+    const uptimePercent = Math.min(100, Math.round((aggregate.upBuckets / totalBuckets) * 1000) / 10);
+    const windowMinutes = observedMs / 60000;
+    const onlineMinutes = Math.round((windowMinutes * uptimePercent) / 100);
+    const offlineMinutes = Math.max(0, Math.round(windowMinutes) - onlineMinutes);
+
+    return { uptimePercent, onlineMinutes, offlineMinutes };
   }
 
   /**

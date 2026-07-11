@@ -9,6 +9,7 @@ import { DatabaseModule } from '../database/database.module';
 import { StorageModule } from '../storage/storage.module';
 import { DeviceGateway } from '../gateways/device.gateway';
 import { RedisService } from '../services/redis.service';
+import { ClickHouseService } from '../services/clickhouse.service';
 import { HeartbeatService } from '../services/heartbeat.service';
 import { PlaylistService } from '../services/playlist.service';
 import { NotificationService } from '../services/notification.service';
@@ -38,6 +39,7 @@ import { WsAuthGuard, WsDeviceGuard } from '../gateways/guards/ws-auth.guard';
     AppService,
     DeviceGateway,
     RedisService,
+    ClickHouseService,
     HeartbeatService,
     PlaylistService,
     NotificationService,

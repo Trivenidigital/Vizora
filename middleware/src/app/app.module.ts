@@ -7,6 +7,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '../modules/config/config.module';
 import { DatabaseModule } from '../modules/database/database.module';
+import { ClickHouseModule } from '../modules/clickhouse/clickhouse.module';
 import { RedisModule } from '../modules/redis/redis.module';
 import { CommonModule } from '../modules/common/common.module';
 import { AuthModule } from '../modules/auth/auth.module';
@@ -119,6 +120,7 @@ import { CsrfMiddleware } from '../modules/common/middleware/csrf.middleware';
     StorageModule,
     MailModule,
     DatabaseModule,
+    ClickHouseModule,
     RedisModule,
     AuthModule,
     OrganizationsModule,
