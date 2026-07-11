@@ -37,6 +37,25 @@ describe('RedisService', () => {
       await service.onModuleInit();
       expect(service.getClient()).not.toBeNull();
     });
+
+    it('uses a resilient retry strategy that never gives up (crash-loop regression)', async () => {
+      await service.onModuleInit();
+      const RedisMock = jest.requireMock('ioredis') as jest.Mock;
+      const opts = RedisMock.mock.calls[0][1];
+
+      // Raised from 3 so in-flight commands ride out a brief reconnect.
+      expect(opts.maxRetriesPerRequest).toBe(20);
+
+      // retryStrategy must NEVER return null: null fires 'end', after which every
+      // command fails and cascades into an unhandled rejection that crash-loops
+      // the process. It must always return a positive, capped backoff.
+      for (const times of [1, 5, 10, 11, 50, 500]) {
+        const delay = opts.retryStrategy(times);
+        expect(typeof delay).toBe('number');
+        expect(delay).toBeGreaterThan(0);
+        expect(delay).toBeLessThanOrEqual(5000);
+      }
+    });
   });
 
   describe('ping', () => {
