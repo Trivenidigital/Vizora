@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { LineChart, BarChart, PieChart, AreaChart, ComposedChart } from '@/components/charts';
+import { LineChart, BarChart, PieChart, AreaChart } from '@/components/charts';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Icon, type IconName } from '@/theme/icons';
@@ -50,7 +50,7 @@ interface KPICardProps {
 
 interface AnalyticsCsvExport {
  summary?: Partial<AnalyticsSummary>;
- deviceMetrics?: Array<{ date: string; mobile?: number; tablet?: number; desktop?: number }>;
+ deviceMetrics?: Array<{ date: string; availabilityEstimate?: number }>;
  contentPerformance?: Array<{
   title?: string;
   name?: string;
@@ -174,7 +174,7 @@ export default function AnalyticsClient() {
  { label: 'Content proof-of-play', error: contentPerformance.error },
  { label: 'Device distribution', error: deviceDistribution.error },
  { label: 'Usage trends', error: usageTrends.error },
- { label: 'Estimated transfer volume', error: bandwidthUsage.error },
+ { label: 'Estimated storage footprint', error: bandwidthUsage.error },
  { label: 'Playlist playback summary', error: playlistPerformance.error },
  ].filter((section) => Boolean(section.error));
 
@@ -216,9 +216,9 @@ export default function AnalyticsClient() {
  // Device Metrics section
  if (data.deviceMetrics?.length) {
  sections.push('ESTIMATED AVAILABILITY');
- sections.push(['Date', 'Lower Estimate %', 'Mid Estimate %', 'Upper Estimate %'].join(','));
+ sections.push(['Date', 'Estimated Availability %'].join(','));
  data.deviceMetrics.forEach((d) => {
- sections.push([csvCell(d.date), fixedCell(d.mobile), fixedCell(d.tablet), fixedCell(d.desktop)].join(','));
+ sections.push([csvCell(d.date), fixedCell(d.availabilityEstimate)].join(','));
  });
  sections.push('');
  }
@@ -395,7 +395,7 @@ export default function AnalyticsClient() {
  </Badge>
  </div>
  <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
- Estimated from display inventory and creation dates. This is not measured historical uptime.
+ Measured from device health check-ins: the share of 5-minute windows each day with at least one heartbeat. Days with no telemetry show as 0%.
  </p>
  </Card.Header>
  <Card.Body>
@@ -413,9 +413,7 @@ export default function AnalyticsClient() {
  <LineChart
  data={deviceMetrics.data}
  dataKeys={[
- { key: 'mobile', name: 'Lower availability estimate' },
- { key: 'tablet', name: 'Mid availability estimate' },
- { key: 'desktop', name: 'Upper availability estimate' },
+ { key: 'availabilityEstimate', name: 'Estimated availability' },
  ]}
  xAxisKey="date"
  yAxisLabel="Estimated availability %"
@@ -528,14 +526,14 @@ export default function AnalyticsClient() {
  </Card.Body>
  </Card>
 
- {/* Estimated Transfer Volume */}
+ {/* Estimated Storage Footprint */}
  <Card className="eh-dash-card lg:col-span-2">
  <Card.Header>
  <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)]">
- Estimated Transfer Volume
+ Estimated Storage Footprint
  </h3>
  <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
- Estimated from stored content size and assigned screens. This is not measured network throughput.
+ Cumulative size of stored content by date, summed from real file sizes. Deleted content is not included; this is not measured network transfer.
  </p>
  </Card.Header>
  <Card.Body>
@@ -546,19 +544,17 @@ export default function AnalyticsClient() {
  </div>
  </div>
  ) : bandwidthUsage.error ? (
- <ChartErrorState message="Unable to load estimated transfer volume." detail={bandwidthUsage.error} />
+ <ChartErrorState message="Unable to load estimated storage footprint." detail={bandwidthUsage.error} />
  ) : bandwidthUsage.data.length === 0 ? (
- <EmptyChartState message="No transfer estimate yet. Upload content and pair screens to estimate daily transfer volume." />
+ <EmptyChartState message="No stored content yet. Upload content to see the storage footprint over time." />
  ) : (
- <ComposedChart
+ <AreaChart
  data={bandwidthUsage.data}
- series={[
- { type: 'line', key: 'current', name: 'Estimated current volume' },
- { type: 'line', key: 'average', name: 'Estimated average volume' },
- { type: 'bar', key: 'peak', name: 'Estimated peak volume' },
+ dataKeys={[
+ { key: 'storageMb', name: 'Stored content size (MB)' },
  ]}
  xAxisKey="time"
- yAxisLabel="MB/day"
+ yAxisLabel="MB"
  height={300}
  />
  )}

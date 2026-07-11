@@ -52,46 +52,57 @@ export class AnalyticsService {
    * Uses Display table heartbeat data
    */
   async getDeviceMetrics(organizationId: string, range: string): Promise<DeviceMetricDataPoint[]> {
-    const days = this.getRangeDays(range);
+    const windowDays = Math.min(this.getRangeDays(range), 30);
+    const now = new Date();
 
-    // Get all devices for this org
-    const displays = await this.db.display.findMany({
-      where: { organizationId },
-      select: {
-        id: true,
-        status: true,
-        lastHeartbeat: true,
-        metadata: true,
-        createdAt: true,
-      },
-    });
+    // Start of the earliest displayed day (UTC), aligned with ClickHouse
+    // toDate(event_time, 'UTC') so per-day keys match.
+    const startOfEarliestDay = new Date(now);
+    startOfEarliestDay.setUTCDate(startOfEarliestDay.getUTCDate() - (windowDays - 1));
+    startOfEarliestDay.setUTCHours(0, 0, 0, 0);
 
-    const totalDevices = displays.length;
-    if (totalDevices === 0) return [];
+    // Real per-day availability from the durable health-sample time-series.
+    // There is NO per-form-factor telemetry, so this is a single measured
+    // availability series — never a fabricated per-device-type split.
+    const daily = await this.clickhouse.getOrgDailyAvailability(organizationId, startOfEarliestDay);
 
-    // Generate daily data points based on device creation/heartbeat patterns
-    const dataPoints = [];
-    for (let i = 0; i < Math.min(days, 30); i++) {
-      const date = new Date();
-      date.setDate(date.getDate() - (days - 1 - i));
-      const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    // Honest-empty: ClickHouse unavailable (null) or zero samples in the whole
+    // window ⇒ return [] so the dashboard shows its empty state, NEVER a
+    // fabricated availability line.
+    if (!daily) return [];
+    if (daily.reduce((sum, d) => sum + d.upBuckets, 0) === 0) return [];
 
-      // Count devices that existed and had heartbeats by this date
-      const activeByDate = displays.filter(d => {
-        const created = new Date(d.createdAt);
-        return created <= date;
-      }).length;
+    const upBucketsByDay = new Map(daily.map((d) => [d.day, d.upBuckets]));
 
-      // Simulate uptime categories based on real device count
-      const baseUptime = totalDevices > 0 ? (activeByDate / totalDevices) * 100 : 0;
+    // Buckets in a full past day (288 = 24×60/5). Today is partial — only count
+    // the 5-min buckets elapsed so far — so a device online all day still reads
+    // ~100% instead of being penalised for the not-yet-elapsed remainder.
+    const fullDayBuckets = (24 * 60 * 60 * 1000) / UPTIME_BUCKET_MS;
+    const todayKey = now.toISOString().slice(0, 10);
+    const elapsedBucketsToday = Math.max(
+      1,
+      Math.floor((now.getTime() - Date.parse(`${todayKey}T00:00:00Z`)) / UPTIME_BUCKET_MS),
+    );
+
+    const dataPoints: DeviceMetricDataPoint[] = [];
+    for (let i = 0; i < windowDays; i++) {
+      const day = new Date(startOfEarliestDay);
+      day.setUTCDate(day.getUTCDate() + i);
+      const dayKey = day.toISOString().slice(0, 10);
+      const dateStr = day.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+
+      // A day with no ClickHouse row means no heartbeats that day ⇒ 0% (device
+      // was down / not reporting). This is only reached when the window has
+      // some data, so it is a measured 0, not a fabricated one.
+      const upBuckets = upBucketsByDay.get(dayKey) ?? 0;
+      const expectedBuckets = dayKey === todayKey ? elapsedBucketsToday : fullDayBuckets;
+      const availabilityEstimate = Math.min(100, Math.round((upBuckets / expectedBuckets) * 1000) / 10);
 
       dataPoints.push({
         date: dateStr,
-        mobile: Math.min(100, Math.max(0, baseUptime * 0.85)),
-        tablet: Math.min(100, Math.max(0, baseUptime * 0.92)),
-        desktop: Math.min(100, Math.max(0, baseUptime * 0.98)),
+        availabilityEstimate,
         isEstimated: true,
-        metricSource: 'display_inventory_estimate',
+        metricSource: 'clickhouse_health_samples',
         unit: 'percent',
       });
     }
@@ -224,37 +235,42 @@ export class AnalyticsService {
   }
 
   /**
-   * Bandwidth usage - estimated from content file sizes and device count
+   * Estimated storage footprint over time — the cumulative size of stored
+   * content as of each day in the range, summed from REAL per-content
+   * `fileSize` values. This replaces the former "bandwidth" metric, which
+   * multiplied content size by device count and fabricated a 1.5x peak;
+   * Vizora does not meter network transfer, so no such number is reported.
+   * Content deleted before "now" is not represented, so early-window points
+   * are a lower-bound reconstruction — hence `isEstimated`.
    */
   async getBandwidthUsage(organizationId: string, range: string): Promise<BandwidthDataPoint[]> {
     const days = this.getRangeDays(range);
 
-    const [contentStats, deviceCount] = await Promise.all([
-      this.db.content.aggregate({
-        where: { organizationId },
-        _sum: { fileSize: true },
-        _count: { id: true },
-      }),
-      this.db.display.count({ where: { organizationId } }),
-    ]);
+    const contents = await this.db.content.findMany({
+      where: { organizationId },
+      select: { fileSize: true, createdAt: true },
+    });
 
-    const totalSizeMB = (contentStats._sum.fileSize || 0) / (1024 * 1024);
-    const avgDailyMB = deviceCount > 0 ? (totalSizeMB * deviceCount) / Math.max(days, 1) : 0;
+    if (contents.length === 0) return [];
 
-    const dataPoints = [];
+    const dataPoints: BandwidthDataPoint[] = [];
     for (let i = 0; i < Math.min(days, 30); i++) {
       const date = new Date();
       date.setDate(date.getDate() - (days - 1 - i));
+      date.setHours(23, 59, 59, 999); // "as of" end of this day
       const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+      const cumulativeBytes = contents.reduce(
+        (sum, c) => (new Date(c.createdAt) <= date ? sum + (c.fileSize || 0) : sum),
+        0,
+      );
 
       dataPoints.push({
         time: dateStr,
-        current: avgDailyMB,
-        average: avgDailyMB,
-        peak: avgDailyMB * 1.5,
+        storageMb: Math.round((cumulativeBytes / (1024 * 1024)) * 10) / 10,
         isEstimated: true,
-        metricSource: 'content_size_device_count_estimate',
-        unit: 'MB/day',
+        metricSource: 'content_file_size_sum',
+        unit: 'MB',
       });
     }
 

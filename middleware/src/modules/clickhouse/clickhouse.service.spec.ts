@@ -103,6 +103,35 @@ describe('ClickHouseService (middleware reader)', () => {
     });
   });
 
+  describe('getOrgDailyAvailability', () => {
+    it('maps each grouped day to an up-bucket count', async () => {
+      mockClient.query.mockResolvedValue(
+        resultSet([
+          { day: '2026-07-09', up_buckets: '288' },
+          { day: '2026-07-10', up_buckets: '144' },
+        ]),
+      );
+      const service = new ClickHouseService();
+
+      const rows = await service.getOrgDailyAvailability('o1', new Date('2026-07-09T00:00:00Z'));
+
+      expect(rows).toEqual([
+        { day: '2026-07-09', upBuckets: 288 },
+        { day: '2026-07-10', upBuckets: 144 },
+      ]);
+      const call = mockClient.query.mock.calls[0][0];
+      expect(call.query_params).toMatchObject({ organizationId: 'o1' });
+      expect(call.query).toContain(DEVICE_HEALTH_SAMPLES_TABLE);
+      expect(call.query).toContain('GROUP BY day');
+    });
+
+    it('returns null (→ honest-empty) when the query throws (fail-open)', async () => {
+      mockClient.query.mockRejectedValueOnce(new Error('down'));
+      const service = new ClickHouseService();
+      await expect(service.getOrgDailyAvailability('o1', new Date())).resolves.toBeNull();
+    });
+  });
+
   describe('getLatestSampleTime', () => {
     it('reports available + lastSample when samples exist', async () => {
       mockClient.query.mockResolvedValue(

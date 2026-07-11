@@ -46,9 +46,12 @@ interface HealthStatus {
     total: number;
   };
   uptime: number;
+  // `null` means "not reported" — the backend /admin/health response carries no
+  // error-rate telemetry, so we surface it as unavailable rather than a
+  // fabricated 0.00%.
   errorRate: {
-    last1h: number;
-    last24h: number;
+    last1h: number | null;
+    last24h: number | null;
   };
 }
 
@@ -71,7 +74,7 @@ const UNAVAILABLE_HEALTH: HealthStatus = {
   redis: { status: 'down', memory: 0, maxMemory: 0, latency: 0 },
   storage: { status: 'unknown', used: 0, total: 0 },
   uptime: 0,
-  errorRate: { last1h: 0, last24h: 0 },
+  errorRate: { last1h: null, last24h: null },
 };
 
 function hasPlatformHealthShape(health: HealthInput): health is PlatformHealth {
@@ -150,7 +153,8 @@ function normalizeHealthStatus(health: HealthInput | null): HealthStatus | null 
       total: 0,
     },
     uptime: 0,
-    errorRate: { last1h: 0, last24h: 0 },
+    // The backend platform-health response has no error-rate telemetry.
+    errorRate: { last1h: null, last24h: null },
   };
 }
 
@@ -205,6 +209,10 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
 
   const formatLatency = (value: number | undefined) => {
     return typeof value === 'number' && Number.isFinite(value) ? `${value}ms latency` : 'Latency not reported';
+  };
+
+  const formatErrorRate = (value: number | null) => {
+    return typeof value === 'number' && Number.isFinite(value) ? `${value.toFixed(2)}%` : 'Not reported';
   };
 
   const formatDbConnections = () => {
@@ -341,10 +349,10 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
         <StatCard title="Uptime" value={formatUptime(healthData.uptime)} icon={<Clock className="w-6 h-6" />} color="green" />
         <StatCard
           title="Error Rate (1h)"
-          value={`${healthData.errorRate.last1h.toFixed(2)}%`}
-          subtitle={`24h: ${healthData.errorRate.last24h.toFixed(2)}%`}
+          value={formatErrorRate(healthData.errorRate.last1h)}
+          subtitle={`24h: ${formatErrorRate(healthData.errorRate.last24h)}`}
           icon={<AlertTriangle className="w-6 h-6" />}
-          color={healthData.errorRate.last1h > 1 ? 'red' : 'green'}
+          color={healthData.errorRate.last1h !== null && healthData.errorRate.last1h > 1 ? 'red' : 'green'}
         />
         <StatCard
           title="DB Connections"

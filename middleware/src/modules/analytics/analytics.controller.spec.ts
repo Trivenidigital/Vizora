@@ -37,7 +37,7 @@ describe('AnalyticsController', () => {
 
   describe('getDeviceMetrics', () => {
     it('should return device metrics', async () => {
-      const mockData = [{ date: 'Jan 1', mobile: 90, tablet: 95, desktop: 99 }];
+      const mockData = [{ date: 'Jan 1', availabilityEstimate: 90, isEstimated: true }];
       mockAnalyticsService.getDeviceMetrics.mockResolvedValue(mockData);
 
       const result = await controller.getDeviceMetrics(organizationId, 'month');
@@ -84,7 +84,7 @@ describe('AnalyticsController', () => {
 
   describe('getBandwidthUsage', () => {
     it('should return bandwidth usage', async () => {
-      const mockData = [{ time: 'Jan 1', current: 100, average: 80, peak: 150 }];
+      const mockData = [{ time: 'Jan 1', storageMb: 100, isEstimated: true, unit: 'MB' }];
       mockAnalyticsService.getBandwidthUsage.mockResolvedValue(mockData);
 
       const result = await controller.getBandwidthUsage(organizationId, 'month');

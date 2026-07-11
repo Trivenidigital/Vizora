@@ -88,7 +88,9 @@ describe('AdminAnalyticsClient', () => {
     render(<AdminAnalyticsClient initialStats={mockStats} />);
     expect(screen.getByText('Platform Usage')).toBeInTheDocument();
     expect(screen.getByText('Screen Utilization')).toBeInTheDocument();
-    expect(screen.getByText('Content Engagement')).toBeInTheDocument();
+    // Fabricated "Content Engagement" and "Active Organizations" rows were removed.
+    expect(screen.queryByText('Content Engagement')).not.toBeInTheDocument();
+    expect(screen.queryByText('Active Organizations')).not.toBeInTheDocument();
   });
 
   it('renders growth trends section', () => {

@@ -30,6 +30,17 @@ export interface ClickHouseFreshness {
 }
 
 /**
+ * Per-day availability for an org, measured from `device_health_samples`.
+ * `day` is a 'YYYY-MM-DD' UTC date; `upBuckets` is the count of distinct 5-min
+ * windows that day that held ≥1 heartbeat across the org's devices. Days with
+ * no telemetry are simply absent from the array.
+ */
+export interface OrgDailyAvailability {
+  day: string;
+  upBuckets: number;
+}
+
+/**
  * Read + schema + freshness side of ClickHouse for the middleware.
  *
  * ═══ FAIL-OPEN CONTRACT ═══ (same non-negotiable as the realtime writer)
@@ -189,6 +200,48 @@ export class ClickHouseService implements OnModuleInit, OnModuleDestroy {
       }));
     } catch (err) {
       this.logThrottled(`Failed to query org uptime for ${organizationId}`, err);
+      return null;
+    }
+  }
+
+  /**
+   * Per-day availability for an org since `since`, measured from the durable
+   * health-sample time-series: for each UTC day, the number of distinct 5-min
+   * buckets that held ≥1 heartbeat across the org's devices. Returns null when
+   * ClickHouse is unavailable/errors (caller → honest-empty, NEVER a fabricated
+   * line); an org with no samples yields an empty array.
+   */
+  async getOrgDailyAvailability(
+    organizationId: string,
+    since: Date,
+  ): Promise<OrgDailyAvailability[] | null> {
+    try {
+      const client = this.getClient();
+      if (!client) return null;
+      const resultSet = await client.query({
+        query: `
+          SELECT
+            toDate(event_time, 'UTC') AS day,
+            uniqExact(toStartOfInterval(event_time, ${UPTIME_BUCKET_INTERVAL_SQL}, 'UTC')) AS up_buckets
+          FROM ${DEVICE_HEALTH_SAMPLES_TABLE}
+          WHERE organizationId = {organizationId:String}
+            AND event_time >= {since:DateTime}
+          GROUP BY day
+          ORDER BY day
+        `,
+        query_params: {
+          organizationId,
+          since: formatClickHouseDateTime(since),
+        },
+        format: 'JSONEachRow',
+      });
+      const rows = await resultSet.json<{ day: string; up_buckets: string | number }>();
+      return rows.map((row) => ({
+        day: String(row.day),
+        upBuckets: Number(row.up_buckets),
+      }));
+    } catch (err) {
+      this.logThrottled(`Failed to query org daily availability for ${organizationId}`, err);
       return null;
     }
   }

@@ -165,13 +165,13 @@ describe('AnalyticsClient', () => {
 
   it('labels current-state and estimated analytics honestly', async () => {
     mockUseDeviceMetrics.mockReturnValue({
-      data: [{ date: 'Jan 1', mobile: 85, tablet: 92, desktop: 98, isEstimated: true }],
+      data: [{ date: 'Jan 1', availabilityEstimate: 90, isEstimated: true }],
       loading: false,
       error: null,
       isMockData: false,
     });
     mockUseBandwidthUsage.mockReturnValue({
-      data: [{ time: 'Jan 1', current: 10, average: 10, peak: 15, isEstimated: true, unit: 'MB/day' }],
+      data: [{ time: 'Jan 1', storageMb: 100, isEstimated: true, unit: 'MB' }],
       loading: false,
       error: null,
       isMockData: false,
@@ -184,11 +184,14 @@ describe('AnalyticsClient', () => {
     expect(screen.getByText('Online Now')).toBeInTheDocument();
     expect(screen.getByText(/Current online ratio from display status/i)).toBeInTheDocument();
     expect(screen.getByText('Estimated Availability Trend')).toBeInTheDocument();
-    expect(screen.getByText(/Estimated from display inventory/i)).toBeInTheDocument();
-    expect(screen.getByText('Estimated Transfer Volume')).toBeInTheDocument();
-    expect(screen.getByText(/Estimated from stored content size and assigned screens/i)).toBeInTheDocument();
-    expect(screen.getByText('MB/day')).toBeInTheDocument();
+    expect(screen.getByText(/Measured from device health check-ins/i)).toBeInTheDocument();
+    // Bandwidth was fabricated (device-count multiplier + 1.5x peak); it is now
+    // an honest storage footprint derived from real content file sizes.
+    expect(screen.getByText('Estimated Storage Footprint')).toBeInTheDocument();
+    expect(screen.getByText(/Cumulative size of stored content/i)).toBeInTheDocument();
+    expect(screen.getByText('MB')).toBeInTheDocument();
     expect(screen.queryByText('MB/s')).not.toBeInTheDocument();
+    expect(screen.queryByText('MB/day')).not.toBeInTheDocument();
   });
 
   it('uses proof-of-play labels for content and playlist charts', async () => {
@@ -289,7 +292,7 @@ describe('AnalyticsClient', () => {
     try {
       (apiClient.exportAnalytics as jest.Mock).mockResolvedValueOnce({
         summary: { totalDevices: 10, onlineDevices: 8, uptimePercent: 80, onlineNowPercent: 80 },
-        deviceMetrics: [{ date: 'Jan 1', mobile: 85, tablet: 92, desktop: 98 }],
+        deviceMetrics: [{ date: 'Jan 1', availabilityEstimate: 90 }],
         contentPerformance: [{ title: 'Promo', impressions: 3, averageCompletion: 90 }],
         playlistPerformance: [{ name: 'Morning Loop', proofOfPlayImpressions: 3, averageCompletion: 90, assignedScreens: 2 }],
       });
