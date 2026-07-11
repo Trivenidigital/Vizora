@@ -349,6 +349,16 @@ export class RedisService implements OnModuleDestroy {
   }
 
   /**
+   * Atomically set a key only if it does not already exist (SET NX EX).
+   * Returns true if this call created the key, false if it already existed.
+   * Used to claim a single-writer lock / cooldown (e.g. device-token refresh).
+   */
+  async setNx(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+    const result = await this.redis.set(key, value, 'EX', ttlSeconds, 'NX');
+    return result === 'OK';
+  }
+
+  /**
    * Delete key
    */
   async delete(key: string): Promise<void> {

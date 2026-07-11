@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Prisma } from '@vizora/database';
+import { Prisma, DEVICE_OFFLINE_THRESHOLD_MS } from '@vizora/database';
 import { JwtService } from '@nestjs/jwt';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
@@ -298,12 +298,16 @@ export class DisplaysService {
 
   /**
    * Detect devices that stopped sending heartbeats and mark them offline.
-   * Runs every 2 minutes. A device is considered offline if its last
-   * heartbeat was >2 minutes ago and status is still 'online'.
+   * Runs every minute. A device is considered offline if its last heartbeat
+   * was older than DEVICE_OFFLINE_THRESHOLD_MS and status is still 'online'.
+   *
+   * The threshold is the single shared constant from @vizora/database so this
+   * cron and the realtime health read (HeartbeatService.getDeviceHealth) agree
+   * on when a device is offline — see that constant for the value rationale.
    */
   @Cron(CronExpression.EVERY_MINUTE)
   async detectOfflineDevices(): Promise<void> {
-    const threshold = new Date(Date.now() - 2 * 60 * 1000); // 2 minutes ago
+    const threshold = new Date(Date.now() - DEVICE_OFFLINE_THRESHOLD_MS);
     const staleDevices = await this.db.display.findMany({
       where: {
         status: 'online',

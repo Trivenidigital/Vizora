@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { DEVICE_OFFLINE_THRESHOLD_MS } from '@vizora/database';
 import { RedisService } from './redis.service';
 import { DatabaseService } from '../database/database.service';
 import {
@@ -185,7 +186,11 @@ export class HeartbeatService {
       const timeSinceHeartbeat = Date.now() - heartbeat.timestamp;
 
       return {
-        status: timeSinceHeartbeat < 60000 ? 'online' : 'offline', // 60 seconds threshold
+        // Shared offline threshold from @vizora/database — keeps this live read
+        // consistent with the middleware offline-detection cron (previously this
+        // used 60s while the cron used 120s, so a 60–120s-stale device disagreed
+        // across the two views).
+        status: timeSinceHeartbeat < DEVICE_OFFLINE_THRESHOLD_MS ? 'online' : 'offline',
         lastSeen: new Date(heartbeat.timestamp).toISOString(),
         metrics: heartbeat.metrics,
         currentContent: heartbeat.currentContent,

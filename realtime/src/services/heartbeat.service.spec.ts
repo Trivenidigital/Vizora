@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { DEVICE_OFFLINE_THRESHOLD_MS } from '@vizora/database';
 import { HeartbeatService } from './heartbeat.service';
 import { RedisService } from './redis.service';
 import { DatabaseService } from '../database/database.service';
@@ -294,10 +295,10 @@ describe('HeartbeatService', () => {
       expect(result.lastSeen).toBeNull();
     });
 
-    it('should return online status when heartbeat is recent (< 60s)', async () => {
+    it('should return online status when heartbeat is within the offline threshold', async () => {
       const heartbeat = {
         deviceId: 'device-1',
-        timestamp: Date.now() - 30000, // 30 seconds ago
+        timestamp: Date.now() - 30000, // 30s ago — well inside the threshold
         metrics: { cpuUsage: 50 },
         currentContent: { contentId: 'c-1' },
       };
@@ -311,10 +312,10 @@ describe('HeartbeatService', () => {
       expect(result.currentContent).toEqual({ contentId: 'c-1' });
     });
 
-    it('should return offline status when heartbeat is stale (> 60s)', async () => {
+    it('should return offline status when heartbeat is older than the shared offline threshold', async () => {
       const heartbeat = {
         deviceId: 'device-1',
-        timestamp: Date.now() - 120000, // 2 minutes ago
+        timestamp: Date.now() - (DEVICE_OFFLINE_THRESHOLD_MS + 30000), // clearly past
       };
       mockRedisService.get.mockResolvedValueOnce(JSON.stringify(heartbeat));
 
@@ -322,6 +323,22 @@ describe('HeartbeatService', () => {
 
       expect(result.status).toBe('offline');
       expect(result.lastSeen).toBeDefined();
+    });
+
+    it('uses the shared 120s threshold — a 90s-stale device now reads online (was offline at 60s)', async () => {
+      // Regression guard for the unification: 60–120s-stale devices previously
+      // read offline here while the middleware cron read them online. Both now
+      // route through DEVICE_OFFLINE_THRESHOLD_MS (120s).
+      expect(DEVICE_OFFLINE_THRESHOLD_MS).toBe(120000);
+      const heartbeat = {
+        deviceId: 'device-1',
+        timestamp: Date.now() - 90000, // 90s ago — between the old 60s and new 120s
+      };
+      mockRedisService.get.mockResolvedValueOnce(JSON.stringify(heartbeat));
+
+      const result = await service.getDeviceHealth('device-1');
+
+      expect(result.status).toBe('online');
     });
 
     it('should return unknown status on Redis error', async () => {

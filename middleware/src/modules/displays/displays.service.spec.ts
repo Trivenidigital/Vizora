@@ -4,6 +4,7 @@ import { HttpService } from '@nestjs/axios';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { of } from 'rxjs';
 import { createHash } from 'node:crypto';
+import { DEVICE_OFFLINE_THRESHOLD_MS } from '@vizora/database';
 import { DisplaysService } from './displays.service';
 import { DatabaseService } from '../database/database.service';
 import { CircuitBreakerService, CircuitState } from '../common/services/circuit-breaker.service';
@@ -1045,6 +1046,22 @@ describe('DisplaysService', () => {
       await service.detectOfflineDevices();
 
       expect(databaseService.display.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('uses the shared DEVICE_OFFLINE_THRESHOLD_MS for the staleness cutoff', async () => {
+      // Routes through the single @vizora/database constant so this cron and the
+      // realtime health read agree on "offline" (unified at 120s).
+      databaseService.display.findMany.mockResolvedValue([]);
+      const before = Date.now();
+
+      await service.detectOfflineDevices();
+
+      const arg = databaseService.display.findMany.mock.calls[0][0];
+      const cutoff = arg.where.lastHeartbeat.lt as Date;
+      const after = Date.now();
+      // cutoff === now - DEVICE_OFFLINE_THRESHOLD_MS (allow for elapsed ms).
+      expect(cutoff.getTime()).toBeGreaterThanOrEqual(before - DEVICE_OFFLINE_THRESHOLD_MS);
+      expect(cutoff.getTime()).toBeLessThanOrEqual(after - DEVICE_OFFLINE_THRESHOLD_MS);
     });
   });
 
