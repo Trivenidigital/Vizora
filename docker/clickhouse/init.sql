@@ -1,6 +1,25 @@
 -- ClickHouse initialization script for Vizora Analytics
 
--- Heartbeats table - Device health metrics
+-- Device health samples - durable device time-series powering REAL uptime.
+-- Written by the realtime gateway on every heartbeat (batched, fail-open) and
+-- read by the middleware AnalyticsService (uptime = fraction of 5-min buckets
+-- that hold >=1 sample). The app also creates this idempotently on startup
+-- (ClickHouseService.ensureSchema); this file is the canonical DDL for a fresh
+-- stack. Keep the two in sync.
+CREATE TABLE IF NOT EXISTS device_health_samples (
+  deviceId String,
+  organizationId String,
+  cpu Float32,
+  memory Float32,
+  temperature Nullable(Float32),
+  status String,
+  event_time DateTime
+) ENGINE = MergeTree()
+PARTITION BY toYYYYMM(event_time)
+ORDER BY (organizationId, deviceId, event_time)
+TTL event_time + INTERVAL 90 DAY DELETE;
+
+-- Heartbeats table - Device health metrics (legacy; not yet wired to the app)
 CREATE TABLE IF NOT EXISTS heartbeats (
   timestamp DateTime64(3),
   device_id String,

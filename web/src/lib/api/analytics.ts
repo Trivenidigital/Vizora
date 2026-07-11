@@ -6,6 +6,44 @@ import type {
 } from '../types';
 import { ApiClient } from './client';
 
+/**
+ * Uptime source. `clickhouse_health_samples` = a real measurement over the
+ * durable device-health time-series. `insufficient_data` = no history yet
+ * (freshly wired, device idle, or ClickHouse unreachable) — `uptimePercent` is
+ * `null`, NEVER a fabricated number. Render insufficient data as "—", not 0%.
+ */
+export type UptimeMetricSource = 'clickhouse_health_samples' | 'insufficient_data';
+
+export interface DeviceUptime {
+  deviceId: string;
+  measured: boolean;
+  uptimePercent: number | null;
+  sampleCount: number;
+  totalOnlineMinutes: number | null;
+  totalOfflineMinutes: number | null;
+  lastHeartbeat: string | null;
+  windowDays: number;
+  metricSource: UptimeMetricSource;
+}
+
+export interface UptimeSummary {
+  measured: boolean;
+  avgUptimePercent: number | null;
+  deviceCount: number;
+  measuredDeviceCount: number;
+  onlineCount: number;
+  offlineCount: number;
+  devices: Array<{
+    id: string;
+    nickname: string;
+    measured: boolean;
+    uptimePercent: number | null;
+    sampleCount: number;
+  }>;
+  windowDays: number;
+  metricSource: UptimeMetricSource;
+}
+
 declare module './client' {
   interface ApiClient {
     getAnalyticsSummary(): Promise<AnalyticsSummary>;
@@ -16,8 +54,8 @@ declare module './client' {
     getBandwidthUsage(range?: string): Promise<BandwidthUsage[]>;
     getPlaylistPerformance(range?: string): Promise<PlaylistPerformance[]>;
     exportAnalytics(range?: string): Promise<AnalyticsExport>;
-    getDeviceUptime(deviceId: string, days?: number): Promise<{ deviceId: string; uptimePercent: number; totalOnlineMinutes: number; totalOfflineMinutes: number; lastHeartbeat: string | null }>;
-    getUptimeSummary(days?: number): Promise<{ avgUptimePercent: number; deviceCount: number; onlineCount: number; offlineCount: number; devices: Array<{ id: string; nickname: string; uptimePercent: number }> }>;
+    getDeviceUptime(deviceId: string, days?: number): Promise<DeviceUptime>;
+    getUptimeSummary(days?: number): Promise<UptimeSummary>;
   }
 }
 
@@ -56,36 +94,12 @@ ApiClient.prototype.exportAnalytics = async function (range: string = 'month'): 
 ApiClient.prototype.getDeviceUptime = async function (
   deviceId: string,
   days?: number,
-): Promise<{
-  deviceId: string;
-  uptimePercent: number;
-  totalOnlineMinutes: number;
-  totalOfflineMinutes: number;
-  lastHeartbeat: string | null;
-}> {
+): Promise<DeviceUptime> {
   const params = days ? `?days=${days}` : '';
-  return this.request<{
-    deviceId: string;
-    uptimePercent: number;
-    totalOnlineMinutes: number;
-    totalOfflineMinutes: number;
-    lastHeartbeat: string | null;
-  }>(`/analytics/device-uptime/${deviceId}${params}`);
+  return this.request<DeviceUptime>(`/analytics/device-uptime/${deviceId}${params}`);
 };
 
-ApiClient.prototype.getUptimeSummary = async function (days?: number): Promise<{
-  avgUptimePercent: number;
-  deviceCount: number;
-  onlineCount: number;
-  offlineCount: number;
-  devices: Array<{ id: string; nickname: string; uptimePercent: number }>;
-}> {
+ApiClient.prototype.getUptimeSummary = async function (days?: number): Promise<UptimeSummary> {
   const params = days ? `?days=${days}` : '';
-  return this.request<{
-    avgUptimePercent: number;
-    deviceCount: number;
-    onlineCount: number;
-    offlineCount: number;
-    devices: Array<{ id: string; nickname: string; uptimePercent: number }>;
-  }>(`/analytics/uptime-summary${params}`);
+  return this.request<UptimeSummary>(`/analytics/uptime-summary${params}`);
 };

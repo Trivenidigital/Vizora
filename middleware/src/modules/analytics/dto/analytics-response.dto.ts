@@ -92,24 +92,52 @@ export interface ContentMetrics {
   topDevices: Array<{ deviceId: string; deviceName: string; views: number }>;
 }
 
+/**
+ * Uptime source markers. `clickhouse_health_samples` = a real measurement over
+ * the durable device-health time-series. `insufficient_data` = no samples yet
+ * (freshly wired, device idle, or ClickHouse unreachable) — the percentage is
+ * `null`, NEVER a fabricated number. Callers must render insufficient data as
+ * "—"/"insufficient", not as a measured percentage.
+ */
+export type UptimeMetricSource = 'clickhouse_health_samples' | 'insufficient_data';
+
 export interface DeviceUptimeResult {
   deviceId: string;
-  uptimePercent: number;
-  totalOnlineMinutes: number;
-  totalOfflineMinutes: number;
+  /** `true` only when computed from real ClickHouse samples. */
+  measured: boolean;
+  /** Measured uptime %, or `null` when there is insufficient data. */
+  uptimePercent: number | null;
+  /** Health samples observed over the window (0 ⇒ insufficient data). */
+  sampleCount: number;
+  totalOnlineMinutes: number | null;
+  totalOfflineMinutes: number | null;
   lastHeartbeat: Date | null;
-  isEstimated?: boolean;
-  metricSource?: 'heartbeat_status_heuristic';
+  windowDays: number;
+  metricSource: UptimeMetricSource;
+}
+
+export interface UptimeSummaryDevice {
+  id: string;
+  nickname: string;
+  measured: boolean;
+  uptimePercent: number | null;
+  sampleCount: number;
 }
 
 export interface UptimeSummaryResult {
-  avgUptimePercent: number;
+  /** `true` when at least one device has a real measurement. */
+  measured: boolean;
+  /** Average uptime % across measured devices, or `null` when none have data. */
+  avgUptimePercent: number | null;
   deviceCount: number;
+  /** Devices with real ClickHouse samples over the window. */
+  measuredDeviceCount: number;
+  /** Currently-online device count (live Display status — always real). */
   onlineCount: number;
   offlineCount: number;
-  devices: Array<{ id: string; nickname: string; uptimePercent: number }>;
-  isEstimated?: boolean;
-  metricSource?: 'heartbeat_status_heuristic';
+  devices: UptimeSummaryDevice[];
+  windowDays: number;
+  metricSource: UptimeMetricSource;
 }
 
 export interface ExportAnalyticsResult {

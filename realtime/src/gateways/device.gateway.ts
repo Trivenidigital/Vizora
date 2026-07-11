@@ -1742,8 +1742,13 @@ export class DeviceGateway
         this.deviceStatusCache.set(deviceId, 'online');
       }
 
-      // Process heartbeat (store in ClickHouse, etc.)
-      await this.heartbeatService.processHeartbeat(deviceId, data);
+      // Process heartbeat: Redis live view + durable ClickHouse time-series.
+      // organizationId keys the ClickHouse sample (fail-open, non-blocking).
+      await this.heartbeatService.processHeartbeat(
+        deviceId,
+        data,
+        client.data.organizationId,
+      );
 
       // Update device metrics if available
       if (data.metrics) {

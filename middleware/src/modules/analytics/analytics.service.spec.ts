@@ -5,8 +5,19 @@ import { DatabaseService } from '../database/database.service';
 describe('AnalyticsService', () => {
   let service: AnalyticsService;
   let mockDb: any;
+  let mockClickhouse: any;
 
   beforeEach(() => {
+    mockClickhouse = {
+      // Default: ClickHouse has no history → uptime reads are "insufficient data".
+      getDeviceUptimeAggregate: jest.fn().mockResolvedValue(null),
+      getOrgUptimeAggregates: jest.fn().mockResolvedValue(null),
+      getLatestSampleTime: jest.fn().mockResolvedValue({ available: false, lastSample: null }),
+      isHealthy: jest.fn().mockResolvedValue(false),
+      ensureSchema: jest.fn().mockResolvedValue(undefined),
+      isEnabled: true,
+    };
+
     mockDb = {
       display: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -34,7 +45,7 @@ describe('AnalyticsService', () => {
       $queryRaw: jest.fn().mockResolvedValue([]),
     };
 
-    service = new AnalyticsService(mockDb as DatabaseService);
+    service = new AnalyticsService(mockDb as DatabaseService, mockClickhouse);
   });
 
   it('should be defined', () => {
@@ -443,24 +454,88 @@ describe('AnalyticsService', () => {
   });
 
   describe('getDeviceUptime', () => {
-    it('should return uptime data for a device', async () => {
+    // A device online for the whole window: a sample in (nearly) every 5-min
+    // bucket. ~30 days ⇒ ~8640 buckets; giving firstSample=windowStart and
+    // upBuckets≈totalBuckets yields ~100% measured uptime.
+    const fullCoverageAggregate = (deviceId: string, days: number, upFraction = 1) => {
+      const now = Date.now();
+      const firstSample = new Date(now - days * 24 * 60 * 60 * 1000);
+      const totalBuckets = Math.ceil((days * 24 * 60 * 60 * 1000) / (5 * 60 * 1000));
+      return {
+        deviceId,
+        upBuckets: Math.round(totalBuckets * upFraction),
+        sampleCount: Math.round(totalBuckets * upFraction),
+        firstSample,
+        lastSample: new Date(now),
+      };
+    };
+
+    it('returns a REAL measured uptime when ClickHouse has samples', async () => {
       const now = new Date();
-      mockDb.display.findFirst.mockResolvedValue({
-        id: 'device-123',
-        nickname: 'Test Device',
-        status: 'online',
-        lastHeartbeat: now,
-      });
+      mockDb.display.findFirst.mockResolvedValue({ id: 'device-123', lastHeartbeat: now });
+      mockClickhouse.getDeviceUptimeAggregate.mockResolvedValue(
+        fullCoverageAggregate('device-123', 30, 1),
+      );
 
       const result = await service.getDeviceUptime('org-123', 'device-123', 30);
 
       expect(result.deviceId).toBe('device-123');
-      expect(result.uptimePercent).toBe(95); // Online device gets 95%
-      expect(result.isEstimated).toBe(true);
-      expect(result.metricSource).toBe('heartbeat_status_heuristic');
-      expect(result.totalOnlineMinutes).toBeGreaterThan(0);
-      expect(result.totalOfflineMinutes).toBeGreaterThan(0);
-      expect(result.lastHeartbeat).toEqual(now);
+      expect(result.measured).toBe(true);
+      expect(result.metricSource).toBe('clickhouse_health_samples');
+      expect(result.uptimePercent).not.toBeNull();
+      expect(result.uptimePercent).toBeGreaterThan(95);
+      expect(result.uptimePercent).toBeLessThanOrEqual(100);
+      expect(result.sampleCount).toBeGreaterThan(0);
+      expect(result.totalOnlineMinutes! + result.totalOfflineMinutes!).toBeGreaterThan(0);
+      expect(mockClickhouse.getDeviceUptimeAggregate).toHaveBeenCalledWith(
+        'org-123',
+        'device-123',
+        expect.any(Date),
+      );
+    });
+
+    it('measures ~50% uptime when only half the buckets have samples', async () => {
+      mockDb.display.findFirst.mockResolvedValue({ id: 'device-123', lastHeartbeat: new Date() });
+      mockClickhouse.getDeviceUptimeAggregate.mockResolvedValue(
+        fullCoverageAggregate('device-123', 30, 0.5),
+      );
+
+      const result = await service.getDeviceUptime('org-123', 'device-123', 30);
+
+      expect(result.measured).toBe(true);
+      expect(result.uptimePercent).toBeGreaterThan(45);
+      expect(result.uptimePercent).toBeLessThan(55);
+    });
+
+    it('returns INSUFFICIENT DATA (null %, not a fabricated number) when no samples exist', async () => {
+      mockDb.display.findFirst.mockResolvedValue({ id: 'device-123', lastHeartbeat: null });
+      mockClickhouse.getDeviceUptimeAggregate.mockResolvedValue({
+        deviceId: 'device-123',
+        upBuckets: 0,
+        sampleCount: 0,
+        firstSample: new Date(),
+        lastSample: new Date(),
+      });
+
+      const result = await service.getDeviceUptime('org-123', 'device-123', 30);
+
+      expect(result.measured).toBe(false);
+      expect(result.uptimePercent).toBeNull();
+      expect(result.totalOnlineMinutes).toBeNull();
+      expect(result.totalOfflineMinutes).toBeNull();
+      expect(result.sampleCount).toBe(0);
+      expect(result.metricSource).toBe('insufficient_data');
+    });
+
+    it('returns INSUFFICIENT DATA when ClickHouse is unavailable (query returns null)', async () => {
+      mockDb.display.findFirst.mockResolvedValue({ id: 'device-123', lastHeartbeat: null });
+      mockClickhouse.getDeviceUptimeAggregate.mockResolvedValue(null);
+
+      const result = await service.getDeviceUptime('org-123', 'device-123', 30);
+
+      expect(result.measured).toBe(false);
+      expect(result.uptimePercent).toBeNull();
+      expect(result.metricSource).toBe('insufficient_data');
     });
 
     it('should throw NotFoundException for invalid device', async () => {
@@ -470,69 +545,75 @@ describe('AnalyticsService', () => {
         NotFoundException,
       );
     });
-
-    it('should calculate lower uptime for offline devices', async () => {
-      const staleHeartbeat = new Date(Date.now() - 10 * 60 * 1000); // 10 minutes ago
-      mockDb.display.findFirst.mockResolvedValue({
-        id: 'device-123',
-        nickname: 'Test Device',
-        status: 'offline',
-        lastHeartbeat: staleHeartbeat,
-      });
-
-      const result = await service.getDeviceUptime('org-123', 'device-123', 30);
-
-      expect(result.uptimePercent).toBe(20); // Offline device gets 20%
-    });
-
-    it('should calculate medium uptime for device with online status but stale heartbeat', async () => {
-      const staleHeartbeat = new Date(Date.now() - 10 * 60 * 1000); // 10 minutes ago
-      mockDb.display.findFirst.mockResolvedValue({
-        id: 'device-123',
-        nickname: 'Test Device',
-        status: 'online',
-        lastHeartbeat: staleHeartbeat,
-      });
-
-      const result = await service.getDeviceUptime('org-123', 'device-123', 30);
-
-      expect(result.uptimePercent).toBe(80); // Online status but stale heartbeat gets 80%
-    });
-
-    it('should use correct days parameter for calculations', async () => {
-      const now = new Date();
-      mockDb.display.findFirst.mockResolvedValue({
-        id: 'device-123',
-        nickname: 'Test Device',
-        status: 'online',
-        lastHeartbeat: now,
-      });
-
-      const result7Days = await service.getDeviceUptime('org-123', 'device-123', 7);
-      const result30Days = await service.getDeviceUptime('org-123', 'device-123', 30);
-
-      // Both have 95% uptime, but total minutes differ based on days
-      expect(result7Days.totalOnlineMinutes + result7Days.totalOfflineMinutes).toBe(7 * 24 * 60);
-      expect(result30Days.totalOnlineMinutes + result30Days.totalOfflineMinutes).toBe(30 * 24 * 60);
-    });
   });
 
   describe('getUptimeSummary', () => {
-    it('should return aggregated uptime data for all devices', async () => {
-      const now = new Date();
+    const coverageAggregate = (deviceId: string, upFraction: number, days = 30) => {
+      const now = Date.now();
+      const totalBuckets = Math.ceil((days * 24 * 60 * 60 * 1000) / (5 * 60 * 1000));
+      return {
+        deviceId,
+        upBuckets: Math.round(totalBuckets * upFraction),
+        sampleCount: Math.round(totalBuckets * upFraction),
+        firstSample: new Date(now - days * 24 * 60 * 60 * 1000),
+        lastSample: new Date(now),
+      };
+    };
+
+    it('measures uptime per device and averages over MEASURED devices only', async () => {
       mockDb.display.findMany.mockResolvedValue([
-        { id: 'd1', nickname: 'Device 1', status: 'online', lastHeartbeat: now },
-        { id: 'd2', nickname: 'Device 2', status: 'offline', lastHeartbeat: null },
+        { id: 'd1', nickname: 'Device 1', status: 'online' },
+        { id: 'd2', nickname: 'Device 2', status: 'offline' },
       ]);
+      // d1 has ~100% coverage; d2 has NO samples (absent from aggregates).
+      mockClickhouse.getOrgUptimeAggregates.mockResolvedValue([coverageAggregate('d1', 1)]);
 
       const result = await service.getUptimeSummary('org-123', 30);
 
       expect(result.deviceCount).toBe(2);
       expect(result.onlineCount).toBe(1);
       expect(result.offlineCount).toBe(1);
-      expect(result.isEstimated).toBe(true);
-      expect(result.metricSource).toBe('heartbeat_status_heuristic');
-      expect(result.devices).toHaveLength(2);
+      expect(result.measured).toBe(true);
+      expect(result.measuredDeviceCount).toBe(1);
+      expect(result.metricSource).toBe('clickhouse_health_samples');
+
+      const d1 = result.devices.find((d) => d.id === 'd1');
+      const d2 = result.devices.find((d) => d.id === 'd2');
+      expect(d1?.measured).toBe(true);
+      expect(d1?.uptimePercent).toBeGreaterThan(95);
+      // d2 has no samples → insufficient data, NOT a fabricated number.
+      expect(d2?.measured).toBe(false);
+      expect(d2?.uptimePercent).toBeNull();
+      // Average is over the single measured device (d1), not diluted by d2.
+      expect(result.avgUptimePercent).toBe(d1?.uptimePercent);
+    });
+
+    it('returns INSUFFICIENT DATA for the org when no device has samples', async () => {
+      mockDb.display.findMany.mockResolvedValue([
+        { id: 'd1', nickname: 'Device 1', status: 'online' },
+      ]);
+      mockClickhouse.getOrgUptimeAggregates.mockResolvedValue([]); // reachable, no rows
+
+      const result = await service.getUptimeSummary('org-123', 30);
+
+      expect(result.measured).toBe(false);
+      expect(result.measuredDeviceCount).toBe(0);
+      expect(result.avgUptimePercent).toBeNull();
+      expect(result.metricSource).toBe('insufficient_data');
+      expect(result.devices[0].uptimePercent).toBeNull();
+    });
+
+    it('returns INSUFFICIENT DATA when ClickHouse is unavailable', async () => {
+      mockDb.display.findMany.mockResolvedValue([
+        { id: 'd1', nickname: 'Device 1', status: 'online' },
+      ]);
+      mockClickhouse.getOrgUptimeAggregates.mockResolvedValue(null); // CH down
+
+      const result = await service.getUptimeSummary('org-123', 30);
+
+      expect(result.measured).toBe(false);
+      expect(result.avgUptimePercent).toBeNull();
+      expect(result.metricSource).toBe('insufficient_data');
     });
 
     it('should handle empty device list', async () => {
@@ -543,49 +624,19 @@ describe('AnalyticsService', () => {
       expect(result.deviceCount).toBe(0);
       expect(result.onlineCount).toBe(0);
       expect(result.offlineCount).toBe(0);
-      expect(result.avgUptimePercent).toBe(0);
+      expect(result.avgUptimePercent).toBeNull();
+      expect(result.measured).toBe(false);
       expect(result.devices).toEqual([]);
     });
 
-    it('should calculate correct average uptime', async () => {
-      const now = new Date();
-      const staleHeartbeat = new Date(Date.now() - 10 * 60 * 1000);
-      mockDb.display.findMany.mockResolvedValue([
-        { id: 'd1', nickname: 'Online Device', status: 'online', lastHeartbeat: now }, // 95%
-        { id: 'd2', nickname: 'Offline Device', status: 'offline', lastHeartbeat: staleHeartbeat }, // 20%
-      ]);
-
-      const result = await service.getUptimeSummary('org-123', 30);
-
-      // Average of 95 and 20 = 57.5
-      expect(result.avgUptimePercent).toBe(57.5);
-    });
-
     it('should use "Unnamed Device" for null nicknames', async () => {
-      const now = new Date();
       mockDb.display.findMany.mockResolvedValue([
-        { id: 'd1', nickname: null, status: 'online', lastHeartbeat: now },
+        { id: 'd1', nickname: null, status: 'online' },
       ]);
 
       const result = await service.getUptimeSummary('org-123', 30);
 
       expect(result.devices[0].nickname).toBe('Unnamed Device');
-    });
-
-    it('should return per-device uptime percentages', async () => {
-      const now = new Date();
-      mockDb.display.findMany.mockResolvedValue([
-        { id: 'd1', nickname: 'Device 1', status: 'online', lastHeartbeat: now },
-        { id: 'd2', nickname: 'Device 2', status: 'offline', lastHeartbeat: null },
-      ]);
-
-      const result = await service.getUptimeSummary('org-123', 30);
-
-      const device1 = result.devices.find((d) => d.id === 'd1');
-      const device2 = result.devices.find((d) => d.id === 'd2');
-
-      expect(device1?.uptimePercent).toBe(95);
-      expect(device2?.uptimePercent).toBe(20);
     });
   });
 
