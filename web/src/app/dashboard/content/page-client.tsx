@@ -16,6 +16,7 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import EmptyState from '@/components/EmptyState';
 import SearchFilter from '@/components/SearchFilter';
 import ContentTagger, { ContentTag } from '@/components/ContentTagger';
+import ContentLifecyclePanel from '@/components/content/ContentLifecyclePanel';
 import DashboardSectionError from '@/components/DashboardSectionError';
 import { ViewToggle, getInitialView } from '@/components/ViewToggle';
 import { useToast } from '@/lib/hooks/useToast';
@@ -135,6 +136,8 @@ export default function ContentClient() {
  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+ const [isBulkDurationModalOpen, setIsBulkDurationModalOpen] = useState(false);
+ const [bulkDurationValue, setBulkDurationValue] = useState(10);
  const [isPushModalOpen, setIsPushModalOpen] = useState(false);
  const [isAddToPlaylistModalOpen, setIsAddToPlaylistModalOpen] = useState(false);
  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
@@ -153,6 +156,7 @@ export default function ContentClient() {
  url: '',
  file: null as File | null,
  });
+ const [editDuration, setEditDuration] = useState<number>(10);
  const [actionLoading, setActionLoading] = useState(false);
  const [filterType, setFilterType] = useState<string>('all');
  const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -761,6 +765,7 @@ export default function ContentClient() {
  url: detail.url || '',
  file: null,
  });
+ setEditDuration(typeof detail.duration === 'number' && detail.duration > 0 ? detail.duration : 10);
  setFormErrors({});
  setIsEditModalOpen(true);
  })();
@@ -797,6 +802,7 @@ export default function ContentClient() {
  async () => {
  await apiClient.updateContent(selectedContent.id, {
  title: uploadForm.title,
+ duration: editDuration,
  });
  return true;
  },
@@ -804,7 +810,7 @@ export default function ContentClient() {
  // Commit optimistic update and sync rendered state
  commitOptimistic(updateId);
  setContent(prev => prev.map(item =>
-  item.id === selectedContent.id ? { ...item, title: uploadForm.title } : item
+  item.id === selectedContent.id ? { ...item, title: uploadForm.title, duration: editDuration } : item
  ));
  toast.success('Content updated successfully');
  setIsEditModalOpen(false);
@@ -1023,16 +1029,59 @@ export default function ContentClient() {
 
  try {
  setActionLoading(true);
- await Promise.all(
- selectedIds.map(id => apiClient.deleteContent(id))
- );
- toast.success(`${selectedIds.length} items deleted`);
+ // Route through the safe server-side bulk endpoint: it performs
+ // storage-aware, quota-adjusting deletes and reports partial failures
+ // instead of firing N independent hard-delete requests that can leave
+ // orphaned MinIO objects behind.
+ const result = await apiClient.bulkDeleteContent(selectedIds);
+ if (result.failed > 0) {
+ toast.warning(`${result.deleted} deleted, ${result.failed} could not be deleted`);
+ } else {
+ toast.success(`${result.deleted} item${result.deleted === 1 ? '' : 's'} deleted`);
+ }
  setSelectedItems(new Set());
  setIsBulkDeleteModalOpen(false);
  void loadContent();
  } catch (error: any) {
  toast.error(error.message || 'Failed to delete some items');
  throw error;
+ } finally {
+ setActionLoading(false);
+ }
+ };
+
+ const handleBulkArchive = async () => {
+ if (selectedItems.size === 0) return;
+ const selectedIds = Array.from(selectedItems);
+ try {
+ setActionLoading(true);
+ const result = await apiClient.bulkArchiveContent(selectedIds);
+ toast.success(`${result.archived} item${result.archived === 1 ? '' : 's'} archived`);
+ setSelectedItems(new Set());
+ void loadContent();
+ } catch (error: any) {
+ toast.error(error.message || 'Failed to archive items');
+ } finally {
+ setActionLoading(false);
+ }
+ };
+
+ const confirmBulkSetDuration = async () => {
+ if (selectedItems.size === 0) {
+ setIsBulkDurationModalOpen(false);
+ return;
+ }
+ const selectedIds = Array.from(selectedItems);
+ const duration = Math.max(1, Math.round(bulkDurationValue) || 1);
+ try {
+ setActionLoading(true);
+ const result = await apiClient.bulkSetContentDuration(selectedIds, duration);
+ toast.success(`Duration set to ${duration}s for ${result.updated} item${result.updated === 1 ? '' : 's'}`);
+ setIsBulkDurationModalOpen(false);
+ setSelectedItems(new Set());
+ void loadContent();
+ } catch (error: any) {
+ toast.error(error.message || 'Failed to update duration');
  } finally {
  setActionLoading(false);
  }
@@ -1069,6 +1118,12 @@ export default function ContentClient() {
  return 'bg-amber-500/20 text-amber-400 border border-amber-500/30';
  case 'rejected':
  return 'bg-red-500/20 text-red-400 border border-red-500/30';
+ case 'expired':
+ return 'bg-orange-500/20 text-orange-400 border border-orange-500/30';
+ case 'pending_approval':
+ return 'bg-blue-500/20 text-blue-400 border border-blue-500/30';
+ case 'draft':
+ return 'bg-slate-500/20 text-slate-400 border border-slate-500/30';
  case 'archived':
  return 'eh-badge-muted';
  default:
@@ -1453,6 +1508,27 @@ export default function ContentClient() {
  >
  <Icon name="folder" size="md" />
  Move to Folder
+ </button>
+ )}
+ {permissions.canManageContent && (
+ <button
+ onClick={() => setIsBulkDurationModalOpen(true)}
+ disabled={actionLoading}
+ className="eh-btn-secondary px-4 py-2 text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+ >
+ <Icon name="clock" size="md" />
+ Set Duration
+ </button>
+ )}
+ {permissions.canManageContent && (
+ <button
+ onClick={handleBulkArchive}
+ disabled={actionLoading}
+ className="eh-btn-secondary px-4 py-2 text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+ >
+ {actionLoading && <LoadingSpinner size="sm" />}
+ <Icon name="storage" size="md" />
+ Archive
  </button>
  )}
  {permissions.canDeleteContent && (
@@ -2129,6 +2205,46 @@ export default function ContentClient() {
  </p>
  </div>
 
+ {/* Playback duration (seconds) */}
+ <div>
+ <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
+ Playback Duration (seconds)
+ </label>
+ <input
+ type="number"
+ min={1}
+ value={editDuration}
+ onChange={(e) => setEditDuration(Math.max(1, parseInt(e.target.value, 10) || 1))}
+ className="w-32 px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ />
+ <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
+ How long this item shows in a playlist before advancing.
+ </p>
+ </div>
+
+ {selectedContent && (
+ <ContentLifecyclePanel
+ content={selectedContent}
+ replacementCandidates={content}
+ disabled={actionLoading}
+ onChanged={() => {
+ void loadContent();
+ const editedId = selectedContent.id;
+ void apiClient
+ .getContentItem(editedId)
+ .then((fresh) => {
+ setSelectedContent(fresh);
+ setEditDuration(
+ typeof fresh.duration === 'number' && fresh.duration > 0 ? fresh.duration : 10,
+ );
+ })
+ .catch(() => {
+ /* list already refreshed; detail refetch is best-effort */
+ });
+ }}
+ />
+ )}
+
  <div className="flex justify-end gap-3 pt-4">
  <button
  onClick={() => {
@@ -2367,6 +2483,50 @@ export default function ContentClient() {
  confirmText={`Delete ${selectedItems.size} Item${selectedItems.size === 1 ? '' : 's'}`}
  type="danger"
  />
+
+ {/* Bulk Set Duration Modal */}
+ <Modal
+ isOpen={isBulkDurationModalOpen && permissions.canManageContent}
+ onClose={() => {
+ if (!actionLoading) setIsBulkDurationModalOpen(false);
+ }}
+ title="Set Playback Duration"
+ >
+ <div className="space-y-4">
+ <p className="text-sm text-[var(--foreground-secondary)]">
+ Apply a playback duration to {selectedItems.size} selected item{selectedItems.size === 1 ? '' : 's'}.
+ </p>
+ <div>
+ <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
+ Duration (seconds)
+ </label>
+ <input
+ type="number"
+ min={1}
+ value={bulkDurationValue}
+ onChange={(e) => setBulkDurationValue(Math.max(1, parseInt(e.target.value, 10) || 1))}
+ className="w-32 px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ />
+ </div>
+ <div className="flex justify-end gap-3 pt-2">
+ <button
+ onClick={() => setIsBulkDurationModalOpen(false)}
+ disabled={actionLoading}
+ className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition disabled:opacity-50"
+ >
+ Cancel
+ </button>
+ <button
+ onClick={confirmBulkSetDuration}
+ disabled={actionLoading}
+ className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+ >
+ {actionLoading && <LoadingSpinner size="sm" />}
+ Apply
+ </button>
+ </div>
+ </div>
+ </Modal>
 
  {/* Create Folder Modal */}
  <Modal

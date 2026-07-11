@@ -641,6 +641,14 @@ export class ContentService {
     // slot) until they reconnect, sometimes hours later.
     const affectedPlaylists: Array<{ playlistId: string; organizationId: string }> = [];
 
+    // Content-level signal for each item flipped to 'expired'. Emitted AFTER
+    // the transaction commits (below) so listeners never observe an item as
+    // expired before the DB row is durable. Without this, the dashboard would
+    // not reflect an auto-expiry until a manual reload and no content-level
+    // audit trail existed — the cron only emitted playlist.updated (content-mgmt
+    // #12 / notifications #2).
+    const expiredForSignal: Array<{ id: string; organizationId: string }> = [];
+
     for (const content of expiredContent) {
       await this.db.$transaction(async (tx) => {
         // Snapshot playlistIds BEFORE the updateMany / deleteMany — we
@@ -700,6 +708,22 @@ export class ContentService {
             organizationId: content.organizationId,
           });
         }
+      });
+
+      // Transaction committed — the row is now durably 'expired'.
+      expiredForSignal.push({ id: content.id, organizationId: content.organizationId });
+    }
+
+    // Per-item content-level signal. Caught by ValidationMonitorService's
+    // `content.**` @OnEvent wildcard (re-validation) and available for any
+    // future audit/notification consumer. Mirrors the EntityEvent shape used
+    // by content.created / content.updated / content.deleted.
+    for (const item of expiredForSignal) {
+      this.eventEmitter.emit('content.expired', {
+        action: 'expired',
+        entityType: 'content',
+        entityId: item.id,
+        organizationId: item.organizationId,
       });
     }
 

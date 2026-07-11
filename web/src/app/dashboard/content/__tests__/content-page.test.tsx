@@ -9,6 +9,14 @@ const mockGetFolders = jest.fn();
 const mockGetDisplays = jest.fn();
 const mockGetPlaylists = jest.fn();
 const mockDeleteContent = jest.fn();
+const mockBulkDeleteContent = jest.fn();
+const mockBulkArchiveContent = jest.fn();
+const mockBulkSetContentDuration = jest.fn();
+const mockGetContentVersions = jest.fn().mockResolvedValue([]);
+const mockSetContentExpiration = jest.fn();
+const mockClearContentExpiration = jest.fn();
+const mockReplaceContentFile = jest.fn();
+const mockRestoreContentVersion = jest.fn();
 const mockUpdateContent = jest.fn();
 const mockUploadContent = jest.fn();
 const mockCreateContent = jest.fn();
@@ -29,6 +37,14 @@ jest.mock('@/lib/api', () => ({
     getDisplays: (...args: any[]) => mockGetDisplays(...args),
     getPlaylists: (...args: any[]) => mockGetPlaylists(...args),
     deleteContent: (...args: any[]) => mockDeleteContent(...args),
+    bulkDeleteContent: (...args: any[]) => mockBulkDeleteContent(...args),
+    bulkArchiveContent: (...args: any[]) => mockBulkArchiveContent(...args),
+    bulkSetContentDuration: (...args: any[]) => mockBulkSetContentDuration(...args),
+    getContentVersions: (...args: any[]) => mockGetContentVersions(...args),
+    setContentExpiration: (...args: any[]) => mockSetContentExpiration(...args),
+    clearContentExpiration: (...args: any[]) => mockClearContentExpiration(...args),
+    replaceContentFile: (...args: any[]) => mockReplaceContentFile(...args),
+    restoreContentVersion: (...args: any[]) => mockRestoreContentVersion(...args),
     updateContent: (...args: any[]) => mockUpdateContent(...args),
     uploadContent: (...args: any[]) => mockUploadContent(...args),
     createContent: (...args: any[]) => mockCreateContent(...args),
@@ -287,6 +303,14 @@ describe('ContentClient', () => {
     mockGetDisplays.mockResolvedValue({ data: [] });
     mockGetPlaylists.mockResolvedValue({ data: [] });
     mockDeleteContent.mockResolvedValue({});
+    mockBulkDeleteContent.mockResolvedValue({ deleted: 0, failed: 0, failedIds: [] });
+    mockBulkArchiveContent.mockResolvedValue({ archived: 0 });
+    mockBulkSetContentDuration.mockResolvedValue({ updated: 0 });
+    mockGetContentVersions.mockResolvedValue([]);
+    mockSetContentExpiration.mockResolvedValue(sampleContent[0]);
+    mockClearContentExpiration.mockResolvedValue(sampleContent[0]);
+    mockReplaceContentFile.mockResolvedValue({ content: sampleContent[0], fileHash: 'h' });
+    mockRestoreContentVersion.mockResolvedValue(sampleContent[0]);
     mockUpdateContent.mockResolvedValue(sampleContent[0]);
     mockUploadContent.mockResolvedValue({ id: 'new-1', title: 'New Content' });
     mockCreateContent.mockResolvedValue({ id: 'new-1', title: 'New Content' });
@@ -402,6 +426,7 @@ describe('ContentClient', () => {
 
   it('requires confirmation before bulk deleting selected content', async () => {
     mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+    mockBulkDeleteContent.mockResolvedValueOnce({ deleted: 2, failed: 0, failedIds: [] });
     render(<ContentClient />);
 
     await waitFor(() => {
@@ -419,6 +444,8 @@ describe('ContentClient', () => {
       fireEvent.click(screen.getByRole('button', { name: /delete selected/i }));
     });
 
+    // Routes through the safe server-side bulk endpoint, never per-item hard deletes.
+    expect(mockBulkDeleteContent).not.toHaveBeenCalled();
     expect(mockDeleteContent).not.toHaveBeenCalled();
     expect(screen.getByTestId('confirm-dialog')).toHaveTextContent('Delete Selected Content');
 
@@ -427,15 +454,15 @@ describe('ContentClient', () => {
     });
 
     await waitFor(() => {
-      expect(mockDeleteContent).toHaveBeenCalledWith('c1');
-      expect(mockDeleteContent).toHaveBeenCalledWith('c2');
+      expect(mockBulkDeleteContent).toHaveBeenCalledWith(['c1', 'c2']);
     });
+    expect(mockDeleteContent).not.toHaveBeenCalled();
     expect(mockToast.success).toHaveBeenCalledWith('2 items deleted');
   });
 
   it('keeps bulk delete confirmation open when deletion fails', async () => {
     mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
-    mockDeleteContent.mockRejectedValueOnce(new Error('Delete failed'));
+    mockBulkDeleteContent.mockRejectedValueOnce(new Error('Delete failed'));
     render(<ContentClient />);
 
     await waitFor(() => {
