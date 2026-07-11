@@ -23,15 +23,37 @@ export interface ContentTagSummary {
   contentCount: number;
 }
 
+export interface ContentBulkDeleteResult {
+  deleted: number;
+  failed: number;
+  failedIds: string[];
+}
+
+export interface ContentReplaceResult {
+  content: Content;
+  fileHash: string;
+}
+
 declare module './client' {
   interface ApiClient {
     getContent(params?: ContentListParams): Promise<PaginatedResponse<Content>>;
     getContentTags(): Promise<ContentTagSummary[]>;
     getContentItem(id: string): Promise<Content>;
     createContent(data: { title: string; type: string; url?: string; file?: File; metadata?: Record<string, unknown> }): Promise<Content>;
-    updateContent(id: string, data: Partial<{ title: string; metadata?: Record<string, unknown> }>): Promise<Content>;
+    updateContent(id: string, data: Partial<{ title: string; duration: number; metadata?: Record<string, unknown> }>): Promise<Content>;
     deleteContent(id: string): Promise<void>;
     archiveContent(id: string): Promise<Content>;
+    // Content expiration (auto-replacement) — PATCH/DELETE /content/:id/expiration
+    setContentExpiration(id: string, expiresAt: string, replacementContentId?: string): Promise<Content>;
+    clearContentExpiration(id: string): Promise<Content>;
+    // File replacement + version history — /content/:id/{replace,versions,restore}
+    replaceContentFile(id: string, file: File, options?: { name?: string; keepBackup?: boolean }): Promise<ContentReplaceResult>;
+    getContentVersions(id: string): Promise<Content[]>;
+    restoreContentVersion(id: string): Promise<Content>;
+    // Safe bulk operations — POST /content/bulk/{delete,archive,duration}
+    bulkDeleteContent(ids: string[]): Promise<ContentBulkDeleteResult>;
+    bulkArchiveContent(ids: string[]): Promise<{ archived: number }>;
+    bulkSetContentDuration(ids: string[], duration: number): Promise<{ updated: number }>;
     getContentDownloadUrl(id: string, expirySeconds?: number): Promise<{ url: string; expiresIn: number }>;
     generateThumbnail(contentId: string): Promise<{ thumbnail: string }>;
     uploadContentWithProgress(data: { title: string; type: string; file: File | Blob }, onProgress?: (percent: number) => void): Promise<Content>;
@@ -197,6 +219,76 @@ ApiClient.prototype.deleteContent = async function (id: string): Promise<void> {
 ApiClient.prototype.archiveContent = async function (id: string): Promise<Content> {
   return this.request<Content>(`/content/${id}/archive`, {
     method: 'POST',
+  });
+};
+
+ApiClient.prototype.setContentExpiration = async function (
+  id: string,
+  expiresAt: string,
+  replacementContentId?: string,
+): Promise<Content> {
+  return this.request<Content>(`/content/${id}/expiration`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      expiresAt,
+      ...(replacementContentId ? { replacementContentId } : {}),
+    }),
+  });
+};
+
+ApiClient.prototype.clearContentExpiration = async function (id: string): Promise<Content> {
+  return this.request<Content>(`/content/${id}/expiration`, {
+    method: 'DELETE',
+  });
+};
+
+ApiClient.prototype.replaceContentFile = async function (
+  id: string,
+  file: File,
+  options: { name?: string; keepBackup?: boolean } = {},
+): Promise<ContentReplaceResult> {
+  const formData = new FormData();
+  formData.append('file', file);
+  if (options.name) {
+    formData.append('name', options.name);
+  }
+  if (options.keepBackup !== undefined) {
+    formData.append('keepBackup', String(options.keepBackup));
+  }
+  return this.requestFormData<ContentReplaceResult>(`/content/${id}/replace`, formData, 'POST');
+};
+
+ApiClient.prototype.getContentVersions = async function (id: string): Promise<Content[]> {
+  return this.request<Content[]>(`/content/${id}/versions`);
+};
+
+ApiClient.prototype.restoreContentVersion = async function (id: string): Promise<Content> {
+  return this.request<Content>(`/content/${id}/restore`, {
+    method: 'POST',
+  });
+};
+
+ApiClient.prototype.bulkDeleteContent = async function (ids: string[]): Promise<ContentBulkDeleteResult> {
+  return this.request<ContentBulkDeleteResult>('/content/bulk/delete', {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  });
+};
+
+ApiClient.prototype.bulkArchiveContent = async function (ids: string[]): Promise<{ archived: number }> {
+  return this.request<{ archived: number }>('/content/bulk/archive', {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  });
+};
+
+ApiClient.prototype.bulkSetContentDuration = async function (
+  ids: string[],
+  duration: number,
+): Promise<{ updated: number }> {
+  return this.request<{ updated: number }>('/content/bulk/duration', {
+    method: 'POST',
+    body: JSON.stringify({ ids, duration }),
   });
 };
 

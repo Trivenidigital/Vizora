@@ -1940,6 +1940,37 @@ describe('ContentService', () => {
       });
     });
 
+    it('emits content.expired for each item flipped to expired (content-level signal)', async () => {
+      const expired1 = { ...mockContent, id: 'exp-1', organizationId: 'org-123', expiresAt: new Date('2020-01-01'), status: 'active' };
+      const expired2 = { ...mockContent, id: 'exp-2', organizationId: 'org-123', expiresAt: new Date('2020-01-01'), status: 'active' };
+      mockDatabaseService.content.findMany.mockResolvedValue([expired1, expired2]);
+      mockDatabaseService.playlistItem.deleteMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.content.update.mockResolvedValue({ status: 'expired' });
+
+      await service.checkExpiredContent();
+
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith('content.expired', {
+        action: 'expired',
+        entityType: 'content',
+        entityId: 'exp-1',
+        organizationId: 'org-123',
+      });
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith('content.expired', {
+        action: 'expired',
+        entityType: 'content',
+        entityId: 'exp-2',
+        organizationId: 'org-123',
+      });
+    });
+
+    it('does not emit content.expired when nothing expired', async () => {
+      mockDatabaseService.content.findMany.mockResolvedValue([]);
+
+      await service.checkExpiredContent();
+
+      expect(mockEventEmitter.emit).not.toHaveBeenCalledWith('content.expired', expect.anything());
+    });
+
     it('should only find active expired content', async () => {
       mockDatabaseService.content.findMany.mockResolvedValue([]);
 

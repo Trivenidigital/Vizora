@@ -23,11 +23,28 @@ export interface Content {
   type: 'image' | 'video' | 'pdf' | 'url' | 'html' | 'template';
   url?: string;
   thumbnailUrl?: string;
-  status: 'ready' | 'processing' | 'error' | 'active' | 'archived' | 'flagged' | 'rejected';
+  status:
+    | 'ready'
+    | 'processing'
+    | 'error'
+    | 'active'
+    | 'archived'
+    | 'flagged'
+    | 'rejected'
+    | 'expired'
+    | 'draft'
+    | 'pending_approval';
   duration?: number;
   fileSize?: number | null;
+  mimeType?: string | null;
   metadata?: Record<string, unknown>;
   folderId?: string;
+  // Content-detail-only lifecycle fields (present on getContentItem responses,
+  // omitted from the paginated list select). All optional so list rows type-check.
+  expiresAt?: string | null;
+  replacementContentId?: string | null;
+  versionNumber?: number;
+  previousVersionId?: string | null;
   createdAt: Date | string;
   updatedAt: Date | string;
 }
