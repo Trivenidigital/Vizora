@@ -136,6 +136,11 @@ describe('AuthService', () => {
         updateMany: jest.fn(),
         deleteMany: jest.fn(),
       },
+      refreshToken: {
+        // S1(b): password change / reset / account deletion revoke the user's
+        // active refresh-token sessions. Default to "none matched".
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       // Mock $transaction to execute the callback with the same mock database
       $transaction: jest.fn().mockImplementation(async (callback) => {
         return callback(mockDatabaseService);
@@ -1381,6 +1386,20 @@ describe('AuthService', () => {
         mockUser.email,
         mockUser.firstName,
       );
+    });
+
+    it('S1(b): revokes the user active refresh-token sessions on password change', async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue(mockUser);
+      (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+      (bcrypt.hash as jest.Mock).mockResolvedValue('new-hashed-password');
+      mockDatabaseService.user.update.mockResolvedValue({ ...mockUser });
+
+      await service.changePassword('user-123', 'current-pw', 'new-pw');
+
+      expect(mockDatabaseService.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { userId: 'user-123', revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
+      });
     });
 
     it('throws and does NOT email when the current password is wrong', async () => {
