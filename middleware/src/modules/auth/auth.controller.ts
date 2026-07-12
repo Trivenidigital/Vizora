@@ -16,10 +16,13 @@ import {
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { RefreshTokenService, RefreshTokenContext } from './refresh-token.service';
+import { MfaService } from './mfa/mfa.service';
 import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto, DeleteAccountDto, UpdateProfileDto, GoogleLoginDto } from './dto';
+import { EnableMfaDto, DisableMfaDto, MfaChallengeDto, RegenerateBackupCodesDto } from './mfa/dto/mfa.dto';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { EnrollmentOrJwtGuard } from './guards/enrollment-or-jwt.guard';
 import { AUTH_CONSTANTS } from './constants/auth.constants';
 import { AuthenticatedUser } from './strategies/jwt.strategy';
 
@@ -36,6 +39,11 @@ import { AuthenticatedUser } from './strategies/jwt.strategy';
  */
 const RATE_LIMIT_STRICT = process.env.NODE_ENV === 'production' ? 3 : 1000;
 const RATE_LIMIT_STANDARD = process.env.NODE_ENV === 'production' ? 5 : 1000;
+// MFA verification endpoints (challenge / enroll / enable / disable / regenerate).
+// Slightly higher than STANDARD because users legitimately mistype 6-digit
+// codes; the real brute-force cap is the per-challenge / per-user lockout in
+// MfaService, not this outer throttle.
+const RATE_LIMIT_MFA = process.env.NODE_ENV === 'production' ? 10 : 1000;
 // Refresh runs more often than login (the frontend re-ups the session), so it
 // gets a slightly higher cap than STANDARD while still throttling refresh-token
 // abuse / enumeration attempts.
@@ -48,6 +56,7 @@ export class AuthController {
   constructor(
     private authService: AuthService,
     private refreshTokenService: RefreshTokenService,
+    private mfaService: MfaService,
   ) {}
 
   /**
@@ -243,6 +252,20 @@ export class AuthController {
       userAgent: req.headers?.['user-agent'],
     });
 
+    // MFA branch (auth #2). When the account is MFA-enrolled OR the org requires
+    // MFA and the user isn't enrolled, `login` returns NO tokens — only a
+    // short-lived challenge/enrollment token. Do NOT set any auth cookie in
+    // these cases. The non-MFA path below is byte-for-byte unchanged.
+    if ('mfaRequired' in result) {
+      return { success: true, data: { mfaRequired: true, challengeToken: result.challengeToken } };
+    }
+    if ('mfaEnrollmentRequired' in result) {
+      return {
+        success: true,
+        data: { mfaEnrollmentRequired: true, enrollmentToken: result.enrollmentToken },
+      };
+    }
+
     // Set httpOnly cookie with JWT token
     this.setAuthCookie(res, result.token);
 
@@ -284,6 +307,20 @@ export class AuthController {
       ipAddress: req.ip || req.socket?.remoteAddress || '',
       userAgent: req.headers?.['user-agent'],
     });
+
+    // MFA branch (auth #2). A Google user who is MFA-enrolled OR is in an
+    // mfaRequired org without enrollment gets NO session here — only a
+    // short-lived challenge/enrollment token. Do NOT set any auth cookie or
+    // start a refresh session in these cases. Mirrors the /auth/login handler.
+    if ('mfaRequired' in result) {
+      return { success: true, data: { mfaRequired: true, challengeToken: result.challengeToken } };
+    }
+    if ('mfaEnrollmentRequired' in result) {
+      return {
+        success: true,
+        data: { mfaEnrollmentRequired: true, enrollmentToken: result.enrollmentToken },
+      };
+    }
 
     // Set httpOnly cookie with JWT token
     this.setAuthCookie(res, result.token);
@@ -356,6 +393,147 @@ export class AuthController {
     return {
       success: true,
       data: {
+        expiresIn: result.expiresIn,
+      },
+    };
+  }
+
+  // ===========================================================================
+  // MFA (auth #2) — TOTP enrollment, backup codes, login challenge
+  // ===========================================================================
+
+  @ApiOperation({ summary: 'Begin MFA enrollment — returns an otpauth URL + QR (does NOT enable MFA yet)' })
+  @ApiResponse({ status: 201, description: 'Pending secret created; scan the QR then call /auth/mfa/enable.' })
+  @ApiResponse({ status: 400, description: 'MFA already enabled.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  // @Public bypasses the global JwtAuthGuard; EnrollmentOrJwtGuard then accepts
+  // EITHER a normal session JWT (voluntary enrollment) OR a forced-enrollment
+  // token (x-mfa-enrollment-token header).
+  @Public()
+  @UseGuards(EnrollmentOrJwtGuard)
+  @Post('mfa/enroll')
+  @Throttle({ default: { limit: RATE_LIMIT_MFA, ttl: RATE_LIMIT_TTL_MS } })
+  async mfaEnroll(@CurrentUser('id') userId: string) {
+    const data = await this.mfaService.enroll(userId);
+    return { success: true, data };
+  }
+
+  @ApiOperation({ summary: 'Enable MFA — verifies the pending secret and returns one-time backup codes' })
+  @ApiBody({ type: EnableMfaDto })
+  @ApiResponse({ status: 200, description: 'MFA enabled; backup codes returned once.' })
+  @ApiResponse({ status: 401, description: 'Invalid verification code.' })
+  @Public()
+  @UseGuards(EnrollmentOrJwtGuard)
+  @Post('mfa/enable')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: RATE_LIMIT_MFA, ttl: RATE_LIMIT_TTL_MS } })
+  async mfaEnable(
+    @CurrentUser() user: { id: string; mfaEnrollmentOnly?: boolean },
+    @Body() dto: EnableMfaDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { backupCodes } = await this.mfaService.enable(user.id, dto.code);
+
+    // Forced-enrollment flow: the caller authenticated with an enrollment token
+    // and has no session yet. Both factors are now satisfied (password at login
+    // + TOTP just now), so complete the login exactly as a normal login would.
+    if (user.mfaEnrollmentOnly) {
+      const result = await this.authService.issueSessionForUser(user.id, {
+        ipAddress: req.ip || req.socket?.remoteAddress || '',
+        userAgent: req.headers?.['user-agent'],
+      });
+      this.setAuthCookie(res, result.token);
+      await this.startRefreshSession(res, req, result.user.id);
+      return {
+        success: true,
+        data: {
+          backupCodes,
+          access_token: result.token,
+          user: result.user,
+          expiresIn: result.expiresIn,
+        },
+      };
+    }
+
+    return { success: true, data: { backupCodes } };
+  }
+
+  @ApiOperation({ summary: 'Disable MFA — requires a valid current TOTP or backup code' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth()
+  @ApiBody({ type: DisableMfaDto })
+  @ApiResponse({ status: 200, description: 'MFA disabled.' })
+  @ApiResponse({ status: 401, description: 'Invalid verification code.' })
+  @UseGuards(JwtAuthGuard)
+  @Post('mfa/disable')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: RATE_LIMIT_MFA, ttl: RATE_LIMIT_TTL_MS } })
+  async mfaDisable(@CurrentUser('id') userId: string, @Body() dto: DisableMfaDto) {
+    await this.mfaService.disable(userId, dto.code);
+    return { success: true, data: { message: 'MFA disabled.' } };
+  }
+
+  @ApiOperation({ summary: 'MFA status for the current user' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth()
+  @ApiResponse({ status: 200, description: '{ enabled, backupCodesRemaining }' })
+  @UseGuards(JwtAuthGuard)
+  @Get('mfa/status')
+  async mfaStatus(@CurrentUser('id') userId: string) {
+    const data = await this.mfaService.status(userId);
+    return { success: true, data };
+  }
+
+  @ApiOperation({ summary: 'Regenerate MFA backup codes — requires a valid current TOTP' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth()
+  @ApiBody({ type: RegenerateBackupCodesDto })
+  @ApiResponse({ status: 200, description: 'New backup codes returned once; old codes invalidated.' })
+  @ApiResponse({ status: 401, description: 'Invalid verification code.' })
+  @UseGuards(JwtAuthGuard)
+  @Post('mfa/backup-codes/regenerate')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: RATE_LIMIT_MFA, ttl: RATE_LIMIT_TTL_MS } })
+  async mfaRegenerateBackupCodes(
+    @CurrentUser('id') userId: string,
+    @Body() dto: RegenerateBackupCodesDto,
+  ) {
+    const data = await this.mfaService.regenerateBackupCodes(userId, dto.code);
+    return { success: true, data };
+  }
+
+  @ApiOperation({ summary: 'Complete an MFA-gated login (TOTP or backup code)' })
+  @ApiBody({ type: MfaChallengeDto })
+  @ApiResponse({ status: 200, description: 'Login complete; tokens issued exactly as a normal login.' })
+  @ApiResponse({ status: 401, description: 'Invalid challenge token or code.' })
+  // PUBLIC by design: the login challenge happens AFTER password verification but
+  // BEFORE the session exists — there is no session to guard on. The challenge
+  // token IS the credential (short-lived, single-use, bound to the userId).
+  @Public()
+  @Post('mfa/challenge')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: RATE_LIMIT_MFA, ttl: RATE_LIMIT_TTL_MS } })
+  async mfaChallenge(
+    @Body() dto: MfaChallengeDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { userId } = await this.mfaService.verifyChallenge(dto.challengeToken, dto.code);
+
+    // Both factors satisfied — issue the session EXACTLY as a normal login.
+    const result = await this.authService.issueSessionForUser(userId, {
+      ipAddress: req.ip || req.socket?.remoteAddress || '',
+      userAgent: req.headers?.['user-agent'],
+    });
+    this.setAuthCookie(res, result.token);
+    await this.startRefreshSession(res, req, result.user.id);
+
+    return {
+      success: true,
+      data: {
+        access_token: result.token,
+        user: result.user,
         expiresIn: result.expiresIn,
       },
     };

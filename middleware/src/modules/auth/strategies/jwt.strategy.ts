@@ -80,6 +80,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Device tokens are not valid for user authentication');
     }
 
+    // Reject MFA challenge/enrollment tokens as access tokens (auth #2). These
+    // are signed with a SEPARATE key derived from JWT_SECRET (getMfaTokenSecret),
+    // so they already fail signature verification here before validate() is
+    // reached — this is belt-and-suspenders so an MFA token can NEVER stand in
+    // for a session token. Existing behavior is unchanged: type-less and 'user'
+    // tokens still pass; only these two new types are rejected.
+    if (payload.type === 'mfa_challenge' || payload.type === 'mfa_enrollment') {
+      throw new UnauthorizedException('MFA tokens are not valid for user authentication');
+    }
+
     // Check if THIS specific token has been revoked (logout / refresh).
     if (payload.jti) {
       const isRevoked = await this.redisService.exists(`revoked_token:${payload.jti}`);

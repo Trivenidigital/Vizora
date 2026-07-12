@@ -116,6 +116,7 @@ JWT_SECRET              # User auth JWT secret (min 32 chars)
 JWT_EXPIRES_IN          # Access-token lifetime, default 30m (short-lived; frontend auto-refreshes on 401). Clamped [60s, 7d]. Set 7d to restore long-lived tokens.
 REFRESH_TOKEN_TTL_DAYS  # Refresh-token session lifetime in days (default 30, clamped [1,365]). Opaque random token, sha256-hashed at rest; no separate secret.
 DEVICE_JWT_SECRET       # Device auth JWT secret (min 32 chars; separate from JWT_SECRET)
+MFA_ENCRYPTION_KEY      # AES-256-GCM key (min 32 chars) for TOTP-secret encryption at rest (auth #2). Fail-closed: MFA ops refuse to run if unset. Non-MFA login unaffected. Keep CONSTANT across deploys (rotating it orphans every stored TOTP secret).
 INTERNAL_API_SECRET     # Required in prod — service-to-service auth (middleware ↔ realtime)
 BCRYPT_ROUNDS           # Password hashing rounds (10-15, default 12)
 GOOGLE_CLIENT_ID        # Optional — Google OAuth client ID

@@ -577,6 +577,21 @@ export class OrganizationsService {
     return this.sanitizeOrg(updated);
   }
 
+  /**
+   * Toggle per-org MFA enforcement (auth #2). When enabled, members who are not
+   * MFA-enrolled are forced through TOTP enrollment before receiving session
+   * tokens on their next login. Returns the resulting flag.
+   */
+  async setMfaRequired(id: string, mfaRequired: boolean): Promise<{ mfaRequired: boolean }> {
+    await this.findOne(id); // 404s for a non-existent org
+    const updated = await this.db.organization.update({
+      where: { id },
+      data: { mfaRequired },
+      select: { mfaRequired: true },
+    });
+    return { mfaRequired: updated.mfaRequired };
+  }
+
   async remove(id: string, requestingUserId?: string) {
     const org = await this.findOne(id);
 

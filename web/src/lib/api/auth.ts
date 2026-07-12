@@ -2,14 +2,18 @@
 
 import { devLog } from '../logger';
 import { ApiClient, LoginResponse, RegisterResponse, AuthUser } from './client';
+import { MfaChallengeRequired, MfaEnrollmentRequired } from './mfa';
 
 export interface GoogleLoginResponse extends LoginResponse {
   isNewUser: boolean;
 }
 
+/** login() may return a normal session OR an MFA continuation (challenge/enroll). */
+export type LoginResult = LoginResponse | MfaChallengeRequired | MfaEnrollmentRequired;
+
 declare module './client' {
   interface ApiClient {
-    login(email: string, password: string): Promise<LoginResponse>;
+    login(email: string, password: string): Promise<LoginResult>;
     register(email: string, password: string, organizationName: string, firstName: string, lastName: string): Promise<RegisterResponse>;
     googleLogin(credential: string): Promise<GoogleLoginResponse>;
     logout(): Promise<void>;
@@ -26,17 +30,21 @@ declare module './client' {
   }
 }
 
-ApiClient.prototype.login = async function (email: string, password: string): Promise<LoginResponse> {
+ApiClient.prototype.login = async function (email: string, password: string): Promise<LoginResult> {
   if (process.env.NODE_ENV === 'development') {
     devLog('[API] Login called');
   }
-  const response = await this.request<LoginResponse>('/auth/login', {
+  const response = await this.request<LoginResult>('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
 
-  // Mark as authenticated - token is in httpOnly cookie
-  this.isAuthenticated = true;
+  // Only a full login (no MFA continuation) establishes a session. When MFA is
+  // required the server issued NO auth cookie — the flow completes at
+  // /auth/mfa/challenge (or /auth/mfa/enable for forced enrollment).
+  if (!('mfaRequired' in response) && !('mfaEnrollmentRequired' in response)) {
+    this.isAuthenticated = true;
+  }
   return response;
 };
 

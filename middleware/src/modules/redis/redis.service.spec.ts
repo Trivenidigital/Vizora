@@ -11,6 +11,8 @@ jest.mock('ioredis', () => {
     setex: jest.fn().mockResolvedValue('OK'),
     del: jest.fn().mockResolvedValue(1),
     exists: jest.fn(),
+    incr: jest.fn().mockResolvedValue(1),
+    expire: jest.fn().mockResolvedValue(1),
     on: jest.fn(),
   }));
 });
@@ -286,6 +288,77 @@ describe('RedisService', () => {
       it('should return false when client not available', async () => {
         await service.onModuleDestroy();
         const result = await service.exists('test-key');
+        expect(result).toBe(false);
+      });
+    });
+
+    describe('incrementWithTtl', () => {
+      it('increments and sets TTL on the first hit (count === 1)', async () => {
+        const client = service.getClient();
+        (client?.incr as jest.Mock).mockResolvedValue(1);
+
+        const result = await service.incrementWithTtl('counter', 900);
+
+        expect(result).toBe(1);
+        expect(client?.incr).toHaveBeenCalledWith('counter');
+        expect(client?.expire).toHaveBeenCalledWith('counter', 900);
+      });
+
+      it('does NOT reset TTL on subsequent hits (count > 1) — fixed window, not sliding', async () => {
+        const client = service.getClient();
+        (client?.incr as jest.Mock).mockResolvedValue(4);
+
+        const result = await service.incrementWithTtl('counter', 900);
+
+        expect(result).toBe(4);
+        expect(client?.expire).not.toHaveBeenCalled();
+      });
+
+      it('returns 0 on error (best-effort)', async () => {
+        const client = service.getClient();
+        (client?.incr as jest.Mock).mockRejectedValue(new Error('Redis error'));
+
+        const result = await service.incrementWithTtl('counter', 900);
+        expect(result).toBe(0);
+      });
+
+      it('returns 0 when client not available', async () => {
+        await service.onModuleDestroy();
+        const result = await service.incrementWithTtl('counter', 900);
+        expect(result).toBe(0);
+      });
+    });
+
+    describe('setIfNotExists', () => {
+      it('returns true and issues SET NX EX when the key is newly claimed', async () => {
+        const client = service.getClient();
+        (client?.set as jest.Mock).mockResolvedValue('OK');
+
+        const result = await service.setIfNotExists('used-key', '1', 300);
+
+        expect(result).toBe(true);
+        expect(client?.set).toHaveBeenCalledWith('used-key', '1', 'EX', 300, 'NX');
+      });
+
+      it('returns false when the key already exists (SET NX returns null)', async () => {
+        const client = service.getClient();
+        (client?.set as jest.Mock).mockResolvedValue(null);
+
+        const result = await service.setIfNotExists('used-key', '1', 300);
+        expect(result).toBe(false);
+      });
+
+      it('returns false on error (fail CLOSED — never allow the claim through)', async () => {
+        const client = service.getClient();
+        (client?.set as jest.Mock).mockRejectedValue(new Error('Redis error'));
+
+        const result = await service.setIfNotExists('used-key', '1', 300);
+        expect(result).toBe(false);
+      });
+
+      it('returns false when client not available', async () => {
+        await service.onModuleDestroy();
+        const result = await service.setIfNotExists('used-key', '1', 300);
         expect(result).toBe(false);
       });
     });

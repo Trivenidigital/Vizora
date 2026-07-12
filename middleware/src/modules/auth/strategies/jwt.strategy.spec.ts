@@ -102,6 +102,35 @@ describe('JwtStrategy', () => {
       });
     });
 
+    describe('MFA tokens (auth #2)', () => {
+      it('rejects an mfa_challenge token as an access token', async () => {
+        const payload: JwtPayload = {
+          sub: 'user-123',
+          email: 'u@e.com',
+          organizationId: 'org-123',
+          role: 'admin',
+          type: 'mfa_challenge',
+        };
+        await expect(strategy.validate(payload)).rejects.toThrow(UnauthorizedException);
+        await expect(strategy.validate(payload)).rejects.toThrow(
+          'MFA tokens are not valid for user authentication',
+        );
+        expect(mockDatabaseService.user.findUnique).not.toHaveBeenCalled();
+      });
+
+      it('rejects an mfa_enrollment token as an access token', async () => {
+        const payload: JwtPayload = {
+          sub: 'user-123',
+          email: 'u@e.com',
+          organizationId: 'org-123',
+          role: 'admin',
+          type: 'mfa_enrollment',
+        };
+        await expect(strategy.validate(payload)).rejects.toThrow(UnauthorizedException);
+        expect(mockDatabaseService.user.findUnique).not.toHaveBeenCalled();
+      });
+    });
+
     describe('user tokens', () => {
       const userPayload: JwtPayload = {
         sub: 'user-123',

@@ -10,6 +10,8 @@ import ValuePanel from '@/components/auth/ValuePanel';
 import FormField from '@/components/auth/FormField';
 import PasswordInput from '@/components/auth/PasswordInput';
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton';
+import MfaChallengeForm from '@/components/auth/MfaChallengeForm';
+import MfaEnrollFlow from '@/components/auth/MfaEnrollFlow';
 
 function isValidRedirectUrl(url: string): boolean {
   return url.startsWith('/') && !url.startsWith('//') && !url.includes('://');
@@ -25,6 +27,10 @@ export default function LoginContent() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  // MFA (auth #2) continuation state — set when /auth/login returns a challenge
+  // or forced-enrollment token instead of a session.
+  const [mfaChallengeToken, setMfaChallengeToken] = useState<string | null>(null);
+  const [mfaEnrollmentToken, setMfaEnrollmentToken] = useState<string | null>(null);
 
   const update = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -73,7 +79,16 @@ export default function LoginContent() {
     }
 
     try {
-      await apiClient.login(formData.email, formData.password);
+      const result = await apiClient.login(formData.email, formData.password);
+      // MFA continuations: don't redirect — render the challenge / enrollment step.
+      if ('mfaRequired' in result) {
+        setMfaChallengeToken(result.challengeToken);
+        return;
+      }
+      if ('mfaEnrollmentRequired' in result) {
+        setMfaEnrollmentToken(result.enrollmentToken);
+        return;
+      }
       window.location.href = redirectUrl;
     } catch (err: unknown) {
       if (process.env.NODE_ENV === 'development') {
@@ -93,6 +108,53 @@ export default function LoginContent() {
       setLoading(false);
     }
   };
+
+  // MFA challenge step (enrolled user) — replaces the login form after a correct
+  // password until the second factor is verified.
+  if (mfaChallengeToken) {
+    return (
+      <div className="min-h-screen flex bg-[var(--background)]">
+        <div className="hidden md:flex md:w-[35%] lg:w-[38%]">
+          <ValuePanel variant="login" />
+        </div>
+        <div className="flex-1 flex flex-col justify-center lg:justify-start px-6 py-8 sm:px-10 lg:pl-6 lg:pr-10 lg:pt-28 xl:pl-8 xl:pr-14">
+          <MfaChallengeForm
+            challengeToken={mfaChallengeToken}
+            onSuccess={() => {
+              window.location.href = redirectUrl;
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Forced-enrollment step (org requires MFA, user not enrolled).
+  if (mfaEnrollmentToken) {
+    return (
+      <div className="min-h-screen flex bg-[var(--background)]">
+        <div className="hidden md:flex md:w-[35%] lg:w-[38%]">
+          <ValuePanel variant="login" />
+        </div>
+        <div className="flex-1 flex flex-col justify-center lg:justify-start px-6 py-8 sm:px-10 lg:pl-6 lg:pr-10 lg:pt-28 xl:pl-8 xl:pr-14">
+          <div className="w-full max-w-md lg:max-w-2xl mx-auto md:mx-0">
+            <h1 className="text-2xl sm:text-3xl font-bold text-[var(--foreground)] eh-heading mb-2">
+              Two-factor authentication required
+            </h1>
+            <p className="text-sm text-[var(--foreground-tertiary)] mb-6">
+              Your organization requires two-factor authentication. Set it up now to continue.
+            </p>
+            <MfaEnrollFlow
+              enrollmentToken={mfaEnrollmentToken}
+              onComplete={() => {
+                window.location.href = redirectUrl;
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex bg-[var(--background)]">

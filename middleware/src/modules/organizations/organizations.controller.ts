@@ -22,6 +22,7 @@ import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { UpdateFeatureFlagsDto } from './dto/update-feature-flags.dto';
 import { BrandingConfigDto } from './dto/branding-config.dto';
+import { SetMfaRequiredDto } from '../auth/mfa/dto/mfa.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -70,6 +71,19 @@ export class OrganizationsController {
     @Body() dto: UpdateFeatureFlagsDto,
   ) {
     return this.featureFlagService.setFlags(organizationId, dto as Record<string, boolean>);
+  }
+
+  // Toggle per-org MFA enforcement (auth #2). Org-admin scoped to their OWN org
+  // (organizationId comes from the token, not the body) — a super-admin also
+  // has role 'admin'. RolesGuard enforces the 'admin' role.
+  @Patch('current/mfa-required')
+  @UseGuards(RolesGuard)
+  @Roles('admin')
+  async setMfaRequired(
+    @CurrentUser('organizationId') organizationId: string,
+    @Body() dto: SetMfaRequiredDto,
+  ) {
+    return this.organizationsService.setMfaRequired(organizationId, dto.mfaRequired);
   }
 
   // Get by ID - only allow access to own organization

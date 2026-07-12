@@ -33,6 +33,12 @@ module.exports = {
   detectOpenHandles: true,
   moduleNameMapper: {
     '^@vizora/database$': '<rootDir>/../test/__mocks__/database.ts',
+    // otplib (MFA / auth #2) v13 + its transitive crypto/base32 deps (@scure,
+    // @noble) ship pure ESM under pnpm's `.pnpm/` layout, which Jest's CJS
+    // runtime can't load. Map to a faithful RFC-6238 TOTP test double
+    // (generate/verify/generateSecret/generateURI). Production uses real otplib;
+    // only Jest resolves this stub.
+    '^otplib$': '<rootDir>/../test/__mocks__/otplib.ts',
   },
   transformIgnorePatterns: [
     'node_modules/(?!(@vizora|isomorphic-dompurify|@exodus|html-encoding-sniffer|jsdom|uuid)/)',
