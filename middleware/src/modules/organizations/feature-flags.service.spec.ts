@@ -14,6 +14,7 @@ describe('FeatureFlagService', () => {
 
   beforeEach(() => {
     mockDb = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
       organization: {
         findUnique: jest.fn(),
         update: jest.fn(),
@@ -21,6 +22,13 @@ describe('FeatureFlagService', () => {
     };
     service = new FeatureFlagService(mockDb as DatabaseService);
   });
+
+  // Pull the interpolated values out of a Prisma tagged-template
+  // `$executeRaw` call: values[0] is the stringified flags payload, [1] is
+  // the orgId. (call[0] is the TemplateStringsArray; the rest are the
+  // `${...}` bindings in SQL order.)
+  const rawFlagsPayload = (callIndex = 0): Record<string, boolean> =>
+    JSON.parse(mockDb.$executeRaw.mock.calls[callIndex][1]);
 
   describe('isEnabled', () => {
     it('should return true for features not explicitly disabled', async () => {
@@ -85,83 +93,93 @@ describe('FeatureFlagService', () => {
   });
 
   describe('setFlags', () => {
-    it('should update flags and return merged result', async () => {
-      // First call for setFlags, second for getFlags
-      mockDb.organization.findUnique
-        .mockResolvedValueOnce({ ...mockOrg, settings: {} })
-        .mockResolvedValueOnce({
-          ...mockOrg,
-          settings: { featureFlags: { advancedAnalytics: false } },
-        });
-      mockDb.organization.update.mockResolvedValue({});
+    it('should update flags via a single atomic write and return merged result', async () => {
+      mockDb.$executeRaw.mockResolvedValueOnce(1);
+      // getFlags reflect-read after the atomic write
+      mockDb.organization.findUnique.mockResolvedValueOnce({
+        ...mockOrg,
+        settings: { featureFlags: { advancedAnalytics: false } },
+      });
 
       const result = await service.setFlags('org-123', { advancedAnalytics: false });
 
-      expect(mockDb.organization.update).toHaveBeenCalledWith({
-        where: { id: 'org-123' },
-        data: {
-          settings: { featureFlags: { advancedAnalytics: false } },
-        },
-      });
+      // Exactly one atomic UPDATE, and NO read-modify-write via
+      // organization.update (the lost-update window is gone).
+      expect(mockDb.$executeRaw).toHaveBeenCalledTimes(1);
+      expect(mockDb.organization.update).not.toHaveBeenCalled();
+      expect(rawFlagsPayload()).toEqual({ advancedAnalytics: false });
       expect(result.advancedAnalytics).toBe(false);
     });
 
-    it('should ignore unknown flag keys', async () => {
-      mockDb.organization.findUnique
-        .mockResolvedValueOnce({ ...mockOrg, settings: {} })
-        .mockResolvedValueOnce({ ...mockOrg, settings: { featureFlags: {} } });
-      mockDb.organization.update.mockResolvedValue({});
-
-      await service.setFlags('org-123', { unknownFlag: true } as any);
-
-      expect(mockDb.organization.update).toHaveBeenCalledWith({
-        where: { id: 'org-123' },
-        data: { settings: { featureFlags: {} } },
-      });
-    });
-
-    it('should ignore non-boolean values', async () => {
-      mockDb.organization.findUnique
-        .mockResolvedValueOnce({ ...mockOrg, settings: {} })
-        .mockResolvedValueOnce({ ...mockOrg, settings: { featureFlags: {} } });
-      mockDb.organization.update.mockResolvedValue({});
-
-      await service.setFlags('org-123', { weatherWidget: 'yes' } as any);
-
-      expect(mockDb.organization.update).toHaveBeenCalledWith({
-        where: { id: 'org-123' },
-        data: { settings: { featureFlags: {} } },
-      });
-    });
-
-    it('should preserve existing settings when updating flags', async () => {
-      mockDb.organization.findUnique
-        .mockResolvedValueOnce({
-          ...mockOrg,
-          settings: { branding: { color: 'blue' }, featureFlags: { rssWidget: false } },
-        })
-        .mockResolvedValueOnce({
-          ...mockOrg,
-          settings: { branding: { color: 'blue' }, featureFlags: { rssWidget: false, weatherWidget: false } },
-        });
-      mockDb.organization.update.mockResolvedValue({});
+    it('should merge atomically at the DB level (jsonb_set + jsonb-merge, not whole-object overwrite)', async () => {
+      mockDb.$executeRaw.mockResolvedValueOnce(1);
+      mockDb.organization.findUnique.mockResolvedValueOnce({ ...mockOrg, settings: {} });
 
       await service.setFlags('org-123', { weatherWidget: false });
 
-      expect(mockDb.organization.update).toHaveBeenCalledWith({
-        where: { id: 'org-123' },
-        data: {
-          settings: {
-            branding: { color: 'blue' },
-            featureFlags: { rssWidget: false, weatherWidget: false },
-          },
-        },
-      });
+      const sql = mockDb.$executeRaw.mock.calls[0][0].join('?');
+      expect(sql).toContain('jsonb_set');
+      expect(sql).toContain("'{featureFlags}'");
+      expect(sql).toContain('||'); // merge onto existing featureFlags, preserving siblings
+      // orgId is the second interpolated binding
+      expect(mockDb.$executeRaw.mock.calls[0][2]).toBe('org-123');
     });
 
-    it('should throw NotFoundException for unknown org', async () => {
-      mockDb.organization.findUnique.mockResolvedValue(null);
+    it('should ignore unknown flag keys', async () => {
+      mockDb.$executeRaw.mockResolvedValueOnce(1);
+      mockDb.organization.findUnique.mockResolvedValueOnce({ ...mockOrg, settings: { featureFlags: {} } });
+
+      await service.setFlags('org-123', { unknownFlag: true } as any);
+
+      expect(rawFlagsPayload()).toEqual({});
+    });
+
+    it('should ignore non-boolean values', async () => {
+      mockDb.$executeRaw.mockResolvedValueOnce(1);
+      mockDb.organization.findUnique.mockResolvedValueOnce({ ...mockOrg, settings: { featureFlags: {} } });
+
+      await service.setFlags('org-123', { weatherWidget: 'yes' } as any);
+
+      expect(rawFlagsPayload()).toEqual({});
+    });
+
+    it('should throw NotFoundException when the atomic UPDATE matches no org', async () => {
+      mockDb.$executeRaw.mockResolvedValueOnce(0);
       await expect(service.setFlags('bad-id', {})).rejects.toThrow(NotFoundException);
+      expect(mockDb.organization.findUnique).not.toHaveBeenCalled();
+    });
+
+    // Lost-update regression: two concurrent writers each toggling a
+    // DIFFERENT flag must both survive. The old load→mutate-in-JS→write
+    // path had both writers read the same stale `featureFlags` and the
+    // last write win, dropping one flag. Here `$executeRaw` models the
+    // Postgres `jsonb_set(... || ...)` semantics against a shared store:
+    // each call merges its own key onto the current value, so nothing is
+    // lost. The real atomicity is enforced by Postgres row-locking during
+    // the UPDATE; this test proves the SERVICE no longer does a JS-side
+    // read-modify-write that could interleave and clobber.
+    it('preserves both writes when two concurrent setFlags target different flags', async () => {
+      const store: { featureFlags: Record<string, boolean> } = { featureFlags: {} };
+
+      mockDb.$executeRaw.mockImplementation(async (_strings: any, flagsJson: string) => {
+        const incoming = JSON.parse(flagsJson) as Record<string, boolean>;
+        store.featureFlags = { ...store.featureFlags, ...incoming };
+        return 1;
+      });
+      mockDb.organization.findUnique.mockImplementation(async () => ({
+        ...mockOrg,
+        settings: { featureFlags: { ...store.featureFlags } },
+      }));
+
+      await Promise.all([
+        service.setFlags('org-123', { weatherWidget: false }),
+        service.setFlags('org-123', { rssWidget: false }),
+      ]);
+
+      const flags = await service.getFlags('org-123');
+      expect(flags.weatherWidget).toBe(false);
+      expect(flags.rssWidget).toBe(false);
+      expect(mockDb.organization.update).not.toHaveBeenCalled();
     });
   });
 });
