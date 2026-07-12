@@ -112,6 +112,7 @@ services:
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - ./clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./clickhouse/config.d:/etc/clickhouse-server/config.d:ro
     healthcheck:
       test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
       interval: 10s
@@ -120,7 +121,11 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          # Tightened from 2G: the VPS is RAM-constrained (~3.7G) and this is a
+          # light device-health workload. Paired with a 512M in-server cap
+          # (clickhouse/config.d/low-memory.xml) so CH self-limits under this
+          # hard ceiling and can't OOM the shared box.
+          memory: 768M
     networks:
       - vizora-network
 
