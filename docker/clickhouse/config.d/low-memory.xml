@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<!--
+  Memory caps for running ClickHouse on the small shared Vizora VPS
+  (~3.7 GiB total RAM, already tight). The device-health-samples workload is
+  trivially light (a few rows per heartbeat + occasional uptime aggregates),
+  so ClickHouse does NOT need analytics-scale memory. We hard-cap the server's
+  total memory well below the container's docker limit (768M — see
+  docker-compose.yml) so ClickHouse self-limits gracefully rather than being
+  OOM-killed by docker, and so it can never push the shared box into OOM/swap.
+-->
+<clickhouse>
+    <!-- Total server memory cap: 512 MiB. Baseline CH usage is ~200-300 MiB;
+         this leaves room for the light workload while staying under the 768M
+         container limit (margin for untracked allocations). -->
+    <max_server_memory_usage>536870912</max_server_memory_usage>
+
+    <!-- Shrink caches from their multi-GiB defaults — pointless for this size. -->
+    <mark_cache_size>134217728</mark_cache_size> <!-- 128 MiB -->
+    <uncompressed_cache_size>0</uncompressed_cache_size> <!-- disabled (opt-in per query anyway) -->
+
+    <!-- This is a single low-traffic writer + dashboard reader; keep concurrency modest. -->
+    <max_concurrent_queries>16</max_concurrent_queries>
+</clickhouse>
