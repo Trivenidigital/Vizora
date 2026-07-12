@@ -15,6 +15,13 @@ export interface IssuedRefreshToken {
   /** Plaintext token, to be placed in the httpOnly cookie. Never persisted. */
   rawToken: string;
   expiresAt: Date;
+  /**
+   * The user this session belongs to. On rotate() this is derived from the
+   * presented token itself (the token IS the credential) — the public
+   * /auth/refresh route has no authenticated caller, so the controller uses
+   * this to know whose access token to mint.
+   */
+  userId: string;
 }
 
 /** Session inventory row — deliberately free of any token material. */
@@ -101,23 +108,26 @@ export class RefreshTokenService {
   /**
    * Validate + rotate a presented refresh token.
    *
-   *  - unknown / wrong-user / expired token  → 401 (no family action)
+   *  - unknown / expired token                → 401 (no family action)
    *  - already-revoked within grace          → 401 (benign concurrent refresh; family preserved)
    *  - already-revoked outside grace          → REUSE: revoke the whole family, then 401
    *  - active token                           → atomically claim + issue a successor in the same family
    *
-   * `expectedUserId` is the authenticated caller's id (defense in depth: a
-   * refresh token can only be rotated by the user it belongs to).
+   * The user is derived from the presented token itself (`existing.userId`) —
+   * the token IS the credential. /auth/refresh is public (an expired access
+   * token must still be refreshable), so there is no authenticated caller to
+   * cross-check against. The S1 live-state re-verification below (isActive +
+   * `user_revoked` + `pwd_changed`) is therefore the PRIMARY security gate:
+   * it runs against the token's own userId before any successor is minted.
    */
   async rotate(
     rawToken: string,
-    expectedUserId: string,
     ctx: RefreshTokenContext = {},
   ): Promise<IssuedRefreshToken> {
     const tokenHash = this.hash(rawToken);
     const existing = await this.databaseService.refreshToken.findUnique({ where: { tokenHash } });
 
-    if (!existing || existing.userId !== expectedUserId) {
+    if (!existing) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
@@ -316,6 +326,6 @@ export class RefreshTokenService {
         lastUsedAt: new Date(),
       },
     });
-    return { rawToken, expiresAt };
+    return { rawToken, expiresAt, userId };
   }
 }

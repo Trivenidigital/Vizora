@@ -20,10 +20,16 @@
  * = 7d): `user_revoked`/`pwd_changed` Redis markers are written with that TTL, so
  * a token outliving it would resurrect a revoked session. Capping here makes that
  * impossible regardless of how JWT_EXPIRES_IN is set. MIN guards near-instant expiry.
+ *
+ * DEFAULT is 30 minutes (PR-17b): access tokens are now short-lived and the
+ * frontend silently re-ups the session via the rotating refresh token
+ * (POST /auth/refresh) on any 401. Override with JWT_EXPIRES_IN (e.g. "7d" to
+ * restore the old long-lived behavior, "1h" for a middle ground); the value is
+ * still clamped into [MIN, MAX].
  */
 export const ACCESS_TOKEN_TTL_MIN_S = 60;
 export const ACCESS_TOKEN_TTL_MAX_S = 7 * 24 * 60 * 60; // 604800
-export const ACCESS_TOKEN_TTL_DEFAULT_S = 7 * 24 * 60 * 60;
+export const ACCESS_TOKEN_TTL_DEFAULT_S = 30 * 60; // 1800 (30 minutes)
 
 const UNIT_SECONDS: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400, w: 604800 };
 
@@ -42,15 +48,17 @@ export function parseExpiryToSeconds(raw: string | undefined): number | null {
 
 /**
  * Resolve JWT_EXPIRES_IN to a bounded whole-seconds NUMBER. Fail-SAFE: unparseable
- * → 7d default; out-of-range → clamp into [MIN, MAX]. Never MORE permissive than
- * the default, never longer than the revocation-marker TTL. Non-clean inputs warn
- * so a misconfig is visible rather than silent.
+ * → 30m default; out-of-range → clamp into [MIN, MAX]. Never longer than the
+ * revocation-marker TTL, never near-instant. Non-clean inputs warn so a misconfig
+ * is visible rather than silent.
  */
 export function resolveAccessTokenTtlSeconds(raw = process.env.JWT_EXPIRES_IN): number {
   const parsed = parseExpiryToSeconds(raw);
   if (parsed === null || !Number.isFinite(parsed)) {
     // eslint-disable-next-line no-console
-    console.warn(`[auth] JWT_EXPIRES_IN="${raw}" is not a valid duration; using 7d default.`);
+    console.warn(
+      `[auth] JWT_EXPIRES_IN="${raw}" is not a valid duration; using ${ACCESS_TOKEN_TTL_DEFAULT_S}s default.`,
+    );
     return ACCESS_TOKEN_TTL_DEFAULT_S;
   }
   if (parsed < ACCESS_TOKEN_TTL_MIN_S) {

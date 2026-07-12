@@ -52,6 +52,16 @@ describe('resolveAccessTokenTtlSeconds (bounded, fail-safe)', () => {
     expect(resolveAccessTokenTtlSeconds('7d')).toBe(604800);
   });
 
+  it('PR-17b: defaults to a short 30-minute TTL when JWT_EXPIRES_IN is unset', () => {
+    // Access tokens are short-lived now; the frontend auto-refreshes on 401.
+    // Pin the default so a regression back to a long-lived 7d token is caught.
+    // (Passing an explicit '' exercises the unset/empty branch without the
+    // env-backed default parameter re-reading process.env.JWT_EXPIRES_IN.)
+    expect(ACCESS_TOKEN_TTL_DEFAULT_S).toBe(30 * 60);
+    expect(parseExpiryToSeconds(undefined)).toBe(30 * 60);
+    expect(resolveAccessTokenTtlSeconds('')).toBe(30 * 60);
+  });
+
   it('review #4: a huge fat-finger value clamps DOWN to MAX (no ~19-year token)', () => {
     // 604800000 ("ms" by habit) as seconds ≈ 19 years — must clamp to the 7d cap.
     expect(resolveAccessTokenTtlSeconds('604800000')).toBe(ACCESS_TOKEN_TTL_MAX_S);
