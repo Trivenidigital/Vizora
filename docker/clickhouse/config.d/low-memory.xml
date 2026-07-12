@@ -9,6 +9,15 @@
   OOM-killed by docker, and so it can never push the shared box into OOM/swap.
 -->
 <clickhouse>
+    <!-- Listen on all interfaces INSIDE the container. The stock image config
+         binds loopback-only (127.0.0.1 + ::1), which the container's own
+         healthcheck (native protocol via localhost) passes, but which makes the
+         HTTP interface (8123) unreachable through docker's port-forward — so the
+         host-side app (PM2) can't connect. The published port is still
+         host-loopback-only (127.0.0.1:8123 in docker-compose.yml), so this does
+         not expose ClickHouse beyond the box. -->
+    <listen_host>0.0.0.0</listen_host>
+
     <!-- Total server memory cap: 512 MiB. Baseline CH usage is ~200-300 MiB;
          this leaves room for the light workload while staying under the 768M
          container limit (margin for untracked allocations). -->
