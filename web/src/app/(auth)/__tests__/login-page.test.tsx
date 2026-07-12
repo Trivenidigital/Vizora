@@ -4,6 +4,9 @@ import LoginContent from '../login-content';
 jest.mock('@/lib/api', () => ({
   apiClient: {
     login: jest.fn(),
+    mfaChallenge: jest.fn(),
+    mfaEnroll: jest.fn(),
+    mfaEnable: jest.fn(),
   },
 }));
 
@@ -80,5 +83,49 @@ describe('LoginPage', () => {
   it('renders forgot password link', () => {
     render(<LoginContent />);
     expect(screen.getByText('Forgot password?')).toBeInTheDocument();
+  });
+
+  it('shows the MFA challenge step when login returns mfaRequired', async () => {
+    const { apiClient } = require('@/lib/api');
+    const { loginSchema } = require('@/lib/validation');
+    loginSchema.parse.mockReturnValue(true);
+    apiClient.login.mockResolvedValue({ mfaRequired: true, challengeToken: 'ct-123' });
+
+    render(<LoginContent />);
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'mfa@test.com' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
+    fireEvent.submit(screen.getByText('Log in', { selector: 'button' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: /Two-factor authentication/i }),
+      ).toBeInTheDocument();
+    });
+    // The password form is gone; a code input is shown instead.
+    expect(screen.getByLabelText(/Authentication code/i)).toBeInTheDocument();
+  });
+
+  it('shows the forced-enrollment step when login returns mfaEnrollmentRequired', async () => {
+    const { apiClient } = require('@/lib/api');
+    const { loginSchema } = require('@/lib/validation');
+    loginSchema.parse.mockReturnValue(true);
+    apiClient.login.mockResolvedValue({ mfaEnrollmentRequired: true, enrollmentToken: 'et-123' });
+    apiClient.mfaEnroll.mockResolvedValue({
+      otpauthUrl: 'otpauth://totp/Vizora:u@e.com?secret=ABCDEF&issuer=Vizora',
+      qrDataUrl: 'data:image/png;base64,AAAA',
+    });
+
+    render(<LoginContent />);
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'force@test.com' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
+    fireEvent.submit(screen.getByText('Log in', { selector: 'button' }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('heading', { name: /Two-factor authentication required/i }),
+      ).toBeInTheDocument();
+    });
+    // The enrollment token was used to fetch the QR.
+    await waitFor(() => expect(apiClient.mfaEnroll).toHaveBeenCalledWith('et-123'));
   });
 });

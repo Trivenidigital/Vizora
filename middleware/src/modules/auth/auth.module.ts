@@ -4,6 +4,8 @@ import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { RefreshTokenService } from './refresh-token.service';
+import { MfaService } from './mfa/mfa.service';
+import { EnrollmentOrJwtGuard } from './guards/enrollment-or-jwt.guard';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { DatabaseModule } from '../database/database.module';
 import { BillingModule } from '../billing/billing.module';
@@ -50,6 +52,8 @@ import { getAccessTokenTtlSeconds } from './jwt-expiry';
   providers: [
     AuthService,
     RefreshTokenService,
+    MfaService,
+    EnrollmentOrJwtGuard,
     JwtStrategy,
     {
       provide: APP_GUARD,
@@ -57,6 +61,6 @@ import { getAccessTokenTtlSeconds } from './jwt-expiry';
     },
     RolesGuard,
   ],
-  exports: [AuthService, RefreshTokenService, JwtModule],
+  exports: [AuthService, RefreshTokenService, MfaService, JwtModule],
 })
 export class AuthModule {}

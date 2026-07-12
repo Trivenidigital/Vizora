@@ -1,6 +1,7 @@
 // Barrel file — re-exports everything for backwards compatibility
 // Import domain modules to register prototype extensions on ApiClient
 import './auth';
+import './mfa';
 import './content';
 import './displays';
 import './playlists';

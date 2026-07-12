@@ -78,6 +78,10 @@ export class CsrfMiddleware implements NestMiddleware {
       '/api/v1/auth/google',
       '/api/v1/auth/forgot-password',
       '/api/v1/auth/reset-password',
+      // Public MFA login challenge: carries its own short-lived, single-use
+      // challenge token as the credential (no cookie surface), rate-limited +
+      // per-challenge lockout. Same rationale as login/register above.
+      '/api/v1/auth/mfa/challenge',
       '/api/v1/devices/pairing/request',
       '/api/v1/devices/pairing/status',
       '/api/v1/webhooks/stripe', // Validates X-Stripe-Signature
@@ -87,6 +91,7 @@ export class CsrfMiddleware implements NestMiddleware {
       '/api/auth/google',
       '/api/auth/forgot-password',
       '/api/auth/reset-password',
+      '/api/auth/mfa/challenge',
       '/api/devices/pairing/request',
       '/api/devices/pairing/status',
       '/api/webhooks/stripe',

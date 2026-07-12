@@ -37,6 +37,10 @@ model Organization {
   // Timestamp of the last entitlement-rung transition. The ladder clock keys on THIS,
   // not updatedAt (which any unrelated org write resets — B8 grace-reset bug).
   entitlementStateSince  DateTime?
+  // Per-org MFA enforcement (auth #2). When true, members who are NOT enrolled
+  // are forced through TOTP enrollment before they receive session tokens;
+  // enrolled members hit the normal login challenge. Opt-in, default off.
+  mfaRequired            Boolean   @default(false)
   storageUsedBytes       BigInt    @default(0) // Current storage usage in bytes
   storageQuotaBytes      BigInt    @default(1073741824) // 1GB default quota in bytes (trial)
   settings               Json?     @db.JsonB
@@ -88,6 +92,14 @@ model User {
   isActive     Boolean   @default(true)
   isSuperAdmin Boolean   @default(false) // Vizora platform admin (separate from org admin)
   lastLoginAt  DateTime?
+  // TOTP multi-factor auth (auth #2). Opt-in per user. `mfaSecret` holds the
+  // AES-256-GCM ciphertext (iv:tag:data) of the base32 TOTP secret — NEVER
+  // plaintext. While `mfaEnabled` is false but `mfaSecret` is set, the secret
+  // is a PENDING enrollment awaiting a verified code; once enabled it is the
+  // active secret. `mfaEnrolledAt` marks when MFA was turned on.
+  mfaEnabled    Boolean   @default(false)
+  mfaSecret     String? // AES-256-GCM ciphertext of the TOTP secret; never plaintext
+  mfaEnrolledAt DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -99,6 +111,7 @@ model User {
   apiKeys                 ApiKey[]
   passwordResetTokens     PasswordResetToken[]
   refreshTokens           RefreshToken[]
+  mfaBackupCodes          MfaBackupCode[]
   supportRequests         SupportRequest[]     @relation("SupportRequestUser")
   resolvedSupportRequests SupportRequest[]     @relation("SupportRequestResolver")
 
@@ -148,6 +161,24 @@ model RefreshToken {
   @@index([expiresAt])
   @@index([familyId])
   @@map("refresh_tokens")
+}
+
+// Single-use TOTP backup/recovery codes (auth #2). Ten are generated when a
+// user enables MFA; the plaintext is shown ONCE at generation and only the
+// SHA-256 hash of the normalized code is stored. A code is consumed by setting
+// `usedAt` on redemption and is never valid again (single-use). Regenerating
+// backup codes deletes the old rows and issues a fresh set.
+model MfaBackupCode {
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String // SHA-256 hash of the normalized backup code — plaintext is never stored
+  usedAt    DateTime? // set once on redemption; a used code is never valid again
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([codeHash])
+  @@map("mfa_backup_codes")
 }
 
 // ============================================================================

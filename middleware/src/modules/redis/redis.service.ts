@@ -209,6 +209,46 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * Atomically increment a counter and set its TTL on the first hit. INCR is
+   * atomic server-side, so N concurrent callers each observe a distinct
+   * post-increment value — none can race a read-of-0 (unlike get-then-incr).
+   * The TTL is applied only when the counter is first created (return value 1)
+   * so the window is fixed, not sliding. Returns the new counter value, or 0 if
+   * Redis is unavailable (best-effort, matches `incr`).
+   */
+  async incrementWithTtl(key: string, ttlSeconds: number): Promise<number> {
+    if (!this.client) return 0;
+    try {
+      const count = await this.client.incr(key);
+      if (count === 1) {
+        await this.client.expire(key, ttlSeconds);
+      }
+      return count;
+    } catch (error) {
+      this.logger.error(`Redis INCR/EXPIRE error for key ${key}: ${error}`);
+      return 0;
+    }
+  }
+
+  /**
+   * Atomically claim a key iff it does not already exist (`SET key value NX EX
+   * ttl`). Returns true when this call created the key, false when it already
+   * existed (or on a Redis error). The single round-trip removes the TOCTOU of a
+   * separate exists-then-set, and — because a Redis error returns false — the
+   * caller fails CLOSED (treats the claim as lost) rather than open.
+   */
+  async setIfNotExists(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+    if (!this.client) return false;
+    try {
+      const result = await this.client.set(key, value, 'EX', ttlSeconds, 'NX');
+      return result === 'OK';
+    } catch (error) {
+      this.logger.error(`Redis SET NX error for key ${key}: ${error}`);
+      return false;
+    }
+  }
+
   async expire(key: string, ttlSeconds: number): Promise<boolean> {
     if (!this.client) return false;
     try {

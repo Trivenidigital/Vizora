@@ -28,6 +28,7 @@ import { StorageService } from '../storage/storage.service';
 import { getCleanupSafeMinioObjectKey, isMinioUrl } from '../storage/minio-object-key';
 import { AlertRulesService } from '../notifications/alert-rules/alert-rules.service';
 import { resolvePublicAppUrl } from '../common/utils/public-app-url';
+import { MfaService } from './mfa/mfa.service';
 
 // Account lockout constants
 const MAX_LOGIN_ATTEMPTS = 10;
@@ -56,6 +57,7 @@ export class AuthService {
     private events: EventEmitter2,
     @Inject(forwardRef(() => AlertRulesService))
     private alertRulesService: AlertRulesService,
+    private mfaService: MfaService,
   ) {}
 
   async register(dto: RegisterDto, clientIp?: string, userAgent?: string | string[]) {
@@ -330,6 +332,22 @@ export class AuthService {
       this.events.emit('user.welcomed', { organizationId: user.organizationId, userId: user.id });
     }
 
+    // MFA branch (auth #2) — route Google login through the SAME gate as
+    // password login. Evaluated AFTER the user is resolved/created + validated
+    // and BEFORE any session/token is minted. `organization` is loaded on both
+    // the existing-user (findUnique include) and auto-register (create include)
+    // branches, so resolveLoginBranch can see org.mfaRequired. For a user who is
+    // NOT MFA-enrolled and whose org does NOT require MFA, resolveLoginBranch
+    // returns { kind: 'none' } and Google login is unchanged: no lastLoginAt
+    // bump and no token are performed here.
+    const mfaBranch = this.mfaService.resolveLoginBranch(user);
+    if (mfaBranch.kind === 'challenge') {
+      return { mfaRequired: true as const, challengeToken: mfaBranch.challengeToken };
+    }
+    if (mfaBranch.kind === 'enroll') {
+      return { mfaEnrollmentRequired: true as const, enrollmentToken: mfaBranch.enrollmentToken };
+    }
+
     // Update last login
     await this.databaseService.user.update({
       where: { id: user.id },
@@ -545,11 +563,77 @@ export class AuthService {
       throw new ForbiddenException('Account is inactive. Contact support.');
     }
 
+    // MFA branch (auth #2). Evaluated AFTER password + isActive verification and
+    // BEFORE any token issuance. For a user who is NOT MFA-enrolled and whose
+    // org does NOT require MFA, resolveLoginBranch returns { kind: 'none' } and
+    // this block is skipped entirely — every statement below runs UNCHANGED, so
+    // non-MFA login is byte-for-byte identical to before this feature.
+    const mfaBranch = this.mfaService.resolveLoginBranch(user);
+    if (mfaBranch.kind !== 'none') {
+      // The password was correct, so clear the password lockout counter exactly
+      // as the normal success path does — a subsequent MFA failure must not be
+      // compounded by the password lock. The login COMPLETES later, at
+      // /auth/mfa/challenge (enrolled) or /auth/mfa/enable (forced enrollment);
+      // no session token is issued here.
+      try {
+        await this.redisService.del(lockoutKey);
+      } catch (error) {
+        this.logger.error(`Failed to clear lockout counter (best-effort): ${error instanceof Error ? error.message : 'Unknown'}`);
+      }
+      if (mfaBranch.kind === 'challenge') {
+        return { mfaRequired: true as const, challengeToken: mfaBranch.challengeToken };
+      }
+      return { mfaEnrollmentRequired: true as const, enrollmentToken: mfaBranch.enrollmentToken };
+    }
+
     // Clear lockout counter on successful login (best-effort cleanup)
     try {
       await this.redisService.del(lockoutKey);
     } catch (error) {
       this.logger.error(`Failed to clear lockout counter (best-effort): ${error instanceof Error ? error.message : 'Unknown'}`);
+    }
+
+    // Update last login timestamp
+    await this.databaseService.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
+    // Generate JWT token
+    const token = this.generateToken(user, user.organization);
+
+    // Log audit event and run the M12 unrecognized-login alert check.
+    await this.createLoginAuditAndCheckUnrecognizedLogin(user, context);
+
+    return {
+      user: {
+        ...this.sanitizeUser(user),
+        organization: {
+          name: user.organization.name,
+          subscriptionTier: user.organization.subscriptionTier,
+        },
+      },
+      token,
+      expiresIn: getAccessTokenTtlSeconds(),
+    };
+  }
+
+  /**
+   * Complete a login for a user whose second factor has just been satisfied
+   * (MFA challenge success, or forced-enrollment `enable`). Issues the session
+   * EXACTLY as the tail of `login` does — same lastLoginAt update, same
+   * generateToken, same audit + unrecognized-login check, same response shape —
+   * so an MFA login is indistinguishable from a normal login downstream.
+   * The password + second factor were both verified before this is called.
+   */
+  async issueSessionForUser(userId: string, context: LoginContext = {}) {
+    const user = await this.databaseService.user.findUnique({
+      where: { id: userId },
+      include: { organization: true },
+    });
+
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('User not found or inactive');
     }
 
     // Update last login timestamp
@@ -1294,8 +1378,11 @@ export class AuthService {
     }
   }
 
-  private sanitizeUser(user: { passwordHash?: string | null; [key: string]: unknown }) {
-    const { passwordHash: _, ...sanitized } = user;
+  private sanitizeUser(user: { passwordHash?: string | null; mfaSecret?: string | null; [key: string]: unknown }) {
+    // Strip the password hash AND the encrypted MFA secret (auth #2) — the
+    // ciphertext must never cross the wire in any response body. mfaEnabled /
+    // mfaEnrolledAt are non-sensitive and kept for the UI.
+    const { passwordHash: _pw, mfaSecret: _mfa, ...sanitized } = user;
     return sanitized;
   }
 

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { RefreshTokenService } from './refresh-token.service';
+import { MfaService } from './mfa/mfa.service';
 import { Request, Response } from 'express';
 import { AUTH_CONSTANTS } from './constants/auth.constants';
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
@@ -59,6 +60,15 @@ describe('AuthController', () => {
       getTtlSeconds: jest.fn().mockReturnValue(30 * 24 * 60 * 60),
     };
 
+    const mockMfaService = {
+      enroll: jest.fn(),
+      enable: jest.fn(),
+      disable: jest.fn(),
+      status: jest.fn(),
+      regenerateBackupCodes: jest.fn(),
+      verifyChallenge: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [
@@ -69,6 +79,10 @@ describe('AuthController', () => {
         {
           provide: RefreshTokenService,
           useValue: mockRefreshTokenService,
+        },
+        {
+          provide: MfaService,
+          useValue: mockMfaService,
         },
       ],
     }).compile();
@@ -263,6 +277,36 @@ describe('AuthController', () => {
         ipAddress: '203.0.113.20',
         userAgent: 'Mozilla/5.0 Chrome/126.0',
       });
+    });
+
+    it('MFA-enrolled Google user: returns mfaRequired + challengeToken and sets NO cookie/session (S1)', async () => {
+      authService.googleLogin.mockResolvedValue({
+        mfaRequired: true,
+        challengeToken: 'chal.jwt',
+      } as any);
+
+      const result = await controller.googleLogin(googleDto, mockGoogleRequest, mockResponse as Response);
+
+      expect(result).toEqual({ success: true, data: { mfaRequired: true, challengeToken: 'chal.jwt' } });
+      // No auth cookie and no refresh session on an MFA gate — mirrors /auth/login.
+      expect(mockResponse.cookie).not.toHaveBeenCalled();
+      expect(refreshTokenService.issueForUser).not.toHaveBeenCalled();
+    });
+
+    it('unenrolled Google user in mfaRequired org: returns mfaEnrollmentRequired and NO cookie/session (S1)', async () => {
+      authService.googleLogin.mockResolvedValue({
+        mfaEnrollmentRequired: true,
+        enrollmentToken: 'enr.jwt',
+      } as any);
+
+      const result = await controller.googleLogin(googleDto, mockGoogleRequest, mockResponse as Response);
+
+      expect(result).toEqual({
+        success: true,
+        data: { mfaEnrollmentRequired: true, enrollmentToken: 'enr.jwt' },
+      });
+      expect(mockResponse.cookie).not.toHaveBeenCalled();
+      expect(refreshTokenService.issueForUser).not.toHaveBeenCalled();
     });
   });
 

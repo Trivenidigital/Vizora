@@ -77,6 +77,7 @@ describe('AuthService', () => {
   let mockGeoService: any;
   let mockStorageService: any;
   let mockAlertRulesService: any;
+  let mockMfaService: any;
 
   const mockUser = {
     id: 'user-123',
@@ -189,6 +190,16 @@ describe('AuthService', () => {
       seedDefaultRuleForOrg: jest.fn().mockResolvedValue(undefined),
     };
 
+    // MFA service mock. Default: resolveLoginBranch returns { kind: 'none' } so
+    // every existing (non-MFA) login test exercises the UNCHANGED password->token
+    // path. Individual MFA tests override resolveLoginBranch per-case.
+    mockMfaService = {
+      resolveLoginBranch: jest.fn().mockReturnValue({ kind: 'none' }),
+      issueChallengeToken: jest.fn().mockReturnValue('challenge.jwt'),
+      issueEnrollmentToken: jest.fn().mockReturnValue('enrollment.jwt'),
+      verifyChallenge: jest.fn(),
+    };
+
     // Directly instantiate the service with mocked dependencies
     service = new AuthService(
       mockDatabaseService as DatabaseService,
@@ -200,6 +211,7 @@ describe('AuthService', () => {
       mockStorageService as any,
       mockEventEmitter as any,
       mockAlertRulesService as any,
+      mockMfaService as any,
     );
     
     // Reset bcrypt mocks
@@ -436,6 +448,114 @@ describe('AuthService', () => {
       expect(result).toHaveProperty('user');
       expect(result).toHaveProperty('token', 'mock-jwt-token');
       expect(result).toHaveProperty('expiresIn', getAccessTokenTtlSeconds());
+    });
+
+    describe('MFA branch (auth #2)', () => {
+      it('non-MFA login is UNCHANGED: resolveLoginBranch=none -> password->token, no challenge', async () => {
+        mockDatabaseService.user.findUnique.mockResolvedValue({
+          ...mockUser,
+          organization: mockOrganization,
+        });
+        mockDatabaseService.user.update.mockResolvedValue(mockUser);
+        mockDatabaseService.auditLog.create.mockResolvedValue({});
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        mockMfaService.resolveLoginBranch.mockReturnValue({ kind: 'none' });
+
+        const result: any = await service.login(loginDto);
+
+        // Byte-for-byte the same response shape as before MFA existed.
+        expect(result).toEqual(
+          expect.objectContaining({ token: 'mock-jwt-token', expiresIn: getAccessTokenTtlSeconds() }),
+        );
+        expect(result.user).toBeDefined();
+        expect(result).not.toHaveProperty('mfaRequired');
+        expect(result).not.toHaveProperty('mfaEnrollmentRequired');
+        // Normal path still updates lastLoginAt + mints a token.
+        expect(mockDatabaseService.user.update).toHaveBeenCalled();
+        expect(mockJwtService.sign).toHaveBeenCalled();
+      });
+
+      it('enrolled user gets a challenge token and NO session token', async () => {
+        mockDatabaseService.user.findUnique.mockResolvedValue({
+          ...mockUser,
+          mfaEnabled: true,
+          organization: mockOrganization,
+        });
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        mockMfaService.resolveLoginBranch.mockReturnValue({
+          kind: 'challenge',
+          challengeToken: 'chal.jwt',
+        });
+
+        const result: any = await service.login(loginDto);
+
+        expect(result).toEqual({ mfaRequired: true, challengeToken: 'chal.jwt' });
+        expect(result).not.toHaveProperty('token');
+        expect(result).not.toHaveProperty('user');
+        // No session was minted and lastLoginAt was NOT bumped (login not complete).
+        expect(mockJwtService.sign).not.toHaveBeenCalled();
+        expect(mockDatabaseService.user.update).not.toHaveBeenCalled();
+        // Password was correct, so the password lockout counter was cleared.
+        expect(mockRedisService.del).toHaveBeenCalledWith(`login_attempts:${loginDto.email}`);
+      });
+
+      it('org-required + not-enrolled user gets an enrollment token and NO session token', async () => {
+        mockDatabaseService.user.findUnique.mockResolvedValue({
+          ...mockUser,
+          mfaEnabled: false,
+          organization: { ...mockOrganization, mfaRequired: true },
+        });
+        (bcrypt.compare as jest.Mock).mockResolvedValue(true);
+        mockMfaService.resolveLoginBranch.mockReturnValue({
+          kind: 'enroll',
+          enrollmentToken: 'enr.jwt',
+        });
+
+        const result: any = await service.login(loginDto);
+
+        expect(result).toEqual({ mfaEnrollmentRequired: true, enrollmentToken: 'enr.jwt' });
+        expect(mockJwtService.sign).not.toHaveBeenCalled();
+        expect(mockDatabaseService.user.update).not.toHaveBeenCalled();
+      });
+
+      it('MFA branch is only reached AFTER a correct password (wrong password never issues a challenge)', async () => {
+        mockDatabaseService.user.findUnique.mockResolvedValue({
+          ...mockUser,
+          mfaEnabled: true,
+          organization: mockOrganization,
+        });
+        (bcrypt.compare as jest.Mock).mockResolvedValue(false);
+
+        await expect(service.login(loginDto)).rejects.toThrow(UnauthorizedException);
+        expect(mockMfaService.resolveLoginBranch).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('issueSessionForUser (MFA completion)', () => {
+      it('issues the normal session (token + user + expiresIn) and bumps lastLoginAt', async () => {
+        mockDatabaseService.user.findUnique.mockResolvedValue({
+          ...mockUser,
+          organization: mockOrganization,
+        });
+        mockDatabaseService.user.update.mockResolvedValue(mockUser);
+        mockDatabaseService.auditLog.create.mockResolvedValue({});
+
+        const result: any = await service.issueSessionForUser('user-123', {});
+
+        expect(result).toHaveProperty('token', 'mock-jwt-token');
+        expect(result).toHaveProperty('expiresIn', getAccessTokenTtlSeconds());
+        expect(result.user).toBeDefined();
+        expect(mockDatabaseService.user.update).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { id: 'user-123' } }),
+        );
+      });
+
+      it('rejects an inactive/missing user', async () => {
+        mockDatabaseService.user.findUnique.mockResolvedValue(null);
+        await expect(service.issueSessionForUser('gone', {})).rejects.toThrow(
+          UnauthorizedException,
+        );
+      });
     });
 
     it('normalizes email (lowercase + trim) for both user lookup and lockout key', async () => {
@@ -1357,6 +1477,79 @@ describe('AuthService', () => {
 
       await expect(service.googleLogin('malformed')).rejects.toThrow(UnauthorizedException);
       await expect(service.googleLogin('malformed')).rejects.toThrow('Invalid Google token');
+    });
+
+    describe('MFA branch (S1 — Google login is gated like password login)', () => {
+      it('MFA-enrolled Google user gets a challenge token and NO session (no token, no cookie)', async () => {
+        mockGoogleSuccess(buildGooglePayload());
+        const oauthUser = {
+          ...mockUser,
+          passwordHash: '', // OAuth user has no password
+          mfaEnabled: true,
+          organization: mockOrganization,
+        };
+        mockDatabaseService.user.findUnique.mockResolvedValue(oauthUser);
+        mockMfaService.resolveLoginBranch.mockReturnValue({
+          kind: 'challenge',
+          challengeToken: 'chal.jwt',
+        });
+
+        const result: any = await service.googleLogin(FAKE_TOKEN, googleLoginContext);
+
+        expect(result).toEqual({ mfaRequired: true, challengeToken: 'chal.jwt' });
+        expect(result).not.toHaveProperty('token');
+        expect(result).not.toHaveProperty('user');
+        // resolveLoginBranch was given the user with organization loaded.
+        expect(mockMfaService.resolveLoginBranch).toHaveBeenCalledWith(oauthUser);
+        // No session minted: no lastLoginAt bump, no JWT signed, no login audit.
+        expect(mockDatabaseService.user.update).not.toHaveBeenCalled();
+        expect(mockJwtService.sign).not.toHaveBeenCalled();
+        expect(mockDatabaseService.auditLog.create).not.toHaveBeenCalled();
+      });
+
+      it('unenrolled Google user in an mfaRequired org gets an enrollment token and NO session', async () => {
+        mockGoogleSuccess(buildGooglePayload());
+        const oauthUser = {
+          ...mockUser,
+          passwordHash: '',
+          mfaEnabled: false,
+          organization: { ...mockOrganization, mfaRequired: true },
+        };
+        mockDatabaseService.user.findUnique.mockResolvedValue(oauthUser);
+        mockMfaService.resolveLoginBranch.mockReturnValue({
+          kind: 'enroll',
+          enrollmentToken: 'enr.jwt',
+        });
+
+        const result: any = await service.googleLogin(FAKE_TOKEN, googleLoginContext);
+
+        expect(result).toEqual({ mfaEnrollmentRequired: true, enrollmentToken: 'enr.jwt' });
+        expect(mockDatabaseService.user.update).not.toHaveBeenCalled();
+        expect(mockJwtService.sign).not.toHaveBeenCalled();
+      });
+
+      it('non-MFA Google user is UNCHANGED: still returns a full session token', async () => {
+        mockGoogleSuccess(buildGooglePayload());
+        const oauthUser = {
+          ...mockUser,
+          passwordHash: '',
+          organization: mockOrganization,
+        };
+        mockDatabaseService.user.findUnique.mockResolvedValue(oauthUser);
+        mockDatabaseService.user.update.mockResolvedValue(oauthUser);
+        mockDatabaseService.auditLog.create.mockResolvedValue(googleLoginAuditLog);
+        // Default resolveLoginBranch => { kind: 'none' }.
+
+        const result: any = await service.googleLogin(FAKE_TOKEN, googleLoginContext);
+        await flushLoginAlertTasks();
+
+        expect(result).toHaveProperty('token', 'mock-jwt-token');
+        expect(result).toHaveProperty('user');
+        expect(result).not.toHaveProperty('mfaRequired');
+        expect(result).not.toHaveProperty('mfaEnrollmentRequired');
+        expect(mockDatabaseService.user.update).toHaveBeenCalled();
+        expect(mockJwtService.sign).toHaveBeenCalled();
+      });
     });
   });
 
