@@ -768,6 +768,13 @@ export class AuthService {
     // account must not leave the legitimate user's live sessions valid.
     await this.redisService.del(`user_auth:${tokenRecord.userId}`);
     await this.markPasswordChanged(tokenRecord.userId);
+
+    // Revoke rotating refresh-token sessions issued before the reset — the
+    // account-takeover case must not leave live refresh lineages valid.
+    await this.databaseService.refreshToken.updateMany({
+      where: { userId: tokenRecord.userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
   }
 
   /**
@@ -827,6 +834,14 @@ export class AuthService {
     // session). JwtStrategy.validate rejects tokens with iat < this timestamp;
     // the user's fresh re-login passes.
     await this.markPasswordChanged(userId);
+
+    // Revoke rotating refresh-token sessions too, so a stolen refresh lineage
+    // can't outlive the password change (defense in depth with the pwd_changed
+    // marker that RefreshTokenService.rotate now re-checks).
+    await this.databaseService.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
 
     // Security notification (M12): tell the user their password changed, so an
     // unauthorized change is noticed. Non-blocking — sendMail already swallows
@@ -1163,6 +1178,19 @@ export class AuthService {
       await this.redisService.del(`user_auth:${userId}`);
     } catch (err) {
       this.logger.warn(`Failed to invalidate tokens for deleted user ${userId}: ${err instanceof Error ? err.message : 'Unknown'}`);
+    }
+
+    // 10. Revoke the user's refresh-token sessions so no rotating lineage can
+    // outlive the deletion. The anonymize path (non-sole-admin) keeps the user
+    // row, so cascade deletion doesn't cover it. Best-effort — additive to the
+    // JWT invalidation above.
+    try {
+      await this.databaseService.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    } catch (err) {
+      this.logger.warn(`Failed to revoke refresh tokens for deleted user ${userId}: ${err instanceof Error ? err.message : 'Unknown'}`);
     }
 
     this.logger.log(`Account deleted for user ${userId}`);

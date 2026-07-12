@@ -17,6 +17,16 @@ export const AUTH_CONSTANTS = {
   // Cookie name for JWT token
   COOKIE_NAME: 'vizora_auth_token',
 
+  // Cookie name for the long-lived refresh token (PR-17a). Opaque random
+  // string; only its SHA-256 hash is persisted server-side.
+  REFRESH_COOKIE_NAME: 'vizora_refresh_token',
+
+  // Default refresh-token lifetime (30 days). Overridable via
+  // REFRESH_TOKEN_TTL_DAYS (clamped to [1, 365] in RefreshTokenService).
+  REFRESH_TOKEN_DEFAULT_TTL_DAYS: 30,
+  REFRESH_TOKEN_TTL_MIN_DAYS: 1,
+  REFRESH_TOKEN_TTL_MAX_DAYS: 365,
+
   // CSRF token header name
   CSRF_HEADER_NAME: 'x-csrf-token',
 

@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { RefreshTokenService } from './refresh-token.service';
 import { Request, Response } from 'express';
 import { AUTH_CONSTANTS } from './constants/auth.constants';
 import { getAccessTokenTtlMs } from './jwt-expiry';
@@ -9,6 +10,7 @@ import { ConflictException, UnauthorizedException } from '@nestjs/common';
 describe('AuthController', () => {
   let controller: AuthController;
   let authService: jest.Mocked<AuthService>;
+  let refreshTokenService: jest.Mocked<RefreshTokenService>;
   let mockResponse: Partial<Response>;
 
   const mockUser = {
@@ -48,6 +50,16 @@ describe('AuthController', () => {
       deleteAvatar: jest.fn(),
     };
 
+    const mockRefreshTokenService = {
+      issueForUser: jest.fn().mockResolvedValue({ rawToken: 'refresh-raw', expiresAt: new Date(Date.now() + 60_000) }),
+      rotate: jest.fn().mockResolvedValue({ rawToken: 'refresh-rotated', expiresAt: new Date(Date.now() + 60_000) }),
+      revokeByRawToken: jest.fn().mockResolvedValue(undefined),
+      listSessions: jest.fn().mockResolvedValue([]),
+      revokeOtherSessions: jest.fn().mockResolvedValue(0),
+      revokeSession: jest.fn().mockResolvedValue(undefined),
+      getTtlSeconds: jest.fn().mockReturnValue(30 * 24 * 60 * 60),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
       providers: [
@@ -55,11 +67,16 @@ describe('AuthController', () => {
           provide: AuthService,
           useValue: mockAuthService,
         },
+        {
+          provide: RefreshTokenService,
+          useValue: mockRefreshTokenService,
+        },
       ],
     }).compile();
 
     controller = module.get<AuthController>(AuthController);
     authService = module.get(AuthService);
+    refreshTokenService = module.get(RefreshTokenService);
   });
 
   describe('register', () => {
@@ -293,6 +310,64 @@ describe('AuthController', () => {
       await expect(controller.refresh('invalid-id', mockRequest, mockResponse as Response))
         .rejects.toThrow(UnauthorizedException);
     });
+
+    it('should issue a fresh refresh token when no refresh cookie is present (legacy session upgrade)', async () => {
+      authService.refresh.mockResolvedValue({
+        token: 'new-jwt-token',
+        expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
+      });
+
+      await controller.refresh('user-123', mockRequest, mockResponse as Response);
+
+      expect(refreshTokenService.issueForUser).toHaveBeenCalledWith('user-123', expect.any(Object));
+      expect(refreshTokenService.rotate).not.toHaveBeenCalled();
+      expect(mockResponse.cookie).toHaveBeenCalledWith(
+        AUTH_CONSTANTS.REFRESH_COOKIE_NAME,
+        'refresh-raw',
+        expect.objectContaining({ httpOnly: true, path: '/' }),
+      );
+    });
+
+    it('should rotate the presented refresh token and set the rotated cookie', async () => {
+      authService.refresh.mockResolvedValue({
+        token: 'new-jwt-token',
+        expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
+      });
+      const reqWithRefresh = {
+        cookies: {
+          [AUTH_CONSTANTS.COOKIE_NAME]: 'old-jwt-token',
+          [AUTH_CONSTANTS.REFRESH_COOKIE_NAME]: 'presented-refresh',
+        },
+        headers: {},
+      } as any;
+
+      await controller.refresh('user-123', reqWithRefresh, mockResponse as Response);
+
+      expect(refreshTokenService.rotate).toHaveBeenCalledWith('presented-refresh', 'user-123', expect.any(Object));
+      expect(refreshTokenService.issueForUser).not.toHaveBeenCalled();
+      expect(mockResponse.cookie).toHaveBeenCalledWith(
+        AUTH_CONSTANTS.REFRESH_COOKIE_NAME,
+        'refresh-rotated',
+        expect.objectContaining({ httpOnly: true, path: '/' }),
+      );
+    });
+
+    it('should propagate reuse-detection 401 without minting a new access token', async () => {
+      refreshTokenService.rotate.mockRejectedValueOnce(
+        new UnauthorizedException('Refresh token reuse detected'),
+      );
+      const reqWithRefresh = {
+        cookies: {
+          [AUTH_CONSTANTS.COOKIE_NAME]: 'old-jwt-token',
+          [AUTH_CONSTANTS.REFRESH_COOKIE_NAME]: 'stolen-refresh',
+        },
+        headers: {},
+      } as any;
+
+      await expect(controller.refresh('user-123', reqWithRefresh, mockResponse as Response))
+        .rejects.toThrow(UnauthorizedException);
+      expect(authService.refresh).not.toHaveBeenCalled();
+    });
   });
 
   describe('logout', () => {
@@ -341,6 +416,83 @@ describe('AuthController', () => {
       await controller.logout('user-123', mockRequest, mockResponse as Response);
 
       expect(authService.logout).toHaveBeenCalledWith('user-123', 'jwt-token-from-header');
+    });
+
+    it('should revoke the refresh token and clear the refresh cookie', async () => {
+      authService.logout.mockResolvedValue({ message: 'Logged out successfully' });
+
+      const mockRequest = {
+        cookies: {
+          [AUTH_CONSTANTS.COOKIE_NAME]: 'jwt-token',
+          [AUTH_CONSTANTS.REFRESH_COOKIE_NAME]: 'refresh-to-revoke',
+        },
+        headers: {},
+      } as any;
+
+      await controller.logout('user-123', mockRequest, mockResponse as Response);
+
+      expect(refreshTokenService.revokeByRawToken).toHaveBeenCalledWith('refresh-to-revoke');
+      expect(mockResponse.clearCookie).toHaveBeenCalledWith(
+        AUTH_CONSTANTS.REFRESH_COOKIE_NAME,
+        expect.objectContaining({ httpOnly: true, path: '/' }),
+      );
+    });
+  });
+
+  describe('sessions', () => {
+    it('should list the caller own sessions and mark the current one', async () => {
+      const sessions = [
+        { id: 's1', userAgent: 'UA', ip: '1.2.3.4', createdAt: new Date(), lastUsedAt: new Date(), current: true },
+      ];
+      refreshTokenService.listSessions.mockResolvedValue(sessions);
+      const req = { cookies: { [AUTH_CONSTANTS.REFRESH_COOKIE_NAME]: 'current-refresh' }, headers: {} } as any;
+
+      const result = await controller.listSessions('user-123', req);
+
+      expect(refreshTokenService.listSessions).toHaveBeenCalledWith('user-123', 'current-refresh');
+      expect(result).toEqual({ success: true, data: { sessions } });
+    });
+
+    it('should not expose any token hash in the session list', async () => {
+      refreshTokenService.listSessions.mockResolvedValue([
+        { id: 's1', userAgent: 'UA', ip: '1.2.3.4', createdAt: new Date(), lastUsedAt: new Date(), current: true },
+      ]);
+      const req = { cookies: {}, headers: {} } as any;
+
+      const result = await controller.listSessions('user-123', req);
+
+      const serialized = JSON.stringify(result);
+      expect(serialized).not.toMatch(/tokenHash/i);
+      expect(serialized).not.toMatch(/replacedByTokenHash/i);
+    });
+
+    it('should revoke all other sessions and return the count', async () => {
+      refreshTokenService.revokeOtherSessions.mockResolvedValue(3);
+      const req = { cookies: { [AUTH_CONSTANTS.REFRESH_COOKIE_NAME]: 'current-refresh' }, headers: {} } as any;
+
+      const result = await controller.revokeOtherSessions('user-123', req);
+
+      expect(refreshTokenService.revokeOtherSessions).toHaveBeenCalledWith('user-123', 'current-refresh');
+      expect(result).toEqual({ success: true, data: { revokedCount: 3 } });
+    });
+
+    it('should revoke a specific session by id', async () => {
+      const result = await controller.revokeSession('user-123', 'session-9');
+
+      expect(refreshTokenService.revokeSession).toHaveBeenCalledWith('user-123', 'session-9');
+      expect(result.success).toBe(true);
+    });
+
+    it('returns the same idempotent success for a missing or cross-user id (no 404/403 oracle)', async () => {
+      // S3: the service treats missing and cross-user ids identically (scoped
+      // no-op), so the controller returns the same success either way — it no
+      // longer surfaces a 404-vs-403 distinction that would leak existence.
+      refreshTokenService.revokeSession.mockResolvedValue(undefined);
+
+      const result = await controller.revokeSession('user-123', 'missing-or-foreign');
+
+      expect(refreshTokenService.revokeSession).toHaveBeenCalledWith('user-123', 'missing-or-foreign');
+      expect(result.success).toBe(true);
     });
   });
 

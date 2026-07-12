@@ -98,6 +98,7 @@ model User {
   notifications           Notification[]
   apiKeys                 ApiKey[]
   passwordResetTokens     PasswordResetToken[]
+  refreshTokens           RefreshToken[]
   supportRequests         SupportRequest[]     @relation("SupportRequestUser")
   resolvedSupportRequests SupportRequest[]     @relation("SupportRequestResolver")
 
@@ -120,6 +121,33 @@ model PasswordResetToken {
   @@index([token])
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+// Long-lived refresh tokens for silent re-authentication + session inventory
+// (PR-17a). Additive to the existing access-token flow — the access JWT is
+// unchanged. The raw token is a 256-bit random string held only in the
+// httpOnly `vizora_refresh_token` cookie; only its SHA-256 hash is ever
+// stored. Rotation on every refresh with reuse detection: presenting an
+// already-rotated token revokes the whole `familyId` lineage (theft response).
+model RefreshToken {
+  id                  String    @id @default(uuid())
+  userId              String
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash           String    @unique // SHA-256 hash of the raw token — plaintext is never stored
+  familyId            String // rotation lineage; reuse of a revoked token kills the whole family
+  createdAt           DateTime  @default(now())
+  expiresAt           DateTime
+  revokedAt           DateTime? // set on logout, rotation, session revocation, or reuse-triggered family kill
+  replacedByTokenHash String? // hash of the successor token issued when this one was rotated
+  userAgent           String? // session metadata for the inventory UI
+  ip                  String? // session metadata for the inventory UI
+  lastUsedAt          DateTime? // updated on each rotation
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@index([familyId])
+  @@map("refresh_tokens")
 }
 
 // ============================================================================

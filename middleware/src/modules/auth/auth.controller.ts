@@ -1,4 +1,4 @@
-import { Controller, Post, Patch, Body, UseGuards, Get, Delete, Res, Req, HttpCode, HttpStatus, BadRequestException, NotFoundException, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Post, Patch, Body, UseGuards, Get, Delete, Param, Res, Req, HttpCode, HttpStatus, BadRequestException, NotFoundException, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Request, Response } from 'express';
 import { pipeline } from 'node:stream/promises';
@@ -15,6 +15,7 @@ import {
   ApiConsumes,
 } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
+import { RefreshTokenService, RefreshTokenContext } from './refresh-token.service';
 import { RegisterDto, LoginDto, ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto, DeleteAccountDto, UpdateProfileDto, GoogleLoginDto } from './dto';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -36,12 +37,19 @@ import { AuthenticatedUser } from './strategies/jwt.strategy';
  */
 const RATE_LIMIT_STRICT = process.env.NODE_ENV === 'production' ? 3 : 1000;
 const RATE_LIMIT_STANDARD = process.env.NODE_ENV === 'production' ? 5 : 1000;
+// Refresh runs more often than login (the frontend re-ups the session), so it
+// gets a slightly higher cap than STANDARD while still throttling refresh-token
+// abuse / enumeration attempts.
+const RATE_LIMIT_REFRESH = process.env.NODE_ENV === 'production' ? 10 : 1000;
 const RATE_LIMIT_TTL_MS = 60_000;
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private refreshTokenService: RefreshTokenService,
+  ) {}
 
   /**
    * Stable, browser-reachable avatar URL. Relative so it flows through the
@@ -104,6 +112,61 @@ export class AuthController {
     res.clearCookie(AUTH_CONSTANTS.COOKIE_NAME, cookieOptions);
   }
 
+  /**
+   * Set the long-lived refresh token as an httpOnly cookie. Mirrors the
+   * access-cookie attributes (httpOnly + Secure + SameSite, scoped to the
+   * origin host) but with the 30d refresh TTL instead of the access TTL.
+   */
+  private setRefreshCookie(res: Response, token: string): void {
+    const isProduction = process.env.NODE_ENV === 'production';
+    res.cookie(AUTH_CONSTANTS.REFRESH_COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'strict' : 'lax',
+      maxAge: this.refreshTokenService.getTtlSeconds() * 1000,
+      path: '/',
+    });
+  }
+
+  /** Clear the refresh cookie on logout — same attributes as setRefreshCookie. */
+  private clearRefreshCookie(res: Response): void {
+    const isProduction = process.env.NODE_ENV === 'production';
+    res.clearCookie(AUTH_CONSTANTS.REFRESH_COOKIE_NAME, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? 'strict' : 'lax',
+      path: '/',
+    });
+  }
+
+  /** Read the raw refresh token from the request cookie, if present. */
+  private extractRefreshToken(req: Request): string | undefined {
+    return req.cookies?.[AUTH_CONSTANTS.REFRESH_COOKIE_NAME];
+  }
+
+  /** Session metadata (ip + user-agent) recorded on refresh-token rows. */
+  private refreshContext(req: Request): RefreshTokenContext {
+    const ua = req.headers?.['user-agent'];
+    return {
+      ip: req.ip || req.socket?.remoteAddress || undefined,
+      userAgent: Array.isArray(ua) ? ua.find(Boolean) : ua || undefined,
+    };
+  }
+
+  /**
+   * Issue a fresh refresh-token session cookie for a user who just logged in
+   * (login / register / google). Best-effort: a refresh-token write failure
+   * must never block the access-token login the caller already completed.
+   */
+  private async startRefreshSession(res: Response, req: Request, userId: string): Promise<void> {
+    try {
+      const issued = await this.refreshTokenService.issueForUser(userId, this.refreshContext(req));
+      this.setRefreshCookie(res, issued.rawToken);
+    } catch {
+      // Non-fatal — the user is logged in via the access cookie regardless.
+    }
+  }
+
   // Environment-aware rate limits: STRICT in production, RELAXED in dev/test
   @ApiOperation({ summary: 'Register a new user and organization' })
   @ApiBody({ type: RegisterDto })
@@ -131,6 +194,9 @@ export class AuthController {
 
     // Set httpOnly cookie with JWT token
     this.setAuthCookie(res, result.token);
+
+    // Start a rotating refresh-token session alongside the access token.
+    await this.startRefreshSession(res, req, result.user.id);
 
     // Return response with token in body (for mobile clients) and cookie (for web)
     return {
@@ -174,6 +240,9 @@ export class AuthController {
     // Set httpOnly cookie with JWT token
     this.setAuthCookie(res, result.token);
 
+    // Start a rotating refresh-token session alongside the access token.
+    await this.startRefreshSession(res, req, result.user.id);
+
     // Return response with token in body (for mobile clients) and cookie (for web)
     return {
       success: true,
@@ -213,6 +282,9 @@ export class AuthController {
     // Set httpOnly cookie with JWT token
     this.setAuthCookie(res, result.token);
 
+    // Start a rotating refresh-token session alongside the access token.
+    await this.startRefreshSession(res, req, result.user.id);
+
     return {
       success: true,
       data: {
@@ -229,17 +301,39 @@ export class AuthController {
   @ApiCookieAuth()
   @ApiResponse({
     status: 200,
-    description: 'Token refreshed successfully.',
+    description: 'Token refreshed successfully. Refresh-token session rotated.',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  // NOTE: This endpoint keeps JwtAuthGuard for now (PR-17a is strictly
+  // additive). While the access token is still 7d, the frontend always holds a
+  // valid access token when it refreshes, so the guard is transparent and no
+  // existing session breaks. When the access TTL is shortened (PR-17b, with the
+  // coordinated frontend auto-refresh), flip this route to @Public() so a
+  // refresh token can be redeemed AFTER the access token has expired.
   @UseGuards(JwtAuthGuard)
   @Post('refresh')
+  @Throttle({
+    default: {
+      limit: RATE_LIMIT_REFRESH,
+      ttl: RATE_LIMIT_TTL_MS,
+    },
+  })
   async refresh(
     @CurrentUser('id') userId: string,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    // Extract the current token so it can be revoked
+    // Rotate the refresh-token session FIRST: a rotation failure (reuse
+    // detection / expiry) must short-circuit to 401 without minting a new
+    // access token. A legacy session predating refresh tokens has no refresh
+    // cookie — issue a fresh one so it upgrades in place.
+    const presentedRefreshToken = this.extractRefreshToken(req);
+    const rotated = presentedRefreshToken
+      ? await this.refreshTokenService.rotate(presentedRefreshToken, userId, this.refreshContext(req))
+      : await this.refreshTokenService.issueForUser(userId, this.refreshContext(req));
+    this.setRefreshCookie(res, rotated.rawToken);
+
+    // Extract the current access token so it can be revoked
     const currentToken =
       req.cookies?.[AUTH_CONSTANTS.COOKIE_NAME] ||
       req.headers.authorization?.replace('Bearer ', '');
@@ -280,13 +374,78 @@ export class AuthController {
 
     const result = await this.authService.logout(userId, token);
 
-    // Clear the auth cookie
+    // Revoke the refresh-token session so logout is real (not just a cookie
+    // clear) — a stolen refresh cookie can no longer be redeemed after logout.
+    const presentedRefreshToken = this.extractRefreshToken(req);
+    if (presentedRefreshToken) {
+      await this.refreshTokenService.revokeByRawToken(presentedRefreshToken);
+    }
+
+    // Clear the auth + refresh cookies
     this.clearAuthCookie(res);
+    this.clearRefreshCookie(res);
 
     return {
       success: true,
       ...result,
     };
+  }
+
+  @ApiOperation({ summary: 'List active login sessions for the authenticated user' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth()
+  @ApiResponse({ status: 200, description: 'Active refresh-token sessions (no token material exposed).' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @UseGuards(JwtAuthGuard)
+  @Get('sessions')
+  async listSessions(
+    @CurrentUser('id') userId: string,
+    @Req() req: Request,
+  ) {
+    const sessions = await this.refreshTokenService.listSessions(
+      userId,
+      this.extractRefreshToken(req),
+    );
+    return { success: true, data: { sessions } };
+  }
+
+  @ApiOperation({ summary: 'Revoke all OTHER sessions for the authenticated user' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth()
+  @ApiResponse({ status: 200, description: 'Other sessions revoked; the current session is kept.' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @UseGuards(JwtAuthGuard)
+  @Delete('sessions')
+  @HttpCode(HttpStatus.OK)
+  async revokeOtherSessions(
+    @CurrentUser('id') userId: string,
+    @Req() req: Request,
+  ) {
+    const revokedCount = await this.refreshTokenService.revokeOtherSessions(
+      userId,
+      this.extractRefreshToken(req),
+    );
+    return { success: true, data: { revokedCount } };
+  }
+
+  @ApiOperation({ summary: 'Revoke a specific session by id (idempotent, scoped to the caller)' })
+  @ApiBearerAuth('JWT-auth')
+  @ApiCookieAuth()
+  @ApiResponse({
+    status: 200,
+    description:
+      'Session revoked (idempotent — same response whether the id was owned, already revoked, or does not exist for this user).',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @UseGuards(JwtAuthGuard)
+  @Delete('sessions/:id')
+  @HttpCode(HttpStatus.OK)
+  async revokeSession(
+    @CurrentUser('id') userId: string,
+    @Param('id') sessionId: string,
+  ) {
+    await this.refreshTokenService.revokeSession(userId, sessionId);
+    return { success: true, data: { message: 'Session revoked.' } };
   }
 
   @ApiOperation({ summary: 'Get current authenticated user' })

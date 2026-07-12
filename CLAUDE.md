@@ -113,7 +113,8 @@ CORS_ORIGIN             # Comma-separated allowed origins
 
 ```
 JWT_SECRET              # User auth JWT secret (min 32 chars)
-JWT_EXPIRES_IN          # Token lifetime, default 7d
+JWT_EXPIRES_IN          # Access-token lifetime, default 7d
+REFRESH_TOKEN_TTL_DAYS  # Refresh-token session lifetime in days (default 30, clamped [1,365]). Opaque random token, sha256-hashed at rest; no separate secret.
 DEVICE_JWT_SECRET       # Device auth JWT secret (min 32 chars; separate from JWT_SECRET)
 INTERNAL_API_SECRET     # Required in prod — service-to-service auth (middleware ↔ realtime)
 BCRYPT_ROUNDS           # Password hashing rounds (10-15, default 12)

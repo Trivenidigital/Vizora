@@ -3,6 +3,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { RefreshTokenService } from './refresh-token.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { DatabaseModule } from '../database/database.module';
 import { BillingModule } from '../billing/billing.module';
@@ -48,6 +49,7 @@ import { getAccessTokenTtlSeconds } from './jwt-expiry';
   controllers: [AuthController],
   providers: [
     AuthService,
+    RefreshTokenService,
     JwtStrategy,
     {
       provide: APP_GUARD,
@@ -55,6 +57,6 @@ import { getAccessTokenTtlSeconds } from './jwt-expiry';
     },
     RolesGuard,
   ],
-  exports: [AuthService, JwtModule],
+  exports: [AuthService, RefreshTokenService, JwtModule],
 })
 export class AuthModule {}
