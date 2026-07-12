@@ -4,7 +4,6 @@ import { AuthService } from './auth.service';
 import { RefreshTokenService } from './refresh-token.service';
 import { Request, Response } from 'express';
 import { AUTH_CONSTANTS } from './constants/auth.constants';
-import { getAccessTokenTtlMs } from './jwt-expiry';
 import { ConflictException, UnauthorizedException } from '@nestjs/common';
 
 describe('AuthController', () => {
@@ -51,8 +50,8 @@ describe('AuthController', () => {
     };
 
     const mockRefreshTokenService = {
-      issueForUser: jest.fn().mockResolvedValue({ rawToken: 'refresh-raw', expiresAt: new Date(Date.now() + 60_000) }),
-      rotate: jest.fn().mockResolvedValue({ rawToken: 'refresh-rotated', expiresAt: new Date(Date.now() + 60_000) }),
+      issueForUser: jest.fn().mockResolvedValue({ rawToken: 'refresh-raw', expiresAt: new Date(Date.now() + 60_000), userId: 'user-123' }),
+      rotate: jest.fn().mockResolvedValue({ rawToken: 'refresh-rotated', expiresAt: new Date(Date.now() + 60_000), userId: 'user-123' }),
       revokeByRawToken: jest.fn().mockResolvedValue(undefined),
       listSessions: jest.fn().mockResolvedValue([]),
       revokeOtherSessions: jest.fn().mockResolvedValue(0),
@@ -268,8 +267,13 @@ describe('AuthController', () => {
   });
 
   describe('refresh', () => {
+    // /auth/refresh is PUBLIC (PR-17b): no authenticated caller, the refresh
+    // cookie is the sole credential and rotate() returns the token's own userId.
     const mockRequest = {
-      cookies: { [AUTH_CONSTANTS.COOKIE_NAME]: 'old-jwt-token' },
+      cookies: {
+        [AUTH_CONSTANTS.COOKIE_NAME]: 'old-jwt-token',
+        [AUTH_CONSTANTS.REFRESH_COOKIE_NAME]: 'presented-refresh',
+      },
       headers: { authorization: 'Bearer old-jwt-token' },
     } as any;
 
@@ -279,7 +283,7 @@ describe('AuthController', () => {
         expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
       });
 
-      const result = await controller.refresh('user-123', mockRequest, mockResponse as Response);
+      const result = await controller.refresh(mockRequest, mockResponse as Response);
 
       expect(result.success).toBe(true);
       expect(result.data.expiresIn).toBe(AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS);
@@ -299,33 +303,49 @@ describe('AuthController', () => {
         expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
       });
 
-      await controller.refresh('user-123', mockRequest, mockResponse as Response);
+      await controller.refresh(mockRequest, mockResponse as Response);
 
       expect(authService.refresh).toHaveBeenCalledWith('user-123', 'old-jwt-token');
     });
 
-    it('should propagate UnauthorizedException for invalid user', async () => {
-      authService.refresh.mockRejectedValue(new UnauthorizedException('User not found'));
-
-      await expect(controller.refresh('invalid-id', mockRequest, mockResponse as Response))
-        .rejects.toThrow(UnauthorizedException);
-    });
-
-    it('should issue a fresh refresh token when no refresh cookie is present (legacy session upgrade)', async () => {
+    it('derives the userId from the rotated token, not from any caller', async () => {
+      // The token OWNs the identity: whatever userId rotate() returns is the one
+      // whose access token gets minted — there is no caller id to fall back on.
+      refreshTokenService.rotate.mockResolvedValueOnce({
+        rawToken: 'refresh-rotated',
+        expiresAt: new Date(Date.now() + 60_000),
+        userId: 'token-owner-42',
+      } as any);
       authService.refresh.mockResolvedValue({
         token: 'new-jwt-token',
         expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
       });
 
-      await controller.refresh('user-123', mockRequest, mockResponse as Response);
+      await controller.refresh(mockRequest, mockResponse as Response);
 
-      expect(refreshTokenService.issueForUser).toHaveBeenCalledWith('user-123', expect.any(Object));
+      expect(authService.refresh).toHaveBeenCalledWith('token-owner-42', 'old-jwt-token');
+    });
+
+    it('should propagate UnauthorizedException for invalid user', async () => {
+      authService.refresh.mockRejectedValue(new UnauthorizedException('User not found'));
+
+      await expect(controller.refresh(mockRequest, mockResponse as Response))
+        .rejects.toThrow(UnauthorizedException);
+    });
+
+    it('rejects with 401 when no refresh cookie is present (public route, unauthenticated)', async () => {
+      const reqNoRefresh = {
+        cookies: { [AUTH_CONSTANTS.COOKIE_NAME]: 'old-jwt-token' },
+        headers: {},
+      } as any;
+
+      await expect(controller.refresh(reqNoRefresh, mockResponse as Response))
+        .rejects.toThrow(UnauthorizedException);
+      // No rotation, no issuance (the legacy access-guarded upgrade path is gone),
+      // and no access token minted.
       expect(refreshTokenService.rotate).not.toHaveBeenCalled();
-      expect(mockResponse.cookie).toHaveBeenCalledWith(
-        AUTH_CONSTANTS.REFRESH_COOKIE_NAME,
-        'refresh-raw',
-        expect.objectContaining({ httpOnly: true, path: '/' }),
-      );
+      expect(refreshTokenService.issueForUser).not.toHaveBeenCalled();
+      expect(authService.refresh).not.toHaveBeenCalled();
     });
 
     it('should rotate the presented refresh token and set the rotated cookie', async () => {
@@ -333,17 +353,11 @@ describe('AuthController', () => {
         token: 'new-jwt-token',
         expiresIn: AUTH_CONSTANTS.TOKEN_EXPIRY_SECONDS,
       });
-      const reqWithRefresh = {
-        cookies: {
-          [AUTH_CONSTANTS.COOKIE_NAME]: 'old-jwt-token',
-          [AUTH_CONSTANTS.REFRESH_COOKIE_NAME]: 'presented-refresh',
-        },
-        headers: {},
-      } as any;
 
-      await controller.refresh('user-123', reqWithRefresh, mockResponse as Response);
+      await controller.refresh(mockRequest, mockResponse as Response);
 
-      expect(refreshTokenService.rotate).toHaveBeenCalledWith('presented-refresh', 'user-123', expect.any(Object));
+      // rotate() is called with the presented token + context ONLY — no userId arg.
+      expect(refreshTokenService.rotate).toHaveBeenCalledWith('presented-refresh', expect.any(Object));
       expect(refreshTokenService.issueForUser).not.toHaveBeenCalled();
       expect(mockResponse.cookie).toHaveBeenCalledWith(
         AUTH_CONSTANTS.REFRESH_COOKIE_NAME,
@@ -364,7 +378,7 @@ describe('AuthController', () => {
         headers: {},
       } as any;
 
-      await expect(controller.refresh('user-123', reqWithRefresh, mockResponse as Response))
+      await expect(controller.refresh(reqWithRefresh, mockResponse as Response))
         .rejects.toThrow(UnauthorizedException);
       expect(authService.refresh).not.toHaveBeenCalled();
     });
@@ -574,14 +588,20 @@ describe('AuthController', () => {
       process.env.NODE_ENV = originalEnv;
     });
 
-    it('should include maxAge based on token expiry constant', async () => {
+    it('sets a LONG-lived access-cookie maxAge (presence marker) decoupled from the short JWT exp', async () => {
       await controller.register(registerDto, mockRegisterRequest, mockResponse as Response);
 
+      // PR-17b: the access cookie maxAge is the refresh-token TTL (~30d), NOT the
+      // 30m JWT exp — so the edge middleware's cookie-presence page guard doesn't
+      // log an idle user out. Security still rests on the JWT's own exp, which is
+      // validated server-side on every request.
+      const refreshTtlMs = refreshTokenService.getTtlSeconds() * 1000;
+      expect(refreshTtlMs).toBe(30 * 24 * 60 * 60 * 1000);
       expect(mockResponse.cookie).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.any(String),
+        AUTH_CONSTANTS.COOKIE_NAME,
+        'jwt-token',
         expect.objectContaining({
-          maxAge: getAccessTokenTtlMs(),
+          maxAge: refreshTtlMs,
         }),
       );
     });

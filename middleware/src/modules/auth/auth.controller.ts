@@ -1,4 +1,4 @@
-import { Controller, Post, Patch, Body, UseGuards, Get, Delete, Param, Res, Req, HttpCode, HttpStatus, BadRequestException, NotFoundException, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Post, Patch, Body, UseGuards, Get, Delete, Param, Res, Req, HttpCode, HttpStatus, BadRequestException, NotFoundException, UnauthorizedException, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Request, Response } from 'express';
 import { pipeline } from 'node:stream/promises';
@@ -21,7 +21,6 @@ import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { AUTH_CONSTANTS } from './constants/auth.constants';
-import { getAccessTokenTtlMs } from './jwt-expiry';
 import { AuthenticatedUser } from './strategies/jwt.strategy';
 
 /**
@@ -78,9 +77,16 @@ export class AuthController {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? 'strict' : 'lax',
-      // Match the token's real lifetime so the cookie doesn't outlive the JWT
-      // (a stale cookie = a "logged-in" UI that 401s on every call).
-      maxAge: getAccessTokenTtlMs(),
+      // DECOUPLED from the JWT lifetime (PR-17b). The cookie maxAge is a long
+      // "you have a session" PRESENCE marker (matched to the refresh-token TTL,
+      // ~30d) — NOT a security boundary. The real boundary is the JWT's own
+      // `exp` (short, 30m by default), which JwtStrategy validates server-side
+      // on EVERY request: a leaked/stolen cookie's JWT is still only good for
+      // 30m. Keeping the cookie long-lived stops `web/src/middleware.ts` (which
+      // gates page navigations on cookie PRESENCE, not JWT expiry) from bouncing
+      // an idle user to /login after 30m; when the JWT inside expires, the next
+      // API call 401s and the frontend auto-refresh mints a fresh JWT + cookie.
+      maxAge: this.refreshTokenService.getTtlSeconds() * 1000,
       path: '/',
     };
 
@@ -297,20 +303,19 @@ export class AuthController {
   }
 
   @ApiOperation({ summary: 'Refresh authentication token' })
-  @ApiBearerAuth('JWT-auth')
   @ApiCookieAuth()
   @ApiResponse({
     status: 200,
     description: 'Token refreshed successfully. Refresh-token session rotated.',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  // NOTE: This endpoint keeps JwtAuthGuard for now (PR-17a is strictly
-  // additive). While the access token is still 7d, the frontend always holds a
-  // valid access token when it refreshes, so the guard is transparent and no
-  // existing session breaks. When the access TTL is shortened (PR-17b, with the
-  // coordinated frontend auto-refresh), flip this route to @Public() so a
-  // refresh token can be redeemed AFTER the access token has expired.
-  @UseGuards(JwtAuthGuard)
+  // PUBLIC by design (PR-17b): the access token is now short-lived, so a
+  // refresh must succeed AFTER the access token has expired — there is no
+  // authenticated caller to guard on. The refresh cookie IS the credential:
+  // rotate() derives the user from the token itself and re-verifies the user's
+  // live state (isActive + user_revoked + pwd_changed) before minting anything.
+  // No refresh cookie → the caller is simply unauthenticated → 401.
+  @Public()
   @Post('refresh')
   @Throttle({
     default: {
@@ -319,26 +324,31 @@ export class AuthController {
     },
   })
   async refresh(
-    @CurrentUser('id') userId: string,
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    // Rotate the refresh-token session FIRST: a rotation failure (reuse
-    // detection / expiry) must short-circuit to 401 without minting a new
-    // access token. A legacy session predating refresh tokens has no refresh
-    // cookie — issue a fresh one so it upgrades in place.
     const presentedRefreshToken = this.extractRefreshToken(req);
-    const rotated = presentedRefreshToken
-      ? await this.refreshTokenService.rotate(presentedRefreshToken, userId, this.refreshContext(req))
-      : await this.refreshTokenService.issueForUser(userId, this.refreshContext(req));
+    if (!presentedRefreshToken) {
+      // Public route with no refresh cookie is just an unauthenticated request.
+      throw new UnauthorizedException('No refresh token');
+    }
+
+    // Rotate the refresh-token session FIRST: a rotation failure (reuse
+    // detection / expiry / revoked-or-inactive user) must short-circuit to 401
+    // without minting a new access token. The user is taken from the token
+    // itself — the token is the sole credential on this public route.
+    const rotated = await this.refreshTokenService.rotate(
+      presentedRefreshToken,
+      this.refreshContext(req),
+    );
     this.setRefreshCookie(res, rotated.rawToken);
 
-    // Extract the current access token so it can be revoked
+    // Extract the (possibly-expired) current access token so it can be revoked.
     const currentToken =
       req.cookies?.[AUTH_CONSTANTS.COOKIE_NAME] ||
       req.headers.authorization?.replace('Bearer ', '');
 
-    const result = await this.authService.refresh(userId, currentToken);
+    const result = await this.authService.refresh(rotated.userId, currentToken);
 
     // Set new httpOnly cookie with refreshed JWT token
     this.setAuthCookie(res, result.token);

@@ -146,8 +146,76 @@ export class ApiClient {
   private csrfInitialized = false;
   private csrfInitPromise: Promise<void> | null = null;
 
+  /**
+   * Shared in-flight `/auth/refresh` promise. A burst of concurrent 401s (N
+   * parallel dashboard requests all hitting an expired access token) must
+   * trigger exactly ONE refresh — the refresh token rotates on use, so N
+   * parallel refreshes would revoke each other and log the user out. All
+   * waiters await this single promise, then replay their own request.
+   */
+  private refreshInFlight: Promise<boolean> | null = null;
+
+  /**
+   * Endpoints where a 401 is a genuine credential/session outcome rather than a
+   * "token expired — go refresh" signal. Auto-refresh is skipped for these to
+   * (a) avoid an infinite loop on the refresh call itself and (b) let real
+   * bad-login / registration errors surface to the caller unchanged.
+   */
+  private static readonly REFRESH_EXEMPT_PREFIXES = [
+    '/auth/refresh',
+    '/auth/login',
+    '/auth/register',
+    '/auth/google',
+    '/auth/logout',
+  ];
+
   constructor(baseUrl: string) {
     this.baseUrl = baseUrl;
+  }
+
+  private isRefreshExempt(endpoint: string): boolean {
+    return ApiClient.REFRESH_EXEMPT_PREFIXES.some((prefix) => endpoint.startsWith(prefix));
+  }
+
+  /**
+   * Clear auth state and, from a protected route, bounce to login. Called when
+   * a 401 could not be recovered by a refresh (session genuinely expired).
+   */
+  private handleAuthExpired(): void {
+    this.isAuthenticated = false;
+    if (typeof window !== 'undefined') {
+      // Only redirect from protected routes (dashboard, admin), not public pages.
+      const currentPath = window.location.pathname;
+      if (currentPath.startsWith('/dashboard') || currentPath.startsWith('/admin')) {
+        window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
+      }
+    }
+  }
+
+  /**
+   * Redeem the httpOnly refresh cookie for a fresh access token, at most once
+   * concurrently (see `refreshInFlight`). Resolves true on success, false if the
+   * refresh token is missing/expired/revoked/reused.
+   */
+  private async refreshAuth(): Promise<boolean> {
+    if (!this.refreshInFlight) {
+      this.refreshInFlight = this.performRefresh().finally(() => {
+        this.refreshInFlight = null;
+      });
+    }
+    return this.refreshInFlight;
+  }
+
+  private async performRefresh(): Promise<boolean> {
+    try {
+      // allowRefresh=false: a 401 from /auth/refresh must NOT trigger another
+      // refresh (it's also on the exempt list, so this is belt-and-suspenders).
+      await this.request<{ expiresIn: number }>('/auth/refresh', { method: 'POST' }, 0, false);
+      this.isAuthenticated = true;
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -208,7 +276,8 @@ export class ApiClient {
   async request<T>(
     endpoint: string,
     options: RequestInit = {},
-    retries = 3
+    retries = 3,
+    allowRefresh = true
   ): Promise<T> {
     // Ensure CSRF token is available before mutating requests
     const method = (options.method || 'GET').toUpperCase();
@@ -254,14 +323,19 @@ export class ApiClient {
         // Handle expired/invalid sessions. A 403 is a permission boundary,
         // not proof that the user's auth cookie is invalid.
         if (response.status === 401) {
-          this.isAuthenticated = false;
-          if (typeof window !== 'undefined') {
-            // Only redirect from protected routes (dashboard, admin), not public pages
-            const currentPath = window.location.pathname;
-            if (currentPath.startsWith('/dashboard') || currentPath.startsWith('/admin')) {
-              window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`;
+          // Access tokens are short-lived (PR-17b). On the FIRST 401 for a
+          // normal API call, silently redeem the rotating refresh cookie and
+          // replay the original request exactly ONCE. `allowRefresh` is false on
+          // the replay and on the refresh/login calls themselves, so a session
+          // that's genuinely gone can't loop.
+          if (allowRefresh && typeof window !== 'undefined' && !this.isRefreshExempt(endpoint)) {
+            const refreshed = await this.refreshAuth();
+            if (refreshed) {
+              return this.request<T>(endpoint, options, retries, false);
             }
           }
+          // Refresh not possible or it failed — the session is really expired.
+          this.handleAuthExpired();
         }
 
         throw await buildApiError(response, 'Request failed');
@@ -292,7 +366,7 @@ export class ApiClient {
           if (process.env.NODE_ENV === 'development') {
             devWarn(`[API] Request timeout, retrying... (${retries} attempts left)`);
           }
-          return this.request<T>(endpoint, options, retries - 1);
+          return this.request<T>(endpoint, options, retries - 1, allowRefresh);
         }
         throw new Error('Request timeout');
       }
@@ -309,6 +383,7 @@ export class ApiClient {
     endpoint: string,
     formData: FormData,
     method = 'POST',
+    allowRefresh = true,
   ): Promise<T> {
     await this.ensureCsrfToken();
 
@@ -334,7 +409,15 @@ export class ApiClient {
 
       if (!response.ok) {
         if (response.status === 401) {
-          this.isAuthenticated = false;
+          // Same short-TTL auto-refresh + single replay as request(); the shared
+          // single-flight means an upload's 401 reuses any in-flight refresh.
+          if (allowRefresh && typeof window !== 'undefined' && !this.isRefreshExempt(endpoint)) {
+            const refreshed = await this.refreshAuth();
+            if (refreshed) {
+              return this.requestFormData<T>(endpoint, formData, method, false);
+            }
+          }
+          this.handleAuthExpired();
         }
         throw await buildApiError(response, 'Upload failed');
       }

@@ -105,7 +105,7 @@ describe('RefreshTokenService', () => {
     it('rotates an active token: atomically revokes+links the old, issues a successor in the same family', async () => {
       db.refreshToken.findUnique.mockResolvedValue({ ...base });
 
-      const issued = await service.rotate(raw, 'user-1', { ip: '9.9.9.9', userAgent: 'UA2' });
+      const issued = await service.rotate(raw, { ip: '9.9.9.9', userAgent: 'UA2' });
 
       // S2: the atomic claim revokes the old token AND links the successor hash
       // in the SAME update — replacedByTokenHash is never transiently null.
@@ -124,23 +124,36 @@ describe('RefreshTokenService', () => {
       // No separate post-hoc update() — the successor link is part of the claim.
       expect(db.refreshToken.update).not.toHaveBeenCalled();
       expect(issued.rawToken).not.toBe(raw);
+      // The issued session carries the token's own userId back to the caller.
+      expect(issued.userId).toBe('user-1');
     });
 
     it('rejects an unknown token', async () => {
       db.refreshToken.findUnique.mockResolvedValue(null);
-      await expect(service.rotate(raw, 'user-1')).rejects.toThrow(UnauthorizedException);
+      await expect(service.rotate(raw)).rejects.toThrow(UnauthorizedException);
       expect(db.refreshToken.create).not.toHaveBeenCalled();
     });
 
-    it('rejects a token belonging to another user (cross-user)', async () => {
-      db.refreshToken.findUnique.mockResolvedValue({ ...base, userId: 'someone-else' });
-      await expect(service.rotate(raw, 'user-1')).rejects.toThrow(UnauthorizedException);
-      expect(db.refreshToken.updateMany).not.toHaveBeenCalled();
+    it('derives the user from the token itself (no caller id): mints the successor + runs S1 for the token OWN userId', async () => {
+      // There is no expectedUserId anymore — the token IS the credential. A row
+      // owned by 'user-2' rotates for 'user-2': the successor and every S1
+      // check key off existing.userId, not any caller-supplied id.
+      db.refreshToken.findUnique.mockResolvedValue({ ...base, userId: 'user-2' });
+
+      const issued = await service.rotate(raw);
+
+      expect(issued.userId).toBe('user-2');
+      expect(db.user.findUnique).toHaveBeenCalledWith({
+        where: { id: 'user-2' },
+        select: { isActive: true },
+      });
+      expect(redis.exists).toHaveBeenCalledWith('user_revoked:user-2');
+      expect(db.refreshToken.create.mock.calls[0][0].data.userId).toBe('user-2');
     });
 
     it('rejects an expired token', async () => {
       db.refreshToken.findUnique.mockResolvedValue({ ...base, expiresAt: new Date(Date.now() - 1000) });
-      await expect(service.rotate(raw, 'user-1')).rejects.toThrow(UnauthorizedException);
+      await expect(service.rotate(raw)).rejects.toThrow(UnauthorizedException);
       expect(db.refreshToken.create).not.toHaveBeenCalled();
     });
 
@@ -151,7 +164,7 @@ describe('RefreshTokenService', () => {
         replacedByTokenHash: sha256('successor'),
       });
 
-      await expect(service.rotate(raw, 'user-1')).rejects.toThrow(/reuse/i);
+      await expect(service.rotate(raw)).rejects.toThrow(/reuse/i);
       expect(db.refreshToken.updateMany).toHaveBeenCalledWith({
         where: { familyId: 'fam-1', revokedAt: null },
         data: { revokedAt: expect.any(Date) },
@@ -166,7 +179,7 @@ describe('RefreshTokenService', () => {
         replacedByTokenHash: sha256('successor'),
       });
 
-      await expect(service.rotate(raw, 'user-1')).rejects.toThrow(/already rotated/i);
+      await expect(service.rotate(raw)).rejects.toThrow(/already rotated/i);
       // Family untouched — the user stays logged in.
       expect(db.refreshToken.updateMany).not.toHaveBeenCalled();
       expect(db.refreshToken.create).not.toHaveBeenCalled();
@@ -176,7 +189,7 @@ describe('RefreshTokenService', () => {
       db.refreshToken.findUnique.mockResolvedValue({ ...base });
       db.refreshToken.updateMany.mockResolvedValueOnce({ count: 0 }); // another racer already claimed it
 
-      await expect(service.rotate(raw, 'user-1')).rejects.toThrow(/already rotated/i);
+      await expect(service.rotate(raw)).rejects.toThrow(/already rotated/i);
       expect(db.refreshToken.create).not.toHaveBeenCalled();
     });
 
@@ -193,7 +206,7 @@ describe('RefreshTokenService', () => {
         replacedByTokenHash: sha256('successor'),
       });
 
-      await expect(service.rotate(raw, 'user-1')).rejects.toThrow(/already rotated/i);
+      await expect(service.rotate(raw)).rejects.toThrow(/already rotated/i);
       // Benign: no family-kill updateMany, no successor minted.
       expect(db.refreshToken.updateMany).not.toHaveBeenCalled();
       expect(db.refreshToken.create).not.toHaveBeenCalled();
@@ -204,7 +217,7 @@ describe('RefreshTokenService', () => {
       db.refreshToken.findUnique.mockResolvedValue({ ...base });
       db.user.findUnique.mockResolvedValue({ isActive: false });
 
-      await expect(service.rotate(raw, 'user-1')).rejects.toThrow(UnauthorizedException);
+      await expect(service.rotate(raw)).rejects.toThrow(UnauthorizedException);
       // No successor minted, family untouched.
       expect(db.refreshToken.updateMany).not.toHaveBeenCalled();
       expect(db.refreshToken.create).not.toHaveBeenCalled();
@@ -216,7 +229,7 @@ describe('RefreshTokenService', () => {
         Promise.resolve(key === 'user_revoked:user-1'),
       );
 
-      await expect(service.rotate(raw, 'user-1')).rejects.toThrow(UnauthorizedException);
+      await expect(service.rotate(raw)).rejects.toThrow(UnauthorizedException);
       expect(redis.exists).toHaveBeenCalledWith('user_revoked:user-1');
       expect(db.refreshToken.create).not.toHaveBeenCalled();
     });
@@ -229,7 +242,7 @@ describe('RefreshTokenService', () => {
         Promise.resolve(key === 'pwd_changed:user-1' ? String(newerEpoch) : null),
       );
 
-      await expect(service.rotate(raw, 'user-1')).rejects.toThrow(UnauthorizedException);
+      await expect(service.rotate(raw)).rejects.toThrow(UnauthorizedException);
       expect(redis.get).toHaveBeenCalledWith('pwd_changed:user-1');
       expect(db.refreshToken.create).not.toHaveBeenCalled();
     });
@@ -242,7 +255,7 @@ describe('RefreshTokenService', () => {
         Promise.resolve(key === 'pwd_changed:user-1' ? String(olderEpoch) : null),
       );
 
-      const issued = await service.rotate(raw, 'user-1');
+      const issued = await service.rotate(raw);
       expect(issued.rawToken).toEqual(expect.any(String));
       expect(db.refreshToken.create).toHaveBeenCalledTimes(1);
     });
