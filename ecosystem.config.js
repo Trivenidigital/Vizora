@@ -20,7 +20,11 @@ module.exports = {
       exec_mode: process.env.NODE_ENV === 'production' ? 'cluster' : 'fork',
       autorestart: true,
       watch: false,
-      max_memory_restart: '512M',
+      // 640M (was 512M): the working set legitimately approached 512M under load,
+      // causing a graceful restart every ~10min (cluster-covered, but churny).
+      // Kept modest — the prod VPS is RAM-constrained (~3.7G total), so 2×640M
+      // for the cluster is the safe headroom without risking OOM/swap.
+      max_memory_restart: '640M',
       env: {
         NODE_ENV: 'development',
         PORT: 3000,
