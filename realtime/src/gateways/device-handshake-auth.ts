@@ -6,6 +6,7 @@ import {
   isGraceAcceptedDeviceToken,
   deviceTokenGraceKey,
 } from './device-token-hash';
+import { isNullOrigin, isNullOriginCorsEnabled } from '../common/cors/cors-policy';
 
 /**
  * Device Revocation Contract v1.1 item 2 — device handshake authentication.
@@ -37,6 +38,10 @@ export interface DeviceHandshakeDeps {
   databaseService: DatabaseService;
   deviceSecret: string | undefined;
   userSecret: string | undefined;
+  // Handshake Origin header, present on BOTH transports. `'null'` selects the
+  // device-only authentication path (cookies ignored, device JWT required).
+  // Undefined for non-browser clients (native Android, curl) — unchanged path.
+  origin?: string;
   // Optional grace lookup (PR-8). When provided, a device presenting the
   // immediately-previous token during a 90d-refresh rotation is accepted via
   // the grace record instead of being rejected DEVICE_REVOKED. Omitted in unit
@@ -76,6 +81,53 @@ export async function authenticateDeviceHandshake(
   token: string | undefined,
   deps: DeviceHandshakeDeps,
 ): Promise<DeviceHandshakeResult> {
+  // ── Null-origin rule (packaged Tizen/webOS clients) ────────────────────────
+  // TRANSPORT-INDEPENDENT: this runs as Socket.IO handshake middleware, which
+  // executes before connection for BOTH the websocket and polling transports,
+  // and `handshake.headers.origin` is populated on both.
+  //
+  // This — not CORS — is the security boundary on realtime. The native
+  // WebSocket handshake is not subject to CORS at all, and a cross-origin
+  // connection still delivers the Cookie header on both transports. Without
+  // this rule a hostile null-origin page could reach getTokenFromClient()'s
+  // cookie fallback and authenticate AS THE VICTIM USER.
+  //
+  // For Origin: null we therefore ignore cookies entirely (never consulted on
+  // this path), require handshake.auth.token, verify it ONLY as a device JWT,
+  // and reject dashboard/user tokens explicitly rather than passing them on.
+  //
+  // FAIL-CLOSED: when the flag is disabled a null origin is rejected here,
+  // ahead of every cookie, user-token, and device-token authentication path.
+  if (isNullOrigin(deps.origin)) {
+    if (!isNullOriginCorsEnabled()) {
+      return { action: 'reject', message: 'auth_invalid', code: 'AUTH_INVALID' };
+    }
+    if (!token) {
+      // Cookie-only (or credential-less) null-origin handshake: refused
+      // outright, never falling through to the dashboard cookie path.
+      return { action: 'reject', message: 'auth_invalid', code: 'AUTH_INVALID' };
+    }
+    let devicePayload: DeviceHandshakePayload;
+    try {
+      devicePayload = deps.jwtService.verify<DeviceHandshakePayload>(token, {
+        secret: deps.deviceSecret,
+        algorithms: ['HS256'],
+      });
+    } catch (err) {
+      // Deliberately does NOT consult isValidUserToken: a valid dashboard/user
+      // JWT presented from a null origin is a rejection, not a pass.
+      const name = (err as { name?: string })?.name;
+      if (name === 'TokenExpiredError') {
+        return { action: 'reject', message: 'auth_expired', code: 'AUTH_EXPIRED' };
+      }
+      return { action: 'reject', message: 'auth_invalid', code: 'AUTH_INVALID' };
+    }
+    if (devicePayload.type !== 'device' || !devicePayload.sub || !devicePayload.organizationId) {
+      return { action: 'reject', message: 'auth_invalid', code: 'AUTH_INVALID' };
+    }
+    return finishDeviceHandshake(devicePayload, token, deps);
+  }
+
   // No auth.token → cookie/dashboard handshake — unchanged path.
   if (!token) return { action: 'pass' };
 
@@ -107,6 +159,20 @@ export async function authenticateDeviceHandshake(
     return { action: 'reject', message: 'auth_invalid', code: 'AUTH_INVALID' };
   }
 
+  return finishDeviceHandshake(payload, token, deps);
+}
+
+/**
+ * Shared tail of the device handshake: DB token-hash match, revocation,
+ * 90d grace rotation, tenant suspension. Extracted so the null-origin path
+ * and the normal path run byte-identical revocation logic — a null-origin
+ * device gets NO weaker checks, only a stricter route in.
+ */
+async function finishDeviceHandshake(
+  payload: DeviceHandshakePayload,
+  token: string,
+  deps: DeviceHandshakeDeps,
+): Promise<DeviceHandshakeResult> {
   let display: {
     organizationId: string;
     isDisabled: boolean;

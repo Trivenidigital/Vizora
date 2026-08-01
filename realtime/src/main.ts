@@ -4,6 +4,10 @@ import { AppModule } from './app/app.module';
 import { RedisIoAdapter } from './adapters/redis-io.adapter';
 import helmet from 'helmet';
 import { initializeSentry } from './config/sentry.config';
+import {
+  createRealtimeCorsDelegate,
+  isNullOriginCorsEnabled,
+} from './common/cors/cors-policy';
 
 // Initialize Sentry before app starts
 initializeSentry();
@@ -39,15 +43,15 @@ async function bootstrap() {
       'CORS_ORIGIN is required in production. Set it to a comma-separated list of allowed origins (e.g. "https://vizora.cloud") before booting realtime.',
     );
   }
-  app.enableCors({
-    origin: corsOrigin || [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:3002',
-      'http://localhost:4200',
-    ],
-    credentials: true,
-  });
+  // ONE request-aware delegate (see common/cors/cors-policy.ts). Browser
+  // origins keep today's credentialed policy; `Origin: null` (packaged
+  // Tizen/webOS clients) is never credentialed, and is refused outright unless
+  // DEVICE_NULL_ORIGIN_CORS=enabled.
+  app.enableCors(createRealtimeCorsDelegate());
+
+  Logger.log(
+    `Device null-origin CORS: ${isNullOriginCorsEnabled() ? 'ENABLED' : 'disabled (default)'}`,
+  );
 
   // Global validation pipe
   app.useGlobalPipes(
