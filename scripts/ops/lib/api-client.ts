@@ -41,16 +41,22 @@ const RATE_LIMIT_MS = 100;
  * `revokeByRawToken`). A bearer token alone is not enough. So we keep the
  * cookie just long enough to hand it back.
  */
-const openSessions = new Map<string, { baseUrl: string; cookie: string }>();
+const openSessions = new Map<string, { baseUrl: string; cookie: string; csrf: string }>();
 
-/** Turn a login response's Set-Cookie headers into a single Cookie header. */
-function cookieHeaderFrom(res: Response): string {
+/** Turn a login response's Set-Cookie headers into `name=value` pairs. */
+function cookiePairs(res: Response): string[] {
   const raw =
     typeof (res.headers as { getSetCookie?: () => string[] }).getSetCookie === 'function'
       ? (res.headers as unknown as { getSetCookie: () => string[] }).getSetCookie()
       : [res.headers.get('set-cookie') ?? ''].filter(Boolean);
   // Keep only the `name=value` pair from each cookie, discard the attributes.
-  return raw.map(c => c.split(';')[0].trim()).filter(Boolean).join('; ');
+  return raw.map(c => c.split(';')[0].trim()).filter(Boolean);
+}
+
+/** Read one cookie's value out of `name=value` pairs. */
+function valueOf(pairs: string[], name: string): string {
+  const hit = pairs.find(p => p.startsWith(`${name}=`));
+  return hit ? hit.slice(name.length + 1) : '';
 }
 
 /**
@@ -58,14 +64,19 @@ function cookieHeaderFrom(res: Response): string {
  * failed logout must not fail an ops run, it just leaves one row to expire.
  */
 export async function logout(baseUrl: string, token: string): Promise<void> {
-  const cookie = openSessions.get(token)?.cookie;
+  const session = openSessions.get(token);
   openSessions.delete(token);
   try {
     await fetch(`${baseUrl}/api/v1/auth/logout`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
-        ...(cookie ? { Cookie: cookie } : {}),
+        ...(session?.cookie ? { Cookie: session.cookie } : {}),
+        // Required. Presenting cookies makes this look cookie-authenticated, so
+        // the CSRF double-submit check applies: cookies WITHOUT this header are
+        // rejected 401 and nothing is revoked. Verified on prod — cookie alone
+        // = 401 + row still live; cookie + this header = 201 + row revoked.
+        ...(session?.csrf ? { 'X-CSRF-Token': session.csrf } : {}),
       },
     });
   } catch {
@@ -108,8 +119,14 @@ export async function login(
   if (!token) throw new Error('Login response has no token');
 
   const accessToken = String(token);
-  const cookie = cookieHeaderFrom(res);
-  if (cookie) openSessions.set(accessToken, { baseUrl, cookie });
+  const pairs = cookiePairs(res);
+  if (pairs.length > 0) {
+    openSessions.set(accessToken, {
+      baseUrl,
+      cookie: pairs.join('; '),
+      csrf: valueOf(pairs, 'vizora_csrf_token'),
+    });
+  }
   return accessToken;
 }
 
