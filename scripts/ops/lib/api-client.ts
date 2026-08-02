@@ -14,6 +14,7 @@
  */
 
 import type { RemediationAction } from './types.js';
+import { log } from './alerting.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -60,14 +61,30 @@ function valueOf(pairs: string[], name: string): string {
 }
 
 /**
- * Release a session opened by `login()`. Best-effort and never throws — a
- * failed logout must not fail an ops run, it just leaves one row to expire.
+ * Count of sessions this process failed to release. Non-zero means refresh-token
+ * rows were leaked; agents surface it so a silent failure cannot recur.
+ */
+let releaseFailures = 0;
+
+/** How many session releases failed in this process. */
+export function sessionReleaseFailures(): number {
+  return releaseFailures;
+}
+
+/**
+ * Release a session opened by `login()`. Never throws — a failed logout must not
+ * fail an ops run — but it is NOT silent.
+ *
+ * Silence here is what let two ineffective fixes ship looking correct: the
+ * server was rejecting the logout 401 (cookies presented without the matching
+ * CSRF header) and the swallowed error made it look like nothing happened at
+ * all. Any non-2xx or thrown error is now logged at ERROR and counted.
  */
 export async function logout(baseUrl: string, token: string): Promise<void> {
   const session = openSessions.get(token);
   openSessions.delete(token);
   try {
-    await fetch(`${baseUrl}/api/v1/auth/logout`, {
+    const res = await fetch(`${baseUrl}/api/v1/auth/logout`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -79,8 +96,20 @@ export async function logout(baseUrl: string, token: string): Promise<void> {
         ...(session?.csrf ? { 'X-CSRF-Token': session.csrf } : {}),
       },
     });
-  } catch {
-    // swallowed by design — see above
+    if (!res.ok) {
+      releaseFailures++;
+      log(
+        'api-client',
+        `ERROR: session release rejected (${res.status}) — the refresh-token row was NOT revoked and is leaked for its full TTL. ` +
+          `A 401 here usually means the CSRF header did not accompany the cookies.`,
+      );
+    }
+  } catch (err) {
+    releaseFailures++;
+    log(
+      'api-client',
+      `ERROR: session release failed — ${err instanceof Error ? err.message : err}. The refresh-token row was NOT revoked.`,
+    );
   }
 }
 
@@ -142,7 +171,20 @@ export async function login(
  */
 export async function releaseSessions(): Promise<void> {
   const tokens = [...openSessions.keys()];
+  if (tokens.length === 0) return;
   await Promise.all(tokens.map(t => logout(openSessions.get(t)!.baseUrl, t)));
+  // Operational signal: agents run headless on cron, so an unreported failure
+  // here is invisible until someone counts rows in the database months later.
+  if (releaseFailures > 0) {
+    log('api-client', `ERROR: ${releaseFailures}/${tokens.length} session release(s) FAILED — refresh tokens leaked this run`);
+  } else {
+    log('api-client', `released ${tokens.length} session(s)`);
+  }
+}
+
+/** Test seam: reset the release-failure counter between cases. */
+export function __resetSessionReleaseFailures(): void {
+  releaseFailures = 0;
 }
 
 /** Test seam: how many sessions are still holding a refresh cookie. */
