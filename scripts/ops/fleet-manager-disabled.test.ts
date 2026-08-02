@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const source = readFileSync(join(here, 'fleet-manager.ts'), 'utf8');
+const scheduleDoctor = readFileSync(join(here, 'schedule-doctor.ts'), 'utf8');
 
 test('DisplayItem carries isDisabled, so the flag survives the fetch', () => {
   assert.match(source, /isDisabled\?: boolean/);
@@ -66,4 +67,22 @@ test('cluster-offline cannot be triggered by a group that is only disabled displ
   assert.equal(considered.length, 0);
   // the 3+ display threshold can no longer be met by disabled fixtures
   assert.ok(considered.length < 3);
+});
+
+/**
+ * schedule-doctor evaluates displays too. #259 filtered fleet-manager ONLY, and
+ * a natural cycle on 2026-08-02 22:30 put `coverage_gap` for a disabled fixture
+ * straight back — the incident had been reconciled minutes earlier. Every agent
+ * that evaluates displays needs the same filter.
+ */
+test('schedule-doctor also skips operator-disabled displays', () => {
+  assert.match(scheduleDoctor, /isDisabled !== true/);
+  assert.match(scheduleDoctor, /Skipping \$\{disabledDisplays\.length\} operator-disabled display\(s\)/);
+});
+
+test('schedule-doctor filters BEFORE it reports what it fetched', () => {
+  const filterIdx = scheduleDoctor.indexOf('isDisabled !== true');
+  const fetchedLogIdx = scheduleDoctor.indexOf('`Fetched ${schedules.length}');
+  assert.ok(filterIdx > -1 && fetchedLogIdx > -1);
+  assert.ok(filterIdx < fetchedLogIdx, 'filter must precede the count it reports');
 });

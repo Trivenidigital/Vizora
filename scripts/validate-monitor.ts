@@ -20,6 +20,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { login as sharedLogin, releaseSessions } from './ops/lib/api-client.js';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -119,21 +120,17 @@ async function apiGetAll<T>(path: string, token: string, params?: Record<string,
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
+/**
+ * Delegates to the shared ops client rather than duplicating the request.
+ *
+ * This file used to carry its own copy of login(), which is why it kept leaking
+ * refresh-token rows after the ops agents were fixed: the shared client learned
+ * to release its session, and this copy never did. A natural cycle on
+ * 2026-08-02 22:30 showed exactly one leaked token, and it was this process.
+ * Released via `releaseSessions()` on the entry-point chain below.
+ */
 async function login(): Promise<string> {
-  const res = await fetch(`${BASE_URL}/api/v1/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Login failed (${res.status}): ${body}`);
-  }
-  const json = await res.json() as Record<string, unknown>;
-  const data = (json.data ?? json) as Record<string, unknown>;
-  const token = data.accessToken || data.access_token || data.token;
-  if (!token) throw new Error('Login response has no token');
-  return String(token);
+  return sharedLogin(BASE_URL, EMAIL, PASSWORD);
 }
 
 // ─── Health Check ────────────────────────────────────────────────────────────
@@ -661,8 +658,12 @@ function isDirectRun(): boolean {
 }
 
 if (isDirectRun()) {
-  main().catch(err => {
-    log(`FATAL: ${err instanceof Error ? err.message : err}`);
-    process.exitCode = 2;
-  });
+  main()
+    .catch(err => {
+      log(`FATAL: ${err instanceof Error ? err.message : err}`);
+      process.exitCode = 2;
+    })
+    // Release the refresh-token session this run opened, on success and on
+    // failure alike. Awaited from the chain so it completes before exit.
+    .finally(() => releaseSessions());
 }
