@@ -49,6 +49,7 @@ h1{font-size:clamp(2rem,4vw,3.1rem);font-weight:600;margin-bottom:16px}
 .pick{background:var(--mint);color:#04241B}
 .alt{background:rgba(240,236,232,.9);color:#0A222E}
 .hm{background:rgba(139,92,246,.9);color:#fff}
+.hyb{background:#0A222E;color:#00E5A0}
 
 /* miniature renderings of each direction */
 .mini{position:absolute;inset:0}
@@ -91,6 +92,24 @@ h1{font-size:clamp(2rem,4vw,3.1rem);font-weight:600;margin-bottom:16px}
   font-size:clamp(.8rem,2vw,1.1rem);letter-spacing:-.04em;line-height:1.05;color:#0E2B36}
 .m3 .h em{font-family:'Bodoni Moda',Georgia,serif;font-style:italic;color:#00A874}
 
+.m4{background:linear-gradient(170deg,#E4F0F4,#C7DDE7)}
+.m4 .stk{position:absolute;left:16%;top:9%;width:36%;height:40%;transform:rotateX(52deg) rotateZ(-38deg);transform-style:preserve-3d}
+.m4 .p{position:absolute;inset:0;border-radius:5px;border:1px solid rgba(255,255,255,.85);background:rgba(255,255,255,.4)}
+.m4 .p1{transform:translateZ(0)}
+.m4 .p2{transform:translateZ(13px);background:rgba(139,92,246,.16)}
+.m4 .p3{transform:translateZ(26px);background:rgba(0,229,160,.18)}
+.m4 .p4{transform:translateZ(42px);background:#0A222E;box-shadow:0 12px 22px rgba(10,34,46,.3)}
+.m4 .fan{position:absolute;left:30%;top:40%;width:72%;height:56%;
+  background:repeating-conic-gradient(from 68deg at 4% 4%, rgba(58,96,110,.34) 0 .45deg, transparent .45deg 2.5deg);
+  -webkit-mask-image:radial-gradient(120% 120% at 4% 4%, transparent 4%, #000 26%, #000 74%, transparent 96%);
+          mask-image:radial-gradient(120% 120% at 4% 4%, transparent 4%, #000 26%, #000 74%, transparent 96%)}
+.m4 .bloom{position:absolute;right:6%;bottom:22%;width:56%;height:18%;
+  background:radial-gradient(ellipse,rgba(0,229,160,.5),transparent 70%);filter:blur(8px)}
+.m4 .h{position:absolute;left:7%;bottom:8%;z-index:4;font-family:'Sora',sans-serif;font-weight:600;
+  font-size:clamp(.85rem,2.1vw,1.2rem);letter-spacing:-.045em;line-height:1;color:#0A222E}
+.m4 .h em{font-family:'Bodoni Moda',Georgia,serif;font-style:italic;font-weight:400;
+  background:linear-gradient(115deg,#00B27C,#00A6CC);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+
 .body{padding:20px 20px 22px}
 .body .kick{color:var(--mint);display:block;margin-bottom:9px}
 .body h3{font-size:1.16rem;font-weight:600;margin-bottom:5px}
@@ -119,7 +138,7 @@ h1{font-size:clamp(2rem,4vw,3.1rem);font-weight:600;margin-bottom:16px}
     <div class="brand-tile"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
     <span class="grad">VIZORA</span>
   </div>
-  <h1>Three homepage directions,<br>rendered with real Vizora copy.</h1>
+  <h1>Four homepage directions,<br>rendered with real Vizora copy.</h1>
   <p class="lede">Adapted from the strongest templates on <b>motionsites.ai</b>. Every sample uses Vizora's actual Electric Horizon tokens (<b>#00E5A0</b> → <b>#00B4D8</b>), the real Sora / DM&nbsp;Sans / JetBrains&nbsp;Mono stack, and copy lifted verbatim from the live site — so what you're judging is the <b>direction</b>, not the placeholder text.</p>
 </header>
 
@@ -198,6 +217,29 @@ h1{font-size:clamp(2rem,4vw,3.1rem);font-weight:600;margin-bottom:16px}
     </div>
   </a>
 
+  <a class="card" href="04-hybrid.html">
+    <div class="thumb">
+      <span class="tag hyb">Hybrid · A + C</span>
+      <div class="mini m4">
+        <div class="stk"><div class="p p1"></div><div class="p p2"></div><div class="p p3"></div><div class="p p4"></div></div>
+        <div class="fan"></div><div class="bloom"></div>
+        <div class="h">Publish. Schedule.<br><em>Everywhere.</em></div>
+      </div>
+    </div>
+    <div class="body">
+      <span class="kick mono">Sample D</span>
+      <h3>Resolve &amp; Distribute</h3>
+      <div class="src">fusion of A's frame + C's object and serif voice</div>
+      <p>The two objects turn out to be halves of one story. C's layers resolve into a board; A's fibres carry that board out to every screen. One image now shows compose → resolve → distribute, and the left rail doubles as its legend — hover a layer to isolate it.</p>
+      <div class="meta">
+        <div><b>Borrows</b><span>A's canvas, rail, headline slot, glass chip · C's stack, serif accent, sky</span></div>
+        <div><b>Says</b><span>We handle the complexity, then put it on every screen.</span></div>
+        <div><b>Risk</b><span>Most complex object — needs care at small viewports</span></div>
+      </div>
+      <span class="open">Open sample D →</span>
+    </div>
+  </a>
+
 </div>
 
 <div class="warn">
@@ -208,8 +250,8 @@ h1{font-size:clamp(2rem,4vw,3.1rem);font-weight:600;margin-bottom:16px}
 <div class="notes">
   <div>
     <span class="kick mono">The recommendation</span>
-    <h4>A's skin, B's skeleton</h4>
-    <p>Take the light, precise Intelligent Operations look for the hero and brand voice, then use Sample B's page structure below the fold — product UI, proof, features, trial. A gives you a homepage people remember; B gives you one that converts.</p>
+    <h4>A or D for the hero, B's skeleton below it</h4>
+    <p>A is the safer, more scalable hero; D is the one that teaches the product in a single image. Either way, use Sample B's structure below the fold — product UI, proof, features, trial. The hero earns attention; B's page converts it.</p>
   </div>
   <div>
     <span class="kick mono">The one substitution</span>
