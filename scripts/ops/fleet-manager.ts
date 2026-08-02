@@ -53,6 +53,8 @@ interface DisplayItem {
   lastSeen?: string;
   error?: string;
   errorState?: string;
+  /** Operator-disabled. Returned by the list API (display-response.select.ts). */
+  isDisabled?: boolean;
 }
 
 interface ScheduleItem {
@@ -136,6 +138,22 @@ async function main(): Promise<void> {
       api.getAll<DisplayItem>('/displays'),
       api.getAll<ScheduleItem>('/schedules'),
     ]);
+    // Drop operator-disabled displays before ANY check runs.
+    //
+    // A disabled display is one an operator has deliberately taken out of
+    // service; paging about it is noise by construction. Nothing here honoured
+    // `isDisabled`, so every check below — offline, persistent-offline,
+    // cluster-offline, no-content — fired on them forever. Measured on prod
+    // 2026-08-02: five displays in an org named "E2E Test Org", last heartbeat
+    // 149-157 days earlier, holding the whole system at CRITICAL, with the
+    // cluster_offline incident alone re-attempted 10,373 times over 84 days.
+    // Once ops alerts actually deliver, that is an hourly page about test
+    // fixtures — which is how operators learn to ignore alerts.
+    const disabled = displays.filter(d => d.isDisabled === true);
+    if (disabled.length > 0) {
+      displays = displays.filter(d => d.isDisabled !== true);
+      log(AGENT, `Skipping ${disabled.length} operator-disabled display(s)`);
+    }
     log(AGENT, `Fetched ${displays.length} displays, ${schedules.length} schedules`);
   } catch (err) {
     log(AGENT, `FATAL: Could not fetch data — ${err instanceof Error ? err.message : err}`);
