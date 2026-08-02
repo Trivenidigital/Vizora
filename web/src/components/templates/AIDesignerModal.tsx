@@ -41,7 +41,7 @@ export default function AIDesignerModal({ onClose }: AIDesignerModalProps) {
             </svg>
           </div>
 
-          <h3 className="font-[var(--font-sora)] text-xl font-bold text-[var(--foreground)] mb-3">
+          <h3 className="font-sora text-xl font-bold text-[var(--foreground)] mb-3">
             AI Designer is Launching Soon
           </h3>
           <p className="text-[var(--foreground-secondary)] text-sm max-w-sm mb-8">

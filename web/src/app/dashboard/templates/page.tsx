@@ -426,7 +426,7 @@ export default function TemplateLibraryPage() {
               {featuredTemplates.length > 0 && (
                 <section>
                   <div className="flex items-center justify-between mb-3">
-                    <h2 className="eh-dash-subtitle font-[var(--font-sora)] text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
+                    <h2 className="eh-dash-subtitle font-sora text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
                       <span className="w-1 h-4 rounded-full bg-[var(--primary)]" />
                       Featured
                     </h2>
@@ -465,7 +465,7 @@ export default function TemplateLibraryPage() {
               {popularTemplates.length > 0 && (
                 <section>
                   <div className="flex items-center justify-between mb-3">
-                    <h2 className="eh-dash-subtitle font-[var(--font-sora)] text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
+                    <h2 className="eh-dash-subtitle font-sora text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
                       <span className="w-1 h-4 rounded-full bg-[var(--primary)]" />
                       Popular
                     </h2>
@@ -497,7 +497,7 @@ export default function TemplateLibraryPage() {
           <section>
             {viewMode === 'home' && (
               <div className="flex items-center justify-between mb-3">
-                <h2 className="eh-dash-subtitle font-[var(--font-sora)] text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
+                <h2 className="eh-dash-subtitle font-sora text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
                   <span className="w-1 h-4 rounded-full bg-[var(--primary)]" />
                   {hasActiveFilters ? 'Search Results' : 'All Templates'}
                   {!loading && <span className="text-xs font-normal text-[var(--foreground-tertiary)] ml-1">({currentTotal})</span>}
@@ -506,7 +506,7 @@ export default function TemplateLibraryPage() {
             )}
             {viewMode === 'your-templates' && (
               <div className="flex items-center justify-between mb-3">
-                <h2 className="eh-dash-subtitle font-[var(--font-sora)] text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
+                <h2 className="eh-dash-subtitle font-sora text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
                   <span className="w-1 h-4 rounded-full bg-[var(--primary)]" />
                   Your Templates
                   {!loading && <span className="text-xs font-normal text-[var(--foreground-tertiary)] ml-1">({userTotalCount})</span>}
@@ -685,7 +685,7 @@ export default function TemplateLibraryPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !cloning && setCloneModalId(null)} />
           <div className="relative eh-dash-card w-full max-w-sm mx-4 p-6 shadow-2xl animate-[fadeIn_0.15s_ease-out]">
-            <h3 className="font-[var(--font-sora)] text-lg font-semibold text-[var(--foreground)] mb-2">Use This Template</h3>
+            <h3 className="font-sora text-lg font-semibold text-[var(--foreground)] mb-2">Use This Template</h3>
             <p className="text-sm text-[var(--foreground-secondary)] mb-6">
               This will create a copy in your templates that you can customize and deploy to your displays.
             </p>
@@ -721,7 +721,7 @@ export default function TemplateLibraryPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => !deleting && setDeleteModalId(null)} />
           <div className="relative eh-dash-card w-full max-w-sm mx-4 p-6 shadow-2xl animate-[fadeIn_0.15s_ease-out]">
-            <h3 className="font-[var(--font-sora)] text-lg font-semibold text-[var(--foreground)] mb-2">Delete Template</h3>
+            <h3 className="font-sora text-lg font-semibold text-[var(--foreground)] mb-2">Delete Template</h3>
             <p className="text-sm text-[var(--foreground-secondary)] mb-6">
               Are you sure? This template will be archived and hidden from the library.
             </p>

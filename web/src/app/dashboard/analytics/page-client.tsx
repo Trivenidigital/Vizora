@@ -85,7 +85,7 @@ const KPICard: React.FC<KPICardProps> = ({
  <p className="text-sm font-medium text-[var(--foreground-secondary)]">
  {label}
  </p>
- <p className="text-3xl font-bold font-[var(--font-sora)] text-[var(--foreground)] mt-2">
+ <p className="text-3xl font-bold font-sora text-[var(--foreground)] mt-2">
  {value}
  </p>
  {change && (
@@ -273,7 +273,7 @@ export default function AnalyticsClient() {
  {/* Header */}
  <div className="flex items-center justify-between">
  <div>
- <h2 className="eh-dash-title font-[var(--font-sora)] text-2xl text-[var(--foreground)]">
+ <h2 className="eh-dash-title font-sora text-2xl text-[var(--foreground)]">
  Analytics
  </h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">

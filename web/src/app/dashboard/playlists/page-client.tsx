@@ -441,7 +441,7 @@ export default function PlaylistsClient() {
 
  <div className="flex justify-between items-center">
  <div>
- <h2 className="eh-dash-title font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Playlists</h2>
+ <h2 className="eh-dash-title font-sora text-2xl text-[var(--foreground)]">Playlists</h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Create and manage content playlists ({playlists.length} total)
  </p>

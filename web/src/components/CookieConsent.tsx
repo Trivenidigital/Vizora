@@ -45,8 +45,14 @@ export function hasConsentFor(category: 'essential' | 'all'): boolean {
  *     broken. Do not "fix" the ~40 bare call sites elsewhere in the app.
  *     The inference is namespace-specific, though: inside colour namespaces a
  *     bare `var()` can only land on colour, but OUTSIDE them it can silently
- *     pick the wrong property — `font-[var(--font-sora)]` currently compiles
- *     to `font-weight` and is dropped, at 35 call sites on main.
+ *     pick the wrong property. The `font-` namespace did exactly that at 35
+ *     call sites (a bare font var typed as font-WEIGHT, so the declaration
+ *     was invalid and dropped); they now use the named `font-sora`
+ *     utility and a regression test forbids the old form.
+ *     The offending literal is deliberately NOT written out here: this
+ *     file is inside Tailwind's content glob, and Tailwind scans raw
+ *     text including comments — spelling it out regenerates the broken
+ *     rule in the production bundle.
  *   - classes, not inline `style`. Inline styles outrank classes, which would
  *     silently kill every `hover:`/`focus:` variant below.
  */

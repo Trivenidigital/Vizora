@@ -687,7 +687,7 @@ export default function SchedulesClient() {
  {/* Header */}
  <div className="flex justify-between items-center">
  <div>
- <h2 className="eh-dash-title font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Schedules</h2>
+ <h2 className="eh-dash-title font-sora text-2xl text-[var(--foreground)]">Schedules</h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Automate content playback with schedules ({schedules.length} total)
  </p>

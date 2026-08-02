@@ -67,7 +67,7 @@ export default function InvoiceHistoryPage() {
  <Icon name="chevronLeft" size="lg" className="text-[var(--foreground-secondary)]" />
  </Link>
  <div>
- <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Invoice History</h2>
+ <h2 className="eh-heading font-sora text-2xl text-[var(--foreground)]">Invoice History</h2>
  <p className="mt-1 text-[var(--foreground-secondary)]">
  View and download your past invoices
  </p>
@@ -92,7 +92,7 @@ export default function InvoiceHistoryPage() {
  <Icon name="chevronLeft" size="lg" className="text-[var(--foreground-secondary)]" />
  </Link>
  <div>
- <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Invoice History</h2>
+ <h2 className="eh-heading font-sora text-2xl text-[var(--foreground)]">Invoice History</h2>
  <p className="mt-1 text-[var(--foreground-secondary)]">
  View and download your past invoices
  </p>

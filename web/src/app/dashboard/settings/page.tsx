@@ -314,7 +314,7 @@ export default function SettingsPage() {
  return (
  <div className="space-y-8">
  <div>
- <h2 className="eh-dash-title font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Settings</h2>
+ <h2 className="eh-dash-title font-sora text-2xl text-[var(--foreground)]">Settings</h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Manage your account and preferences
  </p>

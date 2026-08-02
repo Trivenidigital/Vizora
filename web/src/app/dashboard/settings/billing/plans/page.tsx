@@ -77,7 +77,7 @@ export default function PlansPage() {
  <Icon name="chevronLeft" size="lg" className="text-[var(--foreground-secondary)]" />
  </Link>
  <div>
- <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Choose a Plan</h2>
+ <h2 className="eh-heading font-sora text-2xl text-[var(--foreground)]">Choose a Plan</h2>
  <p className="mt-1 text-[var(--foreground-secondary)]">
  Select the plan that best fits your needs
  </p>
@@ -102,7 +102,7 @@ export default function PlansPage() {
  <Icon name="chevronLeft" size="lg" className="text-[var(--foreground-secondary)]" />
  </Link>
  <div>
- <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Choose a Plan</h2>
+ <h2 className="eh-heading font-sora text-2xl text-[var(--foreground)]">Choose a Plan</h2>
  <p className="mt-1 text-[var(--foreground-secondary)]">
  Select the plan that best fits your needs
  </p>
@@ -236,7 +236,7 @@ export default function PlansPage() {
  <div className="fixed inset-0 z-50 flex items-center justify-center">
  <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowContactModal(false)} />
  <div className="relative bg-[var(--surface)] rounded-xl border border-[var(--border)] w-full max-w-md mx-4 p-6 shadow-2xl animate-[fadeIn_0.15s_ease-out]">
- <h3 className="font-[var(--font-sora)] text-lg font-semibold text-[var(--foreground)] mb-2">Contact Sales</h3>
+ <h3 className="font-sora text-lg font-semibold text-[var(--foreground)] mb-2">Contact Sales</h3>
  <p className="text-sm text-[var(--foreground-secondary)] mb-4">
  Get in touch with our sales team for custom enterprise pricing, dedicated support, and volume discounts.
  </p>

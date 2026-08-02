@@ -148,7 +148,7 @@ export default function ApiKeysPage() {
 
  <div className="flex justify-between items-center">
  <div>
- <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">API Keys</h2>
+ <h2 className="eh-heading font-sora text-2xl text-[var(--foreground)]">API Keys</h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Manage API keys for programmatic access to your Vizora organization
  </p>

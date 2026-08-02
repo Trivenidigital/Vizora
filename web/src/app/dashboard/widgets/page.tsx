@@ -579,7 +579,7 @@ export default function WidgetsPage() {
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="eh-dash-title font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Widgets</h2>
+          <h2 className="eh-dash-title font-sora text-2xl text-[var(--foreground)]">Widgets</h2>
           <p className="mt-2 text-[var(--foreground-secondary)]">
             Add dynamic data widgets like weather, RSS feeds, clocks, and more to your displays.
           </p>

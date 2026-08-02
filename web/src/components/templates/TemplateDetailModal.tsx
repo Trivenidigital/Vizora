@@ -128,7 +128,7 @@ export default function TemplateDetailModal({
             <div className="p-6 sm:p-8">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
                 <div>
-                  <h2 className="font-[var(--font-sora)] text-xl sm:text-2xl font-bold text-[var(--foreground)] mb-2">
+                  <h2 className="font-sora text-xl sm:text-2xl font-bold text-[var(--foreground)] mb-2">
                     {template.name}
                   </h2>
                   <p className="text-[var(--foreground-secondary)] text-sm max-w-xl">
