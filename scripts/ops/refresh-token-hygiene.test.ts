@@ -15,7 +15,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { login, logout, __openSessionCount } from './lib/api-client.js';
+import { login, logout, releaseSessions, __openSessionCount } from './lib/api-client.js';
 
 const BASE = 'http://ops-test.invalid';
 const REFRESH_COOKIE = 'vizora_refresh=rt-abc123';
@@ -155,5 +155,35 @@ test('a failed login opens no session', async () => {
     assert.equal(__openSessionCount(), 0);
   } finally {
     globalThis.fetch = real;
+  }
+});
+
+test('releaseSessions awaits the logout, so the row is revoked before exit', async () => {
+  const { calls, restore } = stubFetch([`${REFRESH_COOKIE}; Path=/; HttpOnly`]);
+  try {
+    await login(BASE, 'ops@example.test', 'pw');
+    assert.equal(__openSessionCount(), 1);
+
+    // The bug this replaces: a fire-and-forget release let the process exit
+    // first, so nothing was revoked. releaseSessions must be awaitable and
+    // must have completed the request by the time it resolves.
+    await releaseSessions();
+
+    const out = calls.find(c => c.url.endsWith('/auth/logout'));
+    assert.ok(out, 'logout must have been issued by releaseSessions');
+    assert.equal(out.headers.Cookie, REFRESH_COOKIE, 'cookie is what revokes the row');
+    assert.equal(__openSessionCount(), 0, 'session released');
+  } finally {
+    restore();
+  }
+});
+
+test('releaseSessions is safe with nothing open', async () => {
+  const { calls, restore } = stubFetch([]);
+  try {
+    await assert.doesNotReject(() => releaseSessions());
+    assert.equal(calls.length, 0);
+  } finally {
+    restore();
   }
 });
