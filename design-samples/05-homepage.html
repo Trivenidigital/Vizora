@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vizora — AI-Powered Digital Signage Platform</title>
+<meta name="description" content="AI-driven digital signage that runs itself. Generate content, optimize schedules, predict device issues, and manage thousands of screens autonomously.">
+<meta name="theme-color" content="#E9EEEF">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════
+   VIZORA — Electric Horizon, light substrate
+   Direction A (Intelligent Operations) hero + conversion skeleton.
+   Tokens map 1:1 onto the app's existing CSS variables.
+   ═══════════════════════════════════════════════════════════ */
+:root{
+  --page:#E9EEEF;
+  --page-2:#E2EAEC;
+  --canvas-1:#DFE8EA;
+  --canvas-2:#CFDDE1;
+  --surface:#FFFFFF;
+  --surface-2:#F4F8F8;
+
+  --ink:#0A222E;          /* brand deep teal, doubles as text */
+  --ink-2:#3E5860;        /* body copy — 6.4:1 on page */
+  --muted:#4E656C;        /* micro labels — 5:1 on page */
+  --hair:rgba(10,34,46,.11);
+  --hair-2:rgba(10,34,46,.07);
+
+  --mint:#00B27C;         /* fills, dots, buttons */
+  --mint-hot:#00E5A0;     /* glow only */
+  --mint-ink:#00745B;     /* mint as small text — 4.9:1 */
+  --cyan:#00B4D8;
+  --cyan-ink:#00697F;
+  --violet:#8B5CF6;
+  --violet-ink:#5B32C9;
+  --amber:#F59E0B;
+  --amber-ink:#8A5A00;
+  --rose:#E11D48;
+
+  --r-xl:28px; --r-lg:18px; --r-md:13px; --r-sm:9px;
+  --ease:cubic-bezier(.22,.61,.36,1);
+  --shadow-sm:0 4px 14px rgba(10,34,46,.05);
+  --shadow-md:0 14px 38px rgba(10,34,46,.09);
+  --shadow-lg:0 30px 70px rgba(10,34,46,.13);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;scroll-padding-top:88px}
+body{
+  background:var(--page);color:var(--ink);overflow-x:hidden;
+  font-family:'DM Sans',ui-sans-serif,system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased;line-height:1.5;
+}
+h1,h2,h3,h4,.display{font-family:'Sora',sans-serif;letter-spacing:-.042em;line-height:1.06}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace;text-transform:uppercase;letter-spacing:.16em;font-size:.62rem;font-weight:500}
+a{color:inherit}
+img,svg{max-width:100%}
+:focus-visible{outline:2px solid var(--mint-ink);outline-offset:3px;border-radius:4px}
+.skip{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.skip:focus{position:fixed;left:0;top:0;width:auto;height:auto;clip:auto;z-index:200;
+  background:var(--ink);color:#EAF3F2;padding:12px 18px;border-radius:0 0 8px 0}
+.grain{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:98;opacity:.26;mix-blend-mode:multiply}
+.wrap{max-width:1320px;margin:0 auto;padding:0 clamp(20px,3.6vw,48px)}
+.narrow{max-width:1120px}
+
+/* ── buttons ───────────────────────────────────────────── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;border:none;cursor:pointer;
+  font-family:'DM Sans',sans-serif;font-weight:500;border-radius:999px;text-decoration:none;white-space:nowrap;
+  transition:transform .3s var(--ease),box-shadow .3s var(--ease),background .22s,border-color .22s}
+.btn-primary{background:var(--mint);color:#04241B;padding:14px 24px;font-size:.94rem;
+  box-shadow:0 8px 24px rgba(0,178,124,.26)}
+.btn-primary:hover{transform:translateY(-2px);background:#00A171;box-shadow:0 14px 34px rgba(0,178,124,.34)}
+.btn-dark{background:var(--ink);color:#EAF3F2;padding:12px 21px;font-size:.86rem}
+.btn-dark:hover{transform:translateY(-1px);box-shadow:0 10px 26px rgba(10,34,46,.22)}
+.btn-ghost{background:rgba(255,255,255,.55);color:var(--ink);border:1px solid var(--hair);padding:13px 21px;font-size:.94rem}
+.btn-ghost:hover{background:#fff;border-color:rgba(10,34,46,.2)}
+.btn-sm{padding:10px 18px;font-size:.84rem}
+.btn-block{width:100%}
+
+/* ── nav ───────────────────────────────────────────────── */
+.nav{position:fixed;top:0;left:0;right:0;z-index:90;
+  background:linear-gradient(180deg,rgba(233,238,239,.92),rgba(233,238,239,.72) 60%,rgba(233,238,239,0));
+  backdrop-filter:blur(12px)}
+.nav-in{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:24px;padding:18px 0}
+.nav-in > .nav-right{justify-self:end}
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none}
+.brand-tile{width:29px;height:29px;border-radius:9px;display:grid;place-items:center;flex:none;
+  background:linear-gradient(135deg,rgba(0,229,160,.24),rgba(0,180,216,.17));border:1px solid rgba(0,178,124,.32)}
+.brand-tile svg{width:15px;height:15px;stroke:var(--mint-ink);fill:none;stroke-width:1.9}
+.wordmark{font-family:'Sora',sans-serif;font-weight:700;font-size:1.1rem;letter-spacing:-.03em;
+  background:linear-gradient(135deg,#00A171,#0090B4);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.nav-links{display:flex;gap:28px}
+.nav-links a{color:var(--ink-2);text-decoration:none;font-size:.88rem;font-weight:500;transition:color .22s}
+.nav-links a:hover{color:var(--ink)}
+.nav-right{display:flex;align-items:center;gap:14px}
+.nav-right .login{color:var(--ink-2);text-decoration:none;font-size:.88rem;font-weight:500}
+.nav-right .login:hover{color:var(--ink)}
+.burger{display:none;background:none;border:1px solid var(--hair);border-radius:9px;padding:9px;cursor:pointer}
+.burger svg{width:18px;height:18px;stroke:var(--ink);fill:none;stroke-width:2;display:block}
+.mobile-menu{display:none;border-top:1px solid var(--hair);background:rgba(233,238,239,.98);padding:14px 0 20px}
+.mobile-menu a{display:block;padding:11px 0;color:var(--ink-2);text-decoration:none;font-weight:500;border-bottom:1px solid var(--hair-2)}
+.mobile-menu .btn{margin-top:16px}
+.mobile-menu[data-open="true"]{display:block}
+@media(max-width:940px){
+  .nav-links,.nav-right .login{display:none}
+  .burger{display:block}
+}
+
+/* ── hero ──────────────────────────────────────────────── */
+.hero-wrap{padding:84px clamp(10px,1.4vw,20px) 0}
+.hero{position:relative;border-radius:var(--r-xl);overflow:hidden;
+  height:min(86vh,900px);min-height:660px;
+  background:
+    radial-gradient(115% 85% at 58% 6%, #F3F8F9 0%, transparent 55%),
+    radial-gradient(75% 65% at 80% 74%, rgba(0,180,216,.11) 0%, transparent 62%),
+    linear-gradient(168deg,var(--canvas-1) 0%,var(--canvas-2) 100%);
+  border:1px solid rgba(255,255,255,.72);
+  box-shadow:0 1px 0 rgba(255,255,255,.9) inset,var(--shadow-lg)}
+
+.hero-rail{position:absolute;left:clamp(22px,3vw,46px);top:13%;z-index:4;display:flex;flex-direction:column;gap:13px}
+.hero-rail span{color:var(--muted);display:flex;align-items:center;gap:10px}
+.hero-rail span::before{content:'';width:16px;height:1px;background:currentColor;opacity:.55}
+
+.hero-statement{position:absolute;right:clamp(22px,3.4vw,52px);top:12.5%;max-width:33ch;text-align:right;z-index:4;
+  font-size:clamp(.92rem,1.05vw,1.05rem);line-height:1.6;color:var(--ink-2)}
+
+.hero-stage{position:absolute;inset:0;z-index:1;display:grid;place-items:center;pointer-events:none}
+.hero-stage svg{width:min(97%,1080px);height:100%;overflow:visible}
+
+.hero-copy{position:absolute;left:clamp(22px,3vw,46px);bottom:clamp(28px,4vw,54px);z-index:5;max-width:min(90%,660px)}
+.hero-micro{display:inline-block;color:var(--muted);margin-bottom:15px;border:1px solid var(--hair);
+  border-radius:999px;padding:6px 13px;background:rgba(255,255,255,.5)}
+.hero h1{font-size:clamp(2.4rem,5.2vw,4.3rem);font-weight:600;margin-bottom:22px}
+.hero h1 .grad{background:linear-gradient(120deg,#00A171 0%,#00A6CC 60%,#4F86D4 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.hero-cta{display:flex;gap:11px;flex-wrap:wrap;margin-bottom:16px}
+.hero-trust{display:flex;gap:18px;flex-wrap:wrap;font-size:.8rem;color:var(--muted)}
+.hero-trust span{display:flex;align-items:center;gap:6px}
+.tick{color:var(--mint-ink);font-weight:700}
+
+.hero-chip{position:absolute;right:clamp(22px,3vw,46px);bottom:clamp(28px,4vw,54px);z-index:5;
+  display:flex;align-items:center;gap:13px;background:rgba(255,255,255,.62);
+  backdrop-filter:blur(18px) saturate(1.3);border:1px solid rgba(255,255,255,.86);border-radius:var(--r-md);
+  padding:11px 16px 11px 11px;box-shadow:0 18px 44px rgba(10,34,46,.12);cursor:pointer;text-align:left;
+  transition:transform .3s var(--ease),background .3s}
+.hero-chip:hover{transform:translateY(-2px);background:rgba(255,255,255,.84)}
+.orb{width:42px;height:42px;border-radius:50%;flex:none;position:relative;overflow:hidden;display:grid;place-items:center;
+  background:radial-gradient(circle at 32% 30%,#B9FFE6 0%,#00E5A0 38%,#00B4D8 78%,#0A6A87 100%);
+  box-shadow:0 0 0 3px rgba(0,229,160,.15),0 0 20px rgba(0,229,160,.32)}
+.orb::after{content:'';position:absolute;inset:0;mix-blend-mode:overlay;
+  background:repeating-linear-gradient(0deg,rgba(255,255,255,.22) 0 1px,transparent 1px 3px)}
+.orb i{position:relative;z-index:2;color:#04241B;font-size:.6rem;font-style:normal;padding-left:2px}
+.hero-chip .mono{color:var(--muted);display:block;margin-bottom:3px}
+.hero-chip strong{font-family:'Sora',sans-serif;font-size:.9rem;font-weight:600;letter-spacing:-.02em;display:block}
+
+@media(max-width:1080px){
+  .hero{height:auto;min-height:0;padding:96px 24px 34px;display:flex;flex-direction:column;gap:26px}
+  .hero-rail,.hero-statement,.hero-copy,.hero-chip{position:static}
+  .hero-statement{text-align:left;max-width:none;order:3}
+  .hero-rail{flex-direction:row;flex-wrap:wrap;gap:10px 20px;order:4}
+  .hero-copy{max-width:none;order:1}
+  .hero-chip{order:5}
+  .hero-stage{position:relative;inset:auto;height:250px;opacity:.9;order:2}
+  .hero-stage svg{width:100%}
+  .hero-chip{width:max-content;max-width:100%}
+}
+
+/* ── section furniture ─────────────────────────────────── */
+section{position:relative}
+.sec{padding:clamp(66px,8.5vw,124px) 0}
+.sec-head{max-width:44ch;margin-bottom:clamp(34px,4vw,58px)}
+.sec-head.center{margin-left:auto;margin-right:auto;text-align:center;max-width:62ch}
+.sec-head.center p{max-width:52ch;margin-left:auto;margin-right:auto}
+.kicker{color:var(--mint-ink);display:block;margin-bottom:14px}
+.sec-head h2{font-size:clamp(1.85rem,3.3vw,2.75rem);font-weight:600;margin-bottom:14px}
+.sec-head p{color:var(--ink-2);line-height:1.65;font-size:1.02rem}
+.rule{height:1px;background:var(--hair);border:0}
+
+/* ── stats ─────────────────────────────────────────────── */
+.stats{border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);
+  background:linear-gradient(135deg,rgba(0,229,160,.05),rgba(0,180,216,.035))}
+.stats-in{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;padding:38px 0;text-align:center}
+.stat .n{font-family:'JetBrains Mono',monospace;font-size:clamp(1.5rem,2.5vw,2.1rem);font-weight:700;letter-spacing:-.03em}
+.stat .l{font-size:.78rem;color:var(--muted);margin-top:6px}
+@media(max-width:720px){.stats-in{grid-template-columns:repeat(2,1fr);gap:28px}}
+
+/* ── how it resolves (layered object) ──────────────────── */
+.resolve-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(30px,5vw,80px);align-items:center}
+@media(max-width:980px){
+  .resolve-grid{grid-template-columns:1fr;gap:0}
+  .lyr-holder{min-height:0;padding-top:144px;padding-bottom:8px}
+}
+.lyr-holder{position:relative;display:grid;place-items:center;min-height:430px;perspective:1500px}
+/* the 3D projection overshoots the element box by ~130px upward — clear for the
+   projection, not the box, or the object collides with the copy above it. */
+.lyr-stack{position:relative;width:min(58vw,380px);aspect-ratio:1/.95;transform-style:preserve-3d;
+  transform:rotateX(52deg) rotateZ(-38deg);animation:lyrDrift 14s ease-in-out infinite}
+@keyframes lyrDrift{0%,100%{transform:rotateX(52deg) rotateZ(-38deg) translateZ(0)}
+                    50%{transform:rotateX(49.5deg) rotateZ(-35.5deg) translateZ(12px)}}
+.lyr{position:absolute;inset:0;border-radius:15px;transform-style:preserve-3d;
+  border:1px solid rgba(255,255,255,.85);background:rgba(255,255,255,.36);
+  box-shadow:0 20px 42px rgba(10,34,46,.14);transition:transform .8s var(--ease),opacity .35s,box-shadow .35s}
+.lyr-1{transform:translateZ(0);background:linear-gradient(135deg,rgba(0,180,216,.18),rgba(255,255,255,.42))}
+.lyr-1::after{content:'';position:absolute;inset:14px;border-radius:8px;
+  background:repeating-linear-gradient(90deg,rgba(10,34,46,.16) 0 26px,transparent 26px 38px);opacity:.5}
+.lyr-2{transform:translateZ(54px);background:linear-gradient(135deg,rgba(139,92,246,.17),rgba(255,255,255,.4))}
+.lyr-2::after{content:'';position:absolute;left:14px;right:14px;top:22px;height:14px;border-radius:4px;
+  background:linear-gradient(90deg,rgba(139,92,246,.52) 0 24%,transparent 24% 42%,rgba(139,92,246,.34) 42% 76%,transparent 76%)}
+.lyr-3{transform:translateZ(108px);background:linear-gradient(135deg,rgba(0,229,160,.2),rgba(255,255,255,.4))}
+.lyr-3::after{content:'';position:absolute;right:18px;bottom:18px;width:44%;height:30%;border-radius:8px;
+  background:rgba(255,255,255,.74);border:1px solid rgba(0,178,124,.36)}
+.lyr-4{transform:translateZ(168px);background:#0A222E;border:1px solid rgba(255,255,255,.5);overflow:hidden;
+  box-shadow:0 38px 76px rgba(10,34,46,.32),0 0 60px rgba(0,229,160,.11)}
+.lyr-stack:hover .lyr-2{transform:translateZ(78px)}
+.lyr-stack:hover .lyr-3{transform:translateZ(156px)}
+.lyr-stack:hover .lyr-4{transform:translateZ(240px)}
+
+.board{position:absolute;inset:0;padding:8% 9%;display:flex;flex-direction:column;color:#EAF3F1}
+.board-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6%}
+.board-top .mono{color:#00E5A0;font-size:.5rem}
+.board .live{display:flex;align-items:center;gap:5px;font-family:'JetBrains Mono',monospace;font-size:.46rem;
+  letter-spacing:.13em;text-transform:uppercase;color:#8FB3B0}
+.board .live i{width:5px;height:5px;border-radius:50%;background:#00E5A0;animation:blip 2s infinite;font-style:normal}
+@keyframes blip{0%,100%{opacity:1}50%{opacity:.25}}
+.board h3{font-family:'Sora',sans-serif;font-size:clamp(.74rem,1.1vw,1.02rem);font-weight:600;letter-spacing:-.045em;margin-bottom:7%}
+.board-menu{display:flex;flex-direction:column;gap:6%;flex:1}
+.board-item{display:flex;align-items:baseline;gap:7px}
+.board-item .nm{font-size:.56rem;font-weight:500;white-space:nowrap}
+.board-item .ln{flex:1;border-bottom:1px dotted rgba(255,255,255,.24);transform:translateY(-3px)}
+.board-item .pr{font-family:'JetBrains Mono',monospace;font-size:.56rem;color:#00E5A0}
+.board-foot{display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,.1);padding-top:5%}
+.board-foot .mono{color:#6D8E93;font-size:.44rem}
+
+.legend{list-style:none;display:flex;flex-direction:column;gap:2px;margin-top:26px}
+.legend li{display:flex;align-items:flex-start;gap:13px;padding:12px 14px;border-radius:11px;
+  transition:background .3s var(--ease)}
+.legend li:hover{background:rgba(255,255,255,.62)}
+.legend i{width:9px;height:9px;border-radius:2px;flex:none;margin-top:6px;transition:transform .3s var(--ease)}
+.legend li:hover i{transform:scale(1.4)}
+.legend .k{display:block;color:var(--muted);margin-bottom:3px}
+.legend .v{display:block;font-family:'Sora',sans-serif;font-size:.98rem;font-weight:600;letter-spacing:-.025em}
+.legend .d{display:block;font-size:.86rem;color:var(--ink-2);line-height:1.55;margin-top:4px}
+/* the legend drives the object */
+.resolve-grid:has(.legend li[data-l="1"]:hover) .lyr:not(.lyr-1),
+.resolve-grid:has(.legend li[data-l="2"]:hover) .lyr:not(.lyr-2),
+.resolve-grid:has(.legend li[data-l="3"]:hover) .lyr:not(.lyr-3),
+.resolve-grid:has(.legend li[data-l="4"]:hover) .lyr:not(.lyr-4){opacity:.26}
+.resolve-grid:has(.legend li[data-l="1"]:hover) .lyr-1,
+.resolve-grid:has(.legend li[data-l="2"]:hover) .lyr-2,
+.resolve-grid:has(.legend li[data-l="3"]:hover) .lyr-3{box-shadow:0 0 0 2px rgba(0,178,124,.7),0 20px 42px rgba(10,34,46,.14)}
+.resolve-grid:has(.legend li[data-l="4"]:hover) .lyr-4{box-shadow:0 0 0 2px rgba(0,229,160,.8),0 38px 76px rgba(10,34,46,.32)}
+
+/* ── platform / dashboard ──────────────────────────────── */
+.platform{background:var(--page-2);border-top:1px solid var(--hair);border-bottom:1px solid var(--hair)}
+.dash{background:var(--surface);border:1px solid var(--hair-2);border-radius:var(--r-lg);overflow:hidden;
+  box-shadow:var(--shadow-lg);max-width:1060px;margin:0 auto}
+.dash-chrome{display:flex;align-items:center;gap:7px;padding:11px 15px;border-bottom:1px solid #EFF3F3;background:#FAFCFC}
+.dash-chrome i{width:9px;height:9px;border-radius:50%;background:#E0E7E8;display:block}
+.dash-chrome .url{margin-left:9px;font-family:'JetBrains Mono',monospace;font-size:.64rem;color:#8FA0A4;
+  background:#F1F5F5;border-radius:6px;padding:5px 12px}
+.dash-body{display:grid;grid-template-columns:150px 1fr}
+.dash-side{border-right:1px solid #F0F4F4;padding:16px 12px;background:#FCFDFD}
+.dash-side .grp{font-family:'JetBrains Mono',monospace;font-size:.53rem;letter-spacing:.14em;text-transform:uppercase;
+  color:#A9B6B9;margin:14px 0 7px}
+.dash-side .grp:first-child{margin-top:0}
+.dash-side a{display:block;font-size:.76rem;color:#54636A;text-decoration:none;padding:6px 9px;border-radius:7px}
+.dash-side a.on{background:rgba(0,178,124,.1);color:var(--mint-ink);font-weight:500}
+.dash-main{padding:18px}
+.dash-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:15px}
+.dash-head h4{font-family:'Sora',sans-serif;font-size:1rem;font-weight:600;letter-spacing:-.025em}
+.dash-head p{font-size:.72rem;color:#8B979B;margin-top:3px}
+.dash-pill{background:var(--mint);color:#04241B;border-radius:999px;font-size:.66rem;font-weight:600;padding:7px 13px;white-space:nowrap}
+.dash-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:15px}
+.dash-tile{border:1px solid #EFF3F3;border-radius:10px;padding:11px}
+.dash-tile .k{font-family:'JetBrains Mono',monospace;font-size:.52rem;letter-spacing:.1em;text-transform:uppercase;color:#A2AEB1}
+.dash-tile .v{font-family:'JetBrains Mono',monospace;font-size:1.15rem;font-weight:700;margin:4px 0 2px;letter-spacing:-.02em}
+.dash-tile .s{font-size:.58rem;color:#9DA9AC}
+.dash-tile.ok .v{color:var(--mint-ink)}
+.dash-tile.warn .v{color:var(--amber-ink)}
+.dash-rows{display:flex;flex-direction:column;gap:7px}
+.dash-row{display:flex;align-items:center;gap:10px;border:1px solid #F0F4F4;border-radius:10px;padding:10px 12px}
+.dash-row .st{width:7px;height:7px;border-radius:50%;flex:none;background:var(--mint-hot)}
+.dash-row .st.off{background:var(--rose)}
+.dash-row .nm{font-size:.76rem;font-weight:500}
+.dash-row .mt{font-family:'JetBrains Mono',monospace;font-size:.57rem;color:#A2AEB1;margin-top:2px}
+.dash-row .pl{margin-left:auto;font-size:.65rem;color:#6E7C81;background:#F5F8F8;border-radius:6px;padding:5px 9px;white-space:nowrap}
+@media(max-width:760px){
+  .dash-body{grid-template-columns:1fr}.dash-side{display:none}
+  .dash-tiles{grid-template-columns:repeat(2,1fr)}
+}
+.plat-feats{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:clamp(24px,3vw,48px);
+  margin-top:clamp(42px,5vw,68px)}
+.plat-feats .cap{padding-top:20px;border-top:1px solid var(--hair)}
+.plat-feats h3{font-size:1.16rem;font-weight:600;margin-bottom:9px}
+.plat-feats p{font-size:.92rem;color:var(--ink-2);line-height:1.62}
+
+/* ── cards (AI / solutions) ────────────────────────────── */
+.cards{display:grid;gap:16px}
+.cards-3{grid-template-columns:repeat(3,1fr)}
+.cards-4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:1000px){.cards-3,.cards-4{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:620px){.cards-3,.cards-4{grid-template-columns:1fr}}
+.card{background:rgba(255,255,255,.66);border:1px solid var(--hair-2);border-radius:var(--r-lg);padding:26px;
+  transition:transform .34s var(--ease),box-shadow .34s var(--ease),border-color .34s}
+.card:hover{transform:translateY(-4px);box-shadow:var(--shadow-md);border-color:rgba(0,178,124,.28)}
+.ico{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;margin-bottom:17px;
+  background:linear-gradient(135deg,rgba(0,229,160,.18),rgba(0,180,216,.13));border:1px solid rgba(0,178,124,.22)}
+.ico svg{width:19px;height:19px;stroke:var(--mint-ink);fill:none;stroke-width:1.75}
+.ico.v{background:linear-gradient(135deg,rgba(139,92,246,.18),rgba(139,92,246,.08));border-color:rgba(91,50,201,.24)}
+.ico.v svg{stroke:var(--violet-ink)}
+.ico.c{background:linear-gradient(135deg,rgba(0,180,216,.18),rgba(0,180,216,.08));border-color:rgba(0,105,127,.24)}
+.ico.c svg{stroke:var(--cyan-ink)}
+.card .tag{display:block;color:var(--muted);margin-bottom:9px}
+.card h3{font-size:1.14rem;font-weight:600;margin-bottom:9px}
+.card p{font-size:.9rem;line-height:1.62;color:var(--ink-2)}
+
+/* ── security ──────────────────────────────────────────── */
+.sec-sec{background:var(--page-2);border-top:1px solid var(--hair);border-bottom:1px solid var(--hair)}
+.sec-grid{display:grid;grid-template-columns:1fr 1fr;gap:clamp(30px,5vw,72px);align-items:start}
+@media(max-width:900px){.sec-grid{grid-template-columns:1fr;gap:36px}}
+.sec-list{list-style:none;display:flex;flex-direction:column;gap:2px}
+.sec-list li{display:flex;gap:14px;padding:15px 0;border-bottom:1px solid var(--hair-2)}
+.sec-list li:last-child{border-bottom:0}
+.sec-list .chk{width:22px;height:22px;border-radius:7px;flex:none;display:grid;place-items:center;
+  background:rgba(0,178,124,.13);color:var(--mint-ink);font-size:.68rem;font-weight:700}
+.sec-list strong{font-family:'Sora',sans-serif;font-size:.98rem;font-weight:600;letter-spacing:-.02em;display:block;margin-bottom:3px}
+.sec-list span{font-size:.88rem;color:var(--ink-2);line-height:1.55}
+.badges{display:flex;flex-wrap:wrap;gap:9px;margin-top:26px}
+.badge{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.72);border:1px solid var(--hair);
+  border-radius:999px;padding:8px 14px;font-size:.78rem;color:var(--ink-2);font-weight:500}
+.badge b{color:var(--mint-ink)}
+
+/* ── pricing ───────────────────────────────────────────── */
+.toggle{display:inline-flex;background:rgba(255,255,255,.7);border:1px solid var(--hair);border-radius:999px;
+  padding:4px;gap:3px;margin:0 auto 12px;display:flex;width:max-content}
+.toggle button{border:none;background:none;cursor:pointer;border-radius:999px;padding:9px 19px;
+  font-family:'DM Sans',sans-serif;font-size:.85rem;font-weight:500;color:var(--ink-2);transition:background .25s,color .25s}
+.toggle button[aria-pressed="true"]{background:var(--ink);color:#EAF3F2}
+.save{display:block;text-align:center;color:var(--amber-ink);margin-bottom:40px}
+.tiers{display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:16px;align-items:start}
+.tier{background:rgba(255,255,255,.72);border:1px solid var(--hair-2);border-radius:var(--r-lg);padding:26px;
+  display:flex;flex-direction:column;height:100%}
+.tier.pop{border-color:rgba(0,178,124,.4);box-shadow:0 18px 44px rgba(0,178,124,.13);background:#fff;position:relative}
+.tier-badge{position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:var(--amber);color:#3D2600;
+  border-radius:999px;padding:5px 13px;font-family:'JetBrains Mono',monospace;font-size:.56rem;letter-spacing:.12em;
+  text-transform:uppercase;font-weight:700;white-space:nowrap}
+.tier h3{font-size:1.12rem;font-weight:600;margin-bottom:5px}
+.tier .who{font-size:.83rem;color:var(--muted);margin-bottom:18px}
+.tier .price{display:flex;align-items:baseline;gap:5px;margin-bottom:4px}
+.tier .amt{font-family:'JetBrains Mono',monospace;font-size:2rem;font-weight:700;letter-spacing:-.04em}
+.tier .per{font-size:.78rem;color:var(--muted)}
+.tier .note{font-size:.72rem;color:var(--muted);min-height:1.1em;margin-bottom:20px}
+.tier ul{list-style:none;display:flex;flex-direction:column;gap:9px;margin-bottom:24px;flex:1}
+.tier li{display:flex;gap:9px;font-size:.86rem;color:var(--ink-2);line-height:1.5}
+.tier li::before{content:'✓';color:var(--mint-ink);font-weight:700;flex:none}
+.price-foot{text-align:center;color:var(--muted);margin-top:26px;font-size:.85rem}
+
+/* ── faq ───────────────────────────────────────────────── */
+.faq{max-width:820px;margin:0 auto}
+.faq details{border-bottom:1px solid var(--hair);padding:4px 0}
+.faq summary{cursor:pointer;list-style:none;padding:19px 40px 19px 0;position:relative;
+  font-family:'Sora',sans-serif;font-size:1.02rem;font-weight:600;letter-spacing:-.025em}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:'+';position:absolute;right:6px;top:50%;transform:translateY(-50%);
+  font-family:'JetBrains Mono',monospace;font-size:1.2rem;color:var(--mint-ink);font-weight:400;transition:transform .3s var(--ease)}
+.faq details[open] summary::after{transform:translateY(-50%) rotate(45deg)}
+.faq .a{padding:0 40px 20px 0;color:var(--ink-2);line-height:1.68;font-size:.94rem}
+
+/* ── final cta ─────────────────────────────────────────── */
+.final{padding:0 0 clamp(60px,8vw,110px)}
+.final-in{background:linear-gradient(135deg,rgba(0,229,160,.11),rgba(0,180,216,.07));
+  border:1px solid rgba(0,178,124,.22);border-radius:var(--r-xl);padding:clamp(40px,5.5vw,76px) clamp(24px,4vw,48px);
+  text-align:center;position:relative;overflow:hidden}
+.final-in::after{content:'';position:absolute;left:50%;bottom:-58%;width:70%;height:88%;transform:translateX(-50%);
+  background:radial-gradient(ellipse,rgba(0,229,160,.2),transparent 68%);filter:blur(28px);pointer-events:none}
+.final-in > *{position:relative;z-index:2}
+.final h2{font-size:clamp(1.9rem,3.4vw,2.9rem);font-weight:600;margin-bottom:15px}
+.final p{color:var(--ink-2);max-width:52ch;margin:0 auto 28px;line-height:1.65}
+.final .hero-trust{justify-content:center;margin-top:22px}
+
+/* ── footer ────────────────────────────────────────────── */
+.foot{border-top:1px solid var(--hair);padding:clamp(44px,5vw,68px) 0 40px}
+.foot-grid{display:grid;grid-template-columns:1.6fr repeat(3,1fr);gap:34px;margin-bottom:44px}
+@media(max-width:820px){.foot-grid{grid-template-columns:1fr 1fr;gap:30px}}
+.foot-brand p{color:var(--ink-2);font-size:.9rem;line-height:1.62;margin:14px 0 16px;max-width:34ch}
+.foot-brand a{color:var(--mint-ink);font-size:.88rem;text-decoration:none;font-weight:500}
+.foot-col h4{font-family:'Sora',sans-serif;font-size:.82rem;font-weight:600;letter-spacing:-.01em;margin-bottom:14px}
+.foot-col a{display:block;color:var(--ink-2);text-decoration:none;font-size:.87rem;padding:5px 0;transition:color .2s}
+.foot-col a:hover{color:var(--ink)}
+.foot-base{border-top:1px solid var(--hair);padding-top:22px;display:flex;justify-content:space-between;
+  flex-wrap:wrap;gap:12px;color:var(--muted)}
+
+/* ── reveal ────────────────────────────────────────────── */
+@keyframes rise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+.r{opacity:0}
+.r.in{animation:rise .9s var(--ease) forwards}
+.d1{animation-delay:.05s}.d2{animation-delay:.15s}.d3{animation-delay:.25s}
+.d4{animation-delay:.35s}.d5{animation-delay:.48s}.d6{animation-delay:.6s}
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  .r,.r.in{opacity:1;animation:none}
+  .lyr-stack{animation:none}
+  .orb,.board .live i{animation:none}
+}
+</style>
+</head>
+<body>
+
+<a class="skip" href="#main">Skip to content</a>
+<svg class="grain" aria-hidden="true"><filter id="grainF"><feTurbulence type="fractalNoise" baseFrequency="0.82" numOctaves="4" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter><rect width="100%" height="100%" filter="url(#grainF)" opacity=".42"/></svg>
+
+<!-- ══ nav ══ -->
+<header class="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="#" aria-label="Vizora home">
+      <span class="brand-tile"><svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>
+      <span class="wordmark">VIZORA</span>
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="#platform">Platform</a>
+      <a href="#solutions">Solutions</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <div class="nav-right">
+      <a class="login" href="#">Login</a>
+      <a class="btn btn-dark" href="#">Start free trial</a>
+      <button class="burger" id="burger" aria-expanded="false" aria-controls="mobileMenu" aria-label="Open menu">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="mobile-menu wrap" id="mobileMenu" data-open="false">
+    <a href="#platform">Platform</a><a href="#solutions">Solutions</a>
+    <a href="#pricing">Pricing</a><a href="#faq">FAQ</a><a href="#">Login</a>
+    <a class="btn btn-primary btn-block" href="#">Start Free — 5 Minutes to Live</a>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ══ hero ══ -->
+<div class="hero-wrap">
+<section class="hero" aria-labelledby="heroTitle">
+
+  <div class="hero-rail mono r d2" aria-hidden="true">
+    <span>01 — Content automation</span>
+    <span>02 — Smart scheduling</span>
+    <span>03 — Fleet operations</span>
+  </div>
+
+  <p class="hero-statement r d3">
+    We build the control layer that brings clarity, precision and
+    reliability to every screen your business runs.
+  </p>
+
+  <div class="hero-stage" aria-hidden="true"><svg id="fibre" viewBox="0 0 1000 760" preserveAspectRatio="xMidYMid meet"></svg></div>
+
+  <div class="hero-copy">
+    <span class="hero-micro mono r d3">50,000+ screens orchestrated · since 2024</span>
+    <h1 id="heroTitle" class="r d4">Publish. Schedule.<br><span class="grad">Everywhere.</span></h1>
+    <div class="hero-cta r d5">
+      <a class="btn btn-primary" href="#">Start Free — 5 Minutes to Live <span aria-hidden="true" style="opacity:.5">→</span></a>
+      <a class="btn btn-ghost" href="#platform">See the platform</a>
+    </div>
+    <div class="hero-trust r d5">
+      <span><b class="tick" aria-hidden="true">✓</b> 30-day free trial</span>
+      <span><b class="tick" aria-hidden="true">✓</b> No credit card required</span>
+      <span><b class="tick" aria-hidden="true">✓</b> 5-minute setup</span>
+    </div>
+  </div>
+
+  <button class="hero-chip r d6">
+    <span class="orb" aria-hidden="true"><i>▶</i></span>
+    <span class="hero-chip-copy">
+      <span class="mono">Watch the product tour</span>
+      <strong>Dashboard, templates &amp; pairing · 1:45</strong>
+    </span>
+  </button>
+
+</section>
+</div>
+
+<!-- ══ stats ══ -->
+<section class="stats" aria-label="Platform at a glance">
+  <div class="wrap stats-in">
+    <div class="stat r"><div class="n">50,000+</div><div class="l">Screens managed</div></div>
+    <div class="stat r d1"><div class="n">99.9%</div><div class="l">Platform uptime</div></div>
+    <div class="stat r d2"><div class="n">2,500+</div><div class="l">Organizations</div></div>
+    <div class="stat r d3"><div class="n">6</div><div class="l">AI systems</div></div>
+  </div>
+</section>
+
+<!-- ══ how it resolves ══ -->
+<section class="sec" id="how" aria-labelledby="howTitle">
+  <div class="wrap resolve-grid">
+    <div>
+      <div class="sec-head" style="margin-bottom:0">
+        <span class="kicker mono">How it resolves</span>
+        <h2 id="howTitle">Four layers.<br>One screen.</h2>
+        <p>A playlist, a daypart, a live price feed, an override from head office. Vizora resolves all of it into the one thing that matters — what your customer is looking at right now.</p>
+      </div>
+      <ul class="legend">
+        <li data-l="1"><i style="background:var(--cyan)"></i><div><span class="k mono">Layer 01</span><span class="v">Base playlist</span><span class="d">The default rotation a screen falls back to, always.</span></div></li>
+        <li data-l="2"><i style="background:var(--violet)"></i><div><span class="k mono">Layer 02</span><span class="v">Daypart schedule</span><span class="d">Breakfast boards at seven, happy hour at five — per location.</span></div></li>
+        <li data-l="3"><i style="background:var(--mint)"></i><div><span class="k mono">Layer 03</span><span class="v">Live data widget</span><span class="d">Prices, wait times, weather — pulled at render, never stale.</span></div></li>
+        <li data-l="4"><i style="background:var(--ink)"></i><div><span class="k mono">Output</span><span class="v">On screen now</span><span class="d">Change any layer and every screen in the group re-renders. No republish, no truck roll.</span></div></li>
+      </ul>
+    </div>
+
+    <div class="lyr-holder r d2" aria-hidden="true">
+      <div class="lyr-stack">
+        <div class="lyr lyr-1"></div>
+        <div class="lyr lyr-2"></div>
+        <div class="lyr lyr-3"></div>
+        <div class="lyr lyr-4">
+          <div class="board">
+            <div class="board-top"><span class="mono">Urban Eats · Downtown</span><span class="live"><i></i> On air</span></div>
+            <h3>Today's Specials</h3>
+            <div class="board-menu">
+              <div class="board-item"><span class="nm">Charred corn elote</span><span class="ln"></span><span class="pr">$9</span></div>
+              <div class="board-item"><span class="nm">Smoked brisket bowl</span><span class="ln"></span><span class="pr">$16</span></div>
+              <div class="board-item"><span class="nm">Cold-brew tonic</span><span class="ln"></span><span class="pr">$6</span></div>
+            </div>
+            <div class="board-foot"><span class="mono">Updated 4 min ago</span><span class="mono">RETAIL-DT-04</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ platform ══ -->
+<section class="sec platform" id="platform" aria-labelledby="platTitle">
+  <div class="wrap">
+    <div class="sec-head center">
+      <span class="kicker mono">Platform</span>
+      <h2 id="platTitle">Complete control over every screen</h2>
+      <p>From content creation to fleet monitoring, Vizora gives you full command of every display in your organization.</p>
+    </div>
+
+    <div class="dash r d2">
+      <div class="dash-chrome" aria-hidden="true"><i></i><i></i><i></i><span class="url">dashboard.vizora.io</span></div>
+      <div class="dash-body">
+        <div class="dash-side">
+          <div class="grp">Fleet</div>
+          <a href="#" class="on">Overview</a><a href="#">Devices</a><a href="#">Groups</a>
+          <div class="grp">Content</div>
+          <a href="#">Library</a><a href="#">Templates</a><a href="#">Playlists</a>
+          <div class="grp">Ops</div>
+          <a href="#">Schedules</a><a href="#">Analytics</a>
+        </div>
+        <div class="dash-main">
+          <div class="dash-head">
+            <div><h4>Fleet Overview</h4><p>24 devices · 22 online · 2 offline</p></div>
+            <span class="dash-pill">+ Pair Device</span>
+          </div>
+          <div class="dash-tiles">
+            <div class="dash-tile ok"><div class="k">Online</div><div class="v">22/24</div><div class="s">91.6% uptime</div></div>
+            <div class="dash-tile"><div class="k">Content</div><div class="v">148</div><div class="s">+12 today</div></div>
+            <div class="dash-tile"><div class="k">Bandwidth</div><div class="v">2.4<span style="font-size:.62rem">GB</span></div><div class="s">48% of quota</div></div>
+            <div class="dash-tile warn"><div class="k">Alerts</div><div class="v">2</div><div class="s">2 offline</div></div>
+          </div>
+          <div class="dash-rows">
+            <div class="dash-row"><span class="st"></span><div><div class="nm">Lobby Main</div><div class="mt">HQ-F1</div></div><span class="pl">Welcome Video</span></div>
+            <div class="dash-row"><span class="st"></span><div><div class="nm">Cafeteria</div><div class="mt">HQ-F2</div></div><span class="pl">Daily Specials</span></div>
+            <div class="dash-row"><span class="st off"></span><div><div class="nm">Store Window</div><div class="mt">RETAIL-DT</div></div><span class="pl">Summer Sale</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="plat-feats">
+      <div class="cap r"><h3>Live fleet command center</h3><p>WebSocket-backed status for every player. You know a screen is dark before anyone standing in front of it does.</p></div>
+      <div class="cap r d1"><h3>Smart content management</h3><p>Describe the board you want and deploy it. Templates, playlists and approvals live in one library your whole team shares.</p></div>
+      <div class="cap r d2"><h3>Schedule with precision</h3><p>Dayparts, locations and audience signals resolve into one schedule — across every venue you operate.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ ai ══ -->
+<section class="sec" id="ai" aria-labelledby="aiTitle">
+  <div class="wrap">
+    <div class="sec-head center">
+      <span class="kicker mono">Intelligence engine</span>
+      <h2 id="aiTitle">AI that works while you sleep</h2>
+      <p>Six intelligent systems running behind every screen in your network.</p>
+    </div>
+    <div class="cards cards-3">
+      <article class="card r">
+        <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4z"/><path d="M18 16l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></svg></div>
+        <span class="tag mono">AI content generation</span>
+        <h3>Describe it. Deploy it.</h3>
+        <p>Generate an on-brand board from a sentence, then push it to a single screen or ten thousand — no design tool in the loop.</p>
+      </article>
+      <article class="card r d1">
+        <div class="ico c"><svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4M12 13v3.5"/></svg></div>
+        <span class="tag mono">Smart scheduling</span>
+        <h3>Right content, right moment.</h3>
+        <p>Dayparts, locations and audience signals resolve into one schedule, per screen, per minute.</p>
+      </article>
+      <article class="card r d2">
+        <div class="ico v"><svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2.5-7 4 14 2.5-7h5"/></svg></div>
+        <span class="tag mono">Predictive monitoring</span>
+        <h3>Fix it before it breaks.</h3>
+        <p>Every player reports health in real time. Vizora predicts the failure and opens the incident before a customer sees black.</p>
+      </article>
+      <article class="card r">
+        <div class="ico"><svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg></div>
+        <span class="tag mono">Audience intelligence</span>
+        <h3>Screens that read the room.</h3>
+        <p>Content adapts to who is actually in front of the display, not who you assumed would be.</p>
+      </article>
+      <article class="card r d1">
+        <div class="ico c"><svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V9M10 19V5M16 19v-7M22 19h-20"/></svg></div>
+        <span class="tag mono">AI analytics</span>
+        <h3>Ask questions. Get answers.</h3>
+        <p>Ask what played where and what it earned, in plain language. Every resolution is logged and queryable.</p>
+      </article>
+      <article class="card r d2">
+        <div class="ico v"><svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4M9 13h.01M15 13h.01"/></svg></div>
+        <span class="tag mono">Autonomous operations</span>
+        <h3>Set goals. Walk away.</h3>
+        <p>Tell Vizora the outcome you want. It schedules, monitors and remediates to hit it without you in the loop.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ══ solutions ══ -->
+<section class="sec" id="solutions" aria-labelledby="solTitle" style="padding-top:0">
+  <div class="wrap">
+    <hr class="rule" style="margin-bottom:clamp(60px,8vw,110px)">
+    <div class="sec-head center">
+      <span class="kicker mono">Solutions</span>
+      <h2 id="solTitle">Built for your industry</h2>
+      <p>From retail storefronts to hospital lobbies, Vizora adapts to your use case.</p>
+    </div>
+    <div class="cards cards-4">
+      <article class="card r"><h3>Retail &amp; Stores</h3><p>Storefront windows, promo end-caps and price boards that change with the campaign calendar — not with a truck roll.</p></article>
+      <article class="card r d1"><h3>Corporate Offices</h3><p>Lobby welcome screens, floor wayfinding and internal comms that stay current across every building.</p></article>
+      <article class="card r d2"><h3>Healthcare</h3><p>Waiting-room information, queue status and department signage with the audit trail your compliance team expects.</p></article>
+      <article class="card r d3"><h3>Restaurants &amp; QSR</h3><p>Menu boards that switch by daypart and update pricing across every location in seconds.</p></article>
+    </div>
+    <p style="text-align:center;color:var(--muted);margin-top:28px;font-size:.88rem">
+      Also used in Education, Manufacturing, Hospitality, Transportation and Government.
+    </p>
+  </div>
+</section>
+
+<!-- ══ security ══ -->
+<section class="sec sec-sec" id="security" aria-labelledby="secTitle">
+  <div class="wrap sec-grid">
+    <div>
+      <div class="sec-head" style="margin-bottom:0">
+        <span class="kicker mono">Security</span>
+        <h2 id="secTitle">Security that never sleeps</h2>
+        <p>Screens sit in public. The system behind them shouldn't be the soft spot in your network.</p>
+      </div>
+      <div class="badges">
+        <span class="badge"><b aria-hidden="true">✓</b> SOC 2 Type II Compliant</span>
+        <span class="badge"><b aria-hidden="true">✓</b> GDPR Ready</span>
+        <span class="badge"><b aria-hidden="true">✓</b> 256-bit Encryption</span>
+        <span class="badge"><b aria-hidden="true">✓</b> SSO Supported</span>
+        <span class="badge"><b aria-hidden="true">✓</b> 99.9% SLA Available</span>
+      </div>
+    </div>
+    <ul class="sec-list r d2">
+      <li><span class="chk" aria-hidden="true">✓</span><div><strong>Dual authentication</strong><span>Users and display devices authenticate on separate credentials, so a compromised screen can never reach your dashboard.</span></div></li>
+      <li><span class="chk" aria-hidden="true">✓</span><div><strong>Content validation</strong><span>Every upload is checked by magic number, not file extension — MIME spoofing doesn't get onto your screens.</span></div></li>
+      <li><span class="chk" aria-hidden="true">✓</span><div><strong>Role-based access</strong><span>Scope who can publish, who can approve and who can only look, per organization.</span></div></li>
+      <li><span class="chk" aria-hidden="true">✓</span><div><strong>Full audit trail</strong><span>Every change is attributed and retained, so you can answer "who put that on the screen" months later.</span></div></li>
+      <li><span class="chk" aria-hidden="true">✓</span><div><strong>Privacy-first AI</strong><span>Audience signals are aggregated, never identifying. No faces stored, ever.</span></div></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ══ pricing ══ -->
+<section class="sec" id="pricing" aria-labelledby="priceTitle">
+  <div class="wrap">
+    <div class="sec-head center">
+      <span class="kicker mono">Pricing</span>
+      <h2 id="priceTitle">Simple per-screen pricing</h2>
+      <p>Start with a 30-day free trial. Scale with transparent per-screen pricing.</p>
+    </div>
+
+    <div class="toggle" role="group" aria-label="Billing period">
+      <button id="btnMonthly" aria-pressed="true">Monthly</button>
+      <button id="btnAnnual" aria-pressed="false">Annual</button>
+    </div>
+    <span class="save mono">Save 20% with annual billing</span>
+
+    <div class="tiers">
+      <div class="tier r">
+        <h3>Free Trial</h3><div class="who">Perfect for getting started</div>
+        <div class="price"><span class="amt">$0</span><span class="per">/ 30 days</span></div>
+        <div class="note">No credit card required</div>
+        <ul><li>Full platform access</li><li>Unlimited content uploads</li><li>Email support</li></ul>
+        <a class="btn btn-ghost btn-block" href="#">Start Free</a>
+      </div>
+
+      <div class="tier r d1">
+        <h3>Basic</h3><div class="who">Up to 50 screens</div>
+        <div class="price"><span class="amt" data-m="$6" data-a="$5">$6</span><span class="per">/ screen / mo</span></div>
+        <div class="note" data-m="Billed monthly" data-a="Billed annually — save 20%">Billed monthly</div>
+        <ul><li>Everything in Free Trial</li><li>Playlists &amp; scheduling</li><li>Real-time fleet monitoring</li><li>99.9% SLA available</li></ul>
+        <a class="btn btn-ghost btn-block" href="#">Start with Basic</a>
+      </div>
+
+      <div class="tier pop r d2">
+        <span class="tier-badge">Most popular</span>
+        <h3>Pro</h3><div class="who">Up to 100 screens</div>
+        <div class="price"><span class="amt" data-m="$8" data-a="$7">$8</span><span class="per">/ screen / mo</span></div>
+        <div class="note" data-m="30-day free trial included" data-a="Billed annually — save 20%">30-day free trial included</div>
+        <ul><li>Everything in Basic</li><li>AI content generation</li><li>Predictive monitoring</li><li>Audience intelligence</li><li>Priority support</li></ul>
+        <a class="btn btn-primary btn-block" href="#">Go Pro</a>
+      </div>
+
+      <div class="tier r d3">
+        <h3>Enterprise</h3><div class="who">For large organizations</div>
+        <div class="price"><span class="amt">Custom</span></div>
+        <div class="note">Volume &amp; multi-region</div>
+        <ul><li>Everything in Pro</li><li>SSO &amp; advanced RBAC</li><li>Dedicated onboarding</li><li>Custom SLA</li></ul>
+        <a class="btn btn-ghost btn-block" href="mailto:sales@vizora.cloud">Talk to Sales</a>
+      </div>
+    </div>
+    <p class="price-foot">All plans include SSL encryption, 99.9% SLA, and email support.</p>
+  </div>
+</section>
+
+<!-- ══ faq ══ -->
+<section class="sec" id="faq" aria-labelledby="faqTitle" style="padding-top:0">
+  <div class="wrap">
+    <hr class="rule" style="margin-bottom:clamp(60px,8vw,110px)">
+    <div class="sec-head center"><span class="kicker mono">FAQ</span><h2 id="faqTitle">Questions, answered</h2></div>
+    <div class="faq">
+      <details><summary>How long does it take to get a screen live?</summary>
+        <div class="a">About five minutes. Install the player, enter the pairing code shown on the screen, assign a playlist. The device joins your fleet and starts reporting status immediately.</div></details>
+      <details><summary>What hardware do I need?</summary>
+        <div class="a">Vizora runs on Android TV devices and on Windows, macOS and Linux through the desktop player. Packaged players configure their own auto-start and keep the display awake, so a screen recovers on its own after a power cut.</div></details>
+      <details><summary>How do I know a screen has actually gone dark?</summary>
+        <div class="a">Every player holds a live connection to the platform and heartbeats continuously. Status changes reach your dashboard in real time rather than on a polling delay, and predictive monitoring flags devices trending toward failure before they drop.</div></details>
+      <details><summary>Can I update pricing across every location at once?</summary>
+        <div class="a">Yes. Change the layer once — a playlist, a daypart or a live data feed — and every screen in the group re-renders. There is no per-screen republish step.</div></details>
+      <details><summary>How does billing work?</summary>
+        <div class="a">Per screen, per month, with a 30-day free trial that needs no credit card. Annual billing saves 20%. Basic covers up to 50 screens and Pro up to 100; beyond that, Enterprise is priced on volume.</div></details>
+      <details><summary>Is my content and data secure?</summary>
+        <div class="a">Users and devices authenticate on separate credentials, uploads are validated by magic number rather than file extension, access is role-scoped per organization, and every change is written to a retained audit trail. SSO is available on Enterprise.</div></details>
+    </div>
+  </div>
+</section>
+
+<!-- ══ final cta ══ -->
+<section class="final">
+  <div class="wrap"><div class="final-in r">
+    <h2>Your screens are waiting</h2>
+    <p>Join thousands of organizations using Vizora to power their digital signage. Deploy your first screen in under 5 minutes.</p>
+    <a class="btn btn-primary" href="#">Get Started Free <span aria-hidden="true" style="opacity:.5">→</span></a>
+    <div class="hero-trust">
+      <span><b class="tick" aria-hidden="true">✓</b> 30-day free trial</span>
+      <span><b class="tick" aria-hidden="true">✓</b> 5-minute setup</span>
+      <span><b class="tick" aria-hidden="true">✓</b> No credit card</span>
+    </div>
+  </div></div>
+</section>
+
+</main>
+
+<!-- ══ footer ══ -->
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="foot-brand">
+        <a class="brand" href="#" aria-label="Vizora home">
+          <span class="brand-tile"><svg viewBox="0 0 24 24" aria-hidden="true" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>
+          <span class="wordmark">VIZORA</span>
+        </a>
+        <p>AI-powered digital signage platform. Intelligent control for every screen.</p>
+        <a href="mailto:support@vizora.cloud">support@vizora.cloud</a>
+      </div>
+      <div class="foot-col"><h4>Product</h4>
+        <a href="#platform">Platform</a><a href="#how">How it works</a><a href="#ai">AI engine</a><a href="#pricing">Pricing</a></div>
+      <div class="foot-col"><h4>Solutions</h4>
+        <a href="#solutions">Retail</a><a href="#solutions">Corporate</a><a href="#solutions">Healthcare</a><a href="#solutions">Restaurants</a></div>
+      <div class="foot-col"><h4>Company</h4>
+        <a href="#security">Security</a><a href="#faq">FAQ</a><a href="mailto:sales@vizora.cloud">Contact sales</a><a href="#">Login</a></div>
+    </div>
+    <div class="foot-base mono">
+      <span>© 2026 Vizora</span>
+      <span>SOC 2 Type II · GDPR ready · 99.9% SLA</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ── hero fibres: one command centre, every screen lit ─────────────── */
+(function(){
+  const svg = document.getElementById('fibre');
+  if(!svg) return;
+  const NS='http://www.w3.org/2000/svg', N=38, ORIGIN={x:470,y:-120};
+
+  const defs=document.createElementNS(NS,'defs');
+  defs.innerHTML=`
+    <linearGradient id="pulse" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00E5A0" stop-opacity="0"/>
+      <stop offset="45%" stop-color="#00E5A0" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#00B4D8" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="tipGlow" x="-260%" y="-260%" width="620%" height="620%">
+      <feGaussianBlur stdDeviation="7" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softGlow" x="-120%" y="-120%" width="340%" height="340%"><feGaussianBlur stdDeviation="14"/></filter>`;
+  svg.appendChild(defs);
+
+  const gGlow=document.createElementNS(NS,'g'), gLine=document.createElementNS(NS,'g'),
+        gPulse=document.createElementNS(NS,'g'), gTip=document.createElementNS(NS,'g');
+  gTip.setAttribute('filter','url(#tipGlow)');
+  svg.append(gGlow,gLine,gPulse,gTip);
+
+  const bloom=document.createElementNS(NS,'ellipse');
+  bloom.setAttribute('cx',546); bloom.setAttribute('cy',505);
+  bloom.setAttribute('rx',282);  bloom.setAttribute('ry',108);
+  bloom.setAttribute('fill','rgba(0,229,160,.16)');
+  bloom.setAttribute('filter','url(#softGlow)');
+  gGlow.appendChild(bloom);
+
+  for(let i=0;i<N;i++){
+    const t=i/(N-1), sway=Math.sin(t*Math.PI*2.1)*16;
+    const tx=268+556*t+sway*0.7;
+    const ty=430+128*Math.sin(t*Math.PI)+Math.cos(t*13)*9;
+    const x0=ORIGIN.x+(t-.5)*54;
+    const c1x=x0+(t-.5)*46, c1y=150+t*70;
+    const c2x=tx-148+sway*1.4, c2y=ty-232+Math.sin(t*6)*24;
+    const d=`M${x0.toFixed(1)},${ORIGIN.y} C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)}`;
+
+    const core=document.createElementNS(NS,'path');
+    core.setAttribute('d',d); core.setAttribute('fill','none');
+    core.setAttribute('stroke','rgba(58,96,110,.30)');
+    core.setAttribute('stroke-width',(1.05+(i%3)*.35).toFixed(2));
+    core.setAttribute('stroke-linecap','round');
+    gLine.appendChild(core);
+
+    const hi=document.createElementNS(NS,'path');
+    hi.setAttribute('d',d); hi.setAttribute('fill','none');
+    hi.setAttribute('stroke','rgba(255,255,255,.95)');
+    hi.setAttribute('stroke-width','.85');
+    hi.setAttribute('stroke-linecap','round');
+    hi.setAttribute('transform','translate(-1.1,-1.1)');
+    gLine.appendChild(hi);
+
+    const p=document.createElementNS(NS,'path');
+    p.setAttribute('d',d); p.setAttribute('fill','none');
+    p.setAttribute('stroke','url(#pulse)');
+    p.setAttribute('stroke-width','2.1');
+    p.setAttribute('stroke-linecap','round');
+    p.setAttribute('stroke-dasharray','120 1400');
+    p.style.animation=`flow 4.6s linear ${(i*.11).toFixed(2)}s infinite`;
+    gPulse.appendChild(p);
+
+    const dot=document.createElementNS(NS,'circle');
+    dot.setAttribute('cx',tx); dot.setAttribute('cy',ty);
+    dot.setAttribute('r',(1.9+(i%4)*.55).toFixed(2));
+    dot.setAttribute('fill', i%3 ? '#00E5A0' : '#7BE9FF');
+    dot.style.animation=`breathe 4.6s ease-in-out ${(i*.11+.9).toFixed(2)}s infinite`;
+    gTip.appendChild(dot);
+  }
+
+  [[324,470,-7],[546,558,0],[768,470,7]].forEach(([x,y,rot],idx)=>{
+    const g=document.createElementNS(NS,'g');
+    g.setAttribute('transform',`translate(${x},${y}) rotate(${rot})`);
+    g.innerHTML=`
+      <rect x="-21" y="-14" width="42" height="27" rx="3.5" fill="rgba(255,255,255,.82)" stroke="rgba(0,178,124,.5)" stroke-width="1"/>
+      <rect x="-16" y="-9" width="32" height="17" rx="2" fill="rgba(0,229,160,.2)"/>
+      <path d="M-6 13 h12 M0 13 v5" stroke="rgba(10,34,46,.28)" stroke-width="1.2" stroke-linecap="round"/>`;
+    g.style.animation=`breathe 4.6s ease-in-out ${(1.1+idx*.5).toFixed(2)}s infinite`;
+    gTip.appendChild(g);
+  });
+
+  const st=document.createElement('style');
+  st.textContent=`
+    @keyframes flow{from{stroke-dashoffset:1520}to{stroke-dashoffset:-140}}
+    @keyframes breathe{0%,72%,100%{opacity:.42}84%{opacity:1}}
+    @media(prefers-reduced-motion:reduce){#fibre *{animation:none!important}#fibre circle{opacity:.9!important}}`;
+  document.head.appendChild(st);
+})();
+
+/* ── scroll reveal ─────────────────────────────────────────────────── */
+(function(){
+  const els=document.querySelectorAll('.r');
+  if(!('IntersectionObserver' in window) || matchMedia('(prefers-reduced-motion: reduce)').matches){
+    els.forEach(el=>el.classList.add('in')); return;
+  }
+  const io=new IntersectionObserver((entries)=>{
+    entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+  },{rootMargin:'0px 0px -8% 0px',threshold:.08});
+  els.forEach(el=>io.observe(el));
+})();
+
+/* ── pricing toggle ────────────────────────────────────────────────── */
+(function(){
+  const m=document.getElementById('btnMonthly'), a=document.getElementById('btnAnnual');
+  if(!m||!a) return;
+  function set(annual){
+    m.setAttribute('aria-pressed', String(!annual));
+    a.setAttribute('aria-pressed', String(annual));
+    document.querySelectorAll('[data-m][data-a]').forEach(el=>{
+      el.textContent = annual ? el.dataset.a : el.dataset.m;
+    });
+  }
+  m.addEventListener('click',()=>set(false));
+  a.addEventListener('click',()=>set(true));
+})();
+
+/* ── mobile menu ───────────────────────────────────────────────────── */
+(function(){
+  const b=document.getElementById('burger'), menu=document.getElementById('mobileMenu');
+  if(!b||!menu) return;
+  b.addEventListener('click',()=>{
+    const open = menu.dataset.open === 'true';
+    menu.dataset.open = String(!open);
+    b.setAttribute('aria-expanded', String(!open));
+    b.setAttribute('aria-label', !open ? 'Close menu' : 'Open menu');
+  });
+  menu.querySelectorAll('a').forEach(link=>link.addEventListener('click',()=>{
+    menu.dataset.open='false'; b.setAttribute('aria-expanded','false');
+  }));
+})();
+</script>
+</body>
+</html>

@@ -36,6 +36,31 @@ h1{font-size:clamp(2rem,4vw,3.1rem);font-weight:600;margin-bottom:16px}
 .lede{color:var(--fg-2);max-width:66ch;line-height:1.65;font-size:1.02rem}
 .lede b{color:var(--fg);font-weight:500}
 
+/* the built page — hero card above the studies */
+.final-card{display:grid;grid-template-columns:1.15fr .85fr;gap:0;margin-top:36px;text-decoration:none;color:inherit;
+  border:1px solid rgba(0,229,160,.3);border-radius:18px;overflow:hidden;background:rgba(0,229,160,.05);
+  transition:transform .38s var(--ease),border-color .38s,box-shadow .38s}
+.final-card:hover{transform:translateY(-4px);border-color:rgba(0,229,160,.55);box-shadow:0 20px 54px rgba(0,229,160,.11)}
+.final-copy{padding:30px 32px}
+.final-copy .kick{color:var(--mint);display:block;margin-bottom:11px}
+.final-copy h2{font-size:1.7rem;font-weight:600;margin-bottom:11px}
+.final-copy p{color:var(--fg-2);font-size:.93rem;line-height:1.62;margin-bottom:16px}
+.final-mini{position:relative;overflow:hidden;min-height:230px;background:linear-gradient(168deg,#DFE8EA,#CFDDE1)}
+.fm-fan{position:absolute;left:50%;top:-26%;width:62%;height:108%;transform:translateX(-50%);
+  background:repeating-conic-gradient(from 176deg at 50% 0%, rgba(58,96,110,.32) 0deg .5deg, transparent .5deg 2.2deg);
+  -webkit-mask-image:linear-gradient(180deg,transparent 4%,#000 34%,#000 80%,transparent 96%);
+          mask-image:linear-gradient(180deg,transparent 4%,#000 34%,#000 80%,transparent 96%)}
+.fm-bloom{position:absolute;left:50%;bottom:16%;width:58%;height:20%;transform:translateX(-50%);
+  background:radial-gradient(ellipse,rgba(0,229,160,.55),transparent 70%);filter:blur(9px)}
+.fm-h{position:absolute;left:7%;bottom:9%;font-family:'Sora',sans-serif;font-weight:600;font-size:1.1rem;
+  letter-spacing:-.045em;line-height:1;color:#0A222E}
+.fm-h em{font-style:normal;background:linear-gradient(120deg,#00A171,#00A6CC);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+@media(max-width:760px){.final-card{grid-template-columns:1fr}.final-mini{min-height:190px;order:-1}}
+
+.studies-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin:52px 0 18px;flex-wrap:wrap}
+.studies-head h3{font-family:'Sora',sans-serif;font-size:1.06rem;font-weight:600;letter-spacing:-.03em}
+.studies-head span{color:var(--dim)}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;padding-bottom:26px}
 .card{
   background:var(--surface);border:1px solid var(--hair);border-radius:16px;overflow:hidden;
@@ -138,9 +163,28 @@ h1{font-size:clamp(2rem,4vw,3.1rem);font-weight:600;margin-bottom:16px}
     <div class="brand-tile"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
     <span class="grad">VIZORA</span>
   </div>
-  <h1>Four homepage directions,<br>rendered with real Vizora copy.</h1>
-  <p class="lede">Adapted from the strongest templates on <b>motionsites.ai</b>. Every sample uses Vizora's actual Electric Horizon tokens (<b>#00E5A0</b> → <b>#00B4D8</b>), the real Sora / DM&nbsp;Sans / JetBrains&nbsp;Mono stack, and copy lifted verbatim from the live site — so what you're judging is the <b>direction</b>, not the placeholder text.</p>
+  <h1>The finished homepage,<br>plus the four directions behind it.</h1>
+  <p class="lede">Adapted from the strongest templates on <b>motionsites.ai</b>. Every page uses Vizora's actual Electric Horizon tokens (<b>#00E5A0</b> → <b>#00B4D8</b>), the real Sora / DM&nbsp;Sans / JetBrains&nbsp;Mono stack, and copy lifted verbatim from the live site.</p>
+
+  <a class="final-card" href="05-homepage.html">
+    <div class="final-copy">
+      <span class="kick mono">Built · direction A + B's skeleton</span>
+      <h2>The full homepage</h2>
+      <p>Hero through footer: fibre-signal hero, the layer object explaining how scheduling resolves, the Fleet Overview dashboard, six AI systems, industries, security, live pricing toggle, FAQ and final CTA. Verified at desktop, tablet and phone with zero console errors and zero horizontal overflow.</p>
+      <span class="open">Open the finished page →</span>
+    </div>
+    <div class="final-mini">
+      <div class="fm-fan"></div><div class="fm-bloom"></div>
+      <div class="fm-h">Publish. Schedule.<br><em>Everywhere.</em></div>
+    </div>
+  </a>
+  <p class="lede" style="margin-top:26px;font-size:.94rem">Handoff notes — section-to-component map, token mapping, and the two 3D-projection gotchas — are in <b>design-samples/HANDOFF.md</b>. The four studies below are what the decision was made from.</p>
 </header>
+
+<div class="studies-head">
+  <h3>The four studies</h3>
+  <span class="mono">what the decision was made from</span>
+</div>
 
 <div class="grid">
 
