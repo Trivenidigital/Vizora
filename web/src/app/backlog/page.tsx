@@ -7,7 +7,7 @@ export const metadata = {
 
 export default function PublicBacklogPage() {
   return (
-    <div className="min-h-screen bg-[var(--background)]">
+    <div className="mkt min-h-screen bg-[var(--background)]">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <BacklogClient />
       </div>

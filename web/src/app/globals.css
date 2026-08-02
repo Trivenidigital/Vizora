@@ -215,6 +215,30 @@ body {
 
   background: var(--mkt-page);
   color: var(--mkt-ink);
+
+  /* Base token reset — this is what makes `.mkt` usable on pages that were
+     never hardcoded dark. The legal and auth pages contain zero colour
+     literals; they read var(--background)/var(--surface)/etc. and are dark
+     only because ThemeProvider puts `.dark` on <html>. Re-declaring the
+     family here beats `.dark` for anything inside `.mkt`, without touching
+     ThemeProvider and without changing the dashboard.
+     Also why components shared with the dashboard (MfaEnrollFlow,
+     admin/backlog/page-client) need no edit: they read these tokens, so they
+     render light inside `.mkt` and stay dark everywhere else. */
+  --background: #E9EEEF;
+  --background-secondary: #E2EAEC;
+  --background-tertiary: #DCE5E7;
+  --foreground: #0A222E;
+  --foreground-secondary: #3E5860;
+  --foreground-tertiary: #4E656C;
+  --surface: #FFFFFF;
+  --surface-secondary: #F4F8F8;
+  --surface-hover: #E8EEEF;
+  --border: #D3DBDD;
+  --border-light: #E2EAEC;
+  --border-dark: #B7C4C7;
+  --primary: #00B27C;
+  --primary-light: #00CC8E;
 }
 
 /* shared utilities, re-tuned for the light substrate — scoped, non-invasive */
@@ -257,6 +281,31 @@ body {
 .mkt .eh-neural-grid::before,
 .mkt .eh-neural-grid::after { opacity: 0.45; }
 .mkt .eh-grain::before { opacity: 0.26; mix-blend-mode: multiply; }
+
+/* Escape hatch: a deliberately DARK panel nested inside the light `.mkt` scope
+   (the auth ValuePanel). Without this, .mkt's light token values resolve on a
+   #061A21 background and the copy renders dark-on-dark. Restores the dark
+   family locally — the inverse of what .mkt does, for the same reason. */
+.mkt .mkt-dark-panel {
+  --background: #061A21;
+  --background-secondary: #081E28;
+  --foreground: #F0ECE8;
+  --foreground-secondary: #B5AEA6;
+  --foreground-tertiary: #9A958E;
+  --surface: #0C2229;
+  --surface-secondary: #122D35;
+  --border: #1B3D47;
+  --border-light: #122D35;
+  --primary: #00E5A0;
+  color: #F0ECE8;
+}
+.mkt .mkt-dark-panel .eh-gradient {
+  background-image: linear-gradient(135deg, #00E5A0, #00B4D8);
+}
+.mkt .mkt-dark-panel .eh-card {
+  background: rgba(12, 34, 41, 0.6);
+  border-color: #1B3D47;
+}
 
 /* marketing-only helpers */
 .mkt-mono {
