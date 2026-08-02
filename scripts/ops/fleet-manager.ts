@@ -161,11 +161,19 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (displays.length === 0) {
-    log(AGENT, 'No displays found — nothing to check');
-    process.exitCode = 0;
-    return;
-  }
+  // NOTE: there is deliberately no `if (displays.length === 0) return` here.
+  //
+  // There used to be, and it was a latent trap: returning early skipped
+  // `recordAgentRun()` at the end of main(), so the agent never stamped its
+  // `lastRun`. ops-watchdog reads exactly that timestamp, so a run that
+  // legitimately had nothing to do was indistinguishable from an agent that had
+  // died — it raised a CRITICAL `agent-silent` incident for fleet-manager on
+  // 2026-08-02, minutes after the disabled-display filter first made the count
+  // zero. The branch had been unreachable until then.
+  //
+  // Every check below iterates `displays`, so all of them no-op on an empty
+  // array. Falling through costs nothing and keeps the run recorded. "Nothing
+  // to do" must still report as a successful run.
 
   // Build lookup: displayId → has active schedule
   const displaysWithSchedule = new Set(
