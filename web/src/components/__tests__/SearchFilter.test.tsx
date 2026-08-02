@@ -1,10 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import SearchFilter from '../SearchFilter';
 
-jest.mock('@/theme/icons', () => ({
-  Icon: ({ name }: { name: string }) => <span data-testid={`icon-${name}`}>{name}</span>,
-}));
-
 describe('SearchFilter', () => {
   const defaultProps = {
     value: '',
