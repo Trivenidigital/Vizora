@@ -41,7 +41,7 @@ const RATE_LIMIT_MS = 100;
  * `revokeByRawToken`). A bearer token alone is not enough. So we keep the
  * cookie just long enough to hand it back.
  */
-const openSessions = new Map<string, string>();
+const openSessions = new Map<string, { baseUrl: string; cookie: string }>();
 
 /** Turn a login response's Set-Cookie headers into a single Cookie header. */
 function cookieHeaderFrom(res: Response): string {
@@ -58,7 +58,7 @@ function cookieHeaderFrom(res: Response): string {
  * failed logout must not fail an ops run, it just leaves one row to expire.
  */
 export async function logout(baseUrl: string, token: string): Promise<void> {
-  const cookie = openSessions.get(token);
+  const cookie = openSessions.get(token)?.cookie;
   openSessions.delete(token);
   try {
     await fetch(`${baseUrl}/api/v1/auth/logout`, {
@@ -77,14 +77,16 @@ export async function logout(baseUrl: string, token: string): Promise<void> {
  * Authenticate with the Vizora API and return a bearer token.
  * Same pattern as validate-monitor.ts — extracts token from envelope.
  *
- * Registers a `beforeExit` hook that releases the session automatically, so
- * every existing caller is fixed without touching the agents. `beforeExit`
- * fires when the loop drains, which is how these short-lived cron scripts
- * finish (they set `process.exitCode` and return rather than calling
- * `process.exit()`). It does NOT fire on an explicit `process.exit()` or an
- * unhandled fatal — those leave one row to expire on its own, which is the
- * pre-existing behaviour and not a regression. Call `logout()` explicitly if
- * you want a deterministic release.
+ * Records the refresh cookie so the session can be released later. The CALLER
+ * must release it — agents do that via `.finally(() => releaseSessions())` on
+ * their entry-point chain.
+ *
+ * Do not "simplify" this back to an automatic `process.once('beforeExit')`
+ * hook. That was tried and deployed, and it does not work: the hook fires
+ * (verified on prod), but it can only kick off a fire-and-forget request, and
+ * the process exits before that request completes — the row is never revoked.
+ * The release has to be awaited from the promise chain the process is already
+ * waiting on.
  */
 export async function login(
   baseUrl: string,
@@ -107,13 +109,23 @@ export async function login(
 
   const accessToken = String(token);
   const cookie = cookieHeaderFrom(res);
-  if (cookie) {
-    openSessions.set(accessToken, cookie);
-    process.once('beforeExit', () => {
-      void logout(baseUrl, accessToken);
-    });
-  }
+  if (cookie) openSessions.set(accessToken, { baseUrl, cookie });
   return accessToken;
+}
+
+/**
+ * Release every session this process opened. Agents call this from a `.finally`
+ * on their entry point, so it runs on success AND on failure.
+ *
+ * This replaced a `process.once('beforeExit')` hook that did NOT work. The hook
+ * fired -- verified on prod -- but it kicked off a fire-and-forget `logout()`
+ * and the process exited before the request completed, so the row was never
+ * revoked. Awaiting from the entry-point chain is deterministic: the promise is
+ * part of the chain, so the loop stays alive until the release finishes.
+ */
+export async function releaseSessions(): Promise<void> {
+  const tokens = [...openSessions.keys()];
+  await Promise.all(tokens.map(t => logout(openSessions.get(t)!.baseUrl, t)));
 }
 
 /** Test seam: how many sessions are still holding a refresh cookie. */

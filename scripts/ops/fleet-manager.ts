@@ -20,7 +20,7 @@
 
 import 'dotenv/config';
 import type { Incident, AgentResult, RemediationAction } from './lib/types.js';
-import { login, OpsApiClient } from './lib/api-client.js';
+import { login, releaseSessions, OpsApiClient } from './lib/api-client.js';
 import {
   readOpsState,
   readOpsStateSnapshot,
@@ -466,7 +466,11 @@ async function main(): Promise<void> {
 
 // ─── Entry Point ─────────────────────────────────────────────────────────────
 
-main().catch(err => {
-  log(AGENT, `FATAL: ${err instanceof Error ? err.message : err}`);
-  process.exitCode = 2;
-});
+main()
+  .catch(err => {
+    log(AGENT, `FATAL: ${err instanceof Error ? err.message : err}`);
+    process.exitCode = 2;
+  })
+  // Release the refresh-token session this run opened. Awaited from the chain
+  // so it completes before the process exits; `beforeExit` was not reliable.
+  .finally(() => releaseSessions());
