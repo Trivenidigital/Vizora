@@ -18,7 +18,8 @@ import test from 'node:test';
 import { login, logout, releaseSessions, __openSessionCount } from './lib/api-client.js';
 
 const BASE = 'http://ops-test.invalid';
-const REFRESH_COOKIE = 'vizora_refresh=rt-abc123';
+const REFRESH_COOKIE = 'vizora_refresh_token=rt-abc123';
+const CSRF_COOKIE = 'vizora_csrf_token=csrf-xyz789';
 
 interface Captured {
   url: string;
@@ -58,7 +59,7 @@ function stubFetch(
 }
 
 test('login captures the refresh cookie so the session can be released', async () => {
-  const { calls, restore } = stubFetch([`${REFRESH_COOKIE}; Path=/; HttpOnly; SameSite=Lax`]);
+  const { calls, restore } = stubFetch([`${REFRESH_COOKIE}; Path=/; HttpOnly; SameSite=Lax`, `${CSRF_COOKIE}; Path=/`]);
   try {
     const token = await login(BASE, 'ops@example.test', 'pw');
     assert.equal(token, 'access-token-1');
@@ -70,7 +71,7 @@ test('login captures the refresh cookie so the session can be released', async (
 });
 
 test('logout presents the refresh cookie back — the only thing that revokes the row', async () => {
-  const { calls, restore } = stubFetch([`${REFRESH_COOKIE}; Path=/; HttpOnly`]);
+  const { calls, restore } = stubFetch([`${REFRESH_COOKIE}; Path=/; HttpOnly`, `${CSRF_COOKIE}; Path=/`]);
   try {
     const token = await login(BASE, 'ops@example.test', 'pw');
     await logout(BASE, token);
@@ -79,10 +80,14 @@ test('logout presents the refresh cookie back — the only thing that revokes th
     assert.ok(out, 'logout must be called');
     assert.equal(out.method, 'POST');
     assert.equal(out.headers.Authorization, 'Bearer access-token-1');
+    assert.ok(
+      out.headers.Cookie.includes(REFRESH_COOKIE),
+      'without the refresh cookie the server revokes nothing and the leak persists',
+    );
     assert.equal(
-      out.headers.Cookie,
-      REFRESH_COOKIE,
-      'without the cookie the server revokes nothing and the leak persists',
+      out.headers['X-CSRF-Token'],
+      'csrf-xyz789',
+      'cookies without the CSRF header are rejected 401 and nothing is revoked',
     );
   } finally {
     restore();
@@ -98,7 +103,8 @@ test('cookie attributes are stripped — only name=value is sent back', async ()
     const token = await login(BASE, 'ops@example.test', 'pw');
     await logout(BASE, token);
     const out = calls.find(c => c.url.endsWith('/auth/logout'));
-    assert.equal(out?.headers.Cookie, `${REFRESH_COOKIE}; vizora_token=at-xyz`);
+    assert.ok(out?.headers.Cookie.includes(REFRESH_COOKIE));
+    assert.ok(out?.headers.Cookie.includes('vizora_token=at-xyz'));
     assert.ok(!out?.headers.Cookie.includes('HttpOnly'));
     assert.ok(!out?.headers.Cookie.includes('Max-Age'));
   } finally {
@@ -107,14 +113,14 @@ test('cookie attributes are stripped — only name=value is sent back', async ()
 });
 
 test('logout is idempotent — a second call does not re-send a cookie', async () => {
-  const { calls, restore } = stubFetch([`${REFRESH_COOKIE}; Path=/`]);
+  const { calls, restore } = stubFetch([`${REFRESH_COOKIE}; Path=/`, `${CSRF_COOKIE}; Path=/`]);
   try {
     const token = await login(BASE, 'ops@example.test', 'pw');
     await logout(BASE, token);
     await logout(BASE, token);
     const outs = calls.filter(c => c.url.endsWith('/auth/logout'));
     assert.equal(outs.length, 2, 'both calls are attempted');
-    assert.equal(outs[0].headers.Cookie, REFRESH_COOKIE);
+    assert.ok(outs[0].headers.Cookie.includes(REFRESH_COOKIE));
     assert.equal(outs[1].headers.Cookie, undefined, 'session already released');
     assert.equal(__openSessionCount(), 0);
   } finally {
@@ -123,7 +129,7 @@ test('logout is idempotent — a second call does not re-send a cookie', async (
 });
 
 test('logout never throws — a failed release must not fail an ops run', async () => {
-  const { restore } = stubFetch([`${REFRESH_COOKIE}; Path=/`], { logoutThrows: true });
+  const { restore } = stubFetch([`${REFRESH_COOKIE}; Path=/`, `${CSRF_COOKIE}; Path=/`], { logoutThrows: true });
   try {
     const token = await login(BASE, 'ops@example.test', 'pw');
     await assert.doesNotReject(() => logout(BASE, token));
@@ -159,7 +165,7 @@ test('a failed login opens no session', async () => {
 });
 
 test('releaseSessions awaits the logout, so the row is revoked before exit', async () => {
-  const { calls, restore } = stubFetch([`${REFRESH_COOKIE}; Path=/; HttpOnly`]);
+  const { calls, restore } = stubFetch([`${REFRESH_COOKIE}; Path=/; HttpOnly`, `${CSRF_COOKIE}; Path=/`]);
   try {
     await login(BASE, 'ops@example.test', 'pw');
     assert.equal(__openSessionCount(), 1);
@@ -171,7 +177,8 @@ test('releaseSessions awaits the logout, so the row is revoked before exit', asy
 
     const out = calls.find(c => c.url.endsWith('/auth/logout'));
     assert.ok(out, 'logout must have been issued by releaseSessions');
-    assert.equal(out.headers.Cookie, REFRESH_COOKIE, 'cookie is what revokes the row');
+    assert.ok(out.headers.Cookie.includes(REFRESH_COOKIE), 'cookie is what revokes the row');
+    assert.equal(out.headers['X-CSRF-Token'], 'csrf-xyz789', 'CSRF header is mandatory');
     assert.equal(__openSessionCount(), 0, 'session released');
   } finally {
     restore();
