@@ -25,8 +25,66 @@ const RATE_LIMIT_MS = 100;
 // ─── Standalone Login ───────────────────────────────────────────────────────
 
 /**
+ * Sessions opened by `login()` that have not been released yet, keyed by the
+ * access token. The value is the `Cookie:` header needed to release them.
+ *
+ * WHY THIS EXISTS. `POST /auth/login` mints a rotating refresh-token row and
+ * returns it as an httpOnly cookie. These agents authenticate with `fetch`,
+ * which has no cookie jar, so the cookie was dropped on the floor and the row
+ * was orphaned at birth — never used, never revoked, valid for 30 days. Every
+ * cron firing leaked one. Measured on prod 2026-08-02: ~16/hour, ~384/day,
+ * 8,405 rows accumulated since the table was created on 2026-07-12, with
+ * `replacedByTokenHash = 0` across the board — not one was ever redeemed.
+ *
+ * `POST /auth/logout` only revokes the row when the refresh cookie is
+ * PRESENTED back (auth.controller.ts: `extractRefreshToken(req)` ->
+ * `revokeByRawToken`). A bearer token alone is not enough. So we keep the
+ * cookie just long enough to hand it back.
+ */
+const openSessions = new Map<string, string>();
+
+/** Turn a login response's Set-Cookie headers into a single Cookie header. */
+function cookieHeaderFrom(res: Response): string {
+  const raw =
+    typeof (res.headers as { getSetCookie?: () => string[] }).getSetCookie === 'function'
+      ? (res.headers as unknown as { getSetCookie: () => string[] }).getSetCookie()
+      : [res.headers.get('set-cookie') ?? ''].filter(Boolean);
+  // Keep only the `name=value` pair from each cookie, discard the attributes.
+  return raw.map(c => c.split(';')[0].trim()).filter(Boolean).join('; ');
+}
+
+/**
+ * Release a session opened by `login()`. Best-effort and never throws — a
+ * failed logout must not fail an ops run, it just leaves one row to expire.
+ */
+export async function logout(baseUrl: string, token: string): Promise<void> {
+  const cookie = openSessions.get(token);
+  openSessions.delete(token);
+  try {
+    await fetch(`${baseUrl}/api/v1/auth/logout`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(cookie ? { Cookie: cookie } : {}),
+      },
+    });
+  } catch {
+    // swallowed by design — see above
+  }
+}
+
+/**
  * Authenticate with the Vizora API and return a bearer token.
  * Same pattern as validate-monitor.ts — extracts token from envelope.
+ *
+ * Registers a `beforeExit` hook that releases the session automatically, so
+ * every existing caller is fixed without touching the agents. `beforeExit`
+ * fires when the loop drains, which is how these short-lived cron scripts
+ * finish (they set `process.exitCode` and return rather than calling
+ * `process.exit()`). It does NOT fire on an explicit `process.exit()` or an
+ * unhandled fatal — those leave one row to expire on its own, which is the
+ * pre-existing behaviour and not a regression. Call `logout()` explicitly if
+ * you want a deterministic release.
  */
 export async function login(
   baseUrl: string,
@@ -46,7 +104,21 @@ export async function login(
   const data = (json.data ?? json) as Record<string, unknown>;
   const token = data.accessToken || data.access_token || data.token;
   if (!token) throw new Error('Login response has no token');
-  return String(token);
+
+  const accessToken = String(token);
+  const cookie = cookieHeaderFrom(res);
+  if (cookie) {
+    openSessions.set(accessToken, cookie);
+    process.once('beforeExit', () => {
+      void logout(baseUrl, accessToken);
+    });
+  }
+  return accessToken;
+}
+
+/** Test seam: how many sessions are still holding a refresh cookie. */
+export function __openSessionCount(): number {
+  return openSessions.size;
 }
 
 // ─── OpsApiClient ───────────────────────────────────────────────────────────
