@@ -176,6 +176,162 @@ body {
   outline-offset: var(--focus-ring-offset);
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   MARKETING SCOPE (.mkt) — light Electric Horizon
+   ------------------------------------------------------------------
+   Applied to the public marketing page wrapper ONLY. Every rule here
+   is scoped under `.mkt`, so the shared .eh-* utilities keep their
+   dark values everywhere else (dashboard, auth). Do NOT recolour the
+   unscoped .eh-* classes below — they are used by the logged-in app.
+
+   Neon #00E5A0 is 1.8:1 on this substrate and must never be text.
+   Use --mkt-mint for fills/glows and --mkt-mint-ink for small text.
+   ══════════════════════════════════════════════════════════════════ */
+
+.mkt {
+  --mkt-page: #E9EEEF;
+  --mkt-page-2: #E2EAEC;
+  --mkt-canvas-1: #DFE8EA;
+  --mkt-canvas-2: #CFDDE1;
+  --mkt-surface: #FFFFFF;
+  --mkt-surface-2: #F4F8F8;
+
+  --mkt-ink: #0A222E;
+  --mkt-ink-2: #3E5860;   /* body copy — 6.4:1 */
+  --mkt-muted: #4E656C;   /* micro labels — 5:1 */
+  --mkt-hair: rgba(10, 34, 46, 0.11);
+  --mkt-hair-2: rgba(10, 34, 46, 0.07);
+
+  --mkt-mint: #00B27C;      /* fills, buttons, dots */
+  --mkt-mint-hot: #00E5A0;  /* glows only — never text */
+  --mkt-mint-ink: #00745B;  /* mint as small text — 4.9:1 */
+  --mkt-cyan: #00B4D8;
+  --mkt-cyan-ink: #00697F;
+  --mkt-violet: #8B5CF6;
+  --mkt-violet-ink: #5B32C9;
+  --mkt-amber: #F59E0B;
+  --mkt-amber-ink: #8A5A00;
+  --mkt-rose: #E11D48;
+
+  background: var(--mkt-page);
+  color: var(--mkt-ink);
+
+  /* Base token reset — this is what makes `.mkt` usable on pages that were
+     never hardcoded dark. The legal and auth pages contain zero colour
+     literals; they read var(--background)/var(--surface)/etc. and are dark
+     only because ThemeProvider puts `.dark` on <html>. Re-declaring the
+     family here beats `.dark` for anything inside `.mkt`, without touching
+     ThemeProvider and without changing the dashboard.
+     Also why components shared with the dashboard (MfaEnrollFlow,
+     admin/backlog/page-client) need no edit: they read these tokens, so they
+     render light inside `.mkt` and stay dark everywhere else. */
+  --background: #E9EEEF;
+  --background-secondary: #E2EAEC;
+  --background-tertiary: #DCE5E7;
+  --foreground: #0A222E;
+  --foreground-secondary: #3E5860;
+  --foreground-tertiary: #4E656C;
+  --surface: #FFFFFF;
+  --surface-secondary: #F4F8F8;
+  --surface-hover: #E8EEEF;
+  --border: #D3DBDD;
+  --border-light: #E2EAEC;
+  --border-dark: #B7C4C7;
+  --primary: #00B27C;
+  --primary-light: #00CC8E;
+}
+
+/* shared utilities, re-tuned for the light substrate — scoped, non-invasive */
+.mkt .eh-gradient {
+  background: linear-gradient(135deg, #00A171, #0090B4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.mkt .eh-btn-neon {
+  background: var(--mkt-mint);
+  color: #04241B;
+  box-shadow: 0 8px 24px rgba(0, 178, 124, 0.26);
+}
+.mkt .eh-btn-neon:hover {
+  background: #00A171;
+  box-shadow: 0 14px 34px rgba(0, 178, 124, 0.34);
+}
+.mkt .eh-btn-ghost {
+  border: 1px solid var(--mkt-hair);
+  color: var(--mkt-ink);
+  background: rgba(255, 255, 255, 0.55);
+}
+.mkt .eh-btn-ghost:hover {
+  color: var(--mkt-ink);
+  border-color: rgba(10, 34, 46, 0.2);
+  background: #FFFFFF;
+}
+.mkt .eh-card,
+.mkt .eh-ai-card {
+  background: rgba(255, 255, 255, 0.66);
+  border: 1px solid var(--mkt-hair-2);
+}
+.mkt .eh-card:hover,
+.mkt .eh-ai-card:hover {
+  border-color: rgba(0, 178, 124, 0.28);
+  box-shadow: 0 14px 38px rgba(10, 34, 46, 0.09);
+}
+.mkt .eh-nav-link::after { background: var(--mkt-mint); }
+.mkt .eh-neural-grid::before,
+.mkt .eh-neural-grid::after { opacity: 0.45; }
+.mkt .eh-grain::before { opacity: 0.26; mix-blend-mode: multiply; }
+
+/* Escape hatch: a deliberately DARK panel nested inside the light `.mkt` scope
+   (the auth ValuePanel). Without this, .mkt's light token values resolve on a
+   #061A21 background and the copy renders dark-on-dark. Restores the dark
+   family locally — the inverse of what .mkt does, for the same reason. */
+.mkt .mkt-dark-panel {
+  --background: #061A21;
+  --background-secondary: #081E28;
+  --foreground: #F0ECE8;
+  --foreground-secondary: #B5AEA6;
+  --foreground-tertiary: #9A958E;
+  --surface: #0C2229;
+  --surface-secondary: #122D35;
+  --border: #1B3D47;
+  --border-light: #122D35;
+  --primary: #00E5A0;
+  color: #F0ECE8;
+}
+.mkt .mkt-dark-panel .eh-gradient {
+  background-image: linear-gradient(135deg, #00E5A0, #00B4D8);
+}
+.mkt .mkt-dark-panel .eh-card {
+  background: rgba(12, 34, 41, 0.6);
+  border-color: #1B3D47;
+}
+
+/* marketing-only helpers */
+.mkt-mono {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.62rem;
+  font-weight: 500;
+}
+.mkt-kicker { color: var(--mkt-mint-ink); display: block; }
+.mkt-canvas {
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background:
+    radial-gradient(115% 85% at 58% 6%, #F3F8F9 0%, transparent 55%),
+    radial-gradient(75% 65% at 80% 74%, rgba(0, 180, 216, 0.11) 0%, transparent 62%),
+    linear-gradient(168deg, var(--mkt-canvas-1) 0%, var(--mkt-canvas-2) 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 30px 70px rgba(10, 34, 46, 0.13);
+}
+.mkt-chip {
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(18px) saturate(1.3);
+  border: 1px solid rgba(255, 255, 255, 0.86);
+  box-shadow: 0 18px 44px rgba(10, 34, 46, 0.12);
+}
+
 /* ── Electric Horizon Global Utilities ── */
 
 .eh-reveal {

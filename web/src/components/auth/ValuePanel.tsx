@@ -58,8 +58,11 @@ const benefits = [
 export default function ValuePanel({ variant }: ValuePanelProps) {
   const { headline, subtext } = content[variant];
 
+  // mkt-dark-panel: this panel is deliberately dark and lives inside the light
+  // `.mkt` auth scope. The class restores the dark token family locally so
+  // var(--foreground) etc. don't resolve to dark-ink-on-dark. See globals.css.
   return (
-    <div className="relative hidden md:flex flex-col p-10 lg:p-12 bg-[#061A21] overflow-hidden">
+    <div className="mkt-dark-panel relative hidden md:flex flex-col p-10 lg:p-12 bg-[#061A21] overflow-hidden">
       {/* Atmospheric background */}
       <div className="absolute inset-0 eh-grain" />
       <div

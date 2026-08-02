@@ -19,20 +19,20 @@ export default function StatsSection() {
             className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 py-10 px-6 sm:px-8 rounded-2xl"
             style={{
               background: 'linear-gradient(135deg, rgba(0,229,160,0.04) 0%, rgba(0,180,216,0.03) 100%)',
-              border: '1px solid rgba(0,229,160,0.1)',
+              border: '1px solid var(--mkt-hair)',
             }}
           >
             {STATS.map((stat) => (
               <div key={stat.label} className="text-center">
-                <stat.icon size={18} className="mx-auto mb-3" style={{ color: '#00E5A0', opacity: 0.7 }} />
-                <div className="text-2xl sm:text-3xl font-bold mb-1" style={{ color: '#F0ECE8' }}>
+                <stat.icon size={18} className="mx-auto mb-3" style={{ color: 'var(--mkt-mint)', opacity: 0.7 }} />
+                <div className="text-2xl sm:text-3xl font-bold mb-1" style={{ color: 'var(--mkt-ink)' }}>
                   {typeof stat.value === 'number' && stat.value >= 100 ? (
                     <AnimatedStat value={stat.value} suffix={stat.suffix} />
                   ) : (
                     <span style={{ fontFamily: 'var(--font-mono), monospace' }}>{stat.value}{stat.suffix}</span>
                   )}
                 </div>
-                <div className="text-xs font-medium" style={{ color: '#6B655D' }}>
+                <div className="text-xs font-medium" style={{ color: 'var(--mkt-muted)' }}>
                   {stat.label}
                 </div>
               </div>

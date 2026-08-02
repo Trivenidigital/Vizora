@@ -1,0 +1,4 @@
+# Agent worktrees each contain full copies of web/, realtime/, middleware/ and
+# packages/database. Without this, Nx infers duplicate project names and EVERY
+# Nx target fails with "set a unique name for each project in a project.json".
+.claude/worktrees

@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vizora — Sample D · Hybrid (Resolve &amp; Distribute)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@1,6..96,400;1,6..96,500&family=Sora:wght@300;400;500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* A's porcelain restraint warmed toward C's sky */
+  --page:#E7EEF0;
+  --canvas-1:#E4F0F4;
+  --canvas-2:#C7DDE7;
+  --ink:#0A222E;
+  --ink-2:#3B5F6C;
+  --muted:#6C8A96;
+  --hair:rgba(10,34,46,.11);
+  --mint:#00B27C;
+  --mint-hot:#00E5A0;
+  --cyan:#00B4D8;
+  --violet:#8B5CF6;
+  --r-lg:28px; --r-md:14px;
+  --ease:cubic-bezier(.22,.61,.36,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--page);color:var(--ink);overflow-x:hidden;
+  font-family:'DM Sans',ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace;text-transform:uppercase;letter-spacing:.16em;font-size:.62rem;font-weight:500}
+.serif{font-family:'Bodoni Moda',Georgia,serif;font-style:italic;font-weight:400}
+h1,h2,h3{font-family:'Sora',sans-serif;letter-spacing:-.045em;line-height:1.02}
+.grain{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:99;opacity:.28;mix-blend-mode:multiply}
+
+/* ── nav (from A) ── */
+.nav{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;align-items:center;justify-content:space-between;
+  padding:22px clamp(20px,3.4vw,46px);background:linear-gradient(180deg,rgba(231,238,240,.88),rgba(231,238,240,0))}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-tile{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;
+  background:linear-gradient(135deg,rgba(0,229,160,.22),rgba(0,180,216,.16));border:1px solid rgba(0,178,124,.32)}
+.brand-tile svg{width:14px;height:14px;stroke:var(--mint);fill:none;stroke-width:1.9}
+.wordmark{font-family:'Sora',sans-serif;font-weight:700;font-size:1.06rem;letter-spacing:-.03em;
+  background:linear-gradient(135deg,#00B27C,#0090B4);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.nav-links{display:flex;gap:30px}
+.nav-links a{color:var(--ink-2);text-decoration:none;font-size:.875rem;font-weight:500;transition:color .25s}
+.nav-links a:hover{color:var(--ink)}
+.nav-cta{display:inline-flex;align-items:center;gap:8px;background:var(--ink);color:#EAF3F2;border:none;
+  border-radius:999px;padding:11px 20px;font-family:'DM Sans',sans-serif;font-size:.83rem;font-weight:500;
+  cursor:pointer;transition:transform .3s var(--ease),box-shadow .3s var(--ease)}
+.nav-cta:hover{transform:translateY(-1px);box-shadow:0 10px 26px rgba(10,34,46,.22)}
+@media(max-width:960px){.nav-links{display:none}}
+
+/* ── hero canvas (A's inset card, C's sky) ── */
+.hero-wrap{padding:86px clamp(12px,1.6vw,22px) 0}
+.hero{position:relative;height:min(90vh,900px);min-height:660px;border-radius:var(--r-lg);overflow:hidden;
+  background:
+    radial-gradient(110% 80% at 40% 4%, #F4FAFB 0%, transparent 56%),
+    radial-gradient(70% 60% at 84% 78%, rgba(0,229,160,.14) 0%, transparent 62%),
+    linear-gradient(170deg,var(--canvas-1) 0%,var(--canvas-2) 100%);
+  border:1px solid rgba(255,255,255,.72);
+  box-shadow:0 1px 0 rgba(255,255,255,.9) inset,0 30px 80px rgba(10,34,46,.11)}
+
+/* ── left rail = legend for the stack (A's rail carrying C's layers) ── */
+.rail{position:absolute;left:clamp(22px,3vw,46px);top:13.5%;z-index:6;display:flex;flex-direction:column;gap:4px}
+.rail-item{display:flex;align-items:center;gap:11px;background:none;border:none;cursor:default;
+  padding:7px 10px 7px 0;border-radius:8px;transition:background .3s var(--ease)}
+.rail-item i{width:8px;height:8px;border-radius:2px;flex:none;transition:transform .3s var(--ease)}
+.rail-item span{color:var(--ink-2);white-space:nowrap}
+.rail-item:hover{background:rgba(255,255,255,.5);padding-left:10px}
+.rail-item:hover i{transform:scale(1.45)}
+.rail-item:hover span{color:var(--ink)}
+.rail-rule{height:1px;background:var(--hair);margin:5px 0 5px 0;width:74%}
+
+/* ── statement (A) ── */
+.statement{position:absolute;right:clamp(22px,3.4vw,52px);top:13%;max-width:34ch;text-align:right;z-index:6;
+  font-size:clamp(.92rem,1.06vw,1.06rem);line-height:1.6;color:var(--ink-2)}
+
+/* ── the fused object ── */
+.stage{position:absolute;inset:0;z-index:1;pointer-events:none}
+.stage svg{width:100%;height:100%;display:block}
+
+.stack-holder{position:absolute;left:24%;top:9%;width:25%;height:46%;z-index:3;perspective:1400px;
+  display:grid;place-items:center;pointer-events:auto}
+.stack{position:relative;width:100%;aspect-ratio:1/.95;transform-style:preserve-3d;
+  transform:rotateX(52deg) rotateZ(-38deg);animation:drift 14s ease-in-out infinite}
+@keyframes drift{0%,100%{transform:rotateX(52deg) rotateZ(-38deg) translateZ(0)}
+                 50%{transform:rotateX(49.5deg) rotateZ(-35.5deg) translateZ(10px)}}
+.layer{position:absolute;inset:0;border-radius:15px;transform-style:preserve-3d;
+  border:1px solid rgba(255,255,255,.85);background:rgba(255,255,255,.34);backdrop-filter:blur(3px);
+  box-shadow:0 20px 42px rgba(10,34,46,.15);transition:transform .8s var(--ease),opacity .4s,box-shadow .4s}
+.l1{transform:translateZ(0);background:linear-gradient(135deg,rgba(0,180,216,.18),rgba(255,255,255,.42))}
+.l1::after{content:'';position:absolute;inset:14px;border-radius:8px;
+  background:repeating-linear-gradient(90deg,rgba(10,34,46,.16) 0 28px,transparent 28px 40px);opacity:.5}
+.l2{transform:translateZ(52px);background:linear-gradient(135deg,rgba(139,92,246,.16),rgba(255,255,255,.4))}
+.l2::after{content:'';position:absolute;left:14px;right:14px;top:22px;height:14px;border-radius:4px;
+  background:linear-gradient(90deg,rgba(139,92,246,.52) 0 24%,transparent 24% 42%,rgba(139,92,246,.34) 42% 76%,transparent 76%)}
+.l3{transform:translateZ(104px);background:linear-gradient(135deg,rgba(0,229,160,.2),rgba(255,255,255,.4))}
+.l3::after{content:'';position:absolute;right:18px;bottom:18px;width:44%;height:30%;border-radius:8px;
+  background:rgba(255,255,255,.72);border:1px solid rgba(0,178,124,.36)}
+.l4{transform:translateZ(162px);background:#0A222E;border:1px solid rgba(255,255,255,.5);overflow:hidden;
+  box-shadow:0 38px 76px rgba(10,34,46,.34),0 0 64px rgba(0,229,160,.12)}
+.stack:hover .l2{transform:translateZ(76px)}
+.stack:hover .l3{transform:translateZ(152px)}
+.stack:hover .l4{transform:translateZ(232px)}
+
+/* rail drives the stack — the legend is the control */
+.hero:has(.rail-item[data-l="1"]:hover) .layer:not(.l1),
+.hero:has(.rail-item[data-l="2"]:hover) .layer:not(.l2),
+.hero:has(.rail-item[data-l="3"]:hover) .layer:not(.l3),
+.hero:has(.rail-item[data-l="4"]:hover) .layer:not(.l4){opacity:.28}
+.hero:has(.rail-item[data-l="1"]:hover) .l1,
+.hero:has(.rail-item[data-l="2"]:hover) .l2,
+.hero:has(.rail-item[data-l="3"]:hover) .l3{box-shadow:0 0 0 2px rgba(0,229,160,.65),0 20px 42px rgba(10,34,46,.15)}
+.hero:has(.rail-item[data-l="4"]:hover) .l4{box-shadow:0 0 0 2px rgba(0,229,160,.75),0 38px 76px rgba(10,34,46,.34)}
+
+/* the on-air board */
+.board{position:absolute;inset:0;padding:8% 9%;display:flex;flex-direction:column;color:#EAF3F1}
+.board-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:5%}
+.board-top .mono{color:#00E5A0;font-size:.5rem}
+.live{display:flex;align-items:center;gap:5px;font-family:'JetBrains Mono',monospace;font-size:.46rem;
+  letter-spacing:.13em;text-transform:uppercase;color:#8FB3B0}
+.live i{width:5px;height:5px;border-radius:50%;background:#00E5A0;animation:blip 2s infinite}
+@keyframes blip{0%,100%{opacity:1}50%{opacity:.25}}
+.board h3{font-family:'Sora',sans-serif;font-size:clamp(.72rem,1.15vw,1.06rem);font-weight:600;letter-spacing:-.045em;line-height:1.05;margin-bottom:7%}
+.board h3 em{font-family:'Bodoni Moda',serif;font-style:italic;font-weight:400;color:#00E5A0}
+.menu{display:flex;flex-direction:column;gap:6%;flex:1}
+.item{display:flex;align-items:baseline;gap:7px}
+.item .nm{font-size:.56rem;font-weight:500;white-space:nowrap}
+.item .ln{flex:1;border-bottom:1px dotted rgba(255,255,255,.24);transform:translateY(-3px)}
+.item .pr{font-family:'JetBrains Mono',monospace;font-size:.6rem;color:#00E5A0}
+.board-foot{display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,.1);padding-top:5%}
+.board-foot .mono{color:#6D8E93;font-size:.44rem}
+
+/* ── headline (A's staccato, C's serif voice) ── */
+.headline{position:absolute;left:clamp(22px,3vw,46px);bottom:clamp(30px,4.4vw,58px);z-index:6}
+.headline .micro{display:inline-block;color:var(--muted);margin-bottom:16px;border:1px solid var(--hair);
+  border-radius:999px;padding:6px 12px;background:rgba(255,255,255,.46)}
+.headline h1{font-size:clamp(2.5rem,5.8vw,4.9rem);font-weight:600}
+.headline h1 .serif{font-size:1.07em;font-weight:400;letter-spacing:-.015em;
+  background:linear-gradient(115deg,#00B27C 0%,#00A6CC 58%,#5B8FD6 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+
+/* ── play card (A's glass chip + orb, C's video affordance) ── */
+.talk{position:absolute;right:clamp(22px,3vw,46px);bottom:clamp(30px,4.4vw,58px);z-index:6;
+  display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.62);
+  backdrop-filter:blur(18px) saturate(1.3);border:1px solid rgba(255,255,255,.85);border-radius:var(--r-md);
+  padding:12px 16px 12px 12px;box-shadow:0 18px 44px rgba(10,34,46,.12);cursor:pointer;
+  transition:transform .3s var(--ease),background .3s}
+.talk:hover{transform:translateY(-2px);background:rgba(255,255,255,.8)}
+.orb{width:44px;height:44px;border-radius:50%;flex:none;position:relative;overflow:hidden;display:grid;place-items:center;
+  background:radial-gradient(circle at 32% 30%,#B9FFE6 0%,#00E5A0 38%,#00B4D8 78%,#0A6A87 100%);
+  box-shadow:0 0 0 3px rgba(0,229,160,.14),0 0 22px rgba(0,229,160,.35)}
+.orb::after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,.22) 0 1px,transparent 1px 3px);mix-blend-mode:overlay}
+.orb span{position:relative;z-index:2;color:#04241B;font-size:.62rem;padding-left:2px}
+.talk-copy .mono{color:var(--muted);display:block;margin-bottom:3px}
+.talk-copy strong{font-family:'Sora',sans-serif;font-size:.92rem;font-weight:600;letter-spacing:-.02em;display:block}
+
+@media(max-width:1080px){
+  .hero{height:auto;min-height:0;padding:100px 20px 40px;display:flex;flex-direction:column;gap:26px}
+  .rail,.statement,.headline,.talk,.stack-holder{position:static}
+  .statement{text-align:left;max-width:none}
+  .stack-holder{width:min(78%,360px);height:auto;aspect-ratio:1/.95;margin:10px auto 30px}
+  .talk{width:max-content}
+  .stage{opacity:.4}
+}
+
+/* ── band ── */
+.band{padding:clamp(64px,8vw,120px) clamp(22px,4vw,60px) clamp(70px,8vw,110px);
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:clamp(28px,4vw,64px);max-width:1440px;margin:0 auto}
+.cap{padding-top:22px;border-top:1px solid var(--hair)}
+.cap-n{color:var(--mint);margin-bottom:14px;display:block}
+.cap h3{font-size:1.42rem;font-weight:600;margin-bottom:10px}
+.cap h3 em{font-family:'Bodoni Moda',serif;font-style:italic;font-weight:400}
+.cap p{color:var(--ink-2);font-size:.94rem;line-height:1.65;max-width:36ch}
+.foot{padding:0 clamp(22px,4vw,60px) 60px;max-width:1440px;margin:0 auto}
+.foot-inner{border-top:1px solid var(--hair);padding-top:22px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:14px}
+.foot-inner span{color:var(--muted)}
+
+@keyframes rise{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:none}}
+.r{opacity:0;animation:rise .95s var(--ease) forwards}
+.d1{animation-delay:.05s}.d2{animation-delay:.18s}.d3{animation-delay:.30s}
+.d4{animation-delay:.42s}.d5{animation-delay:.56s}.d6{animation-delay:.70s}
+@media(prefers-reduced-motion:reduce){.r{animation:none;opacity:1}.stack{animation:none}}
+</style>
+</head>
+<body>
+
+<svg class="grain"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.82" numOctaves="4" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter><rect width="100%" height="100%" filter="url(#n)" opacity=".42"/></svg>
+
+<header class="nav r d1">
+  <div class="brand">
+    <div class="brand-tile"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+    <span class="wordmark">VIZORA</span>
+  </div>
+  <nav class="nav-links"><a href="#">Platform</a><a href="#">Solutions</a><a href="#">Pricing</a><a href="#">Docs</a></nav>
+  <button class="nav-cta">Book a 15-min demo <span style="opacity:.55">→</span></button>
+</header>
+
+<div class="hero-wrap">
+<section class="hero">
+
+  <div class="rail r d3">
+    <div class="rail-item" data-l="1"><i style="background:#00B4D8"></i><span class="mono">01 — Base playlist</span></div>
+    <div class="rail-item" data-l="2"><i style="background:#8B5CF6"></i><span class="mono">02 — Daypart schedule</span></div>
+    <div class="rail-item" data-l="3"><i style="background:#00E5A0"></i><span class="mono">03 — Live data</span></div>
+    <div class="rail-rule"></div>
+    <div class="rail-item" data-l="4"><i style="background:#0A222E"></i><span class="mono">On screen · everywhere</span></div>
+  </div>
+
+  <p class="statement r d4">
+    Playlists, dayparts and live data resolve into one board — and that
+    board reaches every screen you run, in seconds.
+  </p>
+
+  <div class="stage"><svg id="fibre" viewBox="0 0 1000 700" preserveAspectRatio="none"></svg></div>
+
+  <div class="stack-holder r d5">
+    <div class="stack">
+      <div class="layer l1"></div>
+      <div class="layer l2"></div>
+      <div class="layer l3"></div>
+      <div class="layer l4">
+        <div class="board">
+          <div class="board-top"><span class="mono">Urban Eats · Downtown</span><span class="live"><i></i> On air</span></div>
+          <h3>Today's <em>Specials</em></h3>
+          <div class="menu">
+            <div class="item"><span class="nm">Charred corn elote</span><span class="ln"></span><span class="pr">$9</span></div>
+            <div class="item"><span class="nm">Smoked brisket bowl</span><span class="ln"></span><span class="pr">$16</span></div>
+            <div class="item"><span class="nm">Cold-brew tonic</span><span class="ln"></span><span class="pr">$6</span></div>
+          </div>
+          <div class="board-foot"><span class="mono">Updated 4 min ago</span><span class="mono">RETAIL-DT-04</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="headline">
+    <span class="micro mono r d5">50,000+ screens orchestrated · resolved in 4.2s</span>
+    <h1 class="r d6">Publish. Schedule.<br><span class="serif">Everywhere.</span></h1>
+  </div>
+
+  <aside class="talk r d6">
+    <div class="orb"><span>▶</span></div>
+    <div class="talk-copy">
+      <span class="mono">Watch a schedule resolve</span>
+      <strong>Four layers, 85 screens · 0:42</strong>
+    </div>
+  </aside>
+
+</section>
+</div>
+
+<section class="band">
+  <div class="cap"><span class="cap-n mono">01 / Compose</span>
+    <h3>Describe it. <em>Deploy it.</em></h3>
+    <p>Generate an on-brand board from a sentence and drop it into the layer that needs it — no design tool, no export step.</p></div>
+  <div class="cap"><span class="cap-n mono">02 / Resolve</span>
+    <h3>Right content, <em>right moment.</em></h3>
+    <p>Playlist, daypart and live data resolve per screen, per minute. Breakfast boards at seven, happy hour at five — automatically.</p></div>
+  <div class="cap"><span class="cap-n mono">03 / Distribute</span>
+    <h3>Everywhere, <em>at once.</em></h3>
+    <p>One resolved board reaches every player on the network in seconds, and each one reports back that it landed.</p></div>
+</section>
+
+<div class="foot"><div class="foot-inner mono">
+  <span>Vizora — sample D · hybrid of A (intelligent operations) + C (layered story)</span>
+  <span>99.9% platform uptime · SOC 2 type II · GDPR ready</span>
+</div></div>
+
+<script>
+/* The board resolves, then its signal leaves for every screen on the network. */
+(function(){
+  const svg = document.getElementById('fibre');
+  const NS  = 'http://www.w3.org/2000/svg';
+  const N   = 34;
+  const ORIGIN = {x: 382, y: 300};   // tucked beneath the stack
+
+  const defs = document.createElementNS(NS,'defs');
+  defs.innerHTML = `
+    <linearGradient id="pulse" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%"   stop-color="#00E5A0" stop-opacity="0"/>
+      <stop offset="45%"  stop-color="#00E5A0" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#00B4D8" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="tipGlow" x="-260%" y="-260%" width="620%" height="620%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softGlow" x="-120%" y="-120%" width="340%" height="340%"><feGaussianBlur stdDeviation="15"/></filter>`;
+  svg.appendChild(defs);
+
+  const gGlow=document.createElementNS(NS,'g'), gLine=document.createElementNS(NS,'g'),
+        gPulse=document.createElementNS(NS,'g'), gTip=document.createElementNS(NS,'g');
+  gTip.setAttribute('filter','url(#tipGlow)');
+  svg.append(gGlow,gLine,gPulse,gTip);
+
+  const bloom = document.createElementNS(NS,'ellipse');
+  bloom.setAttribute('cx',612); bloom.setAttribute('cy',512);
+  bloom.setAttribute('rx',290); bloom.setAttribute('ry',96);
+  bloom.setAttribute('fill','rgba(0,229,160,.17)');
+  bloom.setAttribute('filter','url(#softGlow)');
+  gGlow.appendChild(bloom);
+
+  for(let i=0;i<N;i++){
+    const t = N===1?0:i/(N-1);
+    const sway = Math.sin(t*Math.PI*2.1)*14;
+
+    // tips ride an arc across the lower-right — the wall of screens
+    const tx = 404 + 486*t + sway*0.6;
+    const ty = 452 + 104*Math.sin(t*Math.PI) + Math.cos(t*13)*8;
+
+    const x0  = ORIGIN.x + (t-0.5)*40;
+    const y0  = ORIGIN.y + (t-0.5)*16;
+    const c1x = x0 + 22 + t*86,        c1y = y0 + 96 + t*26;
+    const c2x = tx - 128 + sway*1.3,   c2y = ty - 128 + Math.sin(t*6)*20;
+    const d = `M${x0.toFixed(1)},${y0.toFixed(1)} C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)}`;
+
+    const core = document.createElementNS(NS,'path');
+    core.setAttribute('d',d); core.setAttribute('fill','none');
+    core.setAttribute('stroke','rgba(58,96,110,.26)');
+    core.setAttribute('stroke-width',(1.0+(i%3)*0.32).toFixed(2));
+    core.setAttribute('stroke-linecap','round');
+    gLine.appendChild(core);
+
+    const hilite = document.createElementNS(NS,'path');
+    hilite.setAttribute('d',d); hilite.setAttribute('fill','none');
+    hilite.setAttribute('stroke','rgba(255,255,255,.95)');
+    hilite.setAttribute('stroke-width','0.85');
+    hilite.setAttribute('stroke-linecap','round');
+    hilite.setAttribute('transform','translate(-1.1,-1.1)');
+    gLine.appendChild(hilite);
+
+    const p = document.createElementNS(NS,'path');
+    p.setAttribute('d',d); p.setAttribute('fill','none');
+    p.setAttribute('stroke','url(#pulse)');
+    p.setAttribute('stroke-width','2.1');
+    p.setAttribute('stroke-linecap','round');
+    p.setAttribute('stroke-dasharray','110 1200');
+    p.style.animation = `flow 4.4s linear ${(i*0.10).toFixed(2)}s infinite`;
+    gPulse.appendChild(p);
+
+    const dot = document.createElementNS(NS,'circle');
+    dot.setAttribute('cx',tx); dot.setAttribute('cy',ty);
+    dot.setAttribute('r',(1.9+(i%4)*0.5).toFixed(2));
+    dot.setAttribute('fill', i%3 ? '#00E5A0' : '#7BE9FF');
+    dot.style.animation = `breathe 4.4s ease-in-out ${(i*0.10+0.85).toFixed(2)}s infinite`;
+    gTip.appendChild(dot);
+  }
+
+  // three screens receiving the resolved board
+  [[452,502,-7],[648,556,0],[856,488,7]].forEach(([x,y,rot],idx)=>{
+    const g = document.createElementNS(NS,'g');
+    g.setAttribute('transform',`translate(${x},${y}) rotate(${rot})`);
+    g.innerHTML = `
+      <rect x="-20" y="-13" width="40" height="26" rx="3.4" fill="rgba(255,255,255,.86)" stroke="rgba(0,178,124,.5)" stroke-width="1"/>
+      <rect x="-15" y="-8.5" width="30" height="16" rx="2" fill="rgba(0,229,160,.22)"/>
+      <path d="M-6 13 h12 M0 13 v5" stroke="rgba(10,34,46,.28)" stroke-width="1.2" stroke-linecap="round"/>`;
+    g.style.animation = `breathe 4.4s ease-in-out ${(1.05+idx*0.48).toFixed(2)}s infinite`;
+    gTip.appendChild(g);
+  });
+
+  const st = document.createElement('style');
+  st.textContent = `
+    @keyframes flow{from{stroke-dashoffset:1310}to{stroke-dashoffset:-120}}
+    @keyframes breathe{0%,72%,100%{opacity:.44}84%{opacity:1}}
+    @media(prefers-reduced-motion:reduce){#fibre *{animation:none!important}#fibre circle{opacity:.9!important}}`;
+  document.head.appendChild(st);
+})();
+</script>
+</body>
+</html>

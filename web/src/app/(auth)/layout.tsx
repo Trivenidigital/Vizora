@@ -1,6 +1,9 @@
+// `mkt` puts the whole auth surface on the light public palette. The ValuePanel
+// keeps its own hardcoded dark brand panel deliberately — a dark brand panel
+// beside a light form is the intended split.
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[var(--background)]">
+    <div className="mkt min-h-screen bg-[var(--background)]">
       {children}
       {/* Shared footer for all auth pages */}
       <footer className="fixed bottom-0 left-0 right-0 py-3 text-center text-[10px] text-[var(--foreground-tertiary)] bg-[var(--background)]/80 backdrop-blur-sm border-t border-[var(--border)]/30">

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vizora — Homepage direction samples</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@1,6..96,400&family=Sora:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,400;9..40,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#061A21; --bg-2:#081E28; --surface:rgba(12,34,41,.6);
+  --fg:#F0ECE8; --fg-2:#B5AEA6; --muted:#9A958E; --dim:#6B655D;
+  --hair:#1B3D47; --hair-2:#122D35;
+  --mint:#00E5A0; --cyan:#00B4D8; --violet:#8B5CF6; --amber:#F59E0B;
+  --ease:cubic-bezier(.22,.61,.36,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:linear-gradient(180deg,#061A21 0%,#081E28 40%,#0A222E 100%);
+  min-height:100vh;color:var(--fg);
+  font-family:'DM Sans',ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{font-family:'Sora',sans-serif;letter-spacing:-.04em;line-height:1.05}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace;text-transform:uppercase;letter-spacing:.16em;font-size:.6rem;font-weight:500}
+.grad{background:linear-gradient(135deg,var(--mint),var(--cyan));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.wrap{max-width:1180px;margin:0 auto;padding:0 clamp(20px,4vw,40px)}
+
+header{padding:clamp(48px,7vw,90px) 0 clamp(30px,4vw,48px)}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:32px}
+.brand-tile{width:28px;height:28px;border-radius:9px;display:grid;place-items:center;
+  background:linear-gradient(135deg,rgba(0,229,160,.2),rgba(0,180,216,.15));border:1px solid rgba(0,229,160,.25)}
+.brand-tile svg{width:14px;height:14px;stroke:var(--mint);fill:none;stroke-width:1.9}
+.brand span{font-family:'Sora',sans-serif;font-weight:700;font-size:1.06rem;letter-spacing:-.03em}
+h1{font-size:clamp(2rem,4vw,3.1rem);font-weight:600;margin-bottom:16px}
+.lede{color:var(--fg-2);max-width:66ch;line-height:1.65;font-size:1.02rem}
+.lede b{color:var(--fg);font-weight:500}
+
+/* the built page — hero card above the studies */
+.final-card{display:grid;grid-template-columns:1.15fr .85fr;gap:0;margin-top:36px;text-decoration:none;color:inherit;
+  border:1px solid rgba(0,229,160,.3);border-radius:18px;overflow:hidden;background:rgba(0,229,160,.05);
+  transition:transform .38s var(--ease),border-color .38s,box-shadow .38s}
+.final-card:hover{transform:translateY(-4px);border-color:rgba(0,229,160,.55);box-shadow:0 20px 54px rgba(0,229,160,.11)}
+.final-copy{padding:30px 32px}
+.final-copy .kick{color:var(--mint);display:block;margin-bottom:11px}
+.final-copy h2{font-size:1.7rem;font-weight:600;margin-bottom:11px}
+.final-copy p{color:var(--fg-2);font-size:.93rem;line-height:1.62;margin-bottom:16px}
+.final-mini{position:relative;overflow:hidden;min-height:230px;background:linear-gradient(168deg,#DFE8EA,#CFDDE1)}
+.fm-fan{position:absolute;left:50%;top:-26%;width:62%;height:108%;transform:translateX(-50%);
+  background:repeating-conic-gradient(from 176deg at 50% 0%, rgba(58,96,110,.32) 0deg .5deg, transparent .5deg 2.2deg);
+  -webkit-mask-image:linear-gradient(180deg,transparent 4%,#000 34%,#000 80%,transparent 96%);
+          mask-image:linear-gradient(180deg,transparent 4%,#000 34%,#000 80%,transparent 96%)}
+.fm-bloom{position:absolute;left:50%;bottom:16%;width:58%;height:20%;transform:translateX(-50%);
+  background:radial-gradient(ellipse,rgba(0,229,160,.55),transparent 70%);filter:blur(9px)}
+.fm-h{position:absolute;left:7%;bottom:9%;font-family:'Sora',sans-serif;font-weight:600;font-size:1.1rem;
+  letter-spacing:-.045em;line-height:1;color:#0A222E}
+.fm-h em{font-style:normal;background:linear-gradient(120deg,#00A171,#00A6CC);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+@media(max-width:760px){.final-card{grid-template-columns:1fr}.final-mini{min-height:190px;order:-1}}
+
+.studies-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin:52px 0 18px;flex-wrap:wrap}
+.studies-head h3{font-family:'Sora',sans-serif;font-size:1.06rem;font-weight:600;letter-spacing:-.03em}
+.studies-head span{color:var(--dim)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;padding-bottom:26px}
+.card{
+  background:var(--surface);border:1px solid var(--hair);border-radius:16px;overflow:hidden;
+  display:flex;flex-direction:column;text-decoration:none;color:inherit;
+  transition:transform .38s var(--ease),border-color .38s,box-shadow .38s;
+}
+.card:hover{transform:translateY(-4px);border-color:rgba(0,229,160,.28);box-shadow:0 16px 46px rgba(0,229,160,.07)}
+.thumb{aspect-ratio:16/10;position:relative;overflow:hidden;border-bottom:1px solid var(--hair-2)}
+.thumb .tag{position:absolute;top:11px;left:11px;z-index:3;border-radius:999px;padding:5px 10px;
+  font-family:'JetBrains Mono',monospace;font-size:.52rem;letter-spacing:.13em;text-transform:uppercase;font-weight:500}
+.pick{background:var(--mint);color:#04241B}
+.alt{background:rgba(240,236,232,.9);color:#0A222E}
+.hm{background:rgba(139,92,246,.9);color:#fff}
+.hyb{background:#0A222E;color:#00E5A0}
+
+/* miniature renderings of each direction */
+.mini{position:absolute;inset:0}
+.m1{background:linear-gradient(168deg,#DFE8EA,#CFDDE1)}
+.m1 .fan{position:absolute;left:50%;top:-24%;width:64%;height:104%;transform:translateX(-50%);
+  background:
+    repeating-conic-gradient(from 176deg at 50% 0%, rgba(58,96,110,.30) 0deg 0.5deg, transparent .5deg 2.2deg);
+  -webkit-mask-image:linear-gradient(180deg,transparent 4%,#000 34%,#000 82%,transparent 96%);
+          mask-image:linear-gradient(180deg,transparent 4%,#000 34%,#000 82%,transparent 96%)}
+.m1 .bloom{position:absolute;left:50%;bottom:14%;width:58%;height:20%;transform:translateX(-50%);
+  background:radial-gradient(ellipse,rgba(0,229,160,.5),transparent 70%);filter:blur(9px)}
+.m1 .h{position:absolute;left:8%;bottom:9%;font-family:'Sora',sans-serif;font-weight:600;
+  font-size:clamp(.9rem,2.2vw,1.25rem);letter-spacing:-.045em;line-height:1;color:#0A222E}
+.m1 .h em{font-style:normal;background:linear-gradient(120deg,#00B27C,#00B4D8);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+
+.m2{background:#F0ECE8;display:flex;align-items:center;gap:5%;padding:0 7%}
+.m2 .col{flex:1}
+.m2 .h{font-family:'Sora',sans-serif;font-weight:600;font-size:clamp(.78rem,1.9vw,1.06rem);
+  letter-spacing:-.04em;line-height:1.1;color:#1A1A1A;margin-bottom:7px}
+.m2 .h em{font-style:normal;color:#00A472}
+.m2 .bar{height:4px;border-radius:3px;background:#DBD4CD;margin-bottom:4px}
+.m2 .bar.s{width:74%}.m2 .bar.t{width:56%;margin-bottom:9px}
+.m2 .cta{display:inline-block;height:15px;width:64%;border-radius:8px;background:#00B27C}
+.m2 .ui{flex:1;background:#fff;border-radius:6px;border:1px solid rgba(0,0,0,.07);
+  box-shadow:0 10px 22px rgba(26,26,26,.13);padding:7px;transform:rotateY(-8deg);display:flex;flex-direction:column;gap:4px}
+.m2 .ui .r{height:5px;border-radius:2px;background:#EFEBE7}
+.m2 .ui .r.a{width:52%;background:#00E5A0;opacity:.55}
+.m2 .ui .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin:2px 0}
+.m2 .ui .tiles i{height:13px;border-radius:2px;background:#F3EFEC;display:block}
+.m2 .ui .tiles i:first-child{background:rgba(0,229,160,.3)}
+
+.m3{background:linear-gradient(178deg,#EAF6FA,#A8D9E8);display:grid;place-items:center}
+.m3 .stk{position:relative;width:44%;height:48%;transform:translate(18%,16%) rotateX(52deg) rotateZ(-38deg);transform-style:preserve-3d}
+.m3 .p{position:absolute;inset:0;border-radius:6px;border:1px solid rgba(255,255,255,.85);background:rgba(255,255,255,.4)}
+.m3 .p1{transform:translateZ(0)}
+.m3 .p2{transform:translateZ(16px);background:rgba(139,92,246,.16)}
+.m3 .p3{transform:translateZ(32px);background:rgba(0,229,160,.18)}
+.m3 .p4{transform:translateZ(52px);background:#0A222E;box-shadow:0 14px 26px rgba(10,34,46,.3)}
+.m3 .h{position:absolute;left:7%;bottom:9%;z-index:4;font-family:'Sora',sans-serif;font-weight:400;
+  font-size:clamp(.8rem,2vw,1.1rem);letter-spacing:-.04em;line-height:1.05;color:#0E2B36}
+.m3 .h em{font-family:'Bodoni Moda',Georgia,serif;font-style:italic;color:#00A874}
+
+.m4{background:linear-gradient(170deg,#E4F0F4,#C7DDE7)}
+.m4 .stk{position:absolute;left:16%;top:9%;width:36%;height:40%;transform:rotateX(52deg) rotateZ(-38deg);transform-style:preserve-3d}
+.m4 .p{position:absolute;inset:0;border-radius:5px;border:1px solid rgba(255,255,255,.85);background:rgba(255,255,255,.4)}
+.m4 .p1{transform:translateZ(0)}
+.m4 .p2{transform:translateZ(13px);background:rgba(139,92,246,.16)}
+.m4 .p3{transform:translateZ(26px);background:rgba(0,229,160,.18)}
+.m4 .p4{transform:translateZ(42px);background:#0A222E;box-shadow:0 12px 22px rgba(10,34,46,.3)}
+.m4 .fan{position:absolute;left:30%;top:40%;width:72%;height:56%;
+  background:repeating-conic-gradient(from 68deg at 4% 4%, rgba(58,96,110,.34) 0 .45deg, transparent .45deg 2.5deg);
+  -webkit-mask-image:radial-gradient(120% 120% at 4% 4%, transparent 4%, #000 26%, #000 74%, transparent 96%);
+          mask-image:radial-gradient(120% 120% at 4% 4%, transparent 4%, #000 26%, #000 74%, transparent 96%)}
+.m4 .bloom{position:absolute;right:6%;bottom:22%;width:56%;height:18%;
+  background:radial-gradient(ellipse,rgba(0,229,160,.5),transparent 70%);filter:blur(8px)}
+.m4 .h{position:absolute;left:7%;bottom:8%;z-index:4;font-family:'Sora',sans-serif;font-weight:600;
+  font-size:clamp(.85rem,2.1vw,1.2rem);letter-spacing:-.045em;line-height:1;color:#0A222E}
+.m4 .h em{font-family:'Bodoni Moda',Georgia,serif;font-style:italic;font-weight:400;
+  background:linear-gradient(115deg,#00B27C,#00A6CC);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+
+.body{padding:20px 20px 22px}
+.body .kick{color:var(--mint);display:block;margin-bottom:9px}
+.body h3{font-size:1.16rem;font-weight:600;margin-bottom:5px}
+.body .src{color:var(--dim);font-size:.76rem;margin-bottom:12px}
+.body p{color:var(--fg-2);font-size:.88rem;line-height:1.6;margin-bottom:14px}
+.meta{border-top:1px solid var(--hair-2);padding-top:12px;display:flex;flex-direction:column;gap:7px;margin-top:auto}
+.meta div{display:flex;gap:9px;font-size:.78rem;color:var(--muted)}
+.meta b{color:var(--fg-2);font-weight:500;flex:none;width:64px}
+.open{margin-top:14px;display:inline-flex;align-items:center;gap:8px;color:var(--mint);font-size:.83rem;font-weight:500}
+
+.notes{border-top:1px solid var(--hair);padding:34px 0 70px;display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:26px}
+.notes h4{font-family:'Sora',sans-serif;font-size:.96rem;font-weight:600;letter-spacing:-.025em;margin-bottom:8px}
+.notes p{color:var(--muted);font-size:.86rem;line-height:1.62}
+.notes .kick{color:var(--cyan);display:block;margin-bottom:9px}
+.warn{border:1px solid rgba(245,158,11,.28);background:rgba(245,158,11,.06);border-radius:12px;padding:16px 18px;margin-bottom:34px}
+.warn .kick{color:var(--amber);display:block;margin-bottom:7px}
+.warn p{color:var(--fg-2);font-size:.87rem;line-height:1.6}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<header>
+  <div class="brand">
+    <div class="brand-tile"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
+    <span class="grad">VIZORA</span>
+  </div>
+  <h1>The finished homepage,<br>plus the four directions behind it.</h1>
+  <p class="lede">Adapted from the strongest templates on <b>motionsites.ai</b>. Every page uses Vizora's actual Electric Horizon tokens (<b>#00E5A0</b> → <b>#00B4D8</b>), the real Sora / DM&nbsp;Sans / JetBrains&nbsp;Mono stack, and copy lifted verbatim from the live site.</p>
+
+  <a class="final-card" href="05-homepage.html">
+    <div class="final-copy">
+      <span class="kick mono">Built · direction A + B's skeleton</span>
+      <h2>The full homepage</h2>
+      <p>Hero through footer: fibre-signal hero, the layer object explaining how scheduling resolves, the Fleet Overview dashboard, six AI systems, industries, security, live pricing toggle, FAQ and final CTA. Verified at desktop, tablet and phone with zero console errors and zero horizontal overflow.</p>
+      <span class="open">Open the finished page →</span>
+    </div>
+    <div class="final-mini">
+      <div class="fm-fan"></div><div class="fm-bloom"></div>
+      <div class="fm-h">Publish. Schedule.<br><em>Everywhere.</em></div>
+    </div>
+  </a>
+  <p class="lede" style="margin-top:26px;font-size:.94rem">Handoff notes — section-to-component map, token mapping, and the two 3D-projection gotchas — are in <b>design-samples/HANDOFF.md</b>. The four studies below are what the decision was made from.</p>
+</header>
+
+<div class="studies-head">
+  <h3>The four studies</h3>
+  <span class="mono">what the decision was made from</span>
+</div>
+
+<div class="grid">
+
+  <a class="card" href="01-intelligent-operations.html">
+    <div class="thumb">
+      <span class="tag pick">Recommended</span>
+      <div class="mini m1">
+        <div class="fan"></div><div class="bloom"></div>
+        <div class="h">Publish. Schedule.<br><em>Everywhere.</em></div>
+      </div>
+    </div>
+    <div class="body">
+      <span class="kick mono">Sample A</span>
+      <h3>Intelligent Operations</h3>
+      <div class="src">after “Intelligent Operations” · Agency · free tier</div>
+      <p>Light, precise, premium-minimal. One striking object — a fibre bundle carrying live signal out to lit screens — with the headline held low-left and everything else whispered in mono micro-type.</p>
+      <div class="meta">
+        <div><b>Borrows</b><span>Three-beat headline, left capability rail, corner talk-chip</span></div>
+        <div><b>Says</b><span>Operationally reliable. Trust us with your storefront.</span></div>
+        <div><b>Risk</b><span>Light palette is a hard break from today's dark site</span></div>
+      </div>
+      <span class="open">Open sample A →</span>
+    </div>
+  </a>
+
+  <a class="card" href="02-conversion-saas.html">
+    <div class="thumb">
+      <span class="tag alt">Structure pick</span>
+      <div class="mini m2">
+        <div class="col">
+          <div class="h">One dashboard.<br><em>Every screen</em>.</div>
+          <div class="bar s"></div><div class="bar t"></div><div class="cta"></div>
+        </div>
+        <div class="ui">
+          <div class="r a"></div>
+          <div class="tiles"><i></i><i></i><i></i><i></i></div>
+          <div class="r"></div><div class="r"></div><div class="r"></div>
+        </div>
+      </div>
+    </div>
+    <div class="body">
+      <span class="kick mono">Sample B</span>
+      <h3>Conversion SaaS</h3>
+      <div class="src">after “AI Meeting Notes” · SaaS · premium</div>
+      <p>The conventional-in-a-good-way B2B page. Benefit headline with an accented keyword, the real Fleet Overview UI floating beside it, two live proof toasts, then stats and feature rows straight down to the trial CTA.</p>
+      <div class="meta">
+        <div><b>Borrows</b><span>Split hero, floating product UI, trust bar, feature rows</span></div>
+        <div><b>Says</b><span>Here is the product. Here is the proof. Start free.</span></div>
+        <div><b>Risk</b><span>Safe — reads like every good SaaS page, so less memorable</span></div>
+      </div>
+      <span class="open">Open sample B →</span>
+    </div>
+  </a>
+
+  <a class="card" href="03-layered-story.html">
+    <div class="thumb">
+      <span class="tag hm">Honourable mention</span>
+      <div class="mini m3">
+        <div class="stk"><div class="p p1"></div><div class="p p2"></div><div class="p p3"></div><div class="p p4"></div></div>
+        <div class="h">Every <em>layer</em><br>tells a story.</div>
+      </div>
+    </div>
+    <div class="body">
+      <span class="kick mono">Sample C</span>
+      <h3>Layered Story</h3>
+      <div class="src">after “Data Storytelling” · SaaS · premium</div>
+      <p>The concept worth stealing even if you don't take the page. Four translucent panes — playlist, daypart, live data, output — resolving into one on-air menu board. It explains Vizora's scheduling model in a single image.</p>
+      <div class="meta">
+        <div><b>Borrows</b><span>Editorial serif accent, layered object, floating annotations</span></div>
+        <div><b>Says</b><span>We handle the complexity underneath the screen.</span></div>
+        <div><b>Risk</b><span>Concept-led — needs the product shot elsewhere on the page</span></div>
+      </div>
+      <span class="open">Open sample C →</span>
+    </div>
+  </a>
+
+  <a class="card" href="04-hybrid.html">
+    <div class="thumb">
+      <span class="tag hyb">Hybrid · A + C</span>
+      <div class="mini m4">
+        <div class="stk"><div class="p p1"></div><div class="p p2"></div><div class="p p3"></div><div class="p p4"></div></div>
+        <div class="fan"></div><div class="bloom"></div>
+        <div class="h">Publish. Schedule.<br><em>Everywhere.</em></div>
+      </div>
+    </div>
+    <div class="body">
+      <span class="kick mono">Sample D</span>
+      <h3>Resolve &amp; Distribute</h3>
+      <div class="src">fusion of A's frame + C's object and serif voice</div>
+      <p>The two objects turn out to be halves of one story. C's layers resolve into a board; A's fibres carry that board out to every screen. One image now shows compose → resolve → distribute, and the left rail doubles as its legend — hover a layer to isolate it.</p>
+      <div class="meta">
+        <div><b>Borrows</b><span>A's canvas, rail, headline slot, glass chip · C's stack, serif accent, sky</span></div>
+        <div><b>Says</b><span>We handle the complexity, then put it on every screen.</span></div>
+        <div><b>Risk</b><span>Most complex object — needs care at small viewports</span></div>
+      </div>
+      <span class="open">Open sample D →</span>
+    </div>
+  </a>
+
+</div>
+
+<div class="warn">
+  <span class="kick mono">Before any of this touches the app</span>
+  <p>These are standalone static files under <code>design-samples/</code>. No app code is modified, and this is deliberately separate from the parked <code>feat/design-explorations</code> branch. Nothing ships until you pick a direction.</p>
+</div>
+
+<div class="notes">
+  <div>
+    <span class="kick mono">The recommendation</span>
+    <h4>A or D for the hero, B's skeleton below it</h4>
+    <p>A is the safer, more scalable hero; D is the one that teaches the product in a single image. Either way, use Sample B's structure below the fold — product UI, proof, features, trial. The hero earns attention; B's page converts it.</p>
+  </div>
+  <div>
+    <span class="kick mono">The one substitution</span>
+    <h4>Your screen is the hero image</h4>
+    <p>Every template on motionsites leans on gorgeous AI-generated 3D. For signage that's a mistake — the product shot <em>is</em> the proof. Replace the rendered object with your dashboard driving a real screen wherever you can.</p>
+  </div>
+  <div>
+    <span class="kick mono">The open question</span>
+    <h4>Light or dark?</h4>
+    <p>Vizora is dark-first today and the dashboard stays dark either way. Going light on the marketing site is the single biggest decision here — it reads as more premium and makes content imagery pop, but it is a genuine brand break.</p>
+  </div>
+</div>
+
+</div>
+</body>
+</html>
