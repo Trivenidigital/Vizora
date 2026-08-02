@@ -332,6 +332,73 @@ body {
   box-shadow: 0 18px 44px rgba(10, 34, 46, 0.12);
 }
 
+/* ── Cookie consent bar — context-aware chrome ──────────────────────────────
+   The consent bar is rendered from the ROOT layout, so it is a sibling of the
+   page content, not a descendant of `.mkt`. That means it cannot pick up the
+   marketing tokens by descent the way the legal/auth pages do, and a plain
+   `.mkt .x` rule would never match it.
+
+   So it carries its own two-value token set instead. `.consent-bar` holds the
+   DARK defaults (the authenticated app, which is where it must keep looking
+   exactly as it does today); `body:has(.mkt) .consent-bar` swaps in the LIGHT
+   values, mirroring the `.mkt` palette above.
+
+   This selects on `.mkt` itself — the same single source of truth the light
+   pages already use — so it cannot drift as light pages are added or removed,
+   and there is no route list to maintain.
+
+   It is deliberately CSS rather than JS, but be precise about why. The obvious
+   JS alternative — `document.querySelector('.mkt')` in a `useEffect` keyed on
+   `usePathname()` — was tried first and, as far as anyone has demonstrated, it
+   WORKS on today's routes: effects fire post-commit, and no `.mkt` route has a
+   `loading.tsx` boundary that could leave the outgoing tree mounted when the
+   effect samples ((auth)/loading.tsx renders inside the `.mkt` layout, so it is
+   covered). No wrong-theme render was ever actually observed. Do not go looking
+   for that bug in the history; it is not there.
+
+   The reason to prefer CSS is structural, not a bug fix: the JS version copies
+   a point-in-time DOM answer into React state in a component that stays mounted
+   across every client-side route change, so its correctness depends on commit
+   ordering continuing to hold. `:has()` holds no state and re-evaluates on DOM
+   change, so it cannot go stale regardless — and it drops a state variable, an
+   effect and an import.
+
+   Browsers without `:has()` (pre-Chrome 105 / Safari 15.4 / Firefox 121) simply
+   get the dark bar — i.e. exactly today's shipped behaviour. Failing to the
+   status quo is the right fallback direction.
+
+   Contrast (WCAG 2.1 AA, normal text needs 4.5:1). Computed, not estimated —
+   the formula was sanity-checked against #000/#FFF = 21.00 and #777/#FFF = 4.48:
+     light  ink #0A222E on #FFFFFF = 16.39:1 · ink-2 #3E5860 on #FFFFFF = 7.58:1
+            accent #00745B on #FFFFFF = 5.75:1 (neon #00E5A0 would be 1.65:1 —
+            which is exactly why the link uses mint-INK here, never the neon)
+     dark   ink-2 #D1D5DB on #0A222E = 11.12:1 · accent #00E5A0 on #0A222E = 9.92:1 */
+.consent-bar {
+  --consent-surface: #0A222E;
+  --consent-ink: #FFFFFF;
+  --consent-ink-2: #D1D5DB;
+  --consent-hair: #1B3D47;
+  --consent-hair-strong: #6B7280;
+  --consent-accent: #00E5A0;
+  --consent-accent-hover: #00CC8E;
+  --consent-fill: #00E5A0;
+  --consent-fill-hover: #00CC8E;
+  --consent-on-fill: #061A21;
+}
+
+body:has(.mkt) .consent-bar {
+  --consent-surface: #FFFFFF;
+  --consent-ink: #0A222E;
+  --consent-ink-2: #3E5860;
+  --consent-hair: rgba(10, 34, 46, 0.11);
+  --consent-hair-strong: rgba(10, 34, 46, 0.32);
+  --consent-accent: #00745B;      /* mint-ink — safe as text on light */
+  --consent-accent-hover: #005C48;
+  --consent-fill: #00B27C;
+  --consent-fill-hover: #00A171;
+  --consent-on-fill: #04241B;
+}
+
 /* ── Electric Horizon Global Utilities ── */
 
 .eh-reveal {

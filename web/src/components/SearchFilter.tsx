@@ -1,7 +1,5 @@
 'use client';
 
-import { Icon } from '@/theme/icons';
-
 interface SearchFilterProps {
   value: string;
   onChange: (value: string) => void;
@@ -22,7 +20,13 @@ export default function SearchFilter({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="eh-input pl-10 pr-10"
+        /* `!` is load-bearing. `.eh-input` sets the `padding` shorthand and is
+           defined in globals.css AFTER `@tailwind utilities`; both are
+           single-class selectors, so source order wins and plain `pl-10`
+           loses to `.eh-input`'s `padding: 10px 16px`. Text then starts at
+           16px while the search icon occupies 14–30px, so the glyph sits on
+           top of the placeholder. */
+        className="eh-input !pl-10 !pr-10"
         autoComplete="off"
       />
       <svg

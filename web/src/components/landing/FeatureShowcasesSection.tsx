@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import {
   Radio,
   FolderOpen,
@@ -115,58 +116,32 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
               </div>
             </div>
           </Reveal>
+          {/* Real product capture, not a CSS reconstruction. Taken from the
+              running app against a synthetic demo tenant — see
+              web/public/product/README.md for how to regenerate it. The frame
+              is deliberately plain so the UI itself carries the shot. */}
           <Reveal delay={150}>
-            <div className="eh-card rounded-xl p-5 relative overflow-hidden">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-sm font-semibold" style={{ fontFamily: 'var(--font-sora), sans-serif' }}>Fleet Status</span>
-                <span className="text-[0.65rem] px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,229,160,0.1)', color: 'var(--mkt-mint-ink)' }}>
-                  Live
-                </span>
+            <figure className="m-0">
+              <div
+                className="rounded-xl overflow-hidden"
+                style={{
+                  border: '1px solid var(--mkt-hair)',
+                  boxShadow: '0 30px 70px rgba(10, 34, 46, 0.16)',
+                }}
+              >
+                <Image
+                  src="/product/dashboard-fleet.png"
+                  alt="The Vizora devices view: a fleet of displays across Seattle-area locations, each row showing a live online status, the playlist it is currently playing, and when it was last seen."
+                  width={2880}
+                  height={1800}
+                  sizes="(min-width: 1248px) 544px, (min-width: 1024px) 46vw, 92vw"
+                  className="block h-auto w-full"
+                />
               </div>
-              <div className="space-y-2.5">
-                {[
-                  { name: 'NYC — Times Square', status: 'online', latency: '12ms', content: 'Brand Campaign' },
-                  { name: 'LA — Beverly Hills', status: 'online', latency: '18ms', content: 'Product Launch' },
-                  { name: 'CHI — Michigan Ave', status: 'online', latency: '22ms', content: 'Holiday Promo' },
-                  { name: 'MIA — Ocean Drive', status: 'updating', latency: '45ms', content: 'Deploying...' },
-                  { name: 'SEA — Pike Place', status: 'offline', latency: '—', content: 'Maintenance' },
-                ].map((device) => (
-                  <div
-                    key={device.name}
-                    className="flex items-center gap-3 p-2.5 rounded-lg"
-                    style={{
-                      border: '1px solid var(--mkt-hair)',
-                      animation: device.status === 'updating' ? 'eh-status-cycle 4s ease-in-out infinite' : undefined,
-                    }}
-                  >
-                    <span
-                      className="w-2 h-2 rounded-full shrink-0"
-                      style={device.status === 'online' ? {
-                        background: 'var(--mkt-mint)',
-                        boxShadow: '0 0 6px rgba(0,229,160,0.3)',
-                        animation: 'eh-neon-pulse 2s ease-in-out infinite',
-                      } : device.status === 'updating' ? {
-                        background: 'var(--mkt-cyan)',
-                        boxShadow: '0 0 6px rgba(0,180,216,0.3)',
-                        animation: 'eh-neon-pulse 1s ease-in-out infinite',
-                      } : { background: 'var(--mkt-rose)' }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[0.75rem] font-medium truncate">{device.name}</div>
-                      <div className="text-[0.6rem]" style={{ color: 'var(--mkt-muted)', fontFamily: 'var(--font-mono), monospace' }}>
-                        {device.content}
-                      </div>
-                    </div>
-                    <div className="text-[0.6rem] font-medium" style={{
-                      color: device.status === 'online' ? 'var(--mkt-mint-ink)' : device.status === 'updating' ? 'var(--mkt-cyan-ink)' : 'var(--mkt-rose)',
-                      fontFamily: 'var(--font-mono), monospace',
-                    }}>
-                      {device.latency}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+              <figcaption className="mt-3 text-[0.7rem]" style={{ color: 'var(--mkt-muted)' }}>
+                Actual product UI — demo workspace, synthetic data.
+              </figcaption>
+            </figure>
           </Reveal>
         </div>
 
