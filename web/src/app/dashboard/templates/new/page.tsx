@@ -159,7 +159,7 @@ export default function CreateTemplatePage() {
             <Icon name="chevronLeft" size="md" />
           </Link>
           <div>
-            <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">
+            <h2 className="eh-heading font-sora text-2xl text-[var(--foreground)]">
               Create Template
             </h2>
             <p className="mt-1 text-sm text-[var(--foreground-secondary)]">

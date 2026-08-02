@@ -310,7 +310,7 @@ export default function LayoutsPage() {
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="eh-dash-title font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Layouts</h2>
+          <h2 className="eh-dash-title font-sora text-2xl text-[var(--foreground)]">Layouts</h2>
           <p className="mt-2 text-[var(--foreground-secondary)]">
             Create multi-zone display layouts to show multiple content items simultaneously.
           </p>

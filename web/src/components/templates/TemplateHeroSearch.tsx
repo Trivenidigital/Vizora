@@ -63,7 +63,7 @@ export default function TemplateHeroSearch({
       <div className="relative px-6 py-16 sm:px-10 sm:py-20 lg:py-24 flex flex-col items-center text-center">
         {/* Heading */}
         <h1
-          className={`font-[var(--font-sora)] text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-[var(--foreground)] mb-3 transition-all duration-700 ${
+          className={`font-sora text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-[var(--foreground)] mb-3 transition-all duration-700 ${
             mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
           }`}
         >

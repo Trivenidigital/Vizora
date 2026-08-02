@@ -73,7 +73,7 @@ export default function FeatureFlagsPage() {
     return (
       <div className="space-y-8">
         <div>
-          <h2 className="eh-dash-title font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Feature Flags</h2>
+          <h2 className="eh-dash-title font-sora text-2xl text-[var(--foreground)]">Feature Flags</h2>
           <p className="mt-2 text-[var(--foreground-secondary)]">Loading...</p>
         </div>
       </div>
@@ -83,7 +83,7 @@ export default function FeatureFlagsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="eh-dash-title font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Feature Flags</h2>
+        <h2 className="eh-dash-title font-sora text-2xl text-[var(--foreground)]">Feature Flags</h2>
         <p className="mt-2 text-[var(--foreground-secondary)]">
           Enable or disable features for your organization. All features are enabled by default.
         </p>

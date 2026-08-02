@@ -169,7 +169,7 @@ export default function TeamClient() {
 
  <div className="flex justify-between items-center">
  <div>
- <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Team Management</h2>
+ <h2 className="eh-heading font-sora text-2xl text-[var(--foreground)]">Team Management</h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Manage team members and their roles
  </p>

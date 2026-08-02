@@ -476,7 +476,7 @@ export default function DashboardClient({
  <p className="text-sm font-medium text-[var(--foreground-secondary)]">Total Devices</p>
  <Icon name="devices" size="2xl" className="text-[var(--foreground-secondary)]" />
  </div>
- <p className="text-4xl font-bold text-[var(--foreground)] font-[var(--font-sora)] mb-2">{stats.devices.total}</p>
+ <p className="text-4xl font-bold text-[var(--foreground)] font-sora mb-2">{stats.devices.total}</p>
  <div className="flex items-center gap-2">
  <span className="w-2 h-2 bg-success-500 rounded-full"></span>
  <p className="text-sm text-success-600 dark:text-success-400 font-medium">
@@ -493,7 +493,7 @@ export default function DashboardClient({
  <p className="text-sm font-medium text-[var(--foreground-secondary)]">Content Items</p>
  <Icon name="content" size="2xl" className="text-[var(--foreground-secondary)]" />
  </div>
- <p className="text-4xl font-bold text-[var(--foreground)] font-[var(--font-sora)] mb-2">{stats.content.total}</p>
+ <p className="text-4xl font-bold text-[var(--foreground)] font-sora mb-2">{stats.content.total}</p>
  <p className="text-sm text-[var(--foreground-tertiary)]">
  {stats.content.processing > 0
  ? `${stats.content.processing} processing`
@@ -509,7 +509,7 @@ export default function DashboardClient({
  <p className="text-sm font-medium text-[var(--foreground-secondary)]">Playlists</p>
  <Icon name="playlists" size="2xl" className="text-[var(--foreground-secondary)]" />
  </div>
- <p className="text-4xl font-bold text-[var(--foreground)] font-[var(--font-sora)] mb-2">{stats.playlists.total}</p>
+ <p className="text-4xl font-bold text-[var(--foreground)] font-sora mb-2">{stats.playlists.total}</p>
  <p className="text-sm text-[var(--foreground-tertiary)]">
  {stats.playlists.active} ready
  </p>

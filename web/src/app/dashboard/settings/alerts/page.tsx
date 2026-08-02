@@ -372,7 +372,7 @@ export default function AlertsPage() {
 
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Alerts</h2>
+          <h2 className="eh-heading font-sora text-2xl text-[var(--foreground)]">Alerts</h2>
           <p className="mt-2 text-[var(--foreground-secondary)]">
             Configure who gets notified when a display goes offline.
           </p>

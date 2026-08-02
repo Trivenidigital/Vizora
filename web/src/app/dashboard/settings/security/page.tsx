@@ -98,7 +98,7 @@ export default function SecuritySettingsPage() {
         <Link href="/dashboard/settings" className="text-sm text-[var(--foreground-tertiary)] hover:text-[var(--primary)]">
           ← Back to settings
         </Link>
-        <h2 className="eh-dash-title font-[var(--font-sora)] text-2xl text-[var(--foreground)] mt-2">Security</h2>
+        <h2 className="eh-dash-title font-sora text-2xl text-[var(--foreground)] mt-2">Security</h2>
         <p className="mt-2 text-[var(--foreground-secondary)]">Two-factor authentication and account security</p>
       </div>
 

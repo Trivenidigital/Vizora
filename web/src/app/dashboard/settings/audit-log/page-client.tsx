@@ -197,7 +197,7 @@ export default function AuditLogClient() {
 
  <div className="flex justify-between items-center">
  <div>
- <h2 className="eh-heading font-[var(--font-sora)] text-2xl text-[var(--foreground)]">Audit Log</h2>
+ <h2 className="eh-heading font-sora text-2xl text-[var(--foreground)]">Audit Log</h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Track all actions performed in your organization ({total} entries)
  </p>

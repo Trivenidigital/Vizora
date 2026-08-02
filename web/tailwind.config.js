@@ -10,6 +10,25 @@ module.exports = {
   darkMode: 'class',
   theme: {
     extend: {
+      /**
+       * Named font-family utilities.
+       *
+       * These exist so nobody has to reach for an arbitrary value. The app used
+       * `font-[var(--font-sora)]` at 35 call sites, which Tailwind types as
+       * font-WEIGHT — `font-weight: var(--font-sora)` resolves to a font stack,
+       * which is invalid, so the declaration was dropped and Sora never
+       * applied. (`dataTypes.length` rejects `var()`, so the colour-namespace
+       * inference that makes `text-[var(--x)]` safe does not apply here.)
+       *
+       * `font-sora` emits font-family and cannot be mis-typed. Prefer these over
+       * `font-[family-name:var(...)]`, which is correct but easy to get wrong
+       * again. The CSS variables come from next/font in app/layout.tsx.
+       */
+      fontFamily: {
+        sora: ['var(--font-sora)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        dm: ['var(--font-dm)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
+      },
       colors: {
         // Semantic colors
         primary: semanticColors.primary,
