@@ -86,3 +86,27 @@ test('schedule-doctor filters BEFORE it reports what it fetched', () => {
   assert.ok(filterIdx > -1 && fetchedLogIdx > -1);
   assert.ok(filterIdx < fetchedLogIdx, 'filter must precede the count it reports');
 });
+
+/**
+ * "Nothing to do" must still be a recorded run.
+ *
+ * fleet-manager used to `return` early when it had zero displays, which skipped
+ * recordAgentRun() at the end of main(). ops-watchdog reads that `lastRun`
+ * stamp, so an agent with nothing to do looked exactly like a dead agent — it
+ * raised a CRITICAL `agent-silent` incident on 2026-08-02, minutes after the
+ * disabled-display filter first made the count zero. The branch had been
+ * unreachable until then, which is why it survived review.
+ */
+test('fleet-manager does NOT short-circuit on an empty display list', () => {
+  assert.doesNotMatch(
+    source,
+    /displays\.length === 0\)\s*\{[^}]*return;/s,
+    'an early return here skips recordAgentRun and the watchdog reports the agent as silent',
+  );
+});
+
+test('every display check is loop-based, so falling through on empty is safe', () => {
+  // This is what makes removing the guard correct rather than merely convenient.
+  assert.match(source, /for \(const display of displays\)/);
+  assert.match(source, /recordAgentRun\(state, result\)/);
+});
