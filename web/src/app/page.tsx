@@ -5,6 +5,7 @@ import {
   NavigationSection,
   HeroSection,
   StatsSection,
+  HowItWorksSection,
   AIFeaturesSection,
   FeatureShowcasesSection,
   SolutionsSection,
@@ -112,23 +113,20 @@ export default function Index() {
   }, []);
 
   return (
-    <div
-      className="relative min-h-screen overflow-x-hidden selection:bg-[#00E5A0]/20"
-      style={{
-        background: 'linear-gradient(180deg, #061A21 0%, #081E28 40%, #0A222E 100%)',
-        color: '#F0ECE8',
-      }}
-    >
+    <div className="mkt relative min-h-screen overflow-x-hidden selection:bg-[#00B27C]/20">
       <NavigationSection scrolled={scrolled} menuOpen={menuOpen} setMenuOpen={setMenuOpen} nav={nav} />
-      <HeroSection heroRef={heroRef} />
-      <StatsSection />
-      <AIFeaturesSection />
-      <FeatureShowcasesSection activeFeatureTab={activeFeatureTab} />
-      <SolutionsSection />
-      <SecuritySection />
-      <PricingSection billingCycle={billingCycle} setBillingCycle={setBillingCycle} pricing={pricing} setPricing={setPricing} />
-      <FAQSection />
-      <FinalCTASection finalCtaRef={finalCtaRef} />
+      <main id="main-content">
+        <HeroSection heroRef={heroRef} />
+        <StatsSection />
+        <HowItWorksSection />
+        <FeatureShowcasesSection activeFeatureTab={activeFeatureTab} />
+        <AIFeaturesSection />
+        <SolutionsSection />
+        <SecuritySection />
+        <PricingSection billingCycle={billingCycle} setBillingCycle={setBillingCycle} pricing={pricing} setPricing={setPricing} />
+        <FAQSection />
+        <FinalCTASection finalCtaRef={finalCtaRef} />
+      </main>
       <StickyBottomBar showStickyBar={showStickyBar} />
       <FooterSection footerRef={footerRef} />
     </div>

@@ -42,7 +42,7 @@ export default function FAQSection() {
             <h2 className="eh-heading text-3xl sm:text-4xl font-bold mb-4">
               Frequently asked questions
             </h2>
-            <p style={{ color: '#9A958E' }}>
+            <p style={{ color: 'var(--mkt-ink-2)' }}>
               Everything you need to know about Vizora.
             </p>
           </div>
@@ -57,9 +57,9 @@ export default function FAQSection() {
         </Reveal>
 
         <Reveal>
-          <p className="text-center text-sm mt-8" style={{ color: '#6B655D' }}>
+          <p className="text-center text-sm mt-8" style={{ color: 'var(--mkt-muted)' }}>
             Still have questions?{' '}
-            <a href="mailto:support@vizora.cloud" className="transition-colors hover:text-[#00E5A0]" style={{ color: '#9A958E' }}>
+            <a href="mailto:support@vizora.cloud" className="transition-colors hover:text-[color:var(--mkt-mint-ink)]" style={{ color: 'var(--mkt-muted)' }}>
               Contact us &rarr;
             </a>
           </p>

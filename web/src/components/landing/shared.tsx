@@ -100,7 +100,7 @@ export function FAQItem({ q, a }: { q: string; a: string }) {
   return (
     <div
       className="relative border-b transition-colors"
-      style={{ borderColor: '#1B3D47' }}
+      style={{ borderColor: 'var(--mkt-hair, #1B3D47)' }}
     >
       <button
         onClick={() => setOpen(!open)}
@@ -108,7 +108,10 @@ export function FAQItem({ q, a }: { q: string; a: string }) {
       >
         <span
           className="text-[0.95rem] font-medium pr-4 transition-colors"
-          style={{ color: open ? '#F0ECE8' : '#B5AEA6', fontFamily: 'var(--font-sora), sans-serif' }}
+          style={{
+            color: open ? 'var(--mkt-ink, #F0ECE8)' : 'var(--mkt-ink-2, #B5AEA6)',
+            fontFamily: 'var(--font-sora), sans-serif',
+          }}
         >
           {q}
         </span>
@@ -116,7 +119,7 @@ export function FAQItem({ q, a }: { q: string; a: string }) {
           size={18}
           className="shrink-0 transition-transform duration-300"
           style={{
-            color: '#00E5A0',
+            color: 'var(--mkt-mint-ink, #00E5A0)',
             transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
           }}
         />
@@ -129,14 +132,14 @@ export function FAQItem({ q, a }: { q: string; a: string }) {
           opacity: open ? 1 : 0,
         }}
       >
-        <p className="pb-5 text-sm leading-relaxed" style={{ color: '#9A958E' }}>
+        <p className="pb-5 text-sm leading-relaxed" style={{ color: 'var(--mkt-ink-2, #9A958E)' }}>
           {a}
         </p>
       </div>
       {open && (
         <div
           className="absolute left-0 top-0 bottom-0 w-[2px] rounded-full"
-          style={{ background: '#00E5A0' }}
+          style={{ background: 'var(--mkt-mint, #00E5A0)' }}
         />
       )}
     </div>
