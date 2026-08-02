@@ -15,7 +15,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { login, logout, releaseSessions, __openSessionCount } from './lib/api-client.js';
+import {
+  login,
+  logout,
+  releaseSessions,
+  sessionReleaseFailures,
+  __resetSessionReleaseFailures,
+  __openSessionCount,
+} from './lib/api-client.js';
 
 const BASE = 'http://ops-test.invalid';
 const REFRESH_COOKIE = 'vizora_refresh_token=rt-abc123';
@@ -53,7 +60,10 @@ function stubFetch(
       } as unknown as Response;
     }
     if (opts.logoutThrows) throw new Error('network down');
-    return { ok: true, status: opts.logoutStatus ?? 200, text: async () => '' } as unknown as Response;
+    const status = opts.logoutStatus ?? 200;
+    // `ok` must follow the status — hardcoding it true is what made a 401
+    // look like a success, which is the exact bug these tests guard.
+    return { ok: status >= 200 && status < 300, status, text: async () => '' } as unknown as Response;
   }) as typeof fetch;
   return { calls, restore: () => { globalThis.fetch = real; } };
 }
@@ -190,6 +200,48 @@ test('releaseSessions is safe with nothing open', async () => {
   try {
     await assert.doesNotReject(() => releaseSessions());
     assert.equal(calls.length, 0);
+  } finally {
+    restore();
+  }
+});
+
+test('a rejected release is COUNTED, not swallowed', async () => {
+  __resetSessionReleaseFailures();
+  const { restore } = stubFetch([`${REFRESH_COOKIE}; Path=/`, `${CSRF_COOKIE}; Path=/`], { logoutStatus: 401 });
+  try {
+    const token = await login(BASE, 'ops@example.test', 'pw');
+    await logout(BASE, token);
+    // A 401 is exactly what the two ineffective fixes hit. It must not look
+    // like success ever again.
+    assert.equal(
+      sessionReleaseFailures(),
+      1,
+      'a 401 release must increment the failure count',
+    );
+  } finally {
+    restore();
+  }
+});
+
+test('a thrown release is COUNTED too', async () => {
+  __resetSessionReleaseFailures();
+  const { restore } = stubFetch([`${REFRESH_COOKIE}; Path=/`, `${CSRF_COOKIE}; Path=/`], { logoutThrows: true });
+  try {
+    const token = await login(BASE, 'ops@example.test', 'pw');
+    await logout(BASE, token);
+    assert.equal(sessionReleaseFailures(), 1);
+  } finally {
+    restore();
+  }
+});
+
+test('a successful release does not increment the failure count', async () => {
+  __resetSessionReleaseFailures();
+  const { restore } = stubFetch([`${REFRESH_COOKIE}; Path=/`, `${CSRF_COOKIE}; Path=/`], { logoutStatus: 200 });
+  try {
+    const token = await login(BASE, 'ops@example.test', 'pw');
+    await releaseSessions();
+    assert.equal(sessionReleaseFailures(), 0, 'clean release must not count as failure');
   } finally {
     restore();
   }

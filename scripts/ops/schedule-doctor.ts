@@ -110,6 +110,15 @@ async function main(): Promise<void> {
     return;
   }
 
+  // Same rule as fleet-manager: an operator-disabled display must not raise
+  // incidents. #259 filtered fleet-manager only, so schedule-doctor kept
+  // re-raising coverage_gap for a disabled fixture — caught by the natural
+  // cycle on 2026-08-02 22:30, which put the incident straight back.
+  const disabledDisplays = displays.filter(d => (d as { isDisabled?: boolean }).isDisabled === true);
+  if (disabledDisplays.length > 0) {
+    displays = displays.filter(d => (d as { isDisabled?: boolean }).isDisabled !== true);
+    log(AGENT, `Skipping ${disabledDisplays.length} operator-disabled display(s)`);
+  }
   log(AGENT, `Fetched ${schedules.length} schedules, ${displays.length} displays, ${playlists.length} playlists`);
 
   // State is read at the very END (after all detection I/O), so the file lock
