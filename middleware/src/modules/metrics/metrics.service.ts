@@ -23,6 +23,20 @@ export class MetricsService implements OnModuleInit {
   readonly webhookDeliveriesTotal: client.Counter<string>;
   readonly webhookAuditFailuresTotal: client.Counter<string>;
 
+  // Persistent-offline reconciliation (internal operational signal only — this
+  // path deliberately sends no customer notifications; see
+  // docs/plans/2026-08-02-persistent-offline-monitoring.md).
+  //
+  // A GAUGE, not a counter, and deliberately unlabelled by organisation:
+  //   - gauge, because middleware runs two PM2 cluster instances and the cron
+  //     fires in each, so `set()` must be idempotent where `inc()` would double;
+  //   - unlabelled, because a per-org label would expose cross-tenant fleet
+  //     detail through /internal/metrics, which is exactly the exposure this
+  //     design was written to avoid.
+  readonly persistentOfflineDisplays: client.Gauge<string>;
+  readonly persistentOfflineReconcileDuration: client.Histogram<string>;
+  readonly persistentOfflineReconcileFailures: client.Counter<string>;
+
   constructor() {
     this.register = new client.Registry();
 
@@ -61,6 +75,24 @@ export class MetricsService implements OnModuleInit {
       name: 'vizora_webhook_audit_failures_total',
       help: 'Webhook delivery audit row insert failed — alert on any non-zero value (silent-failure prevention)',
       labelNames: ['event'],
+      registers: [this.register],
+    });
+
+    this.persistentOfflineDisplays = new client.Gauge({
+      name: 'vizora_persistent_offline_displays',
+      help: 'Displays offline beyond the shared threshold, fleet-wide, excluding operator-disabled ones',
+      registers: [this.register],
+    });
+
+    this.persistentOfflineReconcileDuration = new client.Histogram({
+      name: 'vizora_persistent_offline_reconcile_duration_seconds',
+      help: 'Wall time of one persistent-offline reconciliation pass',
+      registers: [this.register],
+    });
+
+    this.persistentOfflineReconcileFailures = new client.Counter({
+      name: 'vizora_persistent_offline_reconcile_failures_total',
+      help: 'Persistent-offline reconciliation threw — alert on any non-zero value; the offline count is stale while this climbs',
       registers: [this.register],
     });
   }
