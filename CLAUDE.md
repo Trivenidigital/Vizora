@@ -96,6 +96,16 @@ cluster instances. See `docs/plans/2026-08-02-persistent-offline-monitoring.md`.
 
 **Content system**: Supports image/video/url/html types. Template rendering via Handlebars. File validation with magic number verification to prevent MIME spoofing. Expiration system with automatic replacement content.
 
+**Marketing `.mkt` scope (and its pending supersession)**: `globals.css` defines a `.mkt`
+scope applied to the 7 public routes (`/`, 5 legal pages, the auth layout) that re-tunes the
+shared `.eh-*` utilities for the light substrate **without** touching their unscoped
+definitions — which the dashboard also consumes. That isolation is why the marketing rebrand
+could ship without restyling the app. **A full-app rebrand was approved 2026-08-03**, which
+changes the goal (the app SHOULD match) but not the mechanic (shared rules must still be
+changed deliberately and verified on both surfaces). Note the app already has a working light
+theme pointing at an older warm-cream palette, so three palettes currently coexist. See
+`docs/plans/2026-08-03-full-app-rebrand.md` before touching `.eh-*` or the `:root` light tokens.
+
 **Response envelope**: Global `ResponseEnvelopeInterceptor` wraps all responses in `{ success, data, meta }`. Skip with `@SkipEnvelope()` decorator on individual endpoints.
 
 **API versioning**: All routes prefixed with `/api/v1`. Nginx has backwards-compat rewrite from `/api/` to `/api/v1/`.
