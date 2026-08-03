@@ -1,6 +1,26 @@
 # Persistent-offline monitoring — design, and the one decision it needs
 
-**Status:** design only. Not implemented. Blocked on a product decision, not on engineering.
+**Status:** design APPROVED with a narrow policy (2026-08-03). Not yet implemented.
+
+## Approved policy
+
+```
+PERSISTENT_OFFLINE_DETECTION        = ENABLED
+CUSTOMER_NOTIFICATIONS              = DEFAULT_OFF
+INITIAL_BACKFILL_NOTIFICATIONS      = SUPPRESSED
+REPEATED_OUTAGE_NOTIFICATIONS       = NOT_IMPLEMENTED_YET
+```
+
+Reconcile every 15 minutes; create or refresh an idempotent **internal** incident;
+resolve automatically when the display returns or is disabled; on first enable,
+backfill existing offline displays **silently**; never email from historical
+backfill; leave immediate online→offline transition alerts unchanged. Customer
+notification cadence is deliberately deferred until there is real operational
+evidence to base it on.
+
+This resolves the three open questions below — the answer to (1) is "not yet",
+to (2) "suppress backfill", to (3) "decide later". Implementation is unblocked
+within these constraints.
 
 ## The gap, precisely
 
@@ -101,4 +121,19 @@ Three open questions:
 
 **Recommendation:** implement the reconciler emitting an **internal** aggregate signal only, default-off, with no customer notification path wired. Decide (1)–(3) separately, with the counts above in hand. That delivers the missing coverage without committing to a notification policy by accident.
 
-Also open, and deliberately untouched: `Vizora QA` (3 displays) and `Vizora LLC` (3) have been fully offline for ~5 months. Whether they are real, retired, or test assets must be established before any alerting reaches them — a wrong answer here means either false alarms or a real outage dismissed as fixture noise.
+## Tenant classification — evidence gathered 2026-08-03
+
+Still an owner decision, but the evidence is one-sided:
+
+| Org | Sole user | Ever logged in | Displays | Reading |
+|---|---|---|---|---|
+| `Vizora QA` | `qa-test-0226@vizora.test` | **never** | 3 | `.test` is an RFC 2606 reserved TLD → internal test/QA |
+| `Vizora LLC` | `srini@vzora.com` (note the typo: *vzora*) | once, 2026-02-20 | 3 | created 2026-02-18, one login two days later, silent 5½ months → retired/abandoned |
+
+Wider context that lowers the stakes of the whole notification question: **every**
+organisation on this box is `tier=free`, `subscriptionStatus=canceled`, with no
+Razorpay id, no Stripe id and no billing email. There are no active paying
+customers in this database. `Hisaku` is the only org with meaningful recent
+activity (16 content items, last login 2026-07-24).
+
+Until classified, detection may include them; **notification must not**.
