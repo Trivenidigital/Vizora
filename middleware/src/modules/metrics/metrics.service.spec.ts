@@ -8,6 +8,14 @@ jest.mock('prom-client', () => {
   const mockHistogram = {
     observe: jest.fn(),
   };
+  // Gauge is mocked because MetricsService registers persistent-offline gauges;
+  // without it `new client.Gauge()` throws and every test here fails at
+  // construction rather than at the assertion it looks like it is testing.
+  const mockGauge = {
+    set: jest.fn(),
+    inc: jest.fn(),
+    dec: jest.fn(),
+  };
   return {
     Registry: jest.fn().mockImplementation(() => ({
       setDefaultLabels: jest.fn(),
@@ -16,6 +24,7 @@ jest.mock('prom-client', () => {
     })),
     Counter: jest.fn().mockImplementation(() => mockCounter),
     Histogram: jest.fn().mockImplementation(() => mockHistogram),
+    Gauge: jest.fn().mockImplementation(() => mockGauge),
     collectDefaultMetrics: jest.fn(),
   };
 });

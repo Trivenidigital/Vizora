@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { HttpModule } from '@nestjs/axios';
 import { DisplaysService } from './displays.service';
+import { PersistentOfflineReconciler } from './persistent-offline.reconciler';
 import { DisplaysController } from './displays.controller';
 import { PairingService } from './pairing.service';
 import { PairingController } from './pairing.controller';
@@ -29,7 +30,7 @@ import { ProvisioningTemplatesModule } from '../provisioning-templates/provision
     ProvisioningTemplatesModule,
   ],
   controllers: [DisplaysController, PairingController, DeviceAuthController],
-  providers: [DisplaysService, PairingService, DeviceAuthCheckService],
+  providers: [DisplaysService, PairingService, DeviceAuthCheckService, PersistentOfflineReconciler],
   exports: [DisplaysService, PairingService],
 })
 export class DisplaysModule {}
