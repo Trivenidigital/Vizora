@@ -82,6 +82,18 @@ Playwright runs sequentially (1 worker) to avoid DB race conditions. Retries: 2 
 
 **Durable device time-series (ClickHouse)**: ClickHouse is now wired (was provisioned-but-dark). The realtime gateway batches a `device_health_samples` row on every heartbeat via `ClickHouseService` (`realtime/src/services/clickhouse.service.ts`) — buffered, async, fire-and-forget, **fail-open** (a ClickHouse outage never touches the heartbeat path). The middleware reads it (`middleware/src/modules/clickhouse/`) for **real** uptime: `AnalyticsService.getDeviceUptime`/`getUptimeSummary` compute uptime as the fraction of 5-min buckets holding ≥1 sample, and return a clearly-labelled `insufficient_data` (`uptimePercent: null`, `measured: false`) when there is no history or ClickHouse is unreachable — never a fabricated number. A `ClickHouseWatchdogService` @Cron (§12a) alerts via Sentry when displays are active but samples stop arriving. Config is `CLICKHOUSE_*` (see `.env.example`); reads/writes fail-open and never hard-fail boot. Canonical DDL: `docker/clickhouse/init.sql` (app also creates it idempotently on startup).
 
+**Device offline detection — two distinct mechanisms, do not conflate them**:
+`DisplaysService.detectOfflineDevices()` is a `@Cron(EVERY_MINUTE)` firing on the **transition**
+`online → offline`, emitting `device.offline`, which the alert-rule engine turns into per-tenant
+email. That is edge-triggered and is *not* outage coverage — it emits nothing for a display already
+offline, a missed transition, or an outage that persists. `PersistentOfflineReconciler`
+(`displays/persistent-offline.reconciler.ts`, `*/15`) closes that gap as an **internal aggregate
+signal only**: cross-org in-process query, excludes `isDisabled`, sets
+`vizora_persistent_offline_displays`. It creates no incident and sends nothing — it holds no event
+emitter, asserted by test. Gated by `PERSISTENT_OFFLINE_RECONCILE_ENABLED`. **Before adding incident
+writes or notifications, read the activation gate in its docblock** — the cron fires in both PM2
+cluster instances. See `docs/plans/2026-08-02-persistent-offline-monitoring.md`.
+
 **Content system**: Supports image/video/url/html types. Template rendering via Handlebars. File validation with magic number verification to prevent MIME spoofing. Expiration system with automatic replacement content.
 
 **Response envelope**: Global `ResponseEnvelopeInterceptor` wraps all responses in `{ success, data, meta }`. Skip with `@SkipEnvelope()` decorator on individual endpoints.
@@ -132,6 +144,9 @@ VIZORA_TEST_DEVICE_TOKEN        # Fresh local device JWT for realtime/device-con
 VIZORA_TEST_DEVICE_IDENTIFIER   # Optional device identifier override for manual realtime scripts
 VIZORA_TEST_PLAYLIST_ID         # Optional playlist id override for manual content-delivery script
 VIZORA_TEST_CONTENT_ID          # Optional content id override for manual heartbeat/impression payloads
+DEMO_TENANT_PASSWORD            # REQUIRED by scripts/marketing/*. No default — the scripts refuse to
+                                # run without it, and the seed also refuses any non-local DATABASE_URL
+CAPTURE_BASE_URL                # Optional capture-target override (must be localhost)
 ```
 
 These variables are for local manual verification only. Generate tokens through
@@ -223,7 +238,15 @@ REALTIME_URL            # Realtime gateway base URL (default http://localhost:30
 WEB_URL                 # Web frontend base URL (default http://localhost:3001)
 VALIDATOR_BASE_URL      # Middleware base URL for ops scripts (default http://localhost:3000)
 RETENTION_DAYS          # Audit/log retention used by db-maintainer
+PERSISTENT_OFFLINE_RECONCILE_ENABLED  # 'true' enables PersistentOfflineReconciler (middleware, */15).
+                        # INTERNAL signal only — queries, logs and sets a gauge; sends nothing.
+                        # Default off. Enabled on prod 2026-08-03.
 ```
+
+> **`SMTP_PASS` / `SMTP_FROM` are not optional aliases.** `scripts/ops/lib/alerting.ts`
+> `sendEmailAlert()` reads `SMTP_PASS` and `SMTP_FROM` — **not** `SMTP_PASSWORD` or
+> `EMAIL_FROM`. A host that only has the latter pair fails SMTP auth silently (the error
+> is swallowed), so ops alerts vanish even with a recipient configured. Set all four.
 
 ### Third-party
 
@@ -255,6 +278,9 @@ web/src/lib/hooks/          # useSocket, useRealtimeEvents for WebSocket integra
 realtime/src/gateways/     # device.gateway.ts — main WebSocket handler
 scripts/agents/            # Business agents (cron + on-demand): customer-lifecycle, support-triage, etc.
 scripts/ops/               # Autonomous ops agents (PM2 cron) — see "Autonomous Operations"
+scripts/marketing/         # Local-only: seed a synthetic demo tenant + capture the homepage product
+                           #   shot. Both fail closed (non-local DB / missing password).
+                           #   See web/public/product/README.md
 e2e-tests/                 # 15 Playwright spec files (01-auth through 15-comprehensive-integration)
 docs/agents-architecture.md          # Discipline patterns extracted from shift-agent
 docs/agents-mcp-server-design.md     # MCP server module sketch (read-only v1)
@@ -280,12 +306,13 @@ Available at `http://localhost:3000/api/v1/docs` in development mode only.
 
 ## Known Test State
 
-> Numbers below were validated 2026-05-09 by a full autonomous test pass. **Verify with a fresh run before relying on a specific number** — the codebase is actively gaining tests. See `docs/plans/2026-05-09-test-results.md` for the full report.
+> Numbers below were re-validated 2026-08-03 (middleware + web + ops). **Verify with a fresh run before relying on a specific number** — the codebase is actively gaining tests. See `docs/plans/2026-05-09-test-results.md` for the full report.
 
-- **Middleware**: **2335 / 2367 tests pass** across **121 / 124 suites** (32 skipped, 0 fail). 124 spec files. Historical pre-existing failures (auth.controller, pairing.service) NO LONGER REPRODUCE.
+- **Middleware**: **3350 / 3350 tests pass** across **167 / 167 suites**, 0 fail (verified 2026-08-03).
 - **Realtime**: **212 / 212 tests pass** across **10 / 10 suites**. 10 spec files. The historical Prisma-generate-in-test-env issue NO LONGER REPRODUCES.
-- **Web**: **864 / 864 tests pass** across **79 / 79 suites**. 79 test files. The 2 admin RSC failures were resolved in `b712211` and remain green.
-- **Aggregate**: 3411 unit/integration tests passing, **ZERO failures** across all 3 services.
+- **Web**: **1167 / 1167 tests pass** across **113 / 113 suites**, 0 skipped (verified 2026-08-03).
+- **Ops scripts**: **74 / 74 tests pass** via `pnpm test:ops` (node:test + tsx).
+- **Aggregate**: 4517+ unit/integration tests passing, **ZERO failures**.
 - **TypeScript**: middleware `tsc --noEmit` exit 0; realtime + web pass via ts-jest (no separate type-check needed).
 - **Playwright (E2E)**: 24 spec files in `e2e-tests/`. Post-2026-05-09 fix (mass `/api/` → `/api/v1/` + h1 copy regex updates), estimated >90% pass rate. ~26 remaining failures concentrated in 9 specs (heaviest: 16-billing); see `docs/plans/2026-05-09-playwright-results.md`. Critical-path flows verified.
 - **Display**: Jest unit coverage exists for Electron main/preload/device/cache/renderer helpers and is CI-gated via `pnpm --filter @vizora/display test:ci`; display typecheck/build are gated via `pnpm --filter @vizora/display typecheck` and `pnpm --filter @vizora/display build`. Real-device walkthrough is still required per release.

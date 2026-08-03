@@ -1,5 +1,11 @@
 # Session handoff — 2026-08-02
 
+> **STATUS 2026-08-03: every open item below is CLOSED.** Production moved
+> `56a48e5d` → `0aaba06c` (PRs #257–#267). Items 3, 4 and 5 in §4 shipped; item 2
+> is accepted permission-blocked residue; items 1 and 6 remain owner decisions.
+> §8's security note is superseded — the credential was rotated 2026-08-02.
+> See `backlog.md` (2026-08-03 completed section) and `tasks/lessons.md`.
+
 **Headline: the marketing site was rebranded dark → light and is LIVE on https://vizora.cloud.**
 Prod HEAD moved `a0fe01f2` → `56a48e5d`. Local `main` is `1299676d`, pushed.
 
@@ -57,9 +63,9 @@ Colour rule: neon `#00E5A0` is 1.8:1 on `#E9EEEF`. **Fills and glows only — ne
 
 1. **Off-machine disaster recovery.** Both preservation sets are on C:. Covers accidental deletion, not drive loss. The only external drive (D:) is 94% full and holds personal data — Sri declined it. Needs a destination.
 2. **`.claude/worktrees/agent-ad415ba83a2bfef40`** — 1.4G, deregistered, content fully preserved. `rm -rf` was **denied by the permission layer**. That denial stands; do **not** work around it or ask a human to run it to bypass. Deferred disk cleanup only, not a blocker.
-3. **Cookie banner** renders from `layout.tsx` on every page incl. the dark dashboard, so it stays dark by design. Change needs a decision about how it should look over the dark app.
-4. **`DemoVideoSection` / `TestimonialsSection`** still dark, currently unmounted. They'd surface as a bug the moment anyone renders them. `TestimonialsSection` also contains three named customer quotes — **verify they're real and attributable before publishing**.
-5. **Product screenshot.** The homepage still uses a CSS-built dashboard mock. The repo's real captures are an empty demo tenant (0 devices/content/playlists, red "1 Issue" badge) and are unusable. Capturing a populated dashboard is the highest-value remaining improvement — for signage, the product shot *is* the proof.
+3. ~~**Cookie banner**~~ — **DONE (#257).** Context-aware via `body:has(.mkt) .consent-bar`: light on marketing/auth, unchanged dark in the app. Consent behaviour byte-identical.
+4. ~~**`DemoVideoSection` / `TestimonialsSection`** still dark~~ — **DONE (#257).** Both converted to `--mkt-*` tokens. `TestimonialsSection` **remains unmounted** with a DO-NOT-MOUNT banner; its three named quotes and "4.9/5 from 200+ reviews" are still unverified and must not be published.
+5. ~~**Product screenshot**~~ — **DONE (#257).** Real capture of the running app against a synthetic demo tenant, reproducible via `scripts/marketing/`. The red "1 Issue" badge that made earlier captures unusable was the **Next.js dev-tools overlay**, never product state — it does not exist in a production build.
 6. **Branch sprawl** — 216 local branches, mostly stale "readiness pass N" work. Not pruned; see §5 for why naive pruning is unsafe here.
 
 ## 5. Traps that cost real rework — read before touching this area
@@ -95,6 +101,11 @@ Unauthorized: branch pruning, stash deletion, preservation-ref deletion, reflog 
 
 registered worktrees **7** · `refs/preserve/*` **10** · local branches **216** · stashes **10** (7 original + 3 captures) · HEAD `1299676d` · tracked tree clean · prod `56a48e5d` live and verified.
 
-## 8. Security note
+## 8. Security note — SUPERSEDED 2026-08-02
 
-A production admin password was pasted into the session transcript on 2026-08-02 and **has not been rotated**. It should be, along with enabling the TOTP MFA shipped in #254.
+~~A production admin password was pasted into the session transcript and has not been rotated.~~
+**Rotated 2026-08-02** through the app's own change-password path (the new secret never entered a
+transcript). 8,354 refresh tokens revoked; no evidence of misuse — zero non-loopback logins after the
+exposure. Note `VALIDATOR_EMAIL` **is** the platform's only super-admin, so the ops agents run with
+full super-admin rights; rotating it requires `pm2 restart --update-env` or four agents 401 silently.
+TOTP enrollment remains deliberately deferred by the owner while this is a test bed.
