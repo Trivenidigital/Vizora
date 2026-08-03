@@ -1,11 +1,43 @@
 # Vizora Backlog
 
-**Last updated:** 2026-06-03 (main at `3e1ceb2f`)
+**Last updated:** 2026-08-03 (main and production both at `0aaba06c`)
+**Production:** `0aaba06c` — synchronized with `main`. Ops status HEALTHY, 0 active incidents.
 **Production readiness:** repo-side foundation strongest on record; customer-1 launch remains operator-gated on C1-C4 below.
 **Tests:** Current merge evidence: PR #220 GitHub CI passed audit, build, e2e, lint, security, and test. That CI `e2e` job is the narrow middleware Jest gate, not the full Playwright browser suite. Local #211 verification included focused middleware fleet tests (2 suites / 45 tests), realtime tests (13 suites / 287 tests), display focused tests (2 suites / 63 tests), display CI tests (8 suites / 145 tests), display typecheck/build, web tests (106 suites / 1115 tests), web/realtime/middleware builds, diff hygiene, and secret scan. Pass71 re-verified admin web tests (8 suites / 80 tests) for stale K5 closure. Pass72/73 re-verified focused agent/ops gates around Hermes cost and audit fallback. Pass78 adds a repo-side no-send-by-default C1 email readiness helper; pass79 adds a reusable C4 go-live smoke template; operator SMTP/Resend setup and any real test-send remain pending. Historical aggregate test report remains in `docs/plans/2026-05-09-test-results.md`; verify fresh counts before relying on older totals.
 **Customer-1 launch date:** operator-confirmed - do not use historical target dates until the operator confirms the actual launch window.
 
 **Security/realtime/readiness wave (#107-#220, merged through 2026-06-03, main `3e1ceb2f`):** session invalidation now spans REST + WebSocket - password-change / account-deactivation force-logout across all devices (REST `#111`, WS connect-time `#112`, WS mid-session 60s sweep `#114`). Customer-1 smoke coverage is hardened (#116), M12 security alert emails are complete (#117), and the latest overnight readiness passes hardened health/readiness gates, validator reporting, admin readiness display, deploy verification, first-customer runbook truthfulness (#218), public app URL precedence for email/reset/pairing/billing/lifecycle links (#209), repo-side display auto-update command plumbing (#211), Hermes runner balance-delta cost attribution (#213), Hermes audit outcome fallback (#214), a no-send-by-default C1 email readiness helper (#219), and a reusable C4 go-live smoke template (#220). P1/P2 tables below reconciled to match.
+
+---
+
+## COMPLETED (2026-08-02 → 2026-08-03 — web follow-up + ops remediation, PRs #257–#267)
+
+Production moved `56a48e5d` → `0aaba06c`. All work below is merged, deployed and runtime-verified.
+
+### Web (#257, #264)
+- **Real product screenshot** replaces a fabricated CSS mock on the homepage. The old "Fleet Status" card invented devices (`NYC — Times Square`, `12ms`). Now a real capture of the running app against a synthetic demo tenant, captioned "Actual product UI — demo workspace, synthetic data". Reproducible via `scripts/marketing/`.
+- **Context-aware cookie banner** — light on `.mkt` marketing/auth pages, unchanged dark in the app, via `body:has(.mkt) .consent-bar`. Consent storage and behaviour byte-identical; dismissed bar now leaves the tab order.
+- **`DemoVideoSection` / `TestimonialsSection`** converted to `--mkt-*` tokens. `TestimonialsSection` **remains unmounted** with a DO-NOT-MOUNT banner — its three named quotes and "4.9/5 from 200+ reviews" have no source in this repo.
+- **`SearchFilter` padding bug** — `.eh-input` is defined after `@tailwind utilities`, so source order beat `pl-10` and the search glyph sat on the placeholder in *every* dashboard search box.
+- **Sora typeface never applied** at 35 call sites across 22 files: `font-[var(--font-sora)]` types as font-**weight**, producing an invalid declaration that was dropped. Fixed with a named `font-sora` utility (`tailwind.config.js` now declares `fontFamily`), which cannot be mis-typed. Verified in the shipped bundle and by computed `font-family` in a browser.
+
+### Ops (#258, #260, #261, #262, #263)
+- **Refresh-token leak CLOSED.** ~384/day (measured, not estimated), 8,405 rows accumulated, `replacedByTokenHash = 0` — never redeemed. Cause: ops agents logged in via `fetch` (no cookie jar) and discarded the refresh cookie. Fix required **three** attempts; the working one sends the cookie **plus** `X-CSRF-Token`, without which logout returns 401 and revokes nothing. Runtime-verified: minted = revoked, 0 unrevoked on natural cycles.
+- **Session-release failures are now loud** — logged at ERROR naming the consequence, plus a failure counter and per-run summary. Silence is what let two ineffective fixes ship looking correct.
+- **Disabled displays excluded** from `fleet-manager` and `schedule-doctor`. `isDisabled` existed and was returned by the API but no agent read it, so operator-disabled displays paged forever.
+- **`agent-silent` false CRITICAL** — an early return on zero displays skipped `recordAgentRun()`, so "nothing to do" read as "dead" to the watchdog.
+
+### Incidents
+- 12 active incidents → **0**. Seven attributable to five disabled E2E fixtures were reconciled; the remaining five were investigated individually and resolved with evidence (content already `archived` with 0 references; storage proven healthy by a write/read/delete probe). None were bulk-cleared to force a green status.
+
+### Monitoring (#265, #266, #267)
+- **Persistent-offline detection** implemented, deployed and enabled — `PersistentOfflineReconciler`, `*/15`, cross-org in-process query, excludes `isDisabled`, gauge `vizora_persistent_offline_displays` (currently 19). **Aggregate detection only**: no durable incidents, no notifications, no reminder cadence. It holds no event emitter, asserted by test.
+- Established distinction now in the permanent record: **transition alerting ≠ persistent-outage coverage**. Prod proved it — 24 displays offline, 2 alert-rule firings ever.
+- **Rejected on review:** granting `fleet-manager` cross-tenant scope, and a cross-tenant MCP `list_displays_platform` tool. Both duplicate per-tenant behaviour the product already does correctly.
+
+### Security
+- Exposed super-admin credential **rotated** via the app's own change-password path (never printed); 8,354 refresh tokens revoked; no evidence of misuse (zero non-loopback logins post-exposure). **`VALIDATOR_EMAIL` is the platform's only super-admin** — the ops service account runs with full super-admin rights.
+- **Ops alert delivery was broken two ways**: no recipient configured, *and* `sendEmailAlert` reads `SMTP_PASS`/`SMTP_FROM` which did not exist on the host (it had `SMTP_PASSWORD`/`EMAIL_FROM`), so it would have failed auth even with a recipient. Fixed; receipt verified at SMTP level (250 + message id).
 
 ---
 
@@ -264,6 +296,10 @@ Items the audit listed but we are NOT pursuing live (Engage/kiosk, live remote v
 | K6 | AI Designer returns "launching soon" stub | Info | TODO | Intentional — needs API budget |
 | K7 | Push-to-group iterates client-side | Low | FIXED | Generalized fleet command endpoint accepts `target.type = group`; `fleet.service` resolves display-group members server-side and fans out through the existing gateway broadcast path |
 | K8 | Playlist loop UI not fully wired | Low | FIXED | Fixed in unblocked tasks sprint |
+| K9 | No admin/support MFA reset path | Medium | DEFERRED — prerequisite | Zero `mfaEnabled`/`mfaSecret` refs in `admin/` or `users/`; `mfa/disable` needs a TOTP or backup code, so losing both means direct DB access. Harmless while MFA is optional; **must exist before `mfaRequired` is enforced broadly**. Needs a new super-admin audited endpoint — do not build UI first |
+| K10 | `@Cron` fires in every PM2 cluster instance | Medium | OPEN — gate documented | `CronLeaderService` (PR #228) unmerged. Safe for read-only jobs using `set()`; **before adding incident writes or notifications, require leader election, distributed locking, or independently idempotent side effects** |
+| K11 | Ops fleet monitoring sees one org only | Medium | BY DESIGN — understood | The ops account belongs to `E2E Test Org` and the displays REST API is org-scoped, so `fleet-manager` only ever saw 5 of 24 displays. Real per-tenant coverage lives in the alert-rule engine; cross-tenant scope was **rejected**. Do not "fix" by widening scope |
+| K12 | Ops agents re-login every cron firing | Low | MITIGATED | Sessions are now released each run (minted = revoked). Root cause — password auth per run rather than an API key — remains |
 
 ---
 
@@ -271,8 +307,8 @@ Items the audit listed but we are NOT pursuing live (Engage/kiosk, live remote v
 
 | Metric | Start of Week | Current | Target (Launch) |
 |--------|--------------|---------|-----------------|
-| Test suites | ~89 | 213 service suites verified 2026-05-09 | 213+ and green |
-| Total tests | 1,734 | 3,411 service tests verified 2026-05-09 | No regressions |
+| Test suites | ~89 | web 113 · middleware 167 · ops 74 tests (verified 2026-08-03) | green |
+| Total tests | 1,734 | web 1,167 + middleware 3,350 (verified 2026-08-03) | No regressions |
 | Test pass rate | 99.9% | 100% | 100% |
 | P0 customer-1 operator gates | 8 | 4* | 0 |
 | Console errors (dashboard) | Multiple | ~0 | 0 |

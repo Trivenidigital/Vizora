@@ -1,5 +1,47 @@
 # Vizora - Lessons Learned
 
+## Session: 2026-08-03 - Ops remediation + web follow-up (prod `0aaba06c`)
+
+### Green tests are not evidence of correctness — this cost two deploys
+- The ops refresh-token fix **shipped twice looking correct** and was wrong both times: first a `beforeExit` hook that fired but let the process exit before its fire-and-forget request completed; then a logout the server rejected **401**. Both had passing suites, sound reasoning, and clean deploys. Only checking the runtime afterwards caught them.
+- **Rule:** for anything whose effect lives outside the process (a DB row, an email, a revoked session), a green suite means *ready for runtime verification*, not *fixed*. Query the actual state after deploying.
+
+### Swallowed errors are how a broken fix looks identical to a working one
+- `logout()` swallowed its failure by design, so two ineffective fixes looked like silence rather than failure. The leak was only found by counting rows.
+- **Rule:** best-effort code may not fail loudly, but it must never be *silent*. Log the failure, name the consequence, and increment a counter. `catch {}` with a comment is not acceptable on a path whose whole purpose is a side effect.
+- A test stub that returns `ok: true` regardless of status will hide exactly this class of bug. Derive `ok` from the status.
+
+### A fix applied to one agent is not a fix
+- The shared client learned to release its session, but `validate-monitor.ts` carried its **own duplicate `login()`** and kept leaking. `#259` filtered disabled displays in `fleet-manager` only, so `schedule-doctor` re-raised a reconciled incident minutes later.
+- **Rule:** when fixing a behaviour that several agents share, enumerate every agent that performs it. Grep for the *behaviour* (`auth/login`, display evaluation), not for the symbol you just edited.
+
+### "Nothing to do" must still be a recorded run
+- `fleet-manager` returned early on zero displays, skipping `recordAgentRun()`. `ops-watchdog` reads that timestamp, so an agent with nothing to do was indistinguishable from a dead one — a false CRITICAL within minutes.
+- The branch had been **unreachable for the agent's whole life**; a new filter reached it. **The guard was the bug, the filter merely exposed it.** Expect newly-reachable dead code when you change a filter's output domain.
+
+### Tailwind scans raw file text, including comments
+- Documenting the `font-[var(--x)]` anti-pattern with the literal spelled out **regenerated the broken rule in the production bundle**. The comment now describes it without writing it.
+
+### Arbitrary-value typing is namespace-specific — do not over-generalise either way
+- The inherited claim that `text-[var(--x)]` "compiles to nothing" was **false** and was propagated into code and a commit message before anyone checked. `dataTypes.color` accepts anything starting with `var(`, so colour namespaces are safe.
+- But the over-correction is also wrong: `font-[var(--font-sora)]` genuinely mistyped to `font-weight` at 35 sites and silently dropped. **Colour namespaces are safe; others are not.** Prefer a named theme utility over any arbitrary value.
+
+### Runtime state beats configuration files
+- PM2 caches env at spawn and `dotenv` does **not** override an existing `process.env`, so editing `.env` silently changed nothing for four agents until `pm2 restart --update-env`. `health-guardian` stayed green throughout because it never authenticates — a **false all-clear**.
+- Ops `logout` needs `X-CSRF-Token`: presenting cookies makes the request look cookie-authenticated, so cookies *without* the header are rejected 401 and nothing is revoked. Bearer-only returns 201 and revokes nothing at all.
+
+### Claims must not outrun the evidence
+Three corrections were needed this session, all the same shape — a conclusion stronger than what was measured:
+- "already covers all 24 displays" — transition alerting is **not** persistent-outage coverage.
+- "emailing real tenants" — every org on prod is free/canceled with no billing identifier; there are **no** active paying customers.
+- "the only gap is a missing regenerate endpoint" — a **head-limited grep** truncated before the route that proves it exists.
+- **Rule:** before asserting absence, confirm the search was exhaustive. Before asserting coverage, name the mechanism and check it actually fires.
+
+### Read-only safety is a property of the work, not of the scheduler
+- Middleware runs two PM2 cluster instances and every `@Cron` fires in both (`CronLeaderService`, PR #228, is unmerged). Harmless for a read-only reconciler using `set()`; the moment a side effect is added, two instances duplicate it.
+
+---
+
 ## Session: 2026-06-03 - Runtime Assumption Correction
 
 ### SMTP / Email State
