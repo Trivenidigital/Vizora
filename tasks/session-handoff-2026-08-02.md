@@ -56,6 +56,10 @@ Consequences:
 - Components shared with the dark app (`MfaEnrollFlow`, `admin/backlog/page-client`) needed **no edit** — they read those tokens, so they render light inside `.mkt` and dark elsewhere.
 - `ValuePanel` is deliberately dark *inside* the light scope, so it carries `.mkt-dark-panel`, an escape hatch restoring the dark tokens locally.
 - **Never recolour the unscoped `.eh-*` rules to change marketing appearance.**
+- **UPDATE 2026-08-03:** a full-app rebrand was approved — the app *should* now match the
+  homepage. The isolation rule above still governs *how* (change shared rules deliberately,
+  verify both surfaces), but "dashboard stays dark by design" is no longer the intent.
+  See `docs/plans/2026-08-03-full-app-rebrand.md`.
 
 Colour rule: neon `#00E5A0` is 1.8:1 on `#E9EEEF`. **Fills and glows only — never text, never borders.** Text uses `--mkt-mint-ink` / `--mkt-cyan-ink` / `--mkt-violet-ink` / `--mkt-amber-ink`. Body prose `--mkt-ink-2`; `--mkt-muted` for micro labels only; interactive links `--mkt-ink-2`.
 
