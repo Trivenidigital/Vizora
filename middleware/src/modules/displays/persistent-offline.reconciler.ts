@@ -31,6 +31,30 @@ const PAGE_SIZE = 500;
  * retracted. Escalating this to customer notification is a separate, explicit
  * decision. Transition alerting is left exactly as it is.
  *
+ * TWO BOUNDARIES, recorded because both are easy to overstate later:
+ *
+ * 1. This is AGGREGATE DETECTION, not incident reconciliation. It queries,
+ *    logs and sets a gauge. It creates no durable incident, sends nothing, and
+ *    implements no reminder cadence. Those are deferred product capabilities,
+ *    not oversights.
+ *
+ * 2. The gauge is a DATABASE-STATE COUNT, not an actionable-customer-outage
+ *    count. It includes orgs classified as internal-test (`Vizora QA`) and
+ *    retired (`Vizora LLC`), whose data was deliberately left untouched by that
+ *    classification. Fine for an internal technical metric. Do NOT later
+ *    present it as "N real customer outages" — it is not that number.
+ *
+ * ACTIVATION GATE — read before adding incident writes or notifications:
+ *
+ *    Middleware runs two PM2 cluster instances and this cron fires in BOTH.
+ *    That is harmless today only because the job is read-only and the gauge
+ *    uses set(). The moment a side effect is added — an incident row, an
+ *    email, a webhook — two instances will produce duplicates. Before that
+ *    change, require ONE of: leader election (CronLeaderService, PR #228),
+ *    distributed locking, or side effects that are independently idempotent.
+ *    Do not rely on the current safety; it is a property of read-only-ness,
+ *    not of the scheduler.
+ *
  * @see docs/plans/2026-08-02-persistent-offline-monitoring.md
  */
 @Injectable()

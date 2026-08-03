@@ -137,3 +137,35 @@ customers in this database. `Hisaku` is the only org with meaningful recent
 activity (16 content items, last login 2026-07-24).
 
 Until classified, detection may include them; **notification must not**.
+
+---
+
+## Shipped 2026-08-03 — and the boundaries of what shipped
+
+Implemented in `middleware/src/modules/displays/persistent-offline.reconciler.ts`
+(PR #266), deployed and enabled on production. First pass reported **19**
+displays with **0** failures.
+
+**What shipped is aggregate detection, not incident reconciliation.** It queries,
+logs, and sets a gauge. It creates no durable incident, sends no notification,
+and has no reminder cadence. Those remain deferred product capabilities.
+
+**The gauge is a database-state count, not an actionable-customer-outage count.**
+The 19 includes `Vizora QA` (classified internal-test) and `Vizora LLC`
+(classified retired) — classification recorded their status without altering
+their data or disabling their displays. That is correct for an internal
+technical metric. It must not later be presented as "19 real customer outages".
+
+### Activation gate — before adding incident writes or notifications
+
+```
+BEFORE_ADDING_INCIDENT_WRITES_OR_NOTIFICATIONS:
+require leader election, distributed locking,
+or independently idempotent side effects
+```
+
+Middleware runs two PM2 cluster instances and this cron fires in both — visible
+in production as a doubled log line at every pass. That is harmless *only*
+because the job is read-only and the gauge uses `set()` rather than `inc()`. Add
+any side effect and two instances will produce duplicates. The current safety is
+a property of read-only-ness, not of the scheduler.
