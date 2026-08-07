@@ -12,7 +12,13 @@ export const envSchema = z.object({
   
   // CORS
   CORS_ORIGIN: z.string().default('http://localhost:3001'),
-  
+
+  // Null-origin CORS for packaged Samsung Tizen / LG webOS clients, which
+  // request from a file:// document and therefore send `Origin: null`.
+  // FAIL-CLOSED: the schema default is 'disabled'; only the exact string
+  // 'enabled' activates it. See middleware/src/common/cors/cors-policy.ts.
+  DEVICE_NULL_ORIGIN_CORS: z.enum(['enabled', 'disabled']).default('disabled'),
+
   // Database
   DATABASE_URL: z.string().url().refine(
     (url) => url.startsWith('postgresql://') || url.startsWith('postgres://'),
