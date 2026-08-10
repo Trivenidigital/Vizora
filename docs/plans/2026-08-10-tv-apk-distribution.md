@@ -307,13 +307,13 @@ The backup half of Gate B is built and proven. The credential half is not, and
 | Restored keystore opens | **PASS** |
 | Restored key signs | **PASS** |
 | Cert matches `BE2320A5…3A9187A5` | **PASS** |
-| Credentials in an independent store | **NOT VERIFIED** |
+| Credentials in an independent store | **PASS** — filed and read back by Srini, 2026-08-10 |
+| Staging folder removed from build machine | **PASS** — independently re-checked, no stray copies |
 | Recovery owner | Srini |
-| **GATE B** | **FAIL** |
+| **GATE B** | **PASS (closed 2026-08-10)** |
 
-Recovery after a total build-machine loss will be: vault → passphrase → decrypt
-the VPS copy → vault → keystore password → open. No step touches the Windows
-machine — once the secrets are actually in the vault.
+Recovery after a total build-machine loss: vault → passphrase → decrypt the VPS
+copy → vault → keystore password → open. No step touches the Windows machine.
 
 ### The near-miss that shaped this — read before closing Gate B
 
