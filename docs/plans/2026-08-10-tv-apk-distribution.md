@@ -7,6 +7,11 @@ this change touches a running production service.
 > that signed it is not on the build machine. Establish a canonical signing
 > identity and build a fresh release first. Detail in §6.
 
+> **1.3.11 is now BUILT and fully verified (2026-08-10 evening).** The fresh
+> release §6 called for exists, signed by the on-machine key. Everything that
+> does not require a human is done — see §6.1. **Gate B is the only remaining
+> blocker, and it is two acts of custody, not two signatures.**
+
 **Scope:** a bounded customer-pilot distribution surface. Two permanent URLs:
 
 | URL | Serves |
@@ -177,6 +182,151 @@ The candidate's certificate subject is
 whereas the 1.3.10 APK's is bare `CN=Vizora Display` — an independent
 corroboration that these are two genuinely distinct keys, not a fingerprint
 parsing artifact.
+
+## 6.1 Where this actually stands — 2026-08-10 evening
+
+1.3.11 was built, signed and verified. **Nothing was published.** The dry run
+exits 1, as designed.
+
+```
+package       com.vizora.display
+versionName   1.3.11
+versionCode   10141          (> 10140, the never-published 1.3.10)
+apk sha256    D95FA359D194704C8ACB6144B37FB054DB1FCF5789B7D0BE370CDE886F9DB02E
+apk bytes     1250202
+cert sha256   BE2320A5728CFCF1CF9436C04C377BE9BF347807B23183F8C88BE3583A9187A5
+cert owner    CN=Vizora Display, OU=Mobile, O=Triveni Digital, L=Unknown, ST=Unknown, C=US
+cert valid to 2053-08-11
+apksigner     VERIFIES — v1 true, v2 true; 1 signer, matches the certificate
+source        vizora-tv c126ee1 (branch release/1.3.11, parent bff3ee0 = tag v1.3.10)
+```
+
+The signing certificate came out **identical to the rehearsal candidate**, which
+independently confirms which key actually signs on this machine.
+
+**Three findings surfaced during the build, all worth keeping:**
+
+**1. 1.3.10 was never reproducible from its own tag.** `build.gradle` at tag
+`v1.3.10` declares `versionCode 10135` / `versionName "1.0.1"`, but the shipped
+APK is `10140` / `1.3.10`. That version was injected out-of-tree and never
+committed — the same class of problem as the missing signing key, and more
+corroboration that 1.3.10 was produced somewhere this machine cannot reproduce.
+1.3.11 bumps the version *in tracked source* precisely so this stops being true.
+
+**2. `package.json` version reaches production telemetry.** Vite injects it as
+`__APP_VERSION__`, which feeds the device heartbeat's `appVersion` and the Sentry
+release tag. It had been left at `1.0.1` while the APK moved to `1.3.x`, so every
+TV would report a version that does not exist. Bumped with the same commit —
+check these together on every future release.
+
+**3. `vizora-tv` has 5 failing unit tests, and they are pre-existing.** 5 of 296
+fail on `bff3ee0` — the v1.3.10 tag — *before* any change here; the version bump
+introduced no regression (verified by stashing it and re-running). Four are
+`update_config` command handling (`apiUrl` / `realtimeUrl` / `dashboardUrl`
+resolving to `undefined` instead of the allowed value) and one is the F41
+auth-probe suspend latch. `lintVitalRelease` passes, so nothing blocks the build,
+but `update_config` is the remote-reconfiguration path for a fleet of TVs and it
+is either genuinely broken or covered by stale tests. **Worth resolving before
+the pilot, and it is not release-gate work — it is a `vizora-tv` bug hunt.**
+
+**Preserve the binary.** Android release builds are not byte-reproducible (zip
+timestamps, R8), so the SHA-256 above belongs to *that specific file*, not to the
+commit. Rebuilding stales `release.json` and the installer page. The verified APK
+is kept with its provenance at
+`C:\projects\vizora-artifact-backups\tv-apk-1.3.11\`. If it is ever lost, rebuild
+**and** re-run steps 3-4 of §8 to re-record the new hash.
+
+### What remains — and who can do it
+
+| Step | Blocked on | Who |
+|---|---|---|
+| Place a secure **off-machine** backup of the keystore | nothing — just needs doing | operator |
+| Put the keystore/alias password in a **separate** authorized store | nothing | operator |
+| Name a recovery owner who is not the key's author | nothing | operator |
+| Fill `signing.*` + `approval.signingKeyBackupConfirmedBy` (Gate B) | the three above | operator |
+| Fill `approval.artifactApprovedBy` (Gate A) | — | Sri |
+| Pin `signing.canonicalCertSha256` = `BE2320A5…3A9187A5` | Gate B | either |
+| `publish-display-apk.sh --apk … ` | all of the above | either |
+| Tag `v1.3.11` from `c126ee1`, push, attach the APK | — | either |
+| Set `TV_DOWNLOAD_MONITOR_ENABLED=true` | **must ship with the publish**, not before | either |
+
+The first three lines are why an agent cannot finish this. They are not
+approvals to be recorded — they are physical acts of custody. Writing
+`signingKeyBackupConfirmedBy` without them would not close the risk, it would
+only delete the warning about it.
+
+### Gate B closure — the exact procedure
+
+Nothing below prints a password or copies a private key into this repo.
+
+```bash
+# 1. Confirm the key still opens and is a private-key entry (prompts for the password)
+keytool -list -v -keystore /c/projects/vizora-tv/android/vizora-release.jks \
+        -alias vizora-display | grep -E "Entry type|SHA256"
+#    expect: PrivateKeyEntry, and SHA256: BE:23:20:A5:...:87:A5
+
+# 2. Copy the .jks to an off-machine store (password manager attachment,
+#    hardware token, or a different physical machine you control).
+#    Do NOT put it in any Vizora git repo, and not on the prod VPS —
+#    an internet-facing web server is not a key-custody location.
+
+# 3. Store the store/key password in that SAME manager but as a SEPARATE item.
+#    The current blocker is that the .jks and the only known copy of its password
+#    live in one directory: backing up the .jks alone changes nothing.
+
+# 4. Prove recovery: from the backup alone, restore to a scratch dir and re-run
+#    step 1. If it opens with a credential fetched from the store, Gate B is real.
+```
+
+Then record in `deploy/tv/release.json` — **class and ownership only, never a
+password, a path to the secret, or key material**:
+
+```json
+"signing": {
+  "canonicalCertSha256": "BE2320A5728CFCF1CF9436C04C377BE9BF347807B23183F8C88BE3583A9187A5",
+  "canonicalCertPinnedBy": "<name>",
+  "canonicalCertPinnedAt": "<YYYY-MM-DD>",
+  "backupClass": "<e.g. password-manager vault, org-owned>",
+  "recoveryOwner": "<name>"
+},
+"approval": {
+  "artifactApprovedBy": "<name>",
+  "artifactApprovedAt": "<YYYY-MM-DD>",
+  "signingKeyBackupConfirmedBy": "<name>",
+  "signingKeyBackupConfirmedAt": "<YYYY-MM-DD>",
+  "signingKeyLocationClass": "<class, not a path>",
+  "signingKeyRecoveryOwner": "<name>"
+}
+```
+
+Then publish (the APK is already built and verified):
+
+```bash
+ANDROID_HOME=~/Android/Sdk \
+  bash scripts/release/publish-display-apk.sh \
+  --apk .tmp-apk/vizora-display-1.3.11-release.apk --dry-run   # expect exit 0
+# then drop --dry-run, adding --install-nginx on the first publish only
+```
+
+### Build-machine note: TLS interception breaks Gradle
+
+Norton Web/Mail Shield MITMs HTTPS on this machine. `curl` works (its root is in
+the Windows store) but the JDK's `cacerts` does not carry it, so Gradle dies with
+`PKIX path building failed` on `dl.google.com`. Fixed without touching the system
+JDK by copying `cacerts`, importing the Norton root into the copy, and pointing
+one build at it:
+
+```bash
+keytool -importcert -noprompt -trustcacerts -alias norton-tls-scanning-root \
+  -file norton-root.pem -keystore ./cacerts-with-norton.jks -storepass changeit
+
+./gradlew assembleRelease --no-daemon \
+  -Djavax.net.ssl.trustStore=<abs path>\cacerts-with-norton.jks \
+  -Djavax.net.ssl.trustStorePassword=changeit
+```
+
+Export the root with PowerShell:
+`Get-ChildItem Cert:\LocalMachine\Root | ? {$_.Subject -like '*Norton*'}`.
 
 ### Pinned canonical certificate — what protects the first publish
 

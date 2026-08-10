@@ -47,6 +47,23 @@
       "not match the pin."
     ],
 
+    "_status_2026_08_10_evening": [
+      "1.3.11 has now been BUILT and fully verified against the on-machine key,",
+      "and its certificate is BE2320A5…3A9187A5 — matching the rehearsal candidate",
+      "exactly, which independently confirms which key actually signs here.",
+      "",
+      "GATE B IS STILL FAILED, and it is the only thing between this build and",
+      "publication. Its two open items are facts about custody, not paperwork:",
+      "  - no secure OFF-MACHINE backup of the keystore",
+      "  - no credential recovery independent of this one Windows machine",
+      "Neither can be closed by an agent, because neither is a decision — they",
+      "require someone to actually place the backup and own the recovery.",
+      "",
+      "Publishing before they are closed is the one irreversible move here: the",
+      "risk starts the moment a customer installs, and if the key is then lost",
+      "every TV in the field needs uninstall + re-pair to ever update again."
+    ],
+
     "_playStoreNote": [
       "Before customer rollout, compare the canonical sideload certificate with the",
       "Google Play App Signing certificate. If they differ, pilot customers migrating",
@@ -56,16 +73,31 @@
   },
 
   "candidate": {
+    "_comment": [
+      "Built from source on 2026-08-10, NOT downloaded from a GitHub release.",
+      "This is deliberate: the 1.3.10 artifact could not be reproduced from the",
+      "tree it was tagged from (build.gradle at tag v1.3.10 declares versionCode",
+      "10135 / versionName 1.0.1, while the shipped APK is 10140 / 1.3.10), so its",
+      "version was injected out-of-tree and never committed. 1.3.11 bumps the",
+      "version in tracked source instead, at vizora-tv commit c126ee1.",
+      "",
+      "sourceReleaseUrl stays null until a v1.3.11 tag and GitHub release exist.",
+      "Publishing does not depend on it — but the archive story does, so cut the",
+      "tag from c126ee1 before this ships."
+    ],
     "package": "com.vizora.display",
-    "versionName": "1.3.10",
-    "versionCode": 10140,
-    "apkSha256": "80DD8AAAAD8A32957CDDF6AD6097954E77D859B792534F746D896DD015DEBFB6",
-    "apkBytes": 1247598,
-    "signingCertSha256": "AA07524A453375DE143CA4A506C44657E509CCC0F79981821693903DA5137982",
-    "signingCertOwner": "CN=Vizora Display",
-    "sourceReleaseUrl": "https://github.com/Trivenidigital/vizora-tv/releases/tag/v1.3.10",
-    "sourceAssetName": "vizora-display-1.3.10-release.apk",
-    "sourceIsPrerelease": true,
+    "versionName": "1.3.11",
+    "versionCode": 10141,
+    "apkSha256": "D95FA359D194704C8ACB6144B37FB054DB1FCF5789B7D0BE370CDE886F9DB02E",
+    "apkBytes": 1250202,
+    "signingCertSha256": "BE2320A5728CFCF1CF9436C04C377BE9BF347807B23183F8C88BE3583A9187A5",
+    "signingCertOwner": "CN=Vizora Display, OU=Mobile, O=Triveni Digital, L=Unknown, ST=Unknown, C=US",
+    "sourceReleaseUrl": null,
+    "sourceAssetName": "vizora-display-1.3.11-release.apk",
+    "sourceIsPrerelease": null,
+    "sourceRepo": "Trivenidigital/vizora-tv",
+    "sourceCommit": "c126ee1525739be76cbfcee3717cccb7ecbf5277",
+    "sourceCommitParent": "bff3ee0dee7c3d1896f93bf7be131bd833ddadba",
     "verifiedAt": "2026-08-10",
 
     "apksignerVerified": true,
