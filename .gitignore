@@ -90,13 +90,24 @@ docker-compose.override.yml
 # NX
 .nx/
 
-# Android signing (NEVER commit keystores or signing credentials)
+# Android signing (NEVER commit keystores or signing credentials).
+# A private repo is not a key vault — repo access spreads to developers, CI and
+# integrations. The off-machine backup is an ENCRYPTED copy on a VPS path
+# outside every web/Docker/app root; see docs/plans/2026-08-10-tv-apk-distribution.md
 *.keystore
 *.jks
+*.p12
 keystore.properties
+*.jks.enc
 
-# Electron builds
-release/
+# APK staging dir used by the release runbook (`gh release download --dir .tmp-apk`).
+# Without this a stray `git add .` commits a multi-MB binary.
+.tmp-apk/
+
+# Electron builds — anchored to the electron-builder output dir
+# (display/package.json directories.output). An unanchored `release/` also
+# matched scripts/release/, silently un-tracking source that belongs in git.
+display/release/
 
 # Archived/unused files
 unusedInCode/

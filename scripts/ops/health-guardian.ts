@@ -8,6 +8,8 @@
  * Checks:
  *   1. Service HTTP endpoints (middleware, realtime, web)
  *   2. PM2 process status (errored/stopped → restart, high memory → reload)
+ *   3. Customer APK install surface — /tv + /downloads/vizora-display.apk
+ *      (opt-in via TV_DOWNLOAD_MONITOR_ENABLED; no auto-remediation)
  *
  * Escalation: After 2 failed restart attempts, incident is marked 'escalated'.
  *
@@ -39,6 +41,23 @@ const AGENT = 'health-guardian';
 const MAX_RESTART_ATTEMPTS = 2;
 const RESTART_COOLDOWN_MS = 30_000;
 const HEALTH_CHECK_TIMEOUT_MS = 10_000;
+
+/**
+ * Customer APK install surface (https://vizora.cloud/tv + /downloads/).
+ *
+ * OFF BY DEFAULT, and deliberately so: the download surface does not exist
+ * until an approved APK is published, and a check that fails from the moment
+ * it ships teaches operators to ignore this agent. Enable it in the same
+ * change that publishes the first APK, not before.
+ *
+ * There is no auto-remediation — a missing APK or a reverted nginx config
+ * needs a human. The check exists because the failure is otherwise SILENT:
+ * customers simply cannot install, and nothing else notices.
+ */
+const TV_DOWNLOAD_MONITOR_ENABLED = process.env.TV_DOWNLOAD_MONITOR_ENABLED === 'true';
+const TV_APK_URL = process.env.TV_APK_URL || 'https://vizora.cloud/downloads/vizora-display.apk';
+const TV_PAGE_URL = process.env.TV_PAGE_URL || 'https://vizora.cloud/tv';
+const APK_CONTENT_TYPE = 'application/vnd.android.package-archive';
 
 /** Service definitions: name, health URL, PM2 process name, memory limit in bytes */
 interface ServiceDef {
@@ -96,6 +115,83 @@ async function checkEndpoint(url: string): Promise<{ ok: boolean; status?: numbe
   } catch (err) {
     clearTimeout(timer);
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+// ─── APK Download Surface Check ──────────────────────────────────────────────
+
+/** Result of probing the customer APK install surface. */
+interface DownloadSurfaceResult {
+  ok: boolean;
+  /** Human-readable reason for failure, or null when healthy. */
+  problem: string | null;
+  detail: string;
+}
+
+/**
+ * Probe the customer install surface: the /tv page must load, and the APK must
+ * return 200 with the Android package MIME type and a non-zero body.
+ *
+ * Uses HEAD so the 5-minute cadence does not re-download the APK. All three
+ * assertions matter independently: a 200 with the wrong Content-Type still
+ * leaves TV browsers refusing to hand the file to the package installer, and
+ * a zero-length 200 is what a half-finished upload looks like.
+ */
+async function checkDownloadSurface(): Promise<DownloadSurfaceResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
+
+  try {
+    const apkRes = await fetch(TV_APK_URL, { method: 'HEAD', signal: controller.signal });
+
+    if (apkRes.status !== 200) {
+      return {
+        ok: false,
+        problem: `APK URL returned HTTP ${apkRes.status}`,
+        detail: `${TV_APK_URL} -> HTTP ${apkRes.status}`,
+      };
+    }
+
+    const contentType = apkRes.headers.get('content-type') || '(none)';
+    if (!contentType.includes(APK_CONTENT_TYPE)) {
+      return {
+        ok: false,
+        problem: `APK served with wrong Content-Type`,
+        detail: `expected ${APK_CONTENT_TYPE}, got ${contentType} — check the nginx types block`,
+      };
+    }
+
+    const contentLength = Number(apkRes.headers.get('content-length') || '0');
+    if (!Number.isFinite(contentLength) || contentLength <= 0) {
+      return {
+        ok: false,
+        problem: 'APK has zero or unknown content length',
+        detail: `content-length=${apkRes.headers.get('content-length') ?? '(none)'}`,
+      };
+    }
+
+    const pageRes = await fetch(TV_PAGE_URL, { method: 'GET', signal: controller.signal });
+    if (pageRes.status !== 200) {
+      return {
+        ok: false,
+        problem: `Installer page returned HTTP ${pageRes.status}`,
+        detail: `${TV_PAGE_URL} -> HTTP ${pageRes.status}`,
+      };
+    }
+
+    return {
+      ok: true,
+      problem: null,
+      detail: `APK ${contentLength} bytes, ${contentType}; installer page HTTP 200`,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      problem: 'Install surface unreachable',
+      detail: err instanceof Error ? err.message : String(err),
+    };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -515,7 +611,52 @@ async function main(): Promise<void> {
     }
   }
 
-  // ─── 3. Record Results & Write State ──────────────────────────────────────
+  // ─── 3. Customer APK Install Surface ──────────────────────────────────────
+  // Gated off until an approved APK is published — see TV_DOWNLOAD_MONITOR_ENABLED.
+
+  if (TV_DOWNLOAD_MONITOR_ENABLED) {
+    const incidentId = makeIncidentId(AGENT, 'tv-download-surface', 'vizora-display-apk');
+    const existingIncident = priorState.incidents.find(i => i.id === incidentId);
+
+    log(AGENT, `Checking APK install surface: ${TV_APK_URL}`);
+    const surface = await checkDownloadSurface();
+
+    if (surface.ok) {
+      log(AGENT, `install surface: healthy (${surface.detail})`);
+      if (existingIncident && existingIncident.status !== 'resolved') {
+        log(AGENT, `install surface: recovered — resolving incident ${incidentId}`);
+        incidents.push({
+          ...existingIncident,
+          status: 'resolved',
+          resolvedAt: new Date().toISOString(),
+        });
+        issuesFixed++;
+      }
+    } else {
+      issuesFound++;
+      log(AGENT, `install surface: BROKEN — ${surface.problem} (${surface.detail})`);
+      // No auto-remediation: a missing APK or reverted nginx config needs a
+      // human. Reported as open so ops-reporter escalates it.
+      incidents.push({
+        id: incidentId,
+        agent: AGENT,
+        type: 'tv-download-surface',
+        severity: 'critical',
+        target: 'install-surface',
+        targetId: 'vizora-display-apk',
+        detected: existingIncident?.detected ?? new Date().toISOString(),
+        message: `Customers cannot install Vizora Display: ${surface.problem}`,
+        remediation:
+          'Re-publish via scripts/release/publish-display-apk.sh and confirm the ' +
+          '/downloads/ location block is still present in /etc/nginx/sites-enabled/vizora',
+        status: 'open',
+        attempts: existingIncident?.attempts ?? 0,
+        error: surface.detail,
+      });
+    }
+  }
+
+  // ─── 4. Record Results & Write State ──────────────────────────────────────
 
   const durationMs = Date.now() - startTime;
 
@@ -542,7 +683,7 @@ async function main(): Promise<void> {
     writeOpsState(state);
   }
 
-  // ─── 4. Summary ──────────────────────────────────────────────────────────
+  // ─── 5. Summary ──────────────────────────────────────────────────────────
 
   log(AGENT, `Cycle complete in ${durationMs}ms — found: ${issuesFound}, fixed: ${issuesFixed}, escalated: ${issuesEscalated}`);
 

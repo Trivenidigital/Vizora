@@ -178,6 +178,18 @@ These are documented + non-blocking for customer-1. Investigations done; impleme
 
 ---
 
+## Android TV client (`vizora-tv`) — carried defects
+
+Split out of the `/tv` APK distribution workstream on purpose (2026-08-10). These
+predate 1.3.11 and must **not** hold up publication — see
+`docs/plans/2026-08-10-tv-apk-distribution.md`.
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| TV1 | **5 failing unit tests in `vizora-tv`, all pre-existing** | OPEN — not investigated, deliberately | 5 of 296 fail on `bff3ee0` (tag `v1.3.10`) *before* the 1.3.11 version bump — confirmed by stashing the bump and re-running, so 1.3.11 introduced nothing. Four are `update_config` command handling: `apiUrl` / `realtimeUrl` / `dashboardUrl` resolve to `undefined` instead of the allowed value (`src/vizora-app.spec.ts`). The fifth is the F41 auth-probe suspend latch (expects `holding-screen`, gets `content-screen`). `lintVitalRelease` passes and the release build is unaffected. **Trigger to escalate:** runtime evidence that the client pilot depends on remote reconfiguration, or any pilot failure in playback/pairing. Otherwise this is a normal `vizora-tv` bug hunt, scheduled independently. |
+
+---
+
 ## P1 — LAUNCH WEEK (Should have within first week of launch)
 
 | # | Item | Status | Notes |
