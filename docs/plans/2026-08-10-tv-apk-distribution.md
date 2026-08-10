@@ -294,6 +294,61 @@ recorded — they are physical acts of custody. Writing
 `signingKeyBackupConfirmedBy` without them would not close the risk, it would
 only delete the warning about it.
 
+### Gate B — off-machine encrypted backup DONE, custody NOT (2026-08-10)
+
+The backup half of Gate B is built and proven. The credential half is not, and
+**Gate B stays FAIL until it is**.
+
+| Check | Result |
+|---|---|
+| Off-machine encrypted backup exists | **PASS** |
+| Retrieved from VPS | **PASS** |
+| Decryption | **PASS** |
+| Restored keystore opens | **PASS** |
+| Restored key signs | **PASS** |
+| Cert matches `BE2320A5…3A9187A5` | **PASS** |
+| Credentials in an independent store | **NOT VERIFIED** |
+| Recovery owner | Srini (designated) |
+| **GATE B** | **FAIL** |
+
+Arrangement:
+
+```
+Windows build machine ── original vizora-release.jks (unchanged, verified byte-identical after)
+        │
+        └── openssl enc -aes-256-cbc -salt -pbkdf2
+                    │
+                    ▼
+        VPS  /opt/secure-backups/vizora/android-signing/vizora-release.jks.enc
+             dir 700, file 600, root-owned
+             NOT reachable: no nginx root/alias into /opt, no container mount,
+             4/4 HTTP probes 404, sibling of /opt/vizora/app — never inside it
+```
+
+Restore was proven end-to-end **from the VPS copy**, not from the local
+ciphertext: downloaded → decrypted → SHA-256 byte-identical to the original
+(`DB5C23DD…654BC3`) → opened as `PrivateKeyEntry` alias `vizora-display` →
+signed a disposable APK → `apksigner verify --verbose --print-certs` returned v1
++ v2 + v3, 1 signer, `be2320a5…3a9187a5`. Every temporary copy was then shredded;
+the original keystore and the approved 1.3.11 APK both re-hashed unchanged.
+
+**Why this is still FAIL.** Both secrets required to use that backup — the
+backup encryption passphrase and the keystore's own store/key password — are
+currently on the same Windows machine as the original. A machine loss today
+destroys the ability to decrypt *and* the ability to open. That is precisely the
+condition Gate B exists to remove, so the ciphertext on the VPS is not yet a
+recovery path.
+
+Closing it is two human acts, ~5 minutes, laid out in
+`C:\Users\srini\VIZORA-GATE-B-SECRET\README-FIRST.md`: put both secrets in an
+owner-controlled password manager, verify they can be read back, then delete that
+folder. Deleting the folder *is* the fix — it is what ends the
+both-secrets-on-one-machine state.
+
+> Second layer deferred on purpose: the VPS is the same host as the application,
+> so a full host compromise reaches both. Add an independent encrypted copy after
+> launch — do not hold the pilot for it.
+
 ### Gate B closure — the exact procedure
 
 Nothing below prints a password or copies a private key into this repo.

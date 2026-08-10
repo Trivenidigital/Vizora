@@ -90,10 +90,15 @@ docker-compose.override.yml
 # NX
 .nx/
 
-# Android signing (NEVER commit keystores or signing credentials)
+# Android signing (NEVER commit keystores or signing credentials).
+# A private repo is not a key vault — repo access spreads to developers, CI and
+# integrations. The off-machine backup is an ENCRYPTED copy on a VPS path
+# outside every web/Docker/app root; see docs/plans/2026-08-10-tv-apk-distribution.md
 *.keystore
 *.jks
+*.p12
 keystore.properties
+*.jks.enc
 
 # APK staging dir used by the release runbook (`gh release download --dir .tmp-apk`).
 # Without this a stray `git add .` commits a multi-MB binary.
