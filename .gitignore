@@ -95,8 +95,10 @@ docker-compose.override.yml
 *.jks
 keystore.properties
 
-# Electron builds
-release/
+# Electron builds — anchored to the electron-builder output dir
+# (display/package.json directories.output). An unanchored `release/` also
+# matched scripts/release/, silently un-tracking source that belongs in git.
+display/release/
 
 # Archived/unused files
 unusedInCode/

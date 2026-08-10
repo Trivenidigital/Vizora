@@ -114,6 +114,8 @@ theme pointing at an older warm-cream palette, so three palettes currently coexi
 
 **Interceptor order matters**: LoggingInterceptor runs before SanitizeInterceptor so raw input is logged for debugging.
 
+**nginx `add_header` inheritance silently drops parent headers**: a `location` block declaring *any* `add_header` discards *every* `add_header` from the enclosing `server` block. Prod's vizora.cloud server block sets `Strict-Transport-Security` and `Permissions-Policy` — so adding one cache/disposition header to a location deletes both without warning. This is already live: `location /uploads/` declares `add_header Cache-Control "public"` and consequently returns no Permissions-Policy and an HSTS value that is actually NestJS Helmet's leaking through the proxy. **Any new nginx location must re-declare every header it still wants.** Prod nginx is host-installed at `/etc/nginx/sites-enabled/vizora` and is NOT generated from `docker/nginx/nginx.conf`.
+
 **DataSourceRegistry pattern**: Content service uses a registry instead of N individual data-source constructor injections. Tests must mock the registry with `.get(type)` method.
 
 ## Environment Variables
@@ -251,6 +253,11 @@ RETENTION_DAYS          # Audit/log retention used by db-maintainer
 PERSISTENT_OFFLINE_RECONCILE_ENABLED  # 'true' enables PersistentOfflineReconciler (middleware, */15).
                         # INTERNAL signal only — queries, logs and sets a gauge; sends nothing.
                         # Default off. Enabled on prod 2026-08-03.
+TV_DOWNLOAD_MONITOR_ENABLED  # 'true' makes health-guardian probe /tv + /downloads/vizora-display.apk
+                        # (200 + APK MIME type + non-zero length). No auto-remediation.
+                        # Default off — the URLs 404 until an approved APK is published; enable it
+                        # in the SAME change that publishes the first APK, never before.
+TV_APK_URL, TV_PAGE_URL # Optional overrides for the two probed URLs (default the vizora.cloud ones)
 ```
 
 > **`SMTP_PASS` / `SMTP_FROM` are not optional aliases.** `scripts/ops/lib/alerting.ts`
@@ -288,6 +295,12 @@ web/src/lib/hooks/          # useSocket, useRealtimeEvents for WebSocket integra
 realtime/src/gateways/     # device.gateway.ts — main WebSocket handler
 scripts/agents/            # Business agents (cron + on-demand): customer-lifecycle, support-triage, etc.
 scripts/ops/               # Autonomous ops agents (PM2 cron) — see "Autonomous Operations"
+deploy/tv/, deploy/nginx/  # Source of truth for the customer APK install surface (vizora.cloud/tv +
+                           #   /downloads/vizora-display.apk). Static page + nginx location blocks;
+                           #   prod nginx is host-installed so these are copied deliberately, not generated.
+scripts/release/           # Deterministic APK release gate (package id / versionCode / signing-cert
+                           #   SHA-256 / APK SHA-256), installer-page renderer, and the single atomic
+                           #   publish operation. See docs/plans/2026-08-10-tv-apk-distribution.md
 scripts/marketing/         # Local-only: seed a synthetic demo tenant + capture the homepage product
                            #   shot. Both fail closed (non-local DB / missing password).
                            #   See web/public/product/README.md
@@ -303,6 +316,8 @@ backlog.md                 # P0-P4 active backlog with status + effort estimates
 **Electron** (`display/`): Desktop app for Windows/macOS/Linux. Webpack + TypeScript. Packages via electron-builder. Packaged display clients configure OS auto-start, use Electron `powerSaveBlocker` to prevent display sleep, and can run an admin-triggered `update` fleet command through `electron-updater` when the feed host is in `DISPLAY_UPDATE_FEED_ALLOWLIST`. Production update rollout still requires signed display artifacts on the allowlisted HTTPS feed before operators send the update command; verify the signing/verification story for each target, especially Linux/AppImage, before enabling a live rollout.
 
 **Android TV**: Extracted to standalone repo (`vizora-tv`). Capacitor 6 + Vite + TypeScript. See [github.com/Trivenidigital/vizora-tv](https://github.com/Trivenidigital/vizora-tv).
+
+Customers install it by sideload from two permanent URLs — `https://vizora.cloud/tv` (static installer page) and `https://vizora.cloud/downloads/vizora-display.apk`. Both are served directly by host nginx from `/var/www/vizora/`, **not** by the Next.js app: a Next route would force a full `web` rebuild to change a version string, and that build has OOM'd the prod VPS. Never publish an APK by hand — `scripts/release/publish-display-apk.sh` runs the identity/signing gate and deploys the APK, the displayed version and the displayed hash as one operation, and refuses while the approval gates in `deploy/tv/release.json` are open. Read `docs/plans/2026-08-10-tv-apk-distribution.md` before touching any of it.
 
 **Mobile Companion**: Extracted to standalone repo (`vizora-mobile`). Expo 54 + React Native 0.81 + TypeScript. Management app (NOT a display client). See [github.com/Trivenidigital/vizora-mobile](https://github.com/Trivenidigital/vizora-mobile).
 
@@ -372,7 +387,7 @@ Automated deployment readiness checker. Runs 30 validation rules across content,
 
 | Agent | Schedule | Responsibility |
 |-------|----------|---------------|
-| health-guardian | Every 5min | Service health, PM2 restarts, memory monitoring; pings `HEALTHCHECKS_HEALTH_GUARDIAN_URL` on success (external dead-man) |
+| health-guardian | Every 5min | Service health, PM2 restarts, memory monitoring; pings `HEALTHCHECKS_HEALTH_GUARDIAN_URL` on success (external dead-man). Also probes the customer APK install surface when `TV_DOWNLOAD_MONITOR_ENABLED=true` (default off) |
 | content-lifecycle | Every 15min | Archive expired/orphaned content, storage monitoring |
 | fleet-manager | Every 10min | Offline display detection, ping reconnect, error reset |
 | schedule-doctor | Every 15min | Deactivate broken schedules, coverage gaps |

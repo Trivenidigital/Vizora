@@ -1,0 +1,43 @@
+{
+  "_comment": [
+    "Source of truth for what is published at https://vizora.cloud/tv and",
+    "https://vizora.cloud/downloads/vizora-display.apk.",
+    "",
+    "`candidate` is the artifact verified by scripts/release/verify-display-apk.mjs.",
+    "`published` is the artifact currently live (null until the first publish); it is",
+    "the baseline the next release's signing certificate and versionCode are compared",
+    "against.",
+    "",
+    "`approval` encodes the two release gates. publish-display-apk.sh REFUSES to run",
+    "while either pair is null. Do not fill these in without the named human actually",
+    "confirming. Never put the keystore, its password, or any private key in this repo."
+  ],
+
+  "candidate": {
+    "package": "com.vizora.display",
+    "versionName": "1.3.10",
+    "versionCode": 10140,
+    "apkSha256": "80DD8AAAAD8A32957CDDF6AD6097954E77D859B792534F746D896DD015DEBFB6",
+    "apkBytes": 1247598,
+    "signingCertSha256": "AA07524A453375DE143CA4A506C44657E509CCC0F79981821693903DA5137982",
+    "signingCertOwner": "CN=Vizora Display",
+    "sourceReleaseUrl": "https://github.com/Trivenidigital/vizora-tv/releases/tag/v1.3.10",
+    "sourceAssetName": "vizora-display-1.3.10-release.apk",
+    "sourceIsPrerelease": true,
+    "verifiedAt": "2026-08-10"
+  },
+
+  "published": null,
+
+  "approval": {
+    "_gateA": "Artifact approval — confirm this exact APK is the intended client-pilot build, not merely the newest GitHub prerelease.",
+    "artifactApprovedBy": null,
+    "artifactApprovedAt": null,
+
+    "_gateB": "Signing-key durability — confirm the release keystore has a secure off-machine backup and a recoverable password owned by an authorized operator. Record location CLASS and ownership only, never the key or password.",
+    "signingKeyBackupConfirmedBy": null,
+    "signingKeyBackupConfirmedAt": null,
+    "signingKeyLocationClass": null,
+    "signingKeyRecoveryOwner": null
+  }
+}
