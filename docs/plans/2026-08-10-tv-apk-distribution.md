@@ -1,7 +1,11 @@
 # Vizora Display — customer APK distribution (`/tv`)
 
-**Status:** implemented, **NOT deployed**. Publishing is blocked on two open
-release gates (§6). Nothing in this change touches a running production service.
+**Status:** implemented, **NOT deployed**. Publishing is blocked (§6). Nothing in
+this change touches a running production service.
+
+> **Gate B FAILED 2026-08-10 — do not publish the existing 1.3.10 APK.** The key
+> that signed it is not on the build machine. Establish a canonical signing
+> identity and build a fresh release first. Detail in §6.
 
 **Scope:** a bounded customer-pilot distribution surface. Two permanent URLs:
 
@@ -91,10 +95,60 @@ GitHub prerelease. It *is* tagged `Pre-release` on GitHub, and `vizora-tv`
 `master` sits at `bff3ee0` with no later commits — so nothing obviously
 supersedes it, but that is not the same as approval.
 
-**Gate B — signing-key durability.** Identify the release keystore that signed
-this APK and prove it has a secure off-machine backup with a password
-recoverable by an authorized operator. Record **location class**, backup status,
-certificate SHA-256 and recovery ownership only.
+**Gate B — signing-key durability. STATUS: FAILED 2026-08-10.**
+
+> **The 1.3.10 APK must not be published.** The key that signed it
+> (`AA07524A…A5137982`, cert created 2026-03-31) is **not on the Windows build
+> machine**. The only Android keystore there — `vizora-tv`
+> `android/vizora-release.jks`, a single entry, alias `vizora-display`, created
+> 2026-03-26 — carries a different certificate, `BE2320A5…3A9187A5`. Ruled out:
+> not signed in CI (`vizora-tv` has one workflow, no signing secrets), not the
+> debug key (`androiddebugkey` is `59D27DA1…`), and no other `.jks`/`.keystore`
+> exists under the user profile or OneDrive.
+
+Nothing has been distributed, so there is **no installed base** and no signature
+compatibility to preserve. Choosing a controlled signing key costs nothing today
+and becomes impossible once TVs are in the field — publishing an APK whose key
+cannot be reproduced means every future version is rejected with
+`INSTALL_FAILED_UPDATE_INCOMPATIBLE`, forcing uninstall + re-pair on every screen.
+
+To close Gate B, establish the canonical customer-signing identity. Prefer the
+existing `vizora-release.jks` **only if** it passes all of: private-key entry
+exists, certificate SHA-256 known, keystore has a secure off-machine backup,
+keystore and alias credentials recoverable by an authorized operator, and
+restoration tested well enough to prove the key still signs. If any fail, select
+or create a properly controlled release key *before* building the first customer
+artifact. Record **location class**, backup status, certificate SHA-256 and
+recovery ownership only — never a password or private-key material.
+
+Then pin the fingerprint in `release.json` `signing.canonicalCertSha256` and
+build a **fresh release** rather than re-signing the old binary under the same
+version:
+
+```
+package       com.vizora.display
+versionName   1.3.11
+versionCode   10141
+signing cert  <canonical pinned fingerprint>
+```
+
+### Pinned canonical certificate — what protects the first publish
+
+`published` only becomes a baseline from release 2 onward, so release 1 had no
+certificate check at all — which is exactly where the mismatch above was found.
+`signing.canonicalCertSha256` closes that hole: `publish-display-apk.sh` passes
+`--require-pinned-cert`, so publication fails closed when no identity is pinned,
+and fails when the APK's certificate does not match the pin. Verified in all
+three states (unpinned → exit 1; pinned-and-mismatched → exit 1, which is what
+now automatically refuses the 1.3.10 binary; pinned-and-matching → exit 0), with
+regression tests in `scripts/release/verify-display-apk.test.ts`.
+
+### Before customer rollout: compare against Google Play App Signing
+
+If the canonical sideload certificate differs from the Play App Signing
+certificate, pilot customers migrating from the sideloaded APK to the Play Store
+build will need **one uninstall + reinstall**, and will re-pair. Confirm this and
+document it before the migration, not after.
 
 > Never commit the keystore, `.jks`, signing password, or any private key.
 

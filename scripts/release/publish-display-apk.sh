@@ -97,7 +97,8 @@ say "Verifying APK identity, signing key and integrity"
 node "$REPO_ROOT/scripts/release/verify-display-apk.mjs" \
   --apk "$APK" \
   --against "$RELEASE_JSON" \
-  --require-apksigner
+  --require-apksigner \
+  --require-pinned-cert
 
 # ─── Confirm the page matches the artifact ───────────────────────────────────
 say "Confirming installer page matches release.json"

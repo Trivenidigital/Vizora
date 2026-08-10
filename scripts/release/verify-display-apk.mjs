@@ -33,6 +33,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { resolve, join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const DEFAULT_PACKAGE = 'com.vizora.display';
 
@@ -321,12 +322,61 @@ function runApksigner(binary, apkPath) {
 }
 
 /** Fingerprints compare case-insensitively and ignore colon separators. */
-function normalizeFingerprint(fp) {
+export function normalizeFingerprint(fp) {
   return String(fp).replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
 }
 
-function formatFingerprint(hex) {
+export function formatFingerprint(hex) {
   return (hex.match(/.{2}/g) || []).join(':');
+}
+
+/**
+ * Decide the pinned-canonical-certificate check. Pure, so the fail-closed
+ * behaviour is unit-testable without an APK fixture.
+ *
+ * This is the check that protects the FIRST publish. The `published` baseline
+ * only exists from release 2 onward, and release 1 is exactly where the
+ * 2026-08-10 mismatch was found — the only release APK was signed with a key
+ * that is not on the build machine.
+ *
+ * @param pinned   normalized fingerprint from release.json signing.canonicalCertSha256 ('' when unset)
+ * @param actual   normalized fingerprint read from the APK
+ * @param required true when publishing (--require-pinned-cert)
+ */
+export function evaluatePinnedCert(pinned, actual, required) {
+  const name = 'certificate matches the pinned canonical signing identity';
+
+  if (pinned) {
+    const matches = pinned === actual;
+    return {
+      name,
+      pass: matches,
+      detail: matches
+        ? formatFingerprint(pinned)
+        : `MISMATCH — pinned ${formatFingerprint(pinned)} vs apk ${formatFingerprint(actual)}. ` +
+          `This APK was NOT signed with the canonical customer key. Do not publish it.`,
+    };
+  }
+
+  if (required) {
+    return {
+      name,
+      pass: false,
+      detail:
+        'NO CANONICAL CERTIFICATE PINNED — signing.canonicalCertSha256 is null in release.json. ' +
+        'Publishing without a pinned identity is how an APK signed by an unrecoverable key ' +
+        'reaches customers. Complete Gate B, then pin the fingerprint.',
+    };
+  }
+
+  return {
+    name,
+    pass: true,
+    skipped: true,
+    detail:
+      'SKIPPED — no canonical certificate pinned in release.json. ' +
+      'Run with --require-pinned-cert (publish always does) to make this mandatory.',
+  };
 }
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
@@ -371,6 +421,7 @@ async function main() {
   // skipped rather than silently passing.
   let baseline = null;
   let baselineAbsent = false;
+  let pinnedCert = '';
   if (args.against) {
     const p = resolve(String(args.against));
     if (!existsSync(p)) {
@@ -380,6 +431,7 @@ async function main() {
     const doc = JSON.parse(readFileSync(p, 'utf8'));
     baseline = Object.prototype.hasOwnProperty.call(doc, 'published') ? doc.published : doc;
     if (!baseline) baselineAbsent = true;
+    pinnedCert = normalizeFingerprint(doc?.signing?.canonicalCertSha256 || '');
   }
 
   const bytes = readFileSync(apkPath);
@@ -490,6 +542,15 @@ async function main() {
             `differ from the v1 certificate ${formatFingerprint(cert.sha256)}`,
     );
   }
+
+  // 3c. APK certificate matches the PINNED canonical signing identity.
+  //
+  // This is the check that protects the FIRST publish. The `published` baseline
+  // below only exists from release 2 onward, and release 1 is precisely where
+  // the 2026-08-10 mismatch was found: the only release APK was signed with a
+  // key that is not on the build machine. Publishing requires a pin, and the
+  // APK must match it.
+  checks.push(evaluatePinnedCert(pinnedCert, cert.sha256, Boolean(args['require-pinned-cert'])));
 
   // 4. certificate matches the previously accepted release + versionCode increases
   if (baselineAbsent) {
@@ -626,7 +687,14 @@ async function main() {
   process.exit(report.verdict === 'PASS' ? 0 : 1);
 }
 
-main().catch(err => {
-  console.error(`FATAL: ${err.stack || err.message}`);
-  process.exit(2);
-});
+// Only run the CLI when executed directly — importing this module (for tests)
+// must not trigger a verification run or call process.exit().
+const invokedDirectly =
+  process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (invokedDirectly) {
+  main().catch(err => {
+    console.error(`FATAL: ${err.stack || err.message}`);
+    process.exit(2);
+  });
+}
