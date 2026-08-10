@@ -226,8 +226,12 @@ introduced no regression (verified by stashing it and re-running). Four are
 resolving to `undefined` instead of the allowed value) and one is the F41
 auth-probe suspend latch. `lintVitalRelease` passes, so nothing blocks the build,
 but `update_config` is the remote-reconfiguration path for a fleet of TVs and it
-is either genuinely broken or covered by stale tests. **Worth resolving before
-the pilot, and it is not release-gate work — it is a `vizora-tv` bug hunt.**
+is either genuinely broken or covered by stale tests.
+
+**Explicitly OUT of scope for this workstream (decided 2026-08-10).** These
+predate 1.3.11 and must not extend this release. Tracked as **TV1** in
+`backlog.md`. Escalate only on runtime evidence that the pilot depends on remote
+reconfiguration, or a pilot failure in playback/pairing — do not investigate here.
 
 **Preserve the binary.** Android release builds are not byte-reproducible (zip
 timestamps, R8), so the SHA-256 above belongs to *that specific file*, not to the
@@ -236,22 +240,57 @@ is kept with its provenance at
 `C:\projects\vizora-artifact-backups\tv-apk-1.3.11\`. If it is ever lost, rebuild
 **and** re-run steps 3-4 of §8 to re-record the new hash.
 
+### Gate A — decided 2026-08-10
+
+`D95FA359…DB02E` **is the approved Gate A candidate.** Package and version are
+correct, the signer is the intended BE23… key, `apksigner` verifies it, and the
+exact hash is recorded. 1.3.10's provenance failure is independent grounds not to
+use that build.
+
+**There is no further design review before deployment.** The only thing still
+owed is Gate B custody.
+
+### ⚠ `vizora-tv` is a PUBLIC repository
+
+Verified 2026-08-10: `Trivenidigital/vizora-tv` is **public**. So attaching the
+APK to a GitHub Release is not archival — it is publication, on a URL customers
+can install from, with none of `/tv`'s gates in front of it.
+
+**Do not create the v1.3.11 Release or attach the APK until Gate B is PASS.**
+Pushing the *source commit* carries no such risk and is already done (branch
+`release/1.3.11`, commit `c126ee1`) — it is two version-string lines and no
+signing material is tracked in either repo (checked before pushing).
+
+Until then the durable copy of the exact approved binary lives at
+`C:\projects\vizora-artifact-backups\tv-apk-1.3.11\` with its provenance.
+
 ### What remains — and who can do it
 
-| Step | Blocked on | Who |
-|---|---|---|
-| Place a secure **off-machine** backup of the keystore | nothing — just needs doing | operator |
-| Put the keystore/alias password in a **separate** authorized store | nothing | operator |
-| Name a recovery owner who is not the key's author | nothing | operator |
-| Fill `signing.*` + `approval.signingKeyBackupConfirmedBy` (Gate B) | the three above | operator |
-| Fill `approval.artifactApprovedBy` (Gate A) | — | Sri |
-| Pin `signing.canonicalCertSha256` = `BE2320A5…3A9187A5` | Gate B | either |
-| `publish-display-apk.sh --apk … ` | all of the above | either |
-| Tag `v1.3.11` from `c126ee1`, push, attach the APK | — | either |
-| Set `TV_DOWNLOAD_MONITOR_ENABLED=true` | **must ship with the publish**, not before | either |
+Everything not requiring a human is done. Ordered exactly as it should run:
 
-The first three lines are why an agent cannot finish this. They are not
-approvals to be recorded — they are physical acts of custody. Writing
+| # | Step | Blocked on | Who |
+|---|---|---|---|
+| 1 | Place a secure **off-machine** backup of the keystore | nothing — just needs doing | operator |
+| 2 | Put the keystore/alias password in a **separate** authorized store | nothing | operator |
+| 3 | Name a recovery owner who is not the key's author | nothing | operator |
+| 4 | Verify restore → open → sign from that backup alone | 1-3 | operator |
+| 5 | Fill `signing.*` + `approval.*` (both gates) in `release.json` | 4 | operator |
+| 6 | Pin `signing.canonicalCertSha256` = `BE2320A5…3A9187A5` | 5 | either |
+| 7 | Confirm 1.3.10 is now **rejected** by the pinned verifier | 6 | either |
+| 8 | Tag `v1.3.11` from `c126ee1`; create the Release + attach the exact APK | 5 | either |
+| 9 | Final `--dry-run` (expect exit 0) | 6 | either |
+| 10 | Merge PR #271 | 9 | either |
+| 11 | `publish-display-apk.sh --install-nginx` | 10 | either |
+| 12 | `TV_DOWNLOAD_MONITOR_ENABLED=true` — **same change as 11**, never before | 11 | either |
+| 13 | Verify public URLs + downloaded hash == `D95FA359…DB02E` | 11 | either |
+| 14 | Move `candidate` → `published` in `release.json`, commit | 13 | either |
+
+**Never rebuild the APK to satisfy any of these.** Android release builds are not
+byte-reproducible, so a rebuild invalidates the approved hash, the installer page
+and Gate A all at once.
+
+Steps 1-4 are why an agent cannot finish this. They are not approvals to be
+recorded — they are physical acts of custody. Writing
 `signingKeyBackupConfirmedBy` without them would not close the risk, it would
 only delete the warning about it.
 

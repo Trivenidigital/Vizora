@@ -110,8 +110,15 @@
 
   "approval": {
     "_gateA": "Artifact approval — confirm this exact APK is the intended client-pilot build, not merely the newest GitHub prerelease.",
-    "artifactApprovedBy": null,
-    "artifactApprovedAt": null,
+    "_gateA_scope": [
+      "This approval is bound to apkSha256 D95FA359D194704C8ACB6144B37FB054DB1FCF5789B7D0BE370CDE886F9DB02E",
+      "and to NOTHING else. Android release builds are not byte-reproducible, so a",
+      "rebuild — even from the same commit c126ee1 — produces a different hash and",
+      "VOIDS this approval. If the binary is ever lost or rebuilt, reset both fields",
+      "below to null and re-approve."
+    ],
+    "artifactApprovedBy": "Sri",
+    "artifactApprovedAt": "2026-08-10",
 
     "_gateB": "Signing-key durability — confirm the release keystore has a secure off-machine backup and a recoverable password owned by an authorized operator. Record location CLASS and ownership only, never the key or password.",
     "signingKeyBackupConfirmedBy": null,
