@@ -132,6 +132,52 @@ versionCode   10141
 signing cert  <canonical pinned fingerprint>
 ```
 
+### Gate B rehearsal — 2026-08-10
+
+Recorded so nobody repeats this investigation. **Key mechanics: proven good.
+Custody durability: still failed.** The rehearsal changed no gate outcome —
+`canonicalCertSha256` is still null, 1.3.10 is still rejected for customer
+publication, and nothing was deployed, built, or re-signed.
+
+Candidate signing key:
+
+```
+BE2320A5728CFCF1CF9436C04C377BE9BF347807B23183F8C88BE3583A9187A5
+```
+
+**Verified:**
+
+- original keystore opens with recorded credentials
+- `vizora-display` is a `PrivateKeyEntry`
+- local-copy restore succeeds (byte-identical)
+- restored copy signs a disposable APK
+- `apksigner verify --verbose --print-certs` verifies v1 / v2 / v3
+- resulting signer fingerprint matches the candidate key
+- original keystore remained byte-identical (SHA-256 checked before and after)
+- scratch artifacts deleted
+
+**Not verified:**
+
+- secure off-machine backup
+- independent credential recovery
+- assigned recovery owner
+
+**Gate B remains FAIL.**
+
+Do not pin `canonicalCertSha256`, build 1.3.11, approve Gate A, or publish until
+the two custody requirements above are explicitly completed.
+
+> **The blocker in one sentence:** the keystore and the only known source of its
+> password currently live in the same directory on the same machine, so backing
+> up the `.jks` alone achieves nothing — the password has to land in a
+> *separate* authorized store or the backup is decorative.
+
+The candidate's certificate subject is
+`CN=Vizora Display, OU=Mobile, O=Triveni Digital, L=Unknown, ST=Unknown, C=US`,
+whereas the 1.3.10 APK's is bare `CN=Vizora Display` — an independent
+corroboration that these are two genuinely distinct keys, not a fingerprint
+parsing artifact.
+
 ### Pinned canonical certificate — what protects the first publish
 
 `published` only becomes a baseline from release 2 onward, so release 1 had no
@@ -156,23 +202,17 @@ Why B is the only unrecoverable dependency: if the key is lost, no future build
 can update an installed app. Every TV in the field must be manually uninstalled
 and re-paired. There is no recovery path.
 
-**Where to start for Gate B** (located 2026-08-10; no credential was read):
+**Where to start for Gate B.** `vizora-tv` `android/app/build.gradle` reads its
+release signing config from `android/keystore.properties`, which exists only in
+the local checkout on the Windows dev machine. Signing material is correctly
+excluded from git — only `keystore.properties.example` is tracked, and no
+`.jks`/`.keystore` is tracked in either repo.
 
-- `vizora-tv` `android/app/build.gradle` reads the signing config from
-  `android/keystore.properties` — that file holds `storeFile`, `storePassword`
-  and `keyAlias`.
-- `android/keystore.properties` **exists in the local `vizora-tv` checkout on
-  the Windows dev machine** (110 bytes, last modified 2026-03-26). It is
-  correctly gitignored — only `keystore.properties.example` is tracked, and no
-  `.jks`/`.keystore` is tracked in the repo.
-- The `storeFile` entry in that file is the path to the actual keystore. Read it
-  there to answer "where is the key"; then confirm whether that path is covered
-  by an off-machine backup.
-
-The open question is **not** where the file is — it is whether it exists
-anywhere other than one Windows laptop, and whether the password is recoverable
-by someone other than its author. Record only location class, backup status,
-recovery ownership, and the certificate SHA-256 above.
+The open question is **not** where the files are — that was answered by the
+rehearsal below. It is whether the key exists anywhere other than one Windows
+laptop, and whether its password is recoverable by someone other than its
+author. Record only location class, backup status, recovery ownership, and the
+certificate SHA-256 — never a password, a private key, or a secret-store path.
 
 ## 7. Verified artifact facts (2026-08-10)
 
