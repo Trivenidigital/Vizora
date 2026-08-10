@@ -12,7 +12,6 @@
     "while either pair is null. Do not fill these in without the named human actually",
     "confirming. Never put the keystore, its password, or any private key in this repo."
   ],
-
   "signing": {
     "_comment": [
       "The canonical Vizora Android customer-signing identity.",
@@ -33,7 +32,6 @@
     "canonicalCertPinnedAt": "2026-08-10",
     "backupClass": "encrypted (aes-256-cbc/pbkdf2) copy on the company VPS at /opt/secure-backups/vizora/android-signing — dir 700, file 600, root-owned, outside every web, Docker and application root; credentials held separately in an owner-controlled password manager",
     "recoveryOwner": "Srini",
-
     "_findings_2026_08_10": [
       "GATE B FAILED. The key that signed vizora-display-1.3.10-release.apk",
       "(cert AA07524A…A5137982, created 2026-03-31) is NOT on the Windows build",
@@ -46,7 +44,6 @@
       "a durable key, the verifier refuses that binary automatically — its cert will",
       "not match the pin."
     ],
-
     "_status_2026_08_10_evening": [
       "1.3.11 has now been BUILT and fully verified against the on-machine key,",
       "and its certificate is BE2320A5…3A9187A5 — matching the rehearsal candidate",
@@ -63,7 +60,6 @@
       "risk starts the moment a customer installs, and if the key is then lost",
       "every TV in the field needs uninstall + re-pair to ever update again."
     ],
-
     "_playStoreNote": [
       "Before customer rollout, compare the canonical sideload certificate with the",
       "Google Play App Signing certificate. If they differ, pilot customers migrating",
@@ -71,7 +67,6 @@
       "reinstall (and will re-pair). Document it before the migration, not after."
     ]
   },
-
   "candidate": {
     "_comment": [
       "Built from source on 2026-08-10, NOT downloaded from a GitHub release.",
@@ -99,15 +94,53 @@
     "sourceCommit": "c126ee1525739be76cbfcee3717cccb7ecbf5277",
     "sourceCommitParent": "bff3ee0dee7c3d1896f93bf7be131bd833ddadba",
     "verifiedAt": "2026-08-10",
-
     "apksignerVerified": true,
-    "apksignerSchemes": { "v1": true, "v2": true, "v3": false, "v3.1": false, "v4": false },
+    "apksignerSchemes": {
+      "v1": true,
+      "v2": true,
+      "v3": false,
+      "v3.1": false,
+      "v4": false
+    },
     "apksignerSignerCount": 1,
     "apksignerAllSignersMatchCert": true
   },
-
-  "published": null,
-
+  "published": {
+    "package": "com.vizora.display",
+    "versionName": "1.3.11",
+    "versionCode": 10141,
+    "apkSha256": "D95FA359D194704C8ACB6144B37FB054DB1FCF5789B7D0BE370CDE886F9DB02E",
+    "apkBytes": 1250202,
+    "signingCertSha256": "BE2320A5728CFCF1CF9436C04C377BE9BF347807B23183F8C88BE3583A9187A5",
+    "signingCertOwner": "CN=Vizora Display, OU=Mobile, O=Triveni Digital, L=Unknown, ST=Unknown, C=US",
+    "sourceReleaseUrl": null,
+    "sourceAssetName": "vizora-display-1.3.11-release.apk",
+    "sourceIsPrerelease": null,
+    "sourceRepo": "Trivenidigital/vizora-tv",
+    "sourceCommit": "c126ee1525739be76cbfcee3717cccb7ecbf5277",
+    "sourceCommitParent": "bff3ee0dee7c3d1896f93bf7be131bd833ddadba",
+    "verifiedAt": "2026-08-10",
+    "apksignerVerified": true,
+    "apksignerSchemes": {
+      "v1": true,
+      "v2": true,
+      "v3": false,
+      "v3.1": false,
+      "v4": false
+    },
+    "apksignerSignerCount": 1,
+    "apksignerAllSignersMatchCert": true,
+    "_comment": [
+      "LIVE at https://vizora.cloud/tv and /downloads/vizora-display.apk since 2026-08-10.",
+      "Published bytes were verified against this hash from the server itself AND from an",
+      "independent network; the /tv page asserts the same version and hash.",
+      "",
+      "This block is the baseline the NEXT release is compared against: its signing",
+      "certificate must match, and versionCode must be strictly greater than 10141."
+    ],
+    "publishedAt": "2026-08-10",
+    "publishedUrl": "https://vizora.cloud/downloads/vizora-display.apk"
+  },
   "approval": {
     "_gateA": "Artifact approval — confirm this exact APK is the intended client-pilot build, not merely the newest GitHub prerelease.",
     "_gateA_scope": [
@@ -119,34 +152,7 @@
     ],
     "artifactApprovedBy": "Sri",
     "artifactApprovedAt": "2026-08-10",
-
     "_gateB": "Signing-key durability — confirm the release keystore has a secure off-machine backup and a recoverable password owned by an authorized operator. Record location CLASS and ownership only, never the key or password.",
-    "_gateB_evidence": [
-      "CLOSED 2026-08-10. Split by who established what, so a future reader knows",
-      "which parts are machine-checked and which rest on the owner's word.",
-      "",
-      "Machine-verified: the encrypted backup was created, uploaded, and then",
-      "RETRIEVED FROM THE VPS and restored — decrypt produced a file byte-identical",
-      "to the original (DB5C23DD…654BC3), which opened as PrivateKeyEntry alias",
-      "vizora-display and signed a disposable APK that apksigner verified across",
-      "v1+v2+v3 with certificate BE2320A5…3A9187A5. Isolation was verified, not",
-      "assumed: no nginx root/alias into /opt, no container mount, 4/4 HTTP probes",
-      "404. The original keystore re-hashed unchanged afterwards and every temporary",
-      "copy was shredded.",
-      "",
-      "Owner-attested (not machine-checkable, by design): both secrets — the backup",
-      "encryption passphrase and the keystore password — were filed in an",
-      "owner-controlled password manager and the staging folder on the build machine",
-      "was deleted. Confirmed by Srini on 2026-08-10; the deletion was independently",
-      "re-checked here.",
-      "",
-      "The recovery path after a total build-machine loss is therefore: vault →",
-      "passphrase → decrypt the VPS copy → vault → keystore password → open. No step",
-      "depends on the Windows machine, which is what this gate exists to guarantee.",
-      "",
-      "Re-run the restore drill periodically — key custody rots quietly, and the",
-      "failure is only discovered at the moment it is most expensive."
-    ],
     "_gateB_evidence": [
       "CLOSED 2026-08-10 (second attempt). Split by who established what, so a future",
       "reader knows which parts are machine-checked and which rest on the owner.",
