@@ -31,8 +31,8 @@
 
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { resolve, join } from 'node:path';
 
 const DEFAULT_PACKAGE = 'com.vizora.display';
 
@@ -224,6 +224,102 @@ function readSigningCert(apkPath) {
   };
 }
 
+/**
+ * Locate `apksigner` — PATH first, then the Android SDK build-tools dirs.
+ * Returns null when it is not installed anywhere we can find.
+ */
+function findApksigner() {
+  const isWin = process.platform === 'win32';
+  const names = isWin ? ['apksigner.bat', 'apksigner'] : ['apksigner'];
+
+  for (const name of names) {
+    try {
+      execFileSync(isWin ? 'where' : 'which', [name], { stdio: 'pipe' });
+      return name;
+    } catch {
+      /* not on PATH — keep looking */
+    }
+  }
+
+  const sdkRoots = [
+    process.env.ANDROID_HOME,
+    process.env.ANDROID_SDK_ROOT,
+    process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'Android', 'Sdk') : null,
+    process.env.HOME ? join(process.env.HOME, 'Android', 'Sdk') : null,
+    process.env.HOME ? join(process.env.HOME, 'Library', 'Android', 'sdk') : null,
+  ].filter(Boolean);
+
+  for (const root of sdkRoots) {
+    const buildTools = join(root, 'build-tools');
+    if (!existsSync(buildTools)) continue;
+    let versions;
+    try {
+      versions = readdirSync(buildTools).sort().reverse(); // newest first
+    } catch {
+      continue;
+    }
+    for (const v of versions) {
+      for (const name of names) {
+        const candidate = join(buildTools, v, name);
+        if (existsSync(candidate)) return candidate;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Full cross-scheme signature verification via apksigner.
+ *
+ * This is what keytool cannot do: keytool reads the v1 (JAR) block only, so an
+ * APK whose v2/v3 blocks were signed with a DIFFERENT key would pass a keytool
+ * check. apksigner validates every scheme and reports each signer's certificate
+ * digest, letting us assert they all agree.
+ */
+function runApksigner(binary, apkPath) {
+  let out;
+  let verified = true;
+
+  // Node refuses to execFile a .bat/.cmd directly (EINVAL, the CVE-2024-27980
+  // hardening). Route those through cmd.exe with an ARGUMENT ARRAY — never a
+  // concatenated shell string, so the APK path cannot inject.
+  const isBatch = /\.(bat|cmd)$/i.test(binary);
+  const cmd = isBatch ? process.env.COMSPEC || 'cmd.exe' : binary;
+  const argv = ['verify', '--verbose', '--print-certs', apkPath];
+  const args = isBatch ? ['/c', binary, ...argv] : argv;
+
+  try {
+    out = execFileSync(cmd, args, {
+      encoding: 'utf8',
+      maxBuffer: 8 * 1024 * 1024,
+      stdio: 'pipe',
+    });
+  } catch (err) {
+    // Non-zero exit means verification FAILED; keep the output for the report.
+    verified = false;
+    out = `${err.stdout ? String(err.stdout) : ''}${err.stderr ? String(err.stderr) : ''}`;
+  }
+
+  // `[\d.]+` so "v3.1" is its own key rather than colliding with "v3".
+  const schemes = {};
+  for (const m of out.matchAll(/Verified using (v[\d.]+) scheme[^:]*:\s*(true|false)/gi)) {
+    schemes[m[1].toLowerCase()] = m[2].toLowerCase() === 'true';
+  }
+
+  const signerDigests = [...out.matchAll(/Signer #(\d+) certificate SHA-256 digest:\s*([0-9a-fA-F]+)/g)].map(m => ({
+    signer: Number(m[1]),
+    sha256: m[2].toUpperCase(),
+  }));
+
+  return {
+    verified: verified && /^Verifies\s*$/m.test(out),
+    schemes,
+    signerDigests,
+    raw: out.trim(),
+  };
+}
+
 /** Fingerprints compare case-insensitively and ignore colon separators. */
 function normalizeFingerprint(fp) {
   return String(fp).replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
@@ -333,6 +429,68 @@ async function main() {
   // 3. signing certificate extracted
   check('signing certificate readable', Boolean(cert.sha256), formatFingerprint(cert.sha256));
 
+  // 3b. Full cross-scheme signature verification (apksigner).
+  //
+  // REQUIRED on the release machine. keytool validates the v1 block only, so
+  // without this an APK whose v2/v3 blocks carry a different key would pass.
+  // With --require-apksigner, an absent SDK is a FAILURE, not a caveat —
+  // production publication fails closed rather than proceeding half-verified.
+  const requireApksigner = Boolean(args['require-apksigner']);
+  const apksignerBin = findApksigner();
+  let apksigner = null;
+
+  if (!apksignerBin) {
+    if (requireApksigner) {
+      check(
+        'full signature verification (apksigner)',
+        false,
+        'apksigner NOT FOUND — required for publication. Install Android build-tools ' +
+          '(sdkmanager "build-tools;34.0.0") or set ANDROID_HOME. Refusing to treat a ' +
+          'keytool-only check as sufficient: it validates the v1 block and would miss a ' +
+          'v2/v3 block signed with a different key.',
+      );
+    } else {
+      checks.push({
+        name: 'full signature verification (apksigner)',
+        pass: true,
+        skipped: true,
+        detail:
+          'SKIPPED — apksigner not installed. keytool validated the v1 block ONLY. ' +
+          'Run with --require-apksigner on the release machine to make this mandatory.',
+      });
+    }
+  } else {
+    apksigner = runApksigner(apksignerBin, apkPath);
+
+    check(
+      'apksigner verifies the APK',
+      apksigner.verified,
+      apksigner.verified
+        ? `verified using ${Object.entries(apksigner.schemes)
+            .filter(([, v]) => v)
+            .map(([k]) => k)
+            .join(', ') || '(no scheme reported)'}`
+        : `apksigner FAILED to verify this APK:\n${apksigner.raw.split('\n').slice(0, 8).join('\n')}`,
+    );
+
+    const anyScheme = Object.values(apksigner.schemes).some(Boolean);
+    check('at least one signature scheme verified', anyScheme, JSON.stringify(apksigner.schemes));
+
+    // The cross-scheme assertion keytool cannot make: every signer's cert must
+    // be the same key we read from the v1 block.
+    const mismatched = apksigner.signerDigests.filter(d => d.sha256 !== cert.sha256);
+    check(
+      'all signers match the expected certificate',
+      apksigner.signerDigests.length > 0 && mismatched.length === 0,
+      apksigner.signerDigests.length === 0
+        ? 'apksigner reported no signer certificates'
+        : mismatched.length === 0
+          ? `${apksigner.signerDigests.length} signer(s), all ${formatFingerprint(cert.sha256)}`
+          : `MISMATCH — signer(s) ${mismatched.map(d => `#${d.signer}=${formatFingerprint(d.sha256)}`).join(', ')} ` +
+            `differ from the v1 certificate ${formatFingerprint(cert.sha256)}`,
+    );
+  }
+
   // 4. certificate matches the previously accepted release + versionCode increases
   if (baselineAbsent) {
     // Not a pass and not a failure — there is genuinely nothing to compare to.
@@ -420,6 +578,9 @@ async function main() {
     signatureAlgorithm: cert.signatureAlgorithm,
     keyAlgorithm: cert.keyAlgorithm,
     signatureSchemes: schemes,
+    apksigner: apksigner
+      ? { binary: apksignerBin, verified: apksigner.verified, schemes: apksigner.schemes, signers: apksigner.signerDigests }
+      : { binary: null, verified: null, required: requireApksigner },
     published,
     checks,
     verdict: checks.every(c => c.pass) ? 'PASS' : 'FAIL',
@@ -444,9 +605,13 @@ async function main() {
     console.log(
       `  schemes         v1(JAR)=${schemes.v1 ? 'yes' : 'no'}  v2/v3 block=${schemes.v2OrV3Block ? 'present' : 'absent'}`,
     );
-    if (schemes.v2OrV3Block) {
-      console.log('                  NOTE: keytool validates the v1 block only. Cross-scheme');
-      console.log('                  key agreement needs `apksigner verify --print-certs`.');
+    console.log(
+      `  apksigner       ${apksignerBin ? `${apksignerBin} -> ${apksigner.verified ? 'VERIFIES' : 'FAILED'}` : 'not installed'}`,
+    );
+    if (schemes.v2OrV3Block && !apksignerBin) {
+      console.log('                  NOTE: keytool validates the v1 block only. This APK has a');
+      console.log('                  v2/v3 block that was NOT cross-checked. Use --require-apksigner');
+      console.log('                  on the release machine to make that check mandatory.');
     }
     console.log('');
     for (const c of checks) {

@@ -102,6 +102,24 @@ Why B is the only unrecoverable dependency: if the key is lost, no future build
 can update an installed app. Every TV in the field must be manually uninstalled
 and re-paired. There is no recovery path.
 
+**Where to start for Gate B** (located 2026-08-10; no credential was read):
+
+- `vizora-tv` `android/app/build.gradle` reads the signing config from
+  `android/keystore.properties` — that file holds `storeFile`, `storePassword`
+  and `keyAlias`.
+- `android/keystore.properties` **exists in the local `vizora-tv` checkout on
+  the Windows dev machine** (110 bytes, last modified 2026-03-26). It is
+  correctly gitignored — only `keystore.properties.example` is tracked, and no
+  `.jks`/`.keystore` is tracked in the repo.
+- The `storeFile` entry in that file is the path to the actual keystore. Read it
+  there to answer "where is the key"; then confirm whether that path is covered
+  by an off-machine backup.
+
+The open question is **not** where the file is — it is whether it exists
+anywhere other than one Windows laptop, and whether the password is recoverable
+by someone other than its author. Record only location class, backup status,
+recovery ownership, and the certificate SHA-256 above.
+
 ## 7. Verified artifact facts (2026-08-10)
 
 ```
@@ -113,15 +131,38 @@ cert sha256     AA07524A453375DE143CA4A506C44657E509CCC0F79981821693903DA5137982
 cert owner      CN=Vizora Display (self-signed)
 cert valid to   2051-03-25
 key / sig alg   2048-bit RSA / SHA256withRSA
-schemes         v1 (JAR) present; v2/v3 signing block present
+apksigner       VERIFIES — v1 true, v2 true, v3/v3.1/v4 false
+signers         1, digest identical to the v1 certificate
 ```
 
-**Known limit of the check:** `keytool -printcert -jarfile` validates the **v1**
-signature only. If an APK were v2/v3-signed with a *different* key than its v1
-block, keytool would not notice. Full cross-scheme validation needs
-`apksigner verify --print-certs`, which requires the Android SDK (not installed
-on the dev machine). The verifier reports which schemes are present so this
-limit is visible rather than assumed.
+### Full signature verification is mandatory for publication
+
+`keytool -printcert -jarfile` validates the **v1** signature only. An APK whose
+v2/v3 blocks were signed with a *different* key would pass a keytool-only check.
+
+`publish-display-apk.sh` therefore always passes `--require-apksigner`, which
+**fails closed**: if `apksigner` cannot be found, publication aborts rather than
+proceeding half-verified. Verified both ways — present → PASS, hidden → exit 1.
+
+The verifier finds `apksigner` on `PATH`, then under `ANDROID_HOME`,
+`ANDROID_SDK_ROOT`, `%LOCALAPPDATA%\Android\Sdk`, `~/Android/Sdk`, and
+`~/Library/Android/sdk`, newest build-tools first. If it is missing on the
+release machine:
+
+```bash
+sdkmanager "build-tools;34.0.0"     # or set ANDROID_HOME to an existing SDK
+```
+
+Two implementation notes worth keeping:
+
+- Node refuses to `execFile` a `.bat`/`.cmd` directly (`EINVAL`, the
+  CVE-2024-27980 hardening). Windows invocations are routed through `cmd.exe`
+  with an **argument array**, never a concatenated shell string.
+- The scheme regex captures `v[\d.]+` so `v3.1` is its own key instead of
+  silently colliding with `v3`.
+
+Without `--require-apksigner` the check reports **SKIP** with an explicit
+reason, so a keytool-only run can never be mistaken for full verification.
 
 ## 8. Release procedure
 
@@ -132,10 +173,13 @@ Every future version repeats exactly this. The URLs never change.
 gh release download vX.Y.Z --repo Trivenidigital/vizora-tv \
    --pattern '*.apk' --dir .tmp-apk
 
-# 2. Verify identity, signing key and integrity against the published baseline
+# 2. Verify identity, signing key and integrity against the published baseline.
+#    --require-apksigner is mandatory on the release machine; it fails closed
+#    if full cross-scheme signature verification cannot run.
 node scripts/release/verify-display-apk.mjs \
      --apk .tmp-apk/vizora-display-X.Y.Z-release.apk \
-     --against deploy/tv/release.json
+     --against deploy/tv/release.json \
+     --require-apksigner
 
 # 3. Copy the verified values into release.json `candidate`
 #    (use --json output; never transcribe a hash by hand)

@@ -67,7 +67,9 @@ if (missing.length) { console.log("BLOCKED\n" + missing.join("\n")); process.exi
 console.log("OK");
 ' "$RELEASE_JSON")"
 
+GATES_OPEN=0
 if [[ "$GATE_OUT" != "OK" ]]; then
+  GATES_OPEN=1
   echo "$GATE_OUT" | tail -n +2 | sed 's/^/  BLOCKED: /' >&2
   cat >&2 <<'EOF'
 
@@ -76,21 +78,38 @@ if [[ "$GATE_OUT" != "OK" ]]; then
   proceed. Record only the location CLASS and recovery ownership for the
   keystore — never the key, the .jks, or the password.
 EOF
-  exit 1
+  # A real publish stops here. A dry run continues so the verification output
+  # is visible BEFORE the approval decision is made — it uploads nothing, and
+  # still exits non-zero at the end so it can never read as "green".
+  if [[ $DRY_RUN -eq 0 ]]; then
+    exit 1
+  fi
+  echo "  (dry run — continuing to show verification; nothing will be uploaded)" >&2
+else
+  echo "  both gates recorded"
 fi
-echo "  both gates recorded"
 
 # ─── Verify the artifact ─────────────────────────────────────────────────────
+# --require-apksigner makes publication FAIL CLOSED when full cross-scheme
+# signature verification cannot run. keytool alone reads the v1 block only and
+# would miss a v2/v3 block signed with a different key.
 say "Verifying APK identity, signing key and integrity"
 node "$REPO_ROOT/scripts/release/verify-display-apk.mjs" \
   --apk "$APK" \
-  --against "$RELEASE_JSON"
+  --against "$RELEASE_JSON" \
+  --require-apksigner
 
 # ─── Confirm the page matches the artifact ───────────────────────────────────
 say "Confirming installer page matches release.json"
 node "$REPO_ROOT/scripts/release/render-tv-page.mjs" --check
 
 if [[ $DRY_RUN -eq 1 ]]; then
+  if [[ $GATES_OPEN -eq 1 ]]; then
+    say "DRY RUN — verification passed, but PUBLISHING IS STILL BLOCKED"
+    echo "  Gate A and/or Gate B are open in deploy/tv/release.json (listed above)."
+    echo "  Nothing was uploaded. Exiting non-zero so this cannot read as ready."
+    exit 1
+  fi
   say "DRY RUN — verification passed, nothing was uploaded"
   exit 0
 fi
