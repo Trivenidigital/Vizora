@@ -308,8 +308,41 @@ The backup half of Gate B is built and proven. The credential half is not, and
 | Restored key signs | **PASS** |
 | Cert matches `BE2320A5…3A9187A5` | **PASS** |
 | Credentials in an independent store | **NOT VERIFIED** |
-| Recovery owner | Srini (designated) |
+| Recovery owner | Srini |
 | **GATE B** | **FAIL** |
+
+Recovery after a total build-machine loss will be: vault → passphrase → decrypt
+the VPS copy → vault → keystore password → open. No step touches the Windows
+machine — once the secrets are actually in the vault.
+
+### The near-miss that shaped this — read before closing Gate B
+
+Gate B was closed on 2026-08-10 and **reopened the same day**: the owner reported
+the vault copy of the backup passphrase had been lost. The first VPS ciphertext
+became permanently undecryptable — the passphrase was generated with `openssl
+rand` directly into a file and never displayed, so nothing could reproduce it.
+That unrecoverability is the generator working as intended; it is also exactly
+what made the loss final.
+
+**The signing key was never at risk.** The original keystore was intact on the
+build machine throughout and still yields `BE2320A5…3A9187A5`. The incident cost
+a redo, not the key. It was remediated by generating a new passphrase,
+re-encrypting, replacing the VPS object (new ciphertext
+`A666578E…98A725F3`, old one gone), and re-proving the restore end-to-end.
+
+**The lesson is an ordering one, and it is now enforced in the handoff:** filing a
+secret is not the same as having it. The folder was deleted before read-back was
+ever confirmed, and that gap is where the passphrase disappeared. Gate B must not
+be recorded closed until both secrets have been read back **out of** the vault
+after a full close/reopen — and only then is the staging folder deleted.
+
+This is also why the gate is worth its cost. The failure it is built to prevent
+happened in miniature, in a rehearsal, with nothing published and no TV in the
+field. That is the cheapest possible place to learn it.
+
+**Re-run the restore drill periodically.** Key custody rots quietly and the
+failure only surfaces when it is most expensive — the drill is the four commands
+below and costs minutes.
 
 Arrangement:
 
