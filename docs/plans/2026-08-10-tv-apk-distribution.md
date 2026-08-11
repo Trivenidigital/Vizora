@@ -614,3 +614,71 @@ agent that is red on day one gets ignored. Test coverage pins this default.
 - No download analytics.
 - No listing/index of the archive.
 - No change to any application service, PM2 process, database, or the Next.js app.
+
+---
+
+## 13. Release 2 — 1.3.12, the screen-sleep fix (staged, NOT published)
+
+The first release after 1.3.11, and the first time the `published` baseline did
+real work.
+
+```
+versionName   1.3.12    versionCode 10142   (> published 10141)
+apk sha256    1D035BDBB48720B9BCE1F0C8ADA8E74436E9D37A03D9A11FF7CEFA6B515F8EF7
+apk bytes     1250182
+cert sha256   BE2320A5…3A9187A5 — identical to published, so it installs as an
+              UPDATE and paired screens keep their pairing
+source        vizora-tv 538d10b, branch fix/screen-sleep-keep-awake-1.3.12
+```
+
+**The defect.** `android:keepScreenOn="true"` sat on the `<activity>` tag, where it
+does nothing — `keepScreenOn` is a `View` attribute, so the manifest accepts it (it
+exists in the `android` namespace) but `ActivityInfo` never reads it. Nothing warned
+at build time, so a 24/7 signage app looked configured while every device followed
+its normal sleep and screensaver policy. Android was the only platform missing this;
+`src/platform.ts` already handled Tizen and webOS.
+
+**The fix.** `FLAG_KEEP_SCREEN_ON` on the Activity window: no permission, scoped to
+Activity visibility so it cannot leak like a missed `WakeLock` release, and it
+suppresses the daydream as well as the display timeout.
+
+**Verified in the binary, not only the source** — worth repeating on future releases:
+
+| | 1.3.11 | 1.3.12 |
+|---|---|---|
+| compiled manifest (`aapt2 dump xmltree`) | `android:keepScreenOn(0x01010216)=true` | absent |
+| `MainActivity` dex (`dexdump -d`) | — | `const/16 v1, #int 128` → `Window.addFlags` |
+
+R8 inlined the helper into `onCreate`; the call survives. 128 is `FLAG_KEEP_SCREEN_ON`.
+
+### The versionCode collision the gate caught
+
+The originating implementation plan proposed shipping the fix as **versionCode
+10141** — the value 1.3.11 already owns — and described `build.gradle` as sitting at
+1.3.10, having been written against a stale checkout. Shipping that would have been
+refused by Android as a non-upgrade and by `verify-display-apk.mjs:582` as
+`same build as published (re-publish, not an upgrade)`, and it would have left two
+distinct binaries reporting one `appVersion`.
+
+**10142 is the correct monotonic value.** Recorded because the near-miss is the
+argument for the check: `versionCode strictly greater than published` only became
+enforceable once `published` was a real baseline, which happened one PR earlier.
+
+Also bumped `package.json`, not only `build.gradle` — vite injects it as
+`__APP_VERSION__`, feeding the heartbeat `appVersion` and the Sentry release tag.
+
+### Gate A is held pending one hardware acceptance test
+
+Ruling 2026-08-11. The code is correct and binary-verified; that is deliberately
+not treated as sufficient. The reported defect is **hardware-observed**, and OEM
+eco/no-signal power policies sit below the application layer where
+`FLAG_KEEP_SCREEN_ON` cannot reach. Approving on static evidence would convert
+"implementation correct" into "defect fixed" without evidence for the thing the
+customer actually reported.
+
+The test is bounded — one device, not exhaustive OEM coverage — and is written out
+in `deploy/tv/release.json` under `approval._gateA_scope`. On PASS: approve against
+the SHA-256 above, then PRs → CI → publish → verify the public hash. **Never
+rebuild** — Android release builds are not byte-reproducible, so a rebuild voids
+the approval, the installer page and this record at once. On FAIL: stop, report the
+model and observed behaviour; do not add WakeLocks speculatively.
