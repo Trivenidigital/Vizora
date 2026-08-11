@@ -689,6 +689,7 @@ export class DeviceGateway
       if (!activeDeviceIds.has(deviceId)) {
         this.deviceStatusCache.delete(deviceId);
         this.lastHeartbeatDbWrites.delete(deviceId);
+        this.heartbeatService.forgetDevice(deviceId);
         cleaned++;
       }
     }
@@ -1589,6 +1590,10 @@ export class DeviceGateway
         }
         this.deviceSockets.delete(deviceId);
         this.lastHeartbeatDbWrites.delete(deviceId);
+        // Drop the app-version dedup entry too, so that map tracks connected
+        // devices rather than everything seen since boot. Costs one redundant
+        // UPDATE when the device returns, which is the correct trade.
+        this.heartbeatService.forgetDevice(deviceId);
 
         // Update status in Redis. Guarded so a Redis outage doesn't skip the
         // durable DB offline write below (a disconnect must record offline in

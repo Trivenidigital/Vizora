@@ -25,6 +25,7 @@ describe('HeartbeatService', () => {
     contentImpression: {
       create: jest.fn().mockResolvedValue({}),
     },
+    $executeRaw: jest.fn().mockResolvedValue(1),
   };
 
   beforeEach(async () => {
@@ -44,6 +45,93 @@ describe('HeartbeatService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  describe('appVersion persistence (TV2 — which build is each screen running)', () => {
+    const sqlOf = (call: any[]) => (call[0] as string[]).join('?');
+
+    it('persists the reported appVersion onto the device row', async () => {
+      await service.processHeartbeat('device-1', { appVersion: '1.3.12' } as any);
+
+      expect(mockDatabaseService.$executeRaw).toHaveBeenCalledTimes(1);
+      const call = mockDatabaseService.$executeRaw.mock.calls[0];
+      expect(call).toContain('1.3.12');
+      expect(call).toContain('device-1');
+    });
+
+    it('MERGES into metadata rather than replacing it, in a single statement', async () => {
+      // A read-modify-write would clobber concurrent writers owning other keys —
+      // the bug FeatureFlagsService.setFlags was rewritten to fix.
+      await service.processHeartbeat('device-1', { appVersion: '1.3.12' } as any);
+
+      const sql = sqlOf(mockDatabaseService.$executeRaw.mock.calls[0]);
+      expect(sql).toMatch(/\|\|/);                       // jsonb shallow-merge
+      expect(sql).toMatch(/COALESCE\("metadata"/);        // null-safe
+      expect(sql).toMatch(/jsonb_build_object\('appVersion'/);
+      expect(mockDatabaseService.display.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('does NOT write again while the version is unchanged', async () => {
+      // Heartbeats arrive every 15s; the version changes once per upgrade.
+      for (let i = 0; i < 5; i++) {
+        await service.processHeartbeat('device-1', { appVersion: '1.3.12' } as any);
+      }
+      expect(mockDatabaseService.$executeRaw).toHaveBeenCalledTimes(1);
+    });
+
+    it('writes again when the device reports a new version', async () => {
+      await service.processHeartbeat('device-1', { appVersion: '1.3.11' } as any);
+      await service.processHeartbeat('device-1', { appVersion: '1.3.12' } as any);
+
+      expect(mockDatabaseService.$executeRaw).toHaveBeenCalledTimes(2);
+      expect(mockDatabaseService.$executeRaw.mock.calls[1]).toContain('1.3.12');
+    });
+
+    it('dedups per device, not globally', async () => {
+      await service.processHeartbeat('device-1', { appVersion: '1.3.12' } as any);
+      await service.processHeartbeat('device-2', { appVersion: '1.3.12' } as any);
+
+      expect(mockDatabaseService.$executeRaw).toHaveBeenCalledTimes(2);
+    });
+
+    it('skips the write when the device reports no version', async () => {
+      await service.processHeartbeat('device-1', { metrics: { cpuUsage: 1 } } as any);
+      await service.processHeartbeat('device-1', { appVersion: '   ' } as any);
+
+      expect(mockDatabaseService.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it('refuses an over-long version rather than writing it into JSONB', async () => {
+      await service.processHeartbeat('device-1', { appVersion: 'v'.repeat(65) } as any);
+      expect(mockDatabaseService.$executeRaw).not.toHaveBeenCalled();
+    });
+
+    it('is fail-open: a write failure neither throws nor is cached as done', async () => {
+      mockDatabaseService.$executeRaw.mockRejectedValueOnce(new Error('db down'));
+
+      // Must not throw — a failed heartbeat is what the offline scanner turns
+      // into a false "device offline".
+      await expect(
+        service.processHeartbeat('device-1', { appVersion: '1.3.12' } as any),
+      ).resolves.toBeUndefined();
+
+      // Redis + ClickHouse still ran.
+      expect(mockRedisService.set).toHaveBeenCalled();
+
+      // Not cached, so the next heartbeat retries.
+      await service.processHeartbeat('device-1', { appVersion: '1.3.12' } as any);
+      expect(mockDatabaseService.$executeRaw).toHaveBeenCalledTimes(2);
+    });
+
+    it('forgetDevice clears the dedup so a reconnecting device re-persists', async () => {
+      await service.processHeartbeat('device-1', { appVersion: '1.3.12' } as any);
+      expect(mockDatabaseService.$executeRaw).toHaveBeenCalledTimes(1);
+
+      service.forgetDevice('device-1');
+
+      await service.processHeartbeat('device-1', { appVersion: '1.3.12' } as any);
+      expect(mockDatabaseService.$executeRaw).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('processHeartbeat', () => {

@@ -75,8 +75,12 @@ export class HeartbeatMessageDto {
   @IsNumber()
   uptime?: number;
 
+  // Persisted onto devices.metadata.appVersion so the fleet view can show which
+  // build each screen runs. It lands in JSONB, so bound it here — an unbounded
+  // string from a device is an unbounded row.
   @IsOptional()
   @IsString()
+  @MaxLength(64)
   appVersion?: string;
 
   // Device Revocation Contract v1.1: dark-screen detection. The player reports
