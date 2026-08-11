@@ -120,7 +120,28 @@ say "Creating server directories"
 # shellcheck disable=SC2086
 ssh $SSH_OPTS "$SSH_HOST" "mkdir -p '$DL_DIR' '$TV_DIR' '$ARCHIVE_DIR'"
 
-APK_BASENAME="$(basename "$APK")"
+# The archive name must describe the OUTGOING build — the bytes currently at
+# vizora-display.apk, which this publish is about to replace — NOT the incoming
+# one. Using basename "$APK" here labelled every archived build with its
+# successor's version: on 2026-08-11 the 1.3.11 bytes were archived as
+# "vizora-display-1.3.12-release.apk". Nothing customer-facing broke, because the
+# archive is not web-served, but it silently corrupted the one store you reach for
+# during an incident, and it got worse every release.
+#
+# `published` in release.json is still the outgoing build at this point —
+# candidate -> published is a deliberate post-publish step — so it is the correct
+# source for the name. Null on the very first publish, where there is nothing to
+# archive anyway.
+ARCHIVE_NAME="$(node -e '
+const r = require(process.argv[1]);
+const p = r.published;
+if (!p) { process.stdout.write(""); }
+else { process.stdout.write(p.sourceAssetName || `vizora-display-${p.versionName}-release.apk`); }
+' "$RELEASE_JSON")"
+OUTGOING_SHA="$(node -e '
+const r = require(process.argv[1]);
+process.stdout.write(r.published ? String(r.published.apkSha256).toLowerCase() : "");
+' "$RELEASE_JSON")"
 
 say "Uploading APK and installer page"
 # shellcheck disable=SC2086
@@ -134,7 +155,21 @@ say "Archiving current build and swapping atomically"
 ssh $SSH_OPTS "$SSH_HOST" "
   set -e
   if [ -f '$DL_DIR/vizora-display.apk' ]; then
-    cp -p '$DL_DIR/vizora-display.apk' '$ARCHIVE_DIR/$APK_BASENAME'
+    if [ -z '$ARCHIVE_NAME' ]; then
+      echo 'REFUSING to archive: release.json has no published block to name the outgoing build after.' >&2
+      echo 'A live vizora-display.apk with no published baseline means the two have drifted apart.' >&2
+      exit 1
+    fi
+    # Assert the outgoing bytes really are what release.json claims is published
+    # before labelling them. A mismatch means someone published out of band, and
+    # archiving under the recorded name would bake that lie into the archive.
+    actual=\$(sha256sum '$DL_DIR/vizora-display.apk' | cut -d' ' -f1)
+    if [ -n '$OUTGOING_SHA' ] && [ \"\$actual\" != '$OUTGOING_SHA' ]; then
+      echo \"REFUSING to archive: live APK is \$actual but release.json published says $OUTGOING_SHA.\" >&2
+      echo 'Reconcile before publishing — do not overwrite an artifact of unknown provenance.' >&2
+      exit 1
+    fi
+    cp -p '$DL_DIR/vizora-display.apk' '$ARCHIVE_DIR/$ARCHIVE_NAME'
   fi
   mv '$DL_DIR/.incoming.apk' '$DL_DIR/vizora-display.apk'
   mv '$TV_DIR/.incoming.html' '$TV_DIR/index.html'
