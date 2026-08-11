@@ -219,14 +219,18 @@ release tag. It had been left at `1.0.1` while the APK moved to `1.3.x`, so ever
 TV would report a version that does not exist. Bumped with the same commit —
 check these together on every future release.
 
-**3. `vizora-tv` has 5 failing unit tests, and they are pre-existing.** 5 of 296
-fail on `bff3ee0` — the v1.3.10 tag — *before* any change here; the version bump
-introduced no regression (verified by stashing it and re-running). Four are
-`update_config` command handling (`apiUrl` / `realtimeUrl` / `dashboardUrl`
-resolving to `undefined` instead of the allowed value) and one is the F41
-auth-probe suspend latch. `lintVitalRelease` passes, so nothing blocks the build,
-but `update_config` is the remote-reconfiguration path for a fleet of TVs and it
-is either genuinely broken or covered by stale tests.
+**3. `vizora-tv` shows 5 failing unit tests locally — but CI is green, and CI is
+right.** ~~Pre-existing product debt~~ — **corrected 2026-08-11**. CI runs all 296
+tests on the same SHA and reports **294 pass, 2 skip, 0 fail**. The five fail only
+on local Node 24: CI pins `node-version: 20`, the suite runs in vitest's `node`
+environment, and **Node 21+ made `navigator` a built-in global**, so
+`vi.stubGlobal('navigator', …)` at `vizora-app.spec.ts:200` no longer shadows
+cleanly and `platform.ts:73` platform detection takes a different branch — which
+is why `update_config` rejects origins the tests expect it to accept.
+
+Test-harness / runtime-version compatibility, not a product defect. It still
+matters, because a developer running `npm test` on current Node sees five failures
+that do not exist.
 
 **Explicitly OUT of scope for this workstream (decided 2026-08-10).** These
 predate 1.3.11 and must not extend this release. Tracked as **TV1** in
@@ -682,3 +686,40 @@ the SHA-256 above, then PRs → CI → publish → verify the public hash. **Nev
 rebuild** — Android release builds are not byte-reproducible, so a rebuild voids
 the approval, the installer page and this record at once. On FAIL: stop, report the
 model and observed behaviour; do not add WakeLocks speculatively.
+
+### 1.3.12 published — and the archive bug it exposed
+
+Published 2026-08-11. Verified from the server and from an independent network:
+all four URLs 200, `/tv` asserts 1.3.12 / 10142, the downloaded bytes hash to
+`1D035BDB…515F8EF7`, and the watchdog logs the new byte count
+(`APK 1250182 bytes`) rather than merely reporting healthy.
+
+**The archive was labelling every superseded build with its successor's version.**
+`publish-display-apk.sh` archived the *outgoing* bytes under the *incoming* APK's
+filename:
+
+```bash
+APK_BASENAME="$(basename "$APK")"                               # 1.3.12 (incoming)
+cp -p "$DL_DIR/vizora-display.apk" "$ARCHIVE_DIR/$APK_BASENAME" # 1.3.11 bytes
+```
+
+So 1.3.11's binary landed as `vizora-display-1.3.12-release.apk`. Caught by
+hashing the archive after publishing rather than trusting the filename —
+`d95fa359…` is 1.3.11, at 1250202 bytes against 1.3.12's 1250182.
+
+Nothing customer-facing broke: the archive is a sibling of `downloads/`, not a
+child, and is not web-served (probe returns 404). But it silently corrupted the
+one store you reach for during an incident, and it would have got worse every
+release — each archived build off by one, with no signal.
+
+Fixed two ways. The name now derives from `published` in `release.json`, which is
+still the outgoing build at that point because `candidate` → `published` is a
+deliberate post-publish step. And before archiving, the script asserts the live
+bytes actually hash to `published.apkSha256` and **refuses** on mismatch — if
+someone published out of band, archiving under the recorded name would bake that
+lie in permanently. It also refuses when a live APK exists with no `published`
+block, which means the two have drifted apart.
+
+The lesson generalises: **verify the archive by content, not by filename.** The
+publish path was already fully hash-verified; the archive was the one step
+trusting a string, and that is exactly where it went wrong.
