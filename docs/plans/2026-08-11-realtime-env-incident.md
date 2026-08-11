@@ -67,9 +67,16 @@ PM2's stored env**. My earlier `--update-env` had baked the old passwordless
 re-injecting it and dotenv politely declined to correct it. Confirmed by reading
 `/proc/<pid>/environ`.
 
-The fix was `pm2 delete` + `pm2 start` — the only way to discard the stored env —
-launched with `env -u REDIS_URL -u DATABASE_URL` so the shell could not
-re-poison it.
+The fix was `pm2 delete` + `pm2 start`, launched with
+`env -u REDIS_URL -u DATABASE_URL` so the shell could not re-poison it.
+
+> **Scope of that claim.** `delete` + `start` is the **verified recovery path for
+> Vizora's current PM2 setup**, not a universal PM2 rule. PM2 exposes other ways to
+> influence a stored environment, and which of them work depends on version and on
+> how the process was originally created. What is established here is narrower and
+> still useful: on this host, after the stored env had been poisoned, a plain
+> `pm2 restart` kept re-injecting the stale value, and recreating the process
+> cleared it. Re-derive rather than assume if the setup changes.
 
 ## Resolution
 
