@@ -67,6 +67,7 @@ describe('DeviceGateway', () => {
     processHeartbeat: jest.fn().mockResolvedValue(undefined),
     logImpression: jest.fn().mockResolvedValue(undefined),
     logError: jest.fn().mockResolvedValue(undefined),
+    forgetDevice: jest.fn(),
   };
 
   const mockPlaylistService = {

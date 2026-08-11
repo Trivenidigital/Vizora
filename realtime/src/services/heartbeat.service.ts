@@ -44,15 +44,98 @@ interface DeviceStats {
   recentErrors: StoredError[];
 }
 
+/**
+ * Longest `appVersion` we will persist. Mirrors the DTO's @MaxLength — the DTO
+ * guards the socket boundary, this guards the service for any other caller.
+ * The value lands in JSONB, so an unbounded string is an unbounded row.
+ */
+const MAX_APP_VERSION_LENGTH = 64;
+
+/**
+ * Backstop for the app-version dedup cache. Entries are normally evicted by
+ * `forgetDevice` on disconnect; this only matters if a disconnect is ever missed.
+ * Overflow costs one redundant UPDATE for the evicted device, never correctness.
+ */
+const APP_VERSION_CACHE_CAP = 10_000;
+
 @Injectable()
 export class HeartbeatService {
   private readonly logger = new Logger(HeartbeatService.name);
+
+  /**
+   * Last `appVersion` we successfully persisted, per device. Heartbeats arrive
+   * every 15s but the version changes only when someone installs a new APK, so
+   * this turns a per-heartbeat write into a per-upgrade write. Populated only on
+   * a successful UPDATE, so a failed write is retried on the next heartbeat
+   * rather than being cached as done.
+   */
+  private readonly lastPersistedAppVersion = new Map<string, string>();
 
   constructor(
     private redisService: RedisService,
     private readonly db: DatabaseService,
     private readonly clickhouse: ClickHouseService,
   ) {}
+
+  /**
+   * Drop a device's cached app-version. Call on disconnect so the map tracks
+   * connected devices rather than every device seen since boot.
+   */
+  forgetDevice(deviceId: string): void {
+    this.lastPersistedAppVersion.delete(deviceId);
+  }
+
+  /**
+   * Persist the reported app version onto the device row, but only when it
+   * changed.
+   *
+   * Why this exists: the player has always sent `appVersion` in every heartbeat
+   * and the server has always thrown it away — the DTO declared it, nothing read
+   * it, nothing wrote it, and the device-detail page rendered an "App Version"
+   * row from `metadata.appVersion` that could therefore never populate. The
+   * practical cost showed up during the 1.3.12 rollout: there was no way to tell
+   * which build any screen was running, so "did the update actually install?"
+   * could only be answered by asking the customer.
+   *
+   * Atomicity: `metadata || jsonb_build_object(...)` shallow-merges inside a
+   * single statement, so it sets exactly the `appVersion` key and preserves every
+   * other key that a concurrent writer may own. The read-modify-write shape
+   * (load row → mutate JSON in JS → write whole object back) loses those
+   * concurrent writes, which is the bug `FeatureFlagsService.setFlags` was
+   * rewritten to fix — same reasoning, same remedy.
+   *
+   * Fail-open: a failure here is logged and swallowed. Recording telemetry must
+   * never be able to fail a heartbeat, because a failed heartbeat is what the
+   * middleware's offline scanner turns into a false "device offline".
+   */
+  private async persistAppVersionIfChanged(
+    deviceId: string,
+    rawAppVersion: string | undefined,
+  ): Promise<void> {
+    const appVersion = rawAppVersion?.trim();
+    if (!appVersion || appVersion.length > MAX_APP_VERSION_LENGTH) return;
+    if (this.lastPersistedAppVersion.get(deviceId) === appVersion) return;
+
+    try {
+      await this.db.$executeRaw`
+        UPDATE "devices"
+        SET "metadata" = COALESCE("metadata", '{}'::jsonb)
+                         || jsonb_build_object('appVersion', ${appVersion}::text)
+        WHERE "id" = ${deviceId}
+      `;
+
+      if (this.lastPersistedAppVersion.size >= APP_VERSION_CACHE_CAP) {
+        const oldest = this.lastPersistedAppVersion.keys().next();
+        if (!oldest.done) this.lastPersistedAppVersion.delete(oldest.value);
+      }
+      this.lastPersistedAppVersion.set(deviceId, appVersion);
+      this.logger.log(`Device ${deviceId} reported appVersion ${appVersion}`);
+    } catch (error) {
+      // Deliberately not cached — the next heartbeat retries.
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Failed to persist appVersion for ${deviceId}: ${message}`);
+    }
+  }
 
   /**
    * Process device heartbeat
@@ -95,6 +178,11 @@ export class HeartbeatService {
           status: 'online',
         });
       }
+
+      // Fleet visibility: record which build this screen is actually running.
+      // Awaited so a test can assert it, but internally fail-open and a no-op
+      // once the version is known, so the steady-state cost is a Map lookup.
+      await this.persistAppVersionIfChanged(deviceId, data.appVersion);
 
       this.logger.debug(`Processed heartbeat for device: ${deviceId}`);
     } catch (error) {
