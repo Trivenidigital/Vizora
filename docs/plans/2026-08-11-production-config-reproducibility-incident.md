@@ -43,18 +43,37 @@ Discovered in this order, each blocking the one after it:
 application URLs, and unsafe DB pool settings. Fixing any one would not have
 brought it back.
 
-## The catch that prevented a larger outage
+## The connection-budget catch — a major preflight finding, not incidental cleanup
 
 Before recreating middleware, comparing PM2's live `DATABASE_URL` against `.env`
-showed `connection_limit=10` versus `30`, and that `.env` had **lost**
-`statement_timeout=30000`.
+showed two differences beyond the password:
 
-`max_connections` is **50**. Recreating middleware from `.env` would have demanded
-2 instances × 30 = 60 for middleware alone, plus realtime's 30 — **90 against a
-limit of 50** — while silently dropping the statement-timeout guard. That would
-have been a larger and much more confusing outage than the one that happened.
-`.env` was aligned to the tuned values first. Observed usage afterwards: **14 of
-50**.
+| | PM2 live (working) | `.env` (would have been used) |
+|---|---|---|
+| `connection_limit` | 10 | **30** |
+| `pool_timeout` | 20 | **60** |
+| `statement_timeout` | 30000 | **absent** |
+
+`max_connections` is **50**. Recreating middleware from `.env` would have demanded:
+
+```
+middleware   2 instances × 30 = 60
+realtime     1 instance  × 30 = 30
+                             ─────
+                    total     90   against max_connections = 50
+```
+
+— while **silently dropping the 30s `statement_timeout` guard**, leaving runaway
+queries with no ceiling. That is a larger and far more confusing outage than the
+one that occurred: connection exhaustion presents as intermittent failure across
+every service at once, with no single failing component to point at.
+
+`.env` was aligned to the tuned values **before** any process was recreated, so
+`statement_timeout=30000` was retained. Observed usage afterwards: **14 of 50**.
+
+This was caught by comparing the running configuration against the configuration a
+fresh process would use — which is precisely the check proposed as a standing
+control (§4 of the proposals). It worked here because it was done by hand, once.
 
 ## Reasoning mistakes — the second outage is on these
 
@@ -105,36 +124,62 @@ Running `NODE_ENV=production node dist/main.js` for 30 seconds would have surfac
 `Missing required production env vars: API_BASE_URL` with **zero** downtime. It is
 the cheapest possible experiment and it was run fourth instead of first.
 
-## Current state
+## Corrections completed
+
+All of the following are **done**, in persisted production configuration
+(`/opt/vizora/app/.env`), each taken from the authoritative source rather than
+guessed. `.env` was backed up to `/root/env.bak.*` before every edit. **None is
+outstanding.**
+
+| Setting | Corrected to | Source of truth | Runtime mutation |
+|---|---|---|---|
+| `REDIS_URL` | password added, URL-encoded | container `--requirepass` | realtime restarted |
+| `REDIS_PASSWORD` | matched to the container | container `--requirepass` | — |
+| `DATABASE_URL` password | 48-char server password | container `POSTGRES_PASSWORD` | — |
+| `DATABASE_URL` pool params | `connection_limit=10`, `pool_timeout=20`, `statement_timeout=30000` | PM2 live (working) config | — |
+| `API_BASE_URL` | `https://vizora.cloud` | added; was absent | middleware restarted |
+| `MINIO_ACCESS_KEY` / `SECRET_KEY` | real 32/48-char credentials | container `MINIO_ROOT_USER` / `_PASSWORD` | — |
+| `CORS_ORIGIN` | `https://vizora.cloud,https://www.vizora.cloud` | was localhost-only | — |
+| `APP_URL` / `WEB_URL` | `https://vizora.cloud` | were localhost | — |
+| **`NEXT_PUBLIC_API_URL`** | **`https://vizora.cloud`** | were localhost | **none — see below** |
+| **`NEXT_PUBLIC_SOCKET_URL`** | **`https://vizora.cloud`** | were localhost | **none — see below** |
+
+**The two `NEXT_PUBLIC_*` values were corrected without any runtime mutation.**
+They are build-time values baked into the web bundle, so the running build is
+unaffected and neither a rebuild nor a restart was performed or is required. The
+correction exists solely so the *next* legitimate web build cannot silently bake
+localhost endpoints into production. Both were verified against their consumption
+path first — each resolves through `new URL(...).origin`, and `useSocket.ts:57`
+already falls back to same-origin in production, so the bare origin is the correct
+form. **Do not treat these as outstanding work.**
+
+## Closure
 
 ```
-middleware restart-safe: PASS
-web restart-safe:        PASS
-realtime restart-safe:   PASS
+Current runtime state:
+middleware restart-safe from persisted config: PASS
+web restart-safe from persisted config:        PASS
+realtime restart-safe from persisted config:   PASS
+
+Known stale production build-time web values were corrected in persisted
+configuration without rebuilding or restarting web.
+
+This proves the present configuration can recreate the running services.
+It does not prove future drift cannot recur; continuous drift detection is
+a separate proposed control.
 ```
 
-Each verified by recreating the process from persisted configuration with no
-inherited PM2 environment, then confirming: stable PM2 state, restart count not
-climbing over a timed window, Redis authenticated, Postgres authenticated, health
-endpoint 200, and no credential or config errors after the start timestamp. All
-public URLs 200. Database usage **14 of 50** connections — safely below the limit.
+Each PASS was established by recreating the process from persisted configuration
+with no inherited PM2 environment, then confirming: stable PM2 state, restart count
+not climbing over a timed window, Redis authenticated, Postgres authenticated,
+health endpoint 200, and no credential or config errors after the start timestamp.
+All public URLs 200. Database usage **14 of 50** connections.
 
-`NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SOCKET_URL` were also corrected in persisted
-config, deliberately **without** rebuilding or restarting web: the running build is
-unaffected, and the purpose is only to stop the next legitimate web build baking
-localhost endpoints into production.
+Treat these PASSes as a measurement, not a property — they decay silently, and
+nothing in place today would report it. The condition that produced this incident,
+persisted config drifting from running config while everything looks healthy, is
+still unprevented.
 
-## What this does NOT establish
-
-**Restart safety is not permanent.** It was verified at one moment against one
-snapshot of persisted configuration. The condition that produced this incident —
-persisted config drifting away from running config while everything looks healthy —
-is not prevented by anything that exists today. Startup assertions would catch bad
-config *when something restarts*; today's problem survived for weeks precisely
-because nothing forced a restart.
-
-Treat these PASSes as a measurement, not a property. They decay silently.
-
-Proposals for the systemic controls are kept separate, in
-`2026-08-11-config-reproducibility-proposals.md` — deliberately not mixed into this
-record.
+Proposed preventive controls are tracked separately in
+`2026-08-11-config-reproducibility-proposals.md` — recommendations only, none
+built.
