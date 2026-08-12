@@ -342,6 +342,25 @@ Customers install it by sideload from two permanent URLs — `https://vizora.clo
 
 PM2 via `ecosystem.config.js`: middleware runs 2 instances in cluster mode, realtime runs single instance (WebSocket state consistency), web runs single instance. All have memory limits, exponential backoff restart, and graceful shutdown.
 
+**The canonical production command ALWAYS passes `--env production`:**
+
+```bash
+pm2 reload ecosystem.config.js --env production   # never `pm2 restart all` / `reload all`
+```
+
+Without the flag PM2 applies each app's default `env` block, which sets
+`NODE_ENV: 'development'` — on 2026-08-12 that put all three services into
+development mode in production, skipping both boot validators and exposing
+Swagger publicly at `/api/v1/docs`. **`curl https://vizora.cloud/api/v1/docs`
+returning 200 instead of 404 is the cheapest tell that a restart selected the
+wrong environment** — check it after every reload.
+
+`pm2 restart <app>` / `reload all` reuse PM2's *stored* env and do NOT re-read
+the ecosystem file, so their outcome depends on how the process was last
+started. Full procedure + the `env_production` coverage invariant (enforced by
+`scripts/ops/ecosystem-env-coverage.test.ts`):
+`docs/plans/2026-08-12-b2-canonical-pm2-procedure.md`.
+
 ## Swagger Docs
 
 Available at `http://localhost:3000/api/v1/docs` in development mode only.
