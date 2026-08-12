@@ -16,6 +16,10 @@ import test from 'node:test';
 import {
   BUILD_TIME_EXCLUSION,
   DRIFT_CLASS_TO_SEVERITY,
+  analyzeDrift,
+  assessStability,
+  incidentScope,
+  resolveClearedFindings,
   buildMaxConnectionsCandidates,
   compareSecretValues,
   computeConnectionBudget,
@@ -35,6 +39,7 @@ import {
   type EnvMap,
   type ServiceObservation,
 } from './config-drift.js';
+import type { Incident } from './types.js';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -111,6 +116,7 @@ function middlewareObs(over: Partial<ServiceObservation> = {}): ServiceObservati
     ecosystemEnvProduction: ecoProduction,
     ecosystemEnvDefault: ecoDefault,
     dotenvVars: dotenv,
+    stability: { stable: true },
     ...over,
   };
 }
@@ -129,6 +135,7 @@ function realtimeObs(over: Partial<ServiceObservation> = {}): ServiceObservation
     ecosystemEnvProduction: ecoProduction,
     ecosystemEnvDefault: ecoDefault,
     dotenvVars: dotenv,
+    stability: { stable: true },
     ...over,
   };
 }
@@ -152,6 +159,7 @@ function webObs(over: Partial<ServiceObservation> = {}): ServiceObservation {
     ecosystemEnvProduction: ecoProduction,
     ecosystemEnvDefault: ecoDefault,
     dotenvVars: null,
+    stability: { stable: true },
     ...over,
   };
 }
@@ -644,6 +652,349 @@ test('/proc, PM2 and dotenv disagreeing resolves deterministically and is attrib
   assert.ok(shadow, 'a disagreement between runtime and persisted .env must be reported');
   assert.match(shadow.message, /from-pm2\.example/, 'must name the running value');
   assert.match(shadow.message, /from-dotenv\.example/, 'must name the persisted value');
+});
+
+// ─── Operating correctness: stale resolution + stability guard ───────────────
+
+const NOW = 1_786_560_000_000;
+const SETTLED = 90_000;
+
+function sample(
+  over: Partial<{ pmId: number; status: string; restartTime: number; uptimeMs: number; pid: number }> = {},
+) {
+  return { pmId: 36, status: 'online', restartTime: 5, uptimeMs: NOW - 10 * 60_000, pid: 1234, ...over };
+}
+
+/** middleware's real shape: 2 instances in PM2 cluster mode. */
+function cluster(
+  a: Partial<ReturnType<typeof sample>> = {},
+  b: Partial<ReturnType<typeof sample>> = {},
+) {
+  return [
+    sample({ pmId: 36, pid: 1234, ...a }),
+    sample({ pmId: 37, pid: 5678, ...b }),
+  ];
+}
+
+test('stability: a settled single instance is stable', () => {
+  assert.deepEqual(assessStability([sample()], [sample()], NOW, SETTLED), { stable: true });
+});
+
+test('stability: a changed restart generation is NOT stable', () => {
+  // The 2026-08-12 case: a run landed mid-reload and emitted five criticals
+  // that a run 115s later reproduced none of.
+  const v = assessStability([sample({ restartTime: 5 })], [sample({ restartTime: 6 })], NOW, SETTLED);
+  assert.equal(v.stable, false);
+  assert.match(v.reason ?? '', /restart generation changed/);
+});
+
+test('stability: a changed pid is NOT stable', () => {
+  const v = assessStability([sample({ pid: 100 })], [sample({ pid: 200 })], NOW, SETTLED);
+  assert.equal(v.stable, false);
+  assert.match(v.reason ?? '', /pid changed/);
+});
+
+test('stability: a non-online status in either sample is NOT stable', () => {
+  assert.equal(assessStability([sample({ status: 'launching' })], [sample()], NOW, SETTLED).stable, false);
+  assert.equal(assessStability([sample()], [sample({ status: 'stopping' })], NOW, SETTLED).stable, false);
+});
+
+test('stability: a freshly started generation is NOT stable until it settles', () => {
+  const fresh = [sample({ uptimeMs: NOW - 5_000 })];
+  const v = assessStability(fresh, fresh, NOW, SETTLED);
+  assert.equal(v.stable, false);
+  assert.match(v.reason ?? '', /below the 90s settle threshold/);
+});
+
+test('stability: a missing process in either sample is NOT stable', () => {
+  assert.equal(assessStability([], [sample()], NOW, SETTLED).stable, false);
+  assert.equal(assessStability([sample()], [], NOW, SETTLED).stable, false);
+});
+
+test('stability: missing pm_uptime defers rather than silently satisfying the age requirement', () => {
+  const noUptime = [sample({ uptimeMs: undefined as unknown as number })];
+  const v = assessStability(noUptime, noUptime, NOW, SETTLED);
+  assert.equal(v.stable, false);
+  assert.match(v.reason ?? '', /pm_uptime missing/);
+});
+
+// ─── Cluster-wide stability (middleware runs 2 instances) ────────────────────
+
+test('cluster: both instances settled → stable', () => {
+  assert.deepEqual(assessStability(cluster(), cluster(), NOW, SETTLED), { stable: true });
+});
+
+test('cluster: sibling mid-reload defers the WHOLE service even when the primary is settled', () => {
+  // The blocking edge: `pm2 reload` rolls a cluster one instance at a time.
+  // Instance 36 is settled and unchanged; instance 37 is rolling. Judging only
+  // the settled sibling would certify middleware as stable mid-reload.
+  const restartGen = assessStability(
+    cluster({}, { restartTime: 5 }),
+    cluster({}, { restartTime: 6 }),
+    NOW, SETTLED,
+  );
+  assert.equal(restartGen.stable, false);
+  assert.match(restartGen.reason ?? '', /pm_id 37 restart generation changed/);
+
+  const pidChange = assessStability(
+    cluster({}, { pid: 5678 }),
+    cluster({}, { pid: 9999 }),
+    NOW, SETTLED,
+  );
+  assert.equal(pidChange.stable, false);
+  assert.match(pidChange.reason ?? '', /pm_id 37 pid changed/);
+});
+
+test('cluster: an instance launching or stopping defers the whole service', () => {
+  const launching = assessStability(cluster(), cluster({}, { status: 'launching' }), NOW, SETTLED);
+  assert.equal(launching.stable, false);
+  assert.match(launching.reason ?? '', /pm_id 37 status/);
+
+  const stopping = assessStability(cluster({}, { status: 'stopping' }), cluster(), NOW, SETTLED);
+  assert.equal(stopping.stable, false);
+  assert.match(stopping.reason ?? '', /pm_id 37 status/);
+});
+
+test('cluster: an instance count change in either direction defers', () => {
+  const shrank = assessStability(cluster(), [sample({ pmId: 36 })], NOW, SETTLED);
+  assert.equal(shrank.stable, false);
+  assert.match(shrank.reason ?? '', /instance count changed between samples \(2 → 1\)/);
+
+  const grew = assessStability(cluster(), [...cluster(), sample({ pmId: 38, pid: 4242 })], NOW, SETTLED);
+  assert.equal(grew.stable, false);
+  assert.match(grew.reason ?? '', /instance count changed between samples \(2 → 3\)/);
+});
+
+test('cluster: the same COUNT but a different pm_id set defers', () => {
+  // A replaced instance keeps the count identical, so counting alone is not
+  // enough — the identity of the set has to match too.
+  const v = assessStability(
+    cluster(),
+    [sample({ pmId: 36 }), sample({ pmId: 99, pid: 5678 })],
+    NOW, SETTLED,
+  );
+  assert.equal(v.stable, false);
+  assert.match(v.reason ?? '', /instance set changed/);
+});
+
+test('cluster: one instance missing pm_uptime defers the whole service', () => {
+  const v = assessStability(
+    cluster(),
+    cluster({}, { uptimeMs: undefined as unknown as number }),
+    NOW, SETTLED,
+  );
+  assert.equal(v.stable, false);
+  assert.match(v.reason ?? '', /pm_id 37 pm_uptime missing/);
+});
+
+test('cluster: one instance below the settle threshold defers the whole service', () => {
+  const v = assessStability(
+    cluster({}, { uptimeMs: NOW - 5_000 }),
+    cluster({}, { uptimeMs: NOW - 5_000 }),
+    NOW, SETTLED,
+  );
+  assert.equal(v.stable, false);
+  assert.match(v.reason ?? '', /pm_id 37 generation is 5s old/);
+});
+
+test('cluster: a missing pm_id defers — instances cannot be matched across samples', () => {
+  const anonymous = [sample({ pmId: undefined as unknown as number }), sample({ pmId: 37 })];
+  const v = assessStability(anonymous, anonymous, NOW, SETTLED);
+  assert.equal(v.stable, false);
+  assert.match(v.reason ?? '', /pm_id missing/);
+});
+
+test('cluster: instance order between samples does not matter', () => {
+  // PM2 does not guarantee ordering in `jlist`; matching is by pm_id.
+  const [a, b] = cluster();
+  assert.deepEqual(assessStability([a, b], [b, a], NOW, SETTLED), { stable: true });
+});
+
+test('an unstable service is DEFERRED — no drift is emitted for it', () => {
+  const drifted = prodEnv({ APP_URL: 'http://localhost:3001' });
+  const findings = findingsFor([
+    middlewareObs({
+      dotenvVars: drifted,
+      stability: { stable: false, reason: 'restart generation changed between samples (5 → 6)' },
+    }),
+  ]);
+
+  const deferred = findings.find(f => f.type === 'observation-deferred');
+  assert.ok(deferred, `expected observation-deferred, got ${types(findings)}`);
+  assert.match(deferred.message, /NOT established/, 'must not read as healthy');
+  assert.ok(
+    !findings.some(f => f.type === 'config-shadow' || f.type === 'production-url-drift'),
+    'a service mid-restart must not be classified — that is the transient false positive',
+  );
+});
+
+test('a stable service with the same drift IS classified — the guard is not a mute button', () => {
+  const drifted = prodEnv({ APP_URL: 'http://localhost:3001' });
+  const findings = findingsFor([middlewareObs({ dotenvVars: drifted })]);
+  assert.ok(findings.some(f => f.type === 'config-shadow'));
+  assert.ok(!findings.some(f => f.type === 'observation-deferred'));
+});
+
+test('resolution: a finding clears when its scope WAS evaluated and it did not reproduce', () => {
+  const drifted = prodEnv({ APP_URL: 'http://localhost:3001' });
+  const before = findingsToIncidents(
+    findingsFor([middlewareObs({ dotenvVars: drifted })]),
+    '2026-08-12T10:00:00.000Z',
+  );
+  assert.ok(before.length > 0);
+
+  // Next run: configuration corrected, middleware fully evaluated.
+  const next = analyzeDrift([middlewareObs()], { maxConnections: SAFE_MAX_CONNECTIONS });
+  assert.ok(next.evaluated.includes('middleware'));
+
+  const cleared = resolveClearedFindings(
+    before, next.findings, next.evaluated, '2026-08-12T11:00:00.000Z',
+  );
+  assert.equal(cleared.length, before.length, 'every stale finding must clear');
+  assert.ok(cleared.every(i => i.status === 'resolved'));
+  assert.ok(cleared.every(i => i.resolvedAt === '2026-08-12T11:00:00.000Z'));
+  assert.deepEqual(cleared.map(i => i.id).sort(), before.map(i => i.id).sort(), 'same ids, so recordAgentRun upserts');
+});
+
+test('resolution: a DEFERRED service cannot clear its own open findings', () => {
+  // The composition bug. Deferral states "absence of drift was NOT established";
+  // resolving on absence at that moment contradicts the guard's own semantics
+  // and would silently clear a real CRITICAL during a reload.
+  const drifted = prodEnv({ NODE_ENV: 'development' });
+  const before = findingsToIncidents(
+    findingsFor([middlewareObs({ dotenvVars: drifted })]),
+    '2026-08-12T10:00:00.000Z',
+  );
+  assert.ok(before.some(i => i.severity === 'critical'), 'setup: a real CRITICAL exists');
+
+  const next = analyzeDrift(
+    [middlewareObs({
+      dotenvVars: drifted,
+      stability: { stable: false, reason: 'restart generation changed between samples (5 → 6)' },
+    })],
+    { maxConnections: SAFE_MAX_CONNECTIONS },
+  );
+  assert.ok(!next.evaluated.includes('middleware'), 'a deferred service is not evaluated');
+
+  assert.deepEqual(
+    resolveClearedFindings(before, next.findings, next.evaluated, '2026-08-12T11:00:00.000Z'),
+    [],
+    'a deferred service must preserve its open findings',
+  );
+});
+
+test('resolution: deferred middleware preserves its findings while evaluated realtime clears its own', () => {
+  const mwDrift = prodEnv({ NODE_ENV: 'development' });
+  const rtDrift = prodEnv({ REALTIME_PORT: '3002', APP_URL: 'http://localhost:9999' });
+  delete rtDrift.MIDDLEWARE_PORT;
+
+  const before = findingsToIncidents(
+    findingsFor([
+      middlewareObs({ dotenvVars: mwDrift }),
+      realtimeObs({ dotenvVars: rtDrift }),
+    ]),
+    '2026-08-12T10:00:00.000Z',
+  );
+  const mwBefore = before.filter(i => incidentScope(i.targetId) === 'middleware');
+  const rtBefore = before.filter(i => incidentScope(i.targetId) === 'realtime');
+  assert.ok(mwBefore.length > 0 && rtBefore.length > 0, 'setup: both services have findings');
+
+  // middleware restarting; realtime stable and corrected.
+  const next = analyzeDrift(
+    [
+      middlewareObs({
+        dotenvVars: mwDrift,
+        stability: { stable: false, reason: 'pid changed between samples (100 → 200)' },
+      }),
+      realtimeObs(),
+    ],
+    { maxConnections: SAFE_MAX_CONNECTIONS },
+  );
+  assert.ok(!next.evaluated.includes('middleware'));
+  assert.ok(next.evaluated.includes('realtime'));
+
+  const clearedIds = new Set(
+    resolveClearedFindings(before, next.findings, next.evaluated, '2026-08-12T11:00:00.000Z')
+      .map(i => i.id),
+  );
+  assert.ok(
+    mwBefore.every(i => !clearedIds.has(i.id)),
+    'middleware findings must survive while middleware is deferred',
+  );
+  assert.ok(
+    rtBefore.every(i => clearedIds.has(i.id)),
+    'realtime findings clear because realtime WAS evaluated',
+  );
+});
+
+test('resolution: an unreadable /proc (degraded) does not clear findings either', () => {
+  // Comparisons still run when /proc is unreadable, but a variable that lived
+  // only in the exec environment would look absent rather than unchanged —
+  // resolving on that would be a false all-clear.
+  const drifted = prodEnv({ APP_URL: 'http://localhost:3001' });
+  const before = findingsToIncidents(
+    findingsFor([middlewareObs({ dotenvVars: drifted })]),
+    '2026-08-12T10:00:00.000Z',
+  );
+
+  const next = analyzeDrift([middlewareObs({ procEnviron: null })], { maxConnections: SAFE_MAX_CONNECTIONS });
+  assert.ok(!next.evaluated.includes('middleware'), 'degraded is not fully evaluated');
+
+  assert.deepEqual(
+    resolveClearedFindings(before, next.findings, next.evaluated, '2026-08-12T11:00:00.000Z'),
+    [],
+  );
+});
+
+test('resolution: the global scope is evaluated only when every service was', () => {
+  const partial = analyzeDrift(
+    [middlewareObs({ stability: { stable: false, reason: 'restarting' } }), realtimeObs(), webObs()],
+    { maxConnections: SAFE_MAX_CONNECTIONS },
+  );
+  assert.ok(!partial.evaluated.includes('global'), 'a partial sweep cannot clear cross-service findings');
+
+  const full = analyzeDrift([middlewareObs(), realtimeObs(), webObs()], { maxConnections: SAFE_MAX_CONNECTIONS });
+  assert.ok(full.evaluated.includes('global'));
+});
+
+test('incidentScope recovers the owning scope from a persisted targetId', () => {
+  assert.equal(incidentScope('middleware:NODE_ENV'), 'middleware');
+  assert.equal(incidentScope('middleware:DATABASE_URL pool params'), 'middleware');
+  assert.equal(incidentScope('realtime'), 'realtime');
+  assert.equal(incidentScope('global:db-connection-budget'), 'global');
+});
+
+test('resolution: a finding that still reproduces is NOT resolved', () => {
+  const drifted = prodEnv({ APP_URL: 'http://localhost:3001' });
+  const next = analyzeDrift([middlewareObs({ dotenvVars: drifted })], { maxConnections: SAFE_MAX_CONNECTIONS });
+  const incidents = findingsToIncidents(next.findings, '2026-08-12T10:00:00.000Z');
+
+  assert.deepEqual(
+    resolveClearedFindings(incidents, next.findings, next.evaluated, '2026-08-12T11:00:00.000Z'),
+    [],
+    'a persisting drift must stay open',
+  );
+});
+
+test('resolution never touches another agent\'s incidents, or already-resolved rows', () => {
+  const foreign: Incident[] = [
+    {
+      id: 'health-guardian:service-down:realtime', agent: 'health-guardian', type: 'service-down',
+      severity: 'critical', target: 'service', targetId: 'realtime', detected: '2026-08-12T09:00:00.000Z',
+      message: 'down', remediation: 'restart', status: 'open', attempts: 1,
+    },
+    {
+      id: 'config-drift-detector:config-shadow:middleware:NODE_ENV', agent: 'config-drift-detector',
+      type: 'config-shadow', severity: 'critical', target: 'config', targetId: 'middleware:NODE_ENV',
+      detected: '2026-08-12T09:00:00.000Z', message: 'old', remediation: 'x',
+      status: 'resolved', attempts: 0, resolvedAt: '2026-08-12T09:30:00.000Z',
+    },
+  ];
+
+  const cleared = resolveClearedFindings(
+    foreign, [], ['middleware', 'realtime', 'web', 'global'], '2026-08-12T11:00:00.000Z',
+  );
+  assert.deepEqual(cleared, [], 'foreign and already-resolved incidents are left alone');
 });
 
 // ─── Incident mapping + dedup (§7, case 12) ──────────────────────────────────
