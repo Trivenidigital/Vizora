@@ -193,6 +193,57 @@ test('backup failure is CRITICAL only when a backup was attempted', () => {
   assert.equal(b.severity, 'critical');
 });
 
+// ─── Exit-code rule: info=0, warning/critical=1 ──────────────────────────────
+
+test('exit 0 when the only incident is INFO — a permanent info finding is not a failed run', () => {
+  // redis-cli is not installed on the prod host and will not be, so
+  // redis-unobservable fires on every run forever. Exiting non-zero for it
+  // would manufacture a daily false failure.
+  const incidents = buildMaintenanceIncidents(
+    report({ redis: { available: false, reason: 'redis-cli is not installed on this host' } }),
+    AT,
+  );
+  assert.equal(incidents.length, 1);
+  assert.equal(incidents[0].severity, 'info');
+
+  const s = summarize(incidents);
+  assert.equal(s.exitCode, 0, 'info alone must not fail the process');
+  assert.equal(s.issuesFound, 1, 'but the finding is still recorded');
+  assert.equal(s.issuesEscalated, 0);
+});
+
+test('exit 1 when a WARNING is present', () => {
+  const incidents = buildMaintenanceIncidents(
+    report({ prune: { ok: false, deleted: null, error: 'permission denied' } }),
+    AT,
+  );
+  assert.ok(incidents.some(i => i.severity === 'warning'));
+  assert.ok(!incidents.some(i => i.severity === 'critical'));
+  assert.equal(summarize(incidents).exitCode, 1);
+});
+
+test('exit 1 when a CRITICAL is present', () => {
+  const incidents = buildMaintenanceIncidents(
+    report({ vacuum: [{ table: 'devices', success: false, missing: true }] }),
+    AT,
+  );
+  assert.ok(incidents.some(i => i.severity === 'critical'));
+  assert.equal(summarize(incidents).exitCode, 1);
+});
+
+test('an INFO incident alongside a WARNING still exits 1 — info never masks', () => {
+  const incidents = buildMaintenanceIncidents(
+    report({
+      prune: { ok: false, deleted: null, error: 'boom' },
+      redis: { available: false, reason: 'redis-cli is not installed on this host' },
+    }),
+    AT,
+  );
+  assert.ok(incidents.some(i => i.severity === 'info'));
+  assert.ok(incidents.some(i => i.severity === 'warning'));
+  assert.equal(summarize(incidents).exitCode, 1);
+});
+
 test('failures produce a NON-ZERO exit code — the core regression', () => {
   // The shipped agent always exited 0, so PM2 and any human reading exit
   // status saw success while every VACUUM failed.
