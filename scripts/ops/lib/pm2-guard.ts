@@ -25,9 +25,33 @@
  *   1. The resolved target set must be printed and validated before mutation,
  *      so "what will this touch?" is answered deterministically rather than
  *      discovered afterwards.
- *   2. PM2 must be invoked BY EXPLICIT SERVICE NAMES, never with the ecosystem
- *      file as the mutation target. Passing the file is what lets PM2 decide to
- *      start entries that merely happen to exist in it.
+ *   2. The mutation must apply `env_production` FROM the ecosystem file AND
+ *      touch exactly the resolved set — which requires the ecosystem file plus
+ *      an exact `--only` selector, not bare process names.
+ *
+ * ─── Why `--only`, established empirically ──────────────────────────────────
+ *
+ * An earlier draft invoked PM2 by bare process names with `--env production`.
+ * That is cosmetic: `--env` selects an `env_*` block from a PROCESS FILE, so
+ * naming already-registered processes reuses PM2's STORED environment — the
+ * exact mutable state that caused the incident. The guard would have verified
+ * the operator typed "production" without the mutation consuming
+ * `env_production` at all.
+ *
+ * Verified against the installed PM2 (6.0.14) in an isolated `PM2_HOME` fixture
+ * with two plain apps and one `cron_restart` app:
+ *
+ *   reload <name> --env production                  → errored; marker stayed
+ *                                                     STALE (ecosystem not read)
+ *   reload <ecosystem> --only a,b --env production  → marker UPDATED from
+ *                                                     env_production, and the
+ *                                                     cron entry outside the
+ *                                                     --only set did NOT start
+ *   start  <ecosystem> --only c   --env production  → started exactly c
+ *
+ * So `--only` IS honoured for `reload` on this version and does not start apps
+ * outside the selector. That is what makes the environment guarantee real while
+ * preserving the exact-target-set property.
  *
  * ─── Enforcement boundary (stated, not implied) ─────────────────────────────
  *
@@ -72,7 +96,13 @@ export interface GuardDecision {
   targets: TargetRow[];
   /** Every reason the operation was refused. Empty on PASS. */
   refusals: string[];
-  /** Names PM2 may be invoked with. Empty unless PASS. */
+  /**
+   * The exact `--only` selector. Empty unless PASS.
+   *
+   * For `app-reload` this is every registered app-service. For `app-start` it
+   * is ONLY the missing ones — starting an already-registered service would be
+   * an implicit reload wearing a different name.
+   */
   invokeNames: string[];
 }
 
@@ -216,18 +246,46 @@ export function evaluateOperation(input: {
   }
 
   const verdict = refusals.length === 0 ? 'PASS' : 'REFUSE';
+
+  // app-start acts ONLY on what is missing; app-reload on what is registered.
+  const toInvoke = operation === 'app-start'
+    ? intended.filter(t => !t.registered)
+    : intended;
+
   return {
     verdict,
     operation,
     environment,
     targets: intended,
     refusals,
-    invokeNames: verdict === 'PASS' ? intended.map(t => t.name) : [],
+    invokeNames: verdict === 'PASS' ? toInvoke.map(t => t.name) : [],
   };
 }
 
+/**
+ * Build the exact PM2 argv.
+ *
+ * The ecosystem file is the FIRST argument because `--env` only selects an
+ * `env_*` block from a process file — naming registered processes instead
+ * reuses PM2's stored environment (proven in the fixture, see the module
+ * docblock). `--only` then constrains the mutation to the resolved set, which
+ * is what stops PM2 starting cron entries that merely exist in the file.
+ *
+ * Returns null unless the decision passed, so a refusal has no executable form.
+ */
+export function buildPm2Argv(decision: GuardDecision, ecosystemPath: string): string[] | null {
+  if (decision.verdict !== 'PASS' || decision.invokeNames.length === 0) return null;
+  const verb = decision.operation === 'app-reload' ? 'reload' : 'start';
+  return [
+    verb,
+    ecosystemPath,
+    '--only', decision.invokeNames.join(','),
+    '--env', decision.environment,
+  ];
+}
+
 /** Human-readable pre-mutation report. Printed BEFORE PM2 is ever invoked. */
-export function renderReport(decision: GuardDecision, dryRun: boolean): string {
+export function renderReport(decision: GuardDecision, dryRun: boolean, ecosystemPath = 'ecosystem.config.js'): string {
   const lines: string[] = [];
   lines.push(`requested operation: ${decision.operation}${dryRun ? ' (DRY RUN)' : ''}`);
   lines.push(`environment: ${decision.environment}`);

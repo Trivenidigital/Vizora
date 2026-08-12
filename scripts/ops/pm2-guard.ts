@@ -24,8 +24,12 @@
  * `--env production` put all three services into development mode, skipping both
  * boot validators and exposing Swagger publicly.
  *
- * Passing the ecosystem file is what lets PM2 decide to start entries that
- * merely exist in it. This wrapper never does that.
+ * The mutation uses the ecosystem file WITH an exact `--only` selector. The file
+ * is required because `--env` only selects an `env_*` block from a process file —
+ * naming registered processes instead reuses PM2's stored environment, which is
+ * the mutable state that caused the incident. `--only` is what keeps the
+ * mutation inside the resolved set. Both behaviours were verified against the
+ * installed PM2 6.0.14 in an isolated PM2_HOME fixture.
  *
  * ─── Enforcement boundary ───────────────────────────────────────────────────
  *
@@ -44,6 +48,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
+  buildPm2Argv,
   evaluateOperation,
   renderReport,
   type EcosystemAppSummary,
@@ -118,7 +123,7 @@ function main(): void {
   }
 
   const decision = evaluateOperation({ operation, environment, apps, manifest, registered });
-  process.stdout.write(`${renderReport(decision, dryRun)}\n`);
+  process.stdout.write(`${renderReport(decision, dryRun, ECOSYSTEM_PATH)}\n`);
 
   if (decision.verdict !== 'PASS') {
     process.exitCode = 1;
@@ -129,16 +134,20 @@ function main(): void {
     return;
   }
 
-  // Explicit names only. The ecosystem file is never the mutation target.
-  const pm2Command = operation === 'app-reload' ? 'reload' : 'start';
+  // Ecosystem file + exact --only selector. The file is what makes `--env
+  // production` actually consume env_production; --only is what keeps the
+  // mutation inside the resolved set. Verified on PM2 6.0.14 — see lib docblock.
+  const pm2Argv = buildPm2Argv(decision, ECOSYSTEM_PATH);
+  if (!pm2Argv) {
+    process.stderr.write('pm2-guard: validation passed but produced no invocation — refusing.\n');
+    process.exitCode = 2;
+    return;
+  }
   try {
-    execFileSync('pm2', [pm2Command, ...decision.invokeNames, '--env', environment], {
-      stdio: 'inherit',
-      timeout: PM2_TIMEOUT_MS,
-    });
-    process.stdout.write(`\npm2 ${pm2Command} completed for: ${decision.invokeNames.join(', ')}\n`);
+    execFileSync('pm2', pm2Argv, { stdio: 'inherit', timeout: PM2_TIMEOUT_MS });
+    process.stdout.write(`\npm2 ${pm2Argv[0]} completed for: ${decision.invokeNames.join(', ')}\n`);
   } catch (err) {
-    process.stderr.write(`\npm2 ${pm2Command} FAILED: ${err instanceof Error ? err.message : err}\n`);
+    process.stderr.write(`\npm2 ${pm2Argv[0]} FAILED: ${err instanceof Error ? err.message : err}\n`);
     process.exitCode = 2;
   }
 }

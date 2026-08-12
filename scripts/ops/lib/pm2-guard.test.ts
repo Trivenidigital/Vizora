@@ -22,6 +22,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   ALLOWED_CLASS,
+  buildPm2Argv,
   classifyApps,
   evaluateOperation,
   findClassInconsistencies,
@@ -195,13 +196,65 @@ test('a deregistered cron entry cannot be resurrected by a reload', () => {
   assert.ok(!d.invokeNames.includes('ops-config-drift-detector'));
 });
 
-test('PM2 is invoked by explicit names, never the ecosystem file', () => {
+test('the mutation references the ecosystem file — that is what applies env_production', () => {
+  // Verified on PM2 6.0.14: `reload <name> --env production` does NOT re-read the
+  // ecosystem file, so env_production is never consumed and PM2 reuses its stored
+  // env. Only an ecosystem-file invocation makes the environment guarantee real.
+  const argv = buildPm2Argv(reload(), '/opt/vizora/app/ecosystem.config.js');
+  assert.ok(argv, 'a passing decision must be executable');
+  assert.equal(argv[0], 'reload');
+  assert.equal(argv[1], '/opt/vizora/app/ecosystem.config.js');
+  assert.ok(argv.includes('--env'));
+  assert.equal(argv[argv.indexOf('--env') + 1], 'production');
+});
+
+test('the --only selector contains exactly the app services and no cron names', () => {
+  const argv = buildPm2Argv(reload(), 'ecosystem.config.js');
+  const only = argv![argv!.indexOf('--only') + 1].split(',');
+  assert.deepEqual(only.sort(), [...APP_SERVICES].sort());
+  assert.ok(!only.some(n => /cron|db-maintainer|hermes|agent-/.test(n)));
+});
+
+test('a refused decision has no executable form at all', () => {
+  assert.equal(buildPm2Argv(reload({ environment: 'staging' }), 'ecosystem.config.js'), null);
+});
+
+test('app-start invokes ONLY the missing service when one is absent', () => {
+  const d = evaluateOperation({
+    operation: 'app-start',
+    environment: 'production',
+    apps: FIXTURE_APPS,
+    manifest: FIXTURE_MANIFEST,
+    registered: ['vizora-middleware', 'vizora-realtime'],
+  });
+  assert.equal(d.verdict, 'PASS', d.refusals.join('; '));
+  assert.deepEqual(d.invokeNames, ['vizora-web'], 'must not restart the two healthy services');
+
+  const argv = buildPm2Argv(d, 'ecosystem.config.js');
+  assert.equal(argv![argv!.indexOf('--only') + 1], 'vizora-web');
+  assert.equal(argv![0], 'start');
+});
+
+test('app-start invokes exactly the two missing services when two are absent', () => {
+  const d = evaluateOperation({
+    operation: 'app-start',
+    environment: 'production',
+    apps: FIXTURE_APPS,
+    manifest: FIXTURE_MANIFEST,
+    registered: ['vizora-middleware'],
+  });
+  assert.equal(d.verdict, 'PASS', d.refusals.join('; '));
+  assert.deepEqual(d.invokeNames.sort(), ['vizora-realtime', 'vizora-web']);
+
+  const argv = buildPm2Argv(d, 'ecosystem.config.js');
+  const only = argv![argv!.indexOf('--only') + 1].split(',').sort();
+  assert.deepEqual(only, ['vizora-realtime', 'vizora-web']);
+  assert.ok(!only.includes('vizora-middleware'), 'a registered service must not be restarted by app-start');
+});
+
+test('app-reload invokes every registered app service', () => {
   const d = reload();
-  assert.ok(d.invokeNames.length > 0);
-  assert.ok(
-    !d.invokeNames.some(n => n.includes('ecosystem') || n.endsWith('.js')),
-    'passing the ecosystem file is what lets PM2 start entries that merely exist in it',
-  );
+  assert.deepEqual(d.invokeNames.sort(), [...APP_SERVICES].sort());
 });
 
 test('against the REAL ecosystem, app-reload resolves exactly the three services', () => {
