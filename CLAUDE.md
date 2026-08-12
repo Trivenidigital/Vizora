@@ -271,9 +271,10 @@ CONFIG_DRIFT_PG_CONTAINER  # Postgres container for the read-only `SHOW max_conn
                         # (default vizora-postgres). **`psql` is NOT installed on the prod
                         # host** — Postgres runs in Docker — so host-only `psql` calls fail
                         # there. Host psql is tried first, this is the fallback; empty disables
-                        # it. NOTE: `db-maintainer` still calls host `psql` directly and its
-                        # VACUUM has been silently failing on prod ("Vacuum: 0 OK, 7 failed",
-                        # empty error log). Tracked separately — do not assume vacuum runs.
+                        # it. Shared by `db-maintainer`, which uses the same host→container
+                        # ordering. Both derive the DB user/database from `DATABASE_URL` and
+                        # pass the password via `PGPASSWORD` in the child env — never argv,
+                        # which `ps` exposes.
 ```
 
 > **`SMTP_PASS` / `SMTP_FROM` are not optional aliases.** `scripts/ops/lib/alerting.ts`
@@ -413,7 +414,7 @@ Automated deployment readiness checker. Runs 30 validation rules across content,
 | schedule-doctor | Every 15min | Deactivate broken schedules, coverage gaps |
 | ops-reporter | Every 30min | Aggregate status, Slack/email alerts, dashboard update |
 | ops-watchdog | Every 15min | Detects when other ops agents stop firing past per-agent SLA (3× cron interval). Slack alert on stale. Internal dead-man — catches what `HEALTHCHECKS_HEALTH_GUARDIAN_URL` can't (one-agent-stuck vs whole-VPS-down). |
-| db-maintainer | Daily 3am | PostgreSQL vacuum, Redis cleanup, log rotation |
+| db-maintainer | Daily 3am | PostgreSQL VACUUM ANALYZE, `alert_rule_fires` prune, Redis reporting, log rotation, optional backup. **Failures are real incidents + non-zero exit** — before 2026-08-12 it hardcoded `issuesFound: 0` and exited 0 while every VACUUM failed. `pm2 flush` runs FIRST so it cannot erase the same run's diagnostics. Uses PHYSICAL table names (`devices`, `users` — Prisma `@@map`s them) and asserts they exist before vacuuming |
 | config-drift-detector | Hourly | **Read-only.** Detects when a *healthy* service can no longer be recreated from its persisted config. Compares effective config vs what a fresh process would consume, and runs each service's own boot validators against the fresh-start config. Never repairs (`issuesFixed` is always 0), never restarts, never writes a config file. Gated by `CONFIG_DRIFT_DETECTOR_ENABLED`, default off |
 
 **State:** `logs/ops-state.json` — shared state file with incidents and remediation audit trail. Read/write through `scripts/ops/lib/state.ts` (file-locked: `readOpsState` acquires, `writeOpsState` releases — every reader MUST pair with a writer).

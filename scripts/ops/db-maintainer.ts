@@ -2,24 +2,35 @@
 /**
  * Vizora Autonomous Operations — DB Maintainer Agent
  *
- * Runs daily at 3am via PM2 cron. Performs routine maintenance tasks:
- *   1. PostgreSQL VACUUM ANALYZE on high-churn tables
- *   2. Redis memory & key count reporting
- *   3. Log rotation (truncate .log files older than 7 days)
- *   4. PM2 flush (clear PM2's internal log buffer)
- *   5. Backup verification placeholder (future: S3 bucket check)
+ * Runs daily at 3am via PM2 cron:
+ *   1. PostgreSQL VACUUM ANALYZE on high-churn tables (after asserting they exist)
+ *   2. Prune stale `alert_rule_fires` dedup rows
+ *   3. Redis memory & key reporting
+ *   4. Log rotation (truncate .log files older than 7 days)
+ *   5. Database backup (only when BACKUP_S3_BUCKET is set)
  *
  * Exit codes:
- *   0 — maintenance completed successfully
+ *   0 — maintenance completed with no problems
+ *   1 — maintenance completed but something failed (incidents recorded)
  *   2 — fatal error (agent could not complete)
  *
- * Security note: Uses execFileSync (no shell) for psql, redis-cli, and pm2.
- * Arguments are passed as arrays — no shell injection risk.
+ * ─── Ordering rule: `pm2 flush` runs FIRST, never mid-run ────────────────────
+ *
+ * `pm2 flush` truncates PM2's log files. It used to run as task 4, which
+ * deleted the per-table VACUUM failure reasons this agent had already written
+ * in the same run — so `Vacuum: 0 OK, 7 failed` reached the operator with no
+ * cause, and `ops-db-maintainer-error.log` was 0 bytes. Flushing at the START
+ * keeps the hygiene benefit (clears the previous cycle) while guaranteeing that
+ * everything this run produces survives it. Do not move it back.
+ *
+ * Security note: `execFileSync` everywhere (no shell). Database credentials are
+ * passed via `PGPASSWORD` in the child environment and NEVER as arguments —
+ * argv is world-readable through `ps`.
  */
 
 import 'dotenv/config';
 import { execFileSync } from 'node:child_process';
-import { readdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import type { AgentResult } from './lib/types.js';
 import {
@@ -27,465 +38,321 @@ import {
   writeOpsState,
   recordAgentRun,
 } from './lib/state.js';
-import { log } from './lib/alerting.js';
+import { log, sendInlineAlert } from './lib/alerting.js';
+import {
+  AGENT,
+  VACUUM_TABLES,
+  buildMaintenanceIncidents,
+  buildPgDumpCandidates,
+  buildPsqlCandidates,
+  redactUrlCredentials,
+  summarize,
+  type MaintenanceReport,
+  type PgCandidate,
+  type VacuumOutcome,
+} from './lib/db-maintenance.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const AGENT = 'db-maintainer';
-
-/**
- * Postgres container used to reach `psql` when it is not installed on the host —
- * which is prod's actual shape. Set empty to disable the container fallback.
- */
+/** Postgres container used when `psql` is absent from the host — prod's shape. */
 const PG_CONTAINER = process.env.CONFIG_DRIFT_PG_CONTAINER ?? 'vizora-postgres';
-
-/**
- * High-churn PostgreSQL tables to VACUUM ANALYZE.
- *
- * `content_impressions` is the proof-of-play table — at ~12k rows/day/org
- * it bloats fast and was the top finding in the R6 analytics scout (table
- * was previously absent from this list, so weekly bloat went unmanaged).
- * Lower-case + underscores because the impressions model uses @@map for
- * its physical table name, unlike the PascalCase Prisma defaults.
- */
-const VACUUM_TABLES = [
-  'Content',
-  'Display',
-  'Schedule',
-  'Playlist',
-  'AuditLog',
-  'User',
-  'content_impressions',
-];
 
 const VACUUM_TIMEOUT_MS = 120_000; // 2 minutes per table
 const PM2_FLUSH_TIMEOUT_MS = 10_000;
 const LOG_MAX_AGE_DAYS = 7;
+const REDIS_TIMEOUT_MS = 10_000;
 
 /**
  * Retention window for `alert_rule_fires` dedup rows (notifications #18).
  *
- * These rows are per-(rule, device) MUTABLE dedup state, not an audit log
- * (see the model comment in schema.prisma). A row older than the window
- * means that rule/device pair hasn't fired an alert in that long, so
- * deleting it is safe: the next offline event simply re-creates the row and
- * alerts normally — well outside the 15-min dedup window. Overridable via
- * RETENTION_DAYS; defaults to 90.
+ * These rows are per-(rule, device) MUTABLE dedup state, not an audit log. A
+ * row older than the window means that rule/device pair hasn't fired in that
+ * long, so deleting it is safe — the next offline event re-creates it.
  */
 const ALERT_RULE_FIRE_RETENTION_DAYS = (() => {
   const parsed = parseInt(process.env.RETENTION_DAYS || '90', 10);
   return Number.isNaN(parsed) || parsed < 1 ? 90 : parsed;
 })();
 
-/**
- * Logs directory — resolves to `<project-root>/logs/`.
- * The regex handles Windows drive-letter paths from `import.meta.url`
- * (e.g., `/C:/projects/...` → `C:/projects/...`).
- */
 const LOGS_DIR = join(
   dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, '$1')),
   '..', '..', 'logs',
 );
 
-// ─── Postgres CLI Helpers ───────────────────────────────────────────────────
+// ─── Postgres execution ──────────────────────────────────────────────────────
 
-interface PsqlCandidate {
-  command: string;
-  args: string[];
-  env?: Record<string, string>;
-  source: string;
-}
+/** Run SQL through the first candidate that works. Throws with all attempts. */
+function execPsql(sql: string, timeoutMs: number): { output: string; source: string } {
+  const candidates = buildPsqlCandidates(process.env.DATABASE_URL, PG_CONTAINER);
+  if (candidates.length === 0) throw new Error('DATABASE_URL missing or unparseable');
 
-/**
- * Build ordered candidates for psql invocation.
- * Tries host psql first (if available), then docker exec as fallback.
- */
-function buildPsqlCandidates(databaseUrl: string): PsqlCandidate[] {
-  const candidates: PsqlCandidate[] = [];
-
-  // Try host psql first
-  candidates.push({
-    command: 'psql',
-    args: [databaseUrl],
-    source: 'host psql',
-  });
-
-  // Docker fallback
-  if (PG_CONTAINER) {
-    candidates.push({
-      command: 'docker',
-      args: ['exec', '-i', PG_CONTAINER, 'psql', '-U', 'postgres', '-d', 'vizora'],
-      source: 'docker exec psql',
-    });
-  }
-
-  return candidates;
-}
-
-/**
- * Try to execute a psql command using ordered candidates (host first, container fallback).
- * Returns the output on success or throws the last error encountered.
- */
-function execPsql(
-  databaseUrl: string,
-  sqlCommand: string,
-  timeoutMs: number,
-): { output: string; source: string } {
-  const candidates = buildPsqlCandidates(databaseUrl);
   const attempts: string[] = [];
-
   for (const candidate of candidates) {
     try {
-      const fullArgs = candidate.source === 'host psql'
-        ? [...candidate.args, '-c', sqlCommand]
-        : [...candidate.args, '-c', sqlCommand];
-
-      const output = execFileSync(candidate.command, fullArgs, {
-        stdio: 'pipe',
-        timeout: timeoutMs,
-        env: { ...process.env, ...candidate.env },
-        encoding: 'utf-8',
-      });
-
+      const output = execFileSync(
+        candidate.command,
+        [...candidate.args, '-t', '-A', '-c', sql],
+        {
+          stdio: 'pipe',
+          timeout: timeoutMs,
+          env: { ...process.env, ...candidate.env },
+          encoding: 'utf-8',
+        },
+      );
       return { output, source: candidate.source };
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      attempts.push(`${candidate.source}: ${msg}`);
+      const msg = err instanceof Error ? err.message.split('\n')[0] : String(err);
+      attempts.push(`${candidate.source}: ${redactUrlCredentials(msg)}`);
     }
   }
-
-  const allAttempts = attempts.join('; ');
-  throw new Error(`All psql candidates failed: ${allAttempts}`);
+  throw new Error(`all psql candidates failed — ${attempts.join('; ')}`);
 }
+
+// ─── Task 1a: assert configured tables exist ─────────────────────────────────
 
 /**
- * Build ordered candidates for pg_dump invocation.
- * Tries host pg_dump first (if available), then docker exec as fallback.
+ * Confirm every configured table exists BEFORE attempting to vacuum it.
+ *
+ * Two of the seven configured names never existed (`Display`/`User` are Prisma
+ * models; the tables are `devices`/`users`), which produced two permanently
+ * failing VACUUMs indistinguishable from transport errors. Asserting up front
+ * turns that into one clear configuration incident.
+ *
+ * Returns the set of names that are absent. A failure to run the check at all
+ * is reported by the caller as a transport failure, not as "all present".
  */
-function buildPgDumpCandidates(databaseUrl: string): PsqlCandidate[] {
-  const candidates: PsqlCandidate[] = [];
-
-  // Try host pg_dump first
-  candidates.push({
-    command: 'pg_dump',
-    args: [databaseUrl],
-    source: 'host pg_dump',
-  });
-
-  // Docker fallback
-  if (PG_CONTAINER) {
-    candidates.push({
-      command: 'docker',
-      args: ['exec', '-i', PG_CONTAINER, 'pg_dump', '-U', 'postgres', 'vizora'],
-      source: 'docker exec pg_dump',
-    });
+function findMissingTables(): { missing: string[]; checked: boolean; error?: string } {
+  const list = VACUUM_TABLES.map(t => `'${t}'`).join(',');
+  try {
+    const { output } = execPsql(
+      `SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace ` +
+      `WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname IN (${list})`,
+      30_000,
+    );
+    const present = new Set(output.split('\n').map(l => l.trim()).filter(Boolean));
+    return { missing: VACUUM_TABLES.filter(t => !present.has(t)), checked: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { missing: [], checked: false, error: redactUrlCredentials(msg) };
   }
-
-  return candidates;
 }
+
+// ─── Task 1b: VACUUM ANALYZE ─────────────────────────────────────────────────
 
 /**
- * Try to execute a pg_dump command using ordered candidates (host first, container fallback).
- * Writes output to the specified file path.
- * Returns the source on success or throws the last error encountered.
+ * `VACUUM ANALYZE` per table. Each runs standalone via `psql -c`, i.e. in
+ * autocommit — VACUUM cannot run inside a transaction block, so this form is
+ * required and correct. Errors are caught per table so one failure does not
+ * block the rest.
  */
-function execPgDump(
-  databaseUrl: string,
-  outputPath: string,
-  timeoutMs: number,
-): string {
-  const candidates = buildPgDumpCandidates(databaseUrl);
-  const attempts: string[] = [];
+function vacuumAnalyze(missing: string[]): VacuumOutcome[] {
+  const results: VacuumOutcome[] = [];
+  const missingSet = new Set(missing);
 
-  for (const candidate of candidates) {
-    try {
-      const fullArgs = candidate.source === 'host pg_dump'
-        ? [...candidate.args, '-f', outputPath]
-        : [...candidate.args];
-
-      execFileSync(candidate.command, fullArgs, {
-        stdio: 'pipe',
-        timeout: timeoutMs,
-        env: { ...process.env, ...candidate.env },
-      });
-
-      return candidate.source;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      attempts.push(`${candidate.source}: ${msg}`);
-    }
-  }
-
-  const allAttempts = attempts.join('; ');
-  throw new Error(`All pg_dump candidates failed: ${allAttempts}`);
-}
-
-// ─── Task 1: PostgreSQL VACUUM ANALYZE ───────────────────────────────────────
-
-interface VacuumResult {
-  table: string;
-  success: boolean;
-  error?: string;
-  source?: string;
-}
-
-/**
- * Run VACUUM ANALYZE on each high-churn table individually.
- * Catches errors per table so one failure doesn't block the rest.
- * Uses host psql first, then falls back to docker exec if available.
- */
-function vacuumAnalyze(): VacuumResult[] {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
-    log(AGENT, 'DATABASE_URL not set — skipping VACUUM ANALYZE');
-    return [];
-  }
-
-  log(AGENT, `Running VACUUM ANALYZE on ${VACUUM_TABLES.length} tables`);
-  const results: VacuumResult[] = [];
-
+  log(AGENT, `VACUUM ANALYZE across ${VACUUM_TABLES.length} tables`);
   for (const table of VACUUM_TABLES) {
+    if (missingSet.has(table)) {
+      log(AGENT, `  "${table}" — SKIPPED (table does not exist)`);
+      results.push({ table, success: false, missing: true });
+      continue;
+    }
     try {
-      const { source } = execPsql(databaseUrl, `VACUUM ANALYZE "${table}";`, VACUUM_TIMEOUT_MS);
-      log(AGENT, `  VACUUM ANALYZE "${table}" — OK (source: ${source})`);
-      results.push({ table, success: true, source });
+      const { source } = execPsql(`VACUUM ANALYZE "${table}";`, VACUUM_TIMEOUT_MS);
+      log(AGENT, `  "${table}" — OK (${source})`);
+      results.push({ table, success: true });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      log(AGENT, `  VACUUM ANALYZE "${table}" — FAILED: ${msg}`);
+      const msg = redactUrlCredentials(err instanceof Error ? err.message : String(err));
+      log(AGENT, `  "${table}" — FAILED: ${msg}`);
       results.push({ table, success: false, error: msg });
     }
   }
-
-  const ok = results.filter(r => r.success).length;
-  const fail = results.filter(r => !r.success).length;
-  log(AGENT, `VACUUM ANALYZE complete: ${ok} OK, ${fail} failed`);
   return results;
 }
 
-// ─── Task 1b: Prune stale alert_rule_fires rows ──────────────────────────────
+// ─── Task 2: prune alert_rule_fires ──────────────────────────────────────────
 
-interface AlertFirePruneResult {
-  deleted: number | null;
-  error?: string;
-}
-
-/**
- * Delete `alert_rule_fires` rows whose `lastFiredAt` is older than the
- * retention window (notifications #18). Bounds the table's rules×devices
- * growth. Uses host psql first, then falls back to docker exec if available;
- * the interval is a validated integer, so there is no injection surface.
- */
-function pruneAlertRuleFires(): AlertFirePruneResult {
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
-    log(AGENT, 'alert_rule_fires prune skipped — DATABASE_URL not set');
-    return { deleted: null };
-  }
-
+function pruneAlertRuleFires(): { ok: boolean; deleted: number | null; error?: string } {
   const days = ALERT_RULE_FIRE_RETENTION_DAYS;
   log(AGENT, `Pruning alert_rule_fires older than ${days} days`);
   try {
+    // `days` is a validated integer — no injection surface.
     const { output } = execPsql(
-      databaseUrl,
       `DELETE FROM alert_rule_fires WHERE "lastFiredAt" < NOW() - INTERVAL '${days} days';`,
       VACUUM_TIMEOUT_MS,
     );
-    // psql prints the command tag "DELETE <n>" to stdout.
     const match = output.match(/DELETE\s+(\d+)/);
     const deleted = match ? parseInt(match[1], 10) : 0;
-    log(AGENT, `  alert_rule_fires prune — OK (${deleted} deleted)`);
-    return { deleted };
+    log(AGENT, `  prune — OK (${deleted} deleted)`);
+    return { ok: true, deleted };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    log(AGENT, `  alert_rule_fires prune — FAILED: ${msg}`);
-    return { deleted: null, error: msg };
+    const msg = redactUrlCredentials(err instanceof Error ? err.message : String(err));
+    log(AGENT, `  prune — FAILED: ${msg}`);
+    return { ok: false, deleted: null, error: msg };
   }
 }
 
-// ─── Task 2: Redis Cleanup / Status ──────────────────────────────────────────
+// ─── Task 3: Redis status ────────────────────────────────────────────────────
 
 interface RedisStatus {
+  available: boolean;
+  reason?: string;
   memoryHuman: string;
   dbSize: string;
-  error?: string;
 }
 
 /**
- * Report Redis memory usage and key count via redis-cli.
- * Catches errors gracefully — Redis may not be accessible.
+ * Report Redis memory and key count.
+ *
+ * Unavailability is now EXPLICIT. Previously both fields reported the string
+ * `unknown` whether Redis was healthy-but-unreadable or the CLI was simply not
+ * installed — and `redis-cli` is not installed on the prod host, so the agent
+ * has always printed `unknown` and nobody could tell it apart from a real
+ * reading.
+ *
+ * No container fallback is attempted on purpose: `docker exec -e REDISCLI_AUTH`
+ * would place the Redis password into host argv, which is the exposure the
+ * Postgres path deliberately avoids. Better to report the gap honestly.
  */
 function checkRedis(): RedisStatus {
   const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-  log(AGENT, 'Checking Redis status');
-
-  const status: RedisStatus = { memoryHuman: 'unknown', dbSize: 'unknown' };
+  const status: RedisStatus = { available: false, memoryHuman: 'unavailable', dbSize: 'unavailable' };
 
   try {
-    // execFileSync avoids shell — no injection risk from REDIS_URL.
-    const memoryOutput = execFileSync('redis-cli', ['-u', redisUrl, 'info', 'memory'], {
-      timeout: 10_000,
-      stdio: 'pipe',
-      encoding: 'utf-8',
+    const memory = execFileSync('redis-cli', ['-u', redisUrl, 'info', 'memory'], {
+      timeout: REDIS_TIMEOUT_MS, stdio: 'pipe', encoding: 'utf-8',
     });
-    const memoryMatch = memoryOutput.match(/used_memory_human:(.+)/);
-    if (memoryMatch) {
-      status.memoryHuman = memoryMatch[1].trim();
-    }
+    const match = memory.match(/used_memory_human:(.+)/);
+    if (match) status.memoryHuman = match[1].trim();
+
+    const dbsize = execFileSync('redis-cli', ['-u', redisUrl, 'dbsize'], {
+      timeout: REDIS_TIMEOUT_MS, stdio: 'pipe', encoding: 'utf-8',
+    });
+    status.dbSize = dbsize.trim();
+    status.available = true;
+    log(AGENT, `Redis: memory=${status.memoryHuman}, keys=${status.dbSize}`);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    log(AGENT, `  Redis memory check failed: ${msg}`);
-    status.error = msg;
+    const raw = err instanceof Error ? err.message.split('\n')[0] : String(err);
+    status.reason = /ENOENT/.test(raw)
+      ? 'redis-cli is not installed on this host'
+      : redactUrlCredentials(raw);
+    log(AGENT, `Redis: UNAVAILABLE — ${status.reason}`);
   }
 
-  try {
-    const dbsizeOutput = execFileSync('redis-cli', ['-u', redisUrl, 'dbsize'], {
-      timeout: 10_000,
-      stdio: 'pipe',
-      encoding: 'utf-8',
-    });
-    status.dbSize = dbsizeOutput.trim();
-  } catch (err) {
-    if (!status.error) {
-      const msg = err instanceof Error ? err.message : String(err);
-      status.error = msg;
-    }
-  }
-
-  log(AGENT, `  Redis memory: ${status.memoryHuman}, keys: ${status.dbSize}`);
   return status;
 }
 
-// ─── Task 3: Log Rotation ────────────────────────────────────────────────────
+// ─── Task 4: log rotation ────────────────────────────────────────────────────
 
-interface LogRotationResult {
-  truncated: string[];
-  errors: string[];
-}
+interface LogRotationResult { truncated: string[]; errors: string[] }
 
-/**
- * Find .log files in logs/ directory older than 7 days and truncate them.
- * Uses truncation (not deletion) because PM2 keeps file handles open.
- */
+/** Truncate (not delete) .log files older than the window — PM2 holds handles. */
 function rotateLogs(): LogRotationResult {
-  log(AGENT, `Rotating logs older than ${LOG_MAX_AGE_DAYS} days in ${LOGS_DIR}`);
   const result: LogRotationResult = { truncated: [], errors: [] };
 
   let files: string[];
   try {
     files = readdirSync(LOGS_DIR).filter(f => f.endsWith('.log'));
   } catch {
-    log(AGENT, `  Logs directory not found or not readable: ${LOGS_DIR}`);
+    log(AGENT, `Logs directory not readable: ${LOGS_DIR}`);
     return result;
   }
 
   const cutoff = Date.now() - LOG_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
-
   for (const file of files) {
     const filePath = join(LOGS_DIR, file);
     try {
-      const stat = statSync(filePath);
-      if (stat.mtimeMs < cutoff) {
-        // Truncate by writing empty content — preserves file handle for PM2
+      if (statSync(filePath).mtimeMs < cutoff) {
         writeFileSync(filePath, '');
-        log(AGENT, `  Truncated: ${file}`);
         result.truncated.push(file);
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      log(AGENT, `  Failed to process ${file}: ${msg}`);
-      result.errors.push(`${file}: ${msg}`);
+      result.errors.push(`${file}: ${err instanceof Error ? err.message : err}`);
     }
   }
-
   log(AGENT, `Log rotation: ${result.truncated.length} truncated, ${result.errors.length} errors`);
   return result;
 }
 
-// ─── Task 4: PM2 Flush ──────────────────────────────────────────────────────
+// ─── Task 5: backup ──────────────────────────────────────────────────────────
 
 /**
- * Flush PM2's internal log buffer via `pm2 flush`.
- * Returns true on success, false on failure.
+ * Dump the database, gzip it, and upload when configured.
+ *
+ * The container candidate streams to stdout — `-f` would resolve INSIDE the
+ * container — so its bytes are captured and written here. The previously
+ * shipped version passed neither, discarding the dump and reporting success:
+ * a backup that silently produces no file. The non-empty assertion below is
+ * what makes that failure impossible to repeat.
  */
-function pm2Flush(): boolean {
-  log(AGENT, 'Flushing PM2 logs');
-  try {
-    execFileSync('pm2', ['flush'], {
-      timeout: PM2_FLUSH_TIMEOUT_MS,
-      stdio: 'pipe',
-    });
-    log(AGENT, '  PM2 flush — OK');
-    return true;
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    log(AGENT, `  PM2 flush — FAILED: ${msg}`);
-    return false;
-  }
-}
-
-// ─── Task 5: Backup Verification ─────────────────────────────────────────────
-
-/**
- * Run a database backup, compressing the dump with gzip.
- * If BACKUP_S3_BUCKET is set, the backup is created; otherwise skipped.
- * Uses host pg_dump first, then falls back to docker exec if available.
- */
-function runBackup(): void {
+function runBackup(): { attempted: boolean; ok: boolean; error?: string } {
   const bucket = process.env.BACKUP_S3_BUCKET;
   if (!bucket) {
     log(AGENT, 'Backup skipped: BACKUP_S3_BUCKET not set');
-    return;
+    return { attempted: false, ok: true };
   }
-
-  // Validate bucket format to prevent injection via malformed values
-  if (!/^s3:\/\/[a-zA-Z0-9.\-_\/]+$|^[a-zA-Z0-9.\-_\/]+$/.test(bucket)) {
-    log(AGENT, `Backup skipped: BACKUP_S3_BUCKET has invalid format: ${bucket}`);
-    return;
-  }
-
-  const databaseUrl = process.env.DATABASE_URL;
-  if (!databaseUrl) {
-    log(AGENT, 'Backup skipped: DATABASE_URL not set');
-    return;
+  if (!/^s3:\/\/[a-zA-Z0-9.\-_/]+$|^[a-zA-Z0-9.\-_/]+$/.test(bucket)) {
+    return { attempted: false, ok: true, error: 'BACKUP_S3_BUCKET has invalid format' };
   }
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const filename = `vizora-backup-${timestamp}.sql.gz`;
-  const tmpPath = `/tmp/${filename}`;
+  const rawPath = `/tmp/vizora-backup-${timestamp}.sql`;
+  const gzPath = `${rawPath}.gz`;
+  const candidates = buildPgDumpCandidates(process.env.DATABASE_URL, PG_CONTAINER, rawPath);
+  if (candidates.length === 0) {
+    return { attempted: true, ok: false, error: 'DATABASE_URL missing or unparseable' };
+  }
 
-  const tmpPathRaw = `/tmp/vizora-backup-${timestamp}.sql`;
+  const attempts: string[] = [];
+  let source: string | null = null;
+
+  for (const candidate of candidates as PgCandidate[]) {
+    try {
+      const out = execFileSync(candidate.command, candidate.args, {
+        stdio: 'pipe',
+        timeout: 300_000,
+        env: { ...process.env, ...candidate.env },
+        maxBuffer: 512 * 1024 * 1024,
+      });
+      if (candidate.capturesStdout) writeFileSync(rawPath, out);
+
+      // A dump that produced no bytes is a FAILURE, not a success.
+      if (!existsSync(rawPath) || statSync(rawPath).size === 0) {
+        throw new Error('pg_dump produced no output file (or an empty one)');
+      }
+      source = candidate.source;
+      break;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message.split('\n')[0] : String(err);
+      attempts.push(`${candidate.source}: ${redactUrlCredentials(msg)}`);
+    }
+  }
+
+  if (!source) return { attempted: true, ok: false, error: attempts.join('; ') };
 
   try {
-    // Two-step backup: pg_dump (with host/container fallback) then gzip
-    const pgDumpSource = execPgDump(databaseUrl, tmpPathRaw, 300_000);
-    execFileSync('gzip', ['-f', tmpPathRaw], {
-      timeout: 60_000,
-      stdio: 'pipe',
-    });
-    log(AGENT, `Backup created: ${filename} (pg_dump source: ${pgDumpSource})`);
-
-    // Upload to S3 if aws CLI is available
+    execFileSync('gzip', ['-f', rawPath], { timeout: 60_000, stdio: 'pipe' });
+    log(AGENT, `Backup created via ${source}`);
     const s3Dest = bucket.startsWith('s3://') ? bucket : `s3://${bucket}`;
-    try {
-      execFileSync('aws', ['s3', 'cp', tmpPath, `${s3Dest}/${filename}`], {
-        timeout: 300_000,
-        stdio: 'pipe',
-      });
-      log(AGENT, `Backup uploaded to ${s3Dest}/${filename}`);
-    } catch (uploadErr) {
-      const msg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
-      log(AGENT, `Backup upload to S3 failed (local backup retained): ${msg}`);
-    }
-
-    // Clean up local temp file after successful upload
-    try {
-      execFileSync('rm', ['-f', tmpPath], { stdio: 'pipe' });
-    } catch {
-      // Non-critical -- /tmp will be cleaned by OS
-    }
+    execFileSync('aws', ['s3', 'cp', gzPath, `${s3Dest}/${gzPath.split('/').pop()}`], {
+      timeout: 300_000, stdio: 'pipe',
+    });
+    log(AGENT, `Backup uploaded to ${s3Dest}`);
+    return { attempted: true, ok: true };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    log(AGENT, `Backup failed: ${msg}`);
+    const msg = redactUrlCredentials(err instanceof Error ? err.message.split('\n')[0] : String(err));
+    return { attempted: true, ok: false, error: `dump ok via ${source} but post-processing failed: ${msg}` };
+  }
+}
+
+// ─── PM2 flush ───────────────────────────────────────────────────────────────
+
+/** Runs FIRST — see the ordering rule in the module docblock. */
+function pm2Flush(): boolean {
+  try {
+    execFileSync('pm2', ['flush'], { timeout: PM2_FLUSH_TIMEOUT_MS, stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -493,58 +360,79 @@ function runBackup(): void {
 
 async function main(): Promise<void> {
   const startTime = Date.now();
+
+  // FIRST, before any diagnostics exist to destroy.
+  const flushOk = pm2Flush();
   log(AGENT, '=== DB Maintainer starting ===');
+  log(AGENT, `  pm2 flush (run first, so this run's logs survive): ${flushOk ? 'OK' : 'FAILED'}`);
 
   try {
-    // ── 1. PostgreSQL VACUUM ANALYZE ──
-    const vacuumResults = vacuumAnalyze();
+    const tableCheck = findMissingTables();
+    if (!tableCheck.checked) {
+      log(AGENT, `Table existence check FAILED: ${tableCheck.error}`);
+    } else if (tableCheck.missing.length > 0) {
+      log(AGENT, `Configured tables missing from database: ${tableCheck.missing.join(', ')}`);
+    }
 
-    // ── 1b. Prune stale alert_rule_fires dedup rows ──
-    const alertFirePrune = pruneAlertRuleFires();
-
-    // ── 2. Redis status ──
-    const redisStatus = checkRedis();
-
-    // ── 3. Log rotation ──
+    const report: MaintenanceReport = {
+      vacuum: vacuumAnalyze(tableCheck.missing),
+      prune: pruneAlertRuleFires(),
+      redis: checkRedis(),
+      backup: runBackup(),
+    };
     const logRotation = rotateLogs();
 
-    // ── 4. PM2 flush ──
-    const pm2Ok = pm2Flush();
-
-    // ── 5. Database backup ──
-    runBackup();
-
-    // ── Record agent run ──
+    const detectedAt = new Date().toISOString();
+    const incidents = buildMaintenanceIncidents(report, detectedAt);
+    const counts = summarize(incidents);
     const durationMs = Date.now() - startTime;
-
-    const vacuumOk = vacuumResults.filter(r => r.success).length;
-    const vacuumFail = vacuumResults.filter(r => !r.success).length;
 
     const result: AgentResult = {
       agent: AGENT,
-      timestamp: new Date().toISOString(),
+      timestamp: detectedAt,
       durationMs,
-      issuesFound: 0,
-      issuesFixed: 0,
-      issuesEscalated: 0,
-      incidents: [], // Routine maintenance — no incidents
+      issuesFound: counts.issuesFound,
+      issuesFixed: counts.issuesFixed,
+      issuesEscalated: counts.issuesEscalated,
+      incidents,
     };
 
     const state = readOpsState();
-    recordAgentRun(state, result);
-    writeOpsState(state);
+    try {
+      recordAgentRun(state, result);
+    } finally {
+      writeOpsState(state);
+    }
 
+    const vacuumOk = report.vacuum.filter(v => v.success).length;
     log(AGENT, '=== DB Maintainer complete ===');
     log(AGENT, `  Duration: ${durationMs}ms`);
-    log(AGENT, `  Vacuum: ${vacuumOk} OK, ${vacuumFail} failed`);
-    log(AGENT, `  alert_rule_fires pruned: ${alertFirePrune.deleted ?? 'n/a'}`);
-    log(AGENT, `  Redis: memory=${redisStatus.memoryHuman}, keys=${redisStatus.dbSize}`);
+    log(AGENT, `  Vacuum: ${vacuumOk} OK, ${report.vacuum.length - vacuumOk} not OK`);
+    log(AGENT, `  alert_rule_fires pruned: ${report.prune.deleted ?? 'n/a'}`);
+    log(AGENT, `  Redis: ${report.redis.available ? 'available' : `UNAVAILABLE (${report.redis.reason})`}`);
     log(AGENT, `  Logs truncated: ${logRotation.truncated.length}`);
-    log(AGENT, `  PM2 flush: ${pm2Ok ? 'OK' : 'FAILED'}`);
+    log(AGENT, `  Issues: ${counts.issuesFound} (${counts.issuesEscalated} critical), repaired 0 by design`);
 
-    process.exitCode = 0;
+    for (const incident of incidents) {
+      log(AGENT, `  [${incident.severity}] ${incident.type} ${incident.targetId} — ${incident.message}`);
+    }
+
+    // §12b: surface criticals at the write site rather than waiting for the
+    // next aggregate report. Silent maintenance failure is what this agent's
+    // whole repair is about.
+    const criticals = incidents.filter(i => i.severity === 'critical');
+    if (criticals.length > 0) {
+      await sendInlineAlert(
+        AGENT,
+        'critical',
+        `${criticals.length} database maintenance failure(s)`,
+        criticals.map(i => `${i.type} (${i.targetId}): ${i.message}`).join('\n'),
+      );
+    }
+
+    process.exitCode = counts.exitCode;
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = redactUrlCredentials(err instanceof Error ? err.message : String(err));
     log(AGENT, `FATAL: ${msg}`);
     process.exitCode = 2;
   }
