@@ -220,17 +220,42 @@ TV would report a version that does not exist. Bumped with the same commit —
 check these together on every future release.
 
 **3. `vizora-tv` shows 5 failing unit tests locally — but CI is green, and CI is
-right.** ~~Pre-existing product debt~~ — **corrected 2026-08-11**. CI runs all 296
-tests on the same SHA and reports **294 pass, 2 skip, 0 fail**. The five fail only
-on local Node 24: CI pins `node-version: 20`, the suite runs in vitest's `node`
-environment, and **Node 21+ made `navigator` a built-in global**, so
-`vi.stubGlobal('navigator', …)` at `vizora-app.spec.ts:200` no longer shadows
-cleanly and `platform.ts:73` platform detection takes a different branch — which
-is why `update_config` rejects origins the tests expect it to accept.
+right.** ~~Pre-existing product debt~~ ~~Node-version harness divergence~~ —
+**root cause corrected 2026-08-12; fixed in `vizora-tv` PR #16.**
 
-Test-harness / runtime-version compatibility, not a product defect. It still
-matters, because a developer running `npm test` on current Node sees five failures
-that do not exist.
+Both earlier explanations were wrong. It was never about Node.
+
+`DEFAULT_CONFIG` (`src/main.ts:45`) is compiled in from `import.meta.env.VITE_*`,
+which `vite.config.ts:69` resolves as ``env.VITE_API_URL || 'https://api.vizora.io'``.
+The F43 `update_config` allowlist is anchored to those compiled-in defaults and
+accepts a candidate only when its **registrable domain** matches — so the allowlist
+specs depend entirely on what those resolve to.
+
+`.env` is gitignored and every developer has one. **CI does not**, so CI got the
+`vizora.io` fallbacks and was always green, while a local `.env` pointing anywhere
+else (ours: `vizora.cloud`) changed the compiled-in default underneath the tests.
+
+Proven by controlled experiment rather than inference — on the **same Node 24**,
+moving `.env` aside took the suite from 5 failed to **300 passed / 0 failed**,
+identical to CI. Node was a coincidence: CI and local machines differed in both,
+and the Node story was inferred from that correlation without tracing the causal
+chain.
+
+Fixed by committing `.env.test` (fixture data, no secrets) so the tests own their
+environment: vite loads `.env.[mode]` after `.env` and vitest runs `mode=test`.
+Verified test-only — the production bundle still bakes the local `.env` value.
+
+Separately: `vi.stubGlobal('navigator', …)` **was** genuinely broken. Node 21+
+makes `navigator` a getter-only accessor on `globalThis`, so the assignment
+silently no-opped and `platform.ts:73` read the host's real userAgent while the
+file claimed to stub it. Real, worth fixing, and **non-causal** for those five
+failures — replaced with `defineProperty` as test-correctness cleanup.
+
+**The generalisable lesson**, and the third instance of it in two days: a cheap
+controlled experiment beat a plausible inference every time. Moving one file aside
+answered in seconds what code-reading had gotten wrong twice. Compare the
+`psql`/`pg_hba` mistake in `2026-08-11-production-config-reproducibility-incident.md` —
+same shape, same remedy.
 
 **Explicitly OUT of scope for this workstream (decided 2026-08-10).** These
 predate 1.3.11 and must not extend this release. Tracked as **TV1** in
