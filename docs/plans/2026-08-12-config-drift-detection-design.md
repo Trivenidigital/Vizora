@@ -201,17 +201,50 @@ password was *absent*, not wrong.
 **cannot be observed from a running process's environment**. They were localhost
 in `.env` for an unknown period while the served bundle was correct.
 
-Detection therefore requires comparing the **intended** value (`.env`) against the
-value **actually baked into the built artifact**:
+Detection therefore requires comparing the **intended build-time** value against
+the value **actually baked into the built artifact**.
+
+> **Correction (2026-08-12, verified against the tree).** An earlier draft of this
+> section proposed `grep … dist/assets/*.js` and called it verified. That is the
+> **Vite** artifact shape — it belongs to `vizora-tv`, not to `web`. Checked:
+> `web/dist/` contains exactly one file, a `tsconfig.tsbuildinfo` dated
+> **2026-02-25**, and no `assets/` directory at all. The grep would have matched
+> nothing, forever, and silently. The real artifact is
+> `web/.next/static/chunks/*.js` (dated 2026-08-02).
+
+Three constraints, each established by inspecting the actual build output:
+
+**1. Correct artifact path.**
 
 ```
-grep the built bundle for the origin, compare to .env's NEXT_PUBLIC_API_URL
+web/.next/static/chunks/*.js        # served bundle
+web/dist/                           # stale tsbuildinfo, NOT a build artifact
 ```
 
-This is inherently more brittle than env comparison — it depends on the value
-appearing as a literal string in the output. Verified feasible: after the
-2026-08-12 correction, `grep -ohE "https://(api\.vizora\.io|vizora\.cloud)" dist/assets/*.js`
-returned the expected origin from the local build.
+**2. The baseline is NOT `.env`.** Local `.env` holds
+`NEXT_PUBLIC_API_URL=http://localhost:3000`, while the built bundle correctly
+contains `https://vizora.cloud` — because the documented build procedure
+*overrides* `.env` (the prod-URL guard rejects localhost origins at build time).
+Comparing bundle-against-`.env` would therefore emit a **WARNING on every
+correctly-built deployment**. The comparison baseline must be the intended
+build-time value (the build command's env / documented prod origin), never the
+runtime `.env`.
+
+**3. A bare origin grep is ambiguous.** The current bundle contains two distinct
+origins:
+
+| Origin | Chunks | Source |
+|---|---|---|
+| `https://vizora.cloud` | 2 | env substitution — the value under test |
+| `https://api.vizora.io` | 1 | **hardcoded** in `web/src/app/dashboard/settings/api-keys/page.tsx:321`, a `curl` example rendered for users |
+
+So "grep the bundle for an origin" picks up a documentation string that no env var
+controls. The check must test for the *specific expected* origin, and must treat
+"zero matches" or "unexpected candidate present" as **cannot determine** — never
+as a match, per §9.5.
+
+This remains inherently more brittle than env comparison: it depends on the value
+surviving minification as a literal.
 
 Severity should be **WARNING**, not CRITICAL: a stale build-time value breaks the
 *next* build, not the running service. That is exactly the distinction that makes
@@ -279,7 +312,10 @@ and `.env` text.
 | 6 | `CORS_ORIGIN`/`APP_URL` contain `localhost` under `NODE_ENV=production` | HIGH |
 | 7 | `2 × connection_limit=30 + 30 > max_connections=50` | CRITICAL |
 | 8 | `statement_timeout` present in running, absent in fresh-start | WARNING |
-| 9 | built bundle origin ≠ `.env` `NEXT_PUBLIC_API_URL` | WARNING |
+| 9 | `.next/static/chunks` origin ≠ **intended build-time** `NEXT_PUBLIC_API_URL` | WARNING |
+| 9a | bundle matches intended origin, while `.env` still says `localhost` | **healthy — no incident** (regression against the false-positive-on-every-deploy bug) |
+| 9b | expected origin absent from the bundle entirely | `cannot determine`, never "matches" |
+| 9c | a hardcoded doc origin (`api.vizora.io`) present alongside the real one | not mistaken for the env-substituted value |
 | 10 | **no raw secret appears in any incident, log line, alert body, or `ops-state.json`** | asserted explicitly |
 | 11 | **the agent writes no configuration file** — `.env`, ecosystem and PM2 untouched | asserted explicitly |
 | 12 | two consecutive runs with identical drift | one incident, deduped via `makeIncidentId` |
@@ -315,7 +351,13 @@ being incidental.
 5. **Build-artifact grep brittleness.** §5's approach depends on the origin
    appearing as a literal in the bundle. Minification currently preserves it;
    a future build change could break the check silently. It should fail as
-   "cannot determine", never as "matches".
+   "cannot determine", never as "matches". **Now sharpened by evidence** (§5):
+   the bundle also contains a hardcoded documentation origin that no env var
+   controls, so the check must target the specific expected origin rather than
+   "any origin". Still open: where the *intended* build-time value is read from,
+   given it is deliberately not `.env`. Candidates — the deploy runbook's build
+   command, an explicit `web/.env.build`, or a constant in the detector's own
+   config. This is the one input the detector cannot currently derive.
 
 6. **`max_connections` source.** Reading it requires a DB connection. Either query
    it (adds a dependency and a credential use) or configure the expected value.
