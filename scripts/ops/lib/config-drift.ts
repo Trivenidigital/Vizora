@@ -72,12 +72,27 @@ export interface ServiceObservation {
   service: ServiceName;
   /** PM2 instance count — middleware runs 2 in cluster mode. */
   instances: number;
-  /** View A: exec-time environment. `null` when `/proc` could not be read. */
+  /**
+   * Exec-time environment. `null` when `/proc` could not be read.
+   *
+   * An OBSERVATION SOURCE, never runtime truth. In PM2 **cluster mode** this
+   * under-reports severely: middleware's `/proc` holds 25 keys and none of
+   * `NODE_ENV`, `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET` or `PORT`, because
+   * PM2 applies `pm2_env` onto `process.env` inside the worker after exec.
+   * Fork-mode services show 72-74 keys. Absence here proves nothing about
+   * where a value came from.
+   */
   procEnviron: EnvMap | null;
-  /** View A: what PM2 holds and would re-inject. Empty means read failure. */
+  /** What PM2 holds, injects in-process, and would reuse on restart. */
   pm2Env: EnvMap;
-  /** Ecosystem-declared env for this service. */
-  ecosystemEnv: EnvMap;
+  /** Ecosystem `env_production` block — the canonical production start. */
+  ecosystemEnvProduction: EnvMap;
+  /**
+   * Ecosystem default `env` block — what a start WITHOUT `--env production`
+   * applies. Tracked because the two blocks disagree (`NODE_ENV` development
+   * vs production), which makes a zero-state rebuild flag-dependent.
+   */
+  ecosystemEnvDefault: EnvMap;
   /** Parsed `.env`, or `null` when the service loads no dotenv file (web). */
   dotenvVars: EnvMap | null;
 }
@@ -246,25 +261,52 @@ export function resolvePrecedence(processEnv: EnvMap, dotenvVars: EnvMap | null)
   return { ...(dotenvVars ?? {}), ...processEnv };
 }
 
-/** View C — what the application is effectively using. Requires `/proc`. */
-export function computeEffective(obs: ServiceObservation): EnvMap {
-  return resolvePrecedence(obs.procEnviron ?? {}, obs.dotenvVars);
+/**
+ * **R — reconstructed effective runtime.** What the application is using now.
+ *
+ * `pm2Env` is layered ON TOP of `procEnviron` because PM2 applies its stored
+ * env to `process.env` inside the worker, which `/proc` cannot see. Proven
+ * behaviourally on prod: middleware's `/proc` has no `NODE_ENV`, `.env` says
+ * `development`, and the app serves Swagger's production behaviour (404 on a
+ * gate reading `process.env.NODE_ENV`) — so the running value is PM2's.
+ *
+ * dotenv fills only what neither layer set.
+ */
+export function computeRuntime(obs: ServiceObservation): EnvMap {
+  return resolvePrecedence({ ...(obs.procEnviron ?? {}), ...obs.pm2Env }, obs.dotenvVars);
 }
 
 /**
- * View B — what a process started from zero now would consume.
+ * **P — PM2-managed restart.** What `pm2 restart`/`reload` would reuse:
+ * PM2's stored metadata plus the ecosystem's production block.
  *
- * The invoking shell is modelled as EMPTY (ruling constraint 1 / §9.1), so a
- * variable that only ever arrived through operator shell inheritance shows up
- * as missing on fresh start — correctly, and loudly.
- *
- * Ecosystem-declared values win over PM2's stored env because a true
- * from-scratch `pm2 start ecosystem.config.js` re-reads the ecosystem file;
- * PM2's stored env fills whatever the ecosystem does not declare, since that is
- * what PM2 re-injects on restart.
+ * This is NOT a fresh start. It still depends on PM2's stored env surviving,
+ * which is exactly the assumption a zero-state rebuild cannot make.
  */
-export function computeFreshStart(obs: ServiceObservation): EnvMap {
-  return resolvePrecedence({ ...obs.pm2Env, ...obs.ecosystemEnv }, obs.dotenvVars);
+export function computeRestart(obs: ServiceObservation): EnvMap {
+  return resolvePrecedence({ ...obs.pm2Env, ...obs.ecosystemEnvProduction }, obs.dotenvVars);
+}
+
+/**
+ * **Z — canonical zero-state start.** Empty/minimal shell + ecosystem config +
+ * dotenv, with **no reliance on PM2's stored env**.
+ *
+ * Keeping Z distinct from P is the whole point: if PM2's stored env were folded
+ * into the "fresh start" model, B1 could declare the system reproducible while
+ * the zero-state rebuild path is broken — recreating the blind spot it exists
+ * to remove. A value that lives ONLY in PM2's stored env is invisible to P and
+ * missing from Z.
+ *
+ * Models the canonical `--env production` start. The flag-dependent variant is
+ * covered by the shadow check, since the two ecosystem blocks disagree.
+ */
+export function computeZeroState(obs: ServiceObservation): EnvMap {
+  return resolvePrecedence({ ...obs.ecosystemEnvProduction }, obs.dotenvVars);
+}
+
+/** Zero-state WITHOUT `--env production` — the ecosystem default `env` block. */
+export function computeZeroStateDefaultFlag(obs: ServiceObservation): EnvMap {
+  return resolvePrecedence({ ...obs.ecosystemEnvDefault }, obs.dotenvVars);
 }
 
 // ─── URL decomposition (design §4) ──────────────────────────────────────────
@@ -503,8 +545,11 @@ export function computeConnectionBudget(observations: ServiceObservation[]): Con
   let determinable = true;
 
   for (const obs of observations) {
-    const freshStart = computeFreshStart(obs);
-    const pg = decomposePostgresUrl(freshStart.DATABASE_URL);
+    // Computed from R — the live pool is what actually consumes connections,
+    // and a rebuild differing in `connection_limit` is reported separately as
+    // pool-parameter drift.
+    const runtime = computeRuntime(obs);
+    const pg = decomposePostgresUrl(runtime.DATABASE_URL);
     if (!pg) {
       // No DATABASE_URL at all (e.g. web) — contributes nothing, not unknown.
       perService[obs.service] = 0;
@@ -590,36 +635,53 @@ export function detectDrift(
 
   for (const obs of observations) {
     // A view we could not build must never be silently treated as agreement.
-    const incomplete: string[] = [];
-    if (obs.procEnviron === null) {
-      incomplete.push('/proc/<pid>/environ unreadable — effective config (view C) cannot be reconstructed');
-    }
+    // PM2's stored env is load-bearing for R, P and Z alike — without it no
+    // view can be built. `/proc` is only a supplementary source: in cluster
+    // mode it legitimately carries none of the app's config, so its absence is
+    // degraded, not fatal.
     if (Object.keys(obs.pm2Env).length === 0) {
-      incomplete.push('PM2 stored environment empty or unavailable — fresh-start config (view B) cannot be built');
-    }
-    if (incomplete.length > 0) {
       findings.push({
         driftClass: 'CRITICAL',
         type: 'observation-incomplete',
         service: obs.service,
         targetId: obs.service,
-        message: `cannot determine drift for ${obs.service}: ${incomplete.join('; ')}`,
+        message:
+          `cannot determine drift for ${obs.service}: PM2 stored environment empty or ` +
+          `unavailable — none of R (runtime), P (restart) or Z (zero-state) can be built`,
         remediation:
-          'Check the agent runs with sufficient privilege to read /proc for the service ' +
-          'user, and that `pm2 jlist` succeeds. Absence of drift was NOT established.',
+          'Check `pm2 jlist` succeeds for the user running this agent. ' +
+          'Absence of drift was NOT established.',
       });
       unobservable.push(obs.service);
-      continue; // never emit comparisons derived from a view we could not build
+      continue; // never emit comparisons derived from views we could not build
     }
 
-    const effective = computeEffective(obs);
-    const freshStart = computeFreshStart(obs);
+    if (obs.procEnviron === null) {
+      findings.push({
+        driftClass: 'WARNING',
+        type: 'observation-degraded',
+        service: obs.service,
+        targetId: `${obs.service}:proc`,
+        message:
+          `/proc/<pid>/environ unreadable for ${obs.service} — runtime (R) reconstructed from ` +
+          `PM2 stored env + dotenv only. Sufficient for cluster-mode services, which carry no ` +
+          `app config in their exec environment, but exec-only variables would be missed.`,
+        remediation:
+          'Check the agent can read /proc for the service user. Comparisons continue.',
+      });
+    }
 
-    findings.push(...detectFreshStartFailures(obs, freshStart));
-    findings.push(...detectDirectDrift(obs, effective, freshStart));
-    findings.push(...detectSecretDrift(obs, effective, freshStart));
-    findings.push(...detectUrlComponentDrift(obs, effective, freshStart));
-    findings.push(...detectPoolDrift(obs, effective, freshStart));
+    const runtime = computeRuntime(obs);
+    const restart = computeRestart(obs);
+    const zeroState = computeZeroState(obs);
+
+    // Validators run against Z — the rebuild path that assumes the least.
+    findings.push(...detectZeroStateFailures(obs, zeroState));
+    findings.push(...detectDirectDrift(obs, runtime, restart, zeroState));
+    findings.push(...detectConfigShadow(obs, runtime));
+    findings.push(...detectSecretDrift(obs, runtime, zeroState));
+    findings.push(...detectUrlComponentDrift(obs, runtime, zeroState));
+    findings.push(...detectPoolDrift(obs, runtime, zeroState));
   }
 
   findings.push(...detectBudgetFindings(observations, opts.maxConnections, unobservable));
@@ -627,17 +689,113 @@ export function detectDrift(
   return findings;
 }
 
-function detectFreshStartFailures(obs: ServiceObservation, freshStart: EnvMap): DriftFinding[] {
-  return validateFreshStart(obs.service, freshStart).map((failure, index) => ({
+function detectZeroStateFailures(obs: ServiceObservation, zeroState: EnvMap): DriftFinding[] {
+  return validateFreshStart(obs.service, zeroState).map((failure, index) => ({
     driftClass: 'CRITICAL' as const,
-    type: 'fresh-start-would-fail',
+    type: 'zero-state-would-fail',
     service: obs.service,
     // Index keeps concurrent failures distinct while staying stable across runs
     // for the same set of failures.
     targetId: `${obs.service}:validator-${index}`,
-    message: `${obs.service} would NOT boot from persisted config: ${failure}`,
+    message:
+      `${obs.service} would NOT boot from a zero-state rebuild (no PM2 stored env): ${failure}`,
     remediation: NO_REPAIR,
   }));
+}
+
+/**
+ * Keys whose divergence is CRITICAL regardless of category.
+ *
+ * `NODE_ENV` earns it on code evidence, not judgement: both of middleware's
+ * boot validators are gated on `NODE_ENV === 'production'`
+ * (`main.ts:37` presence check, and the Zod schema's production `superRefine`
+ * covering MinIO defaults and `INTERNAL_API_SECRET`). realtime's presence check
+ * (`main.ts:12`) and its `CORS_ORIGIN` requirement are gated the same way. A
+ * start that resolves `NODE_ENV` to anything else silently skips all of them —
+ * so the config that guards production stops guarding it.
+ */
+const CRITICAL_KEYS = ['NODE_ENV'] as const;
+
+/**
+ * `absentOnRebuild` separates the two cases a boot-required variable can be in.
+ * ABSENT is fatal — the validator exits non-zero. Present-but-different is not:
+ * the service starts and behaves differently, which is HIGH, not CRITICAL.
+ * Conflating them inflates every URL difference to CRITICAL.
+ */
+function classifyKey(service: ServiceName, key: string, absentOnRebuild: boolean): DriftClass {
+  if (CRITICAL_KEYS.includes(key as never)) return 'CRITICAL';
+  // A rebuild landing on different credentials fails just as hard as one that
+  // cannot boot — auth simply fails later instead of at startup.
+  if ((SECRET_KEYS as readonly string[]).includes(key)) return 'CRITICAL';
+  if (absentOnRebuild && isValidatorOwned(service, key)) return 'CRITICAL';
+  if (PRODUCTION_URL_KEYS.includes(key as never)) return 'HIGH';
+  return 'WARNING';
+}
+
+/**
+ * **Config shadowing** — the persisted configuration contradicts what is
+ * actually running, even though the process is healthy.
+ *
+ * This is the reproducibility hazard the 2026-08-11 incident was made of, and
+ * it is invisible to any comparison that only looks at healthy-vs-restart: a
+ * higher-precedence layer (PM2's in-process env, or the ecosystem block)
+ * supplies the working value while the persisted file says something else. Any
+ * path that does not apply that layer gets the wrong value.
+ *
+ * Only `.env` is checked for shadowing. The ecosystem's default `env` block is
+ * NOT — it is the development block by construction on every PM2 app, so
+ * comparing it against a production runtime would fire on every service on
+ * every run, forever. That is the alert-fatigue failure this detector exists to
+ * avoid. Its genuine hazard — a production start that omits `--env production`
+ * — is a deployment-procedure concern (B2), and it is surfaced here only as
+ * supporting context on a finding that already fired on its own evidence.
+ */
+function detectConfigShadow(obs: ServiceObservation, runtime: EnvMap): DriftFinding[] {
+  const findings: DriftFinding[] = [];
+  const tracked = [...DIRECT_COMPARE_KEYS, ...SECRET_KEYS];
+
+  for (const key of tracked) {
+    const running = runtime[key];
+    if (running === undefined) continue;
+
+    const persisted = obs.dotenvVars?.[key];
+    if (persisted === undefined || persisted === running) continue;
+
+    const isSecret = (SECRET_KEYS as readonly string[]).includes(key);
+    const driftClass = classifyKey(obs.service, key, false);
+
+    // Flag-dependency context: only when the default block would ALSO land on
+    // the persisted value, i.e. a start without `--env production` reproduces
+    // the wrong value through a second independent path.
+    const defaultBlock = obs.ecosystemEnvDefault[key];
+    const flagNote =
+      defaultBlock !== undefined && defaultBlock !== running
+        ? ` A start without \`--env production\` would also resolve ${key} to ` +
+          `${isSecret ? 'the persisted value' : describe(defaultBlock)}, so the correct value ` +
+          `depends on the start flag as well as on PM2 stored state.`
+        : '';
+
+    const validatorNote =
+      key === 'NODE_ENV'
+        ? ` Both boot validators are gated on NODE_ENV === 'production', so a start resolving ` +
+          `it otherwise skips them silently.`
+        : '';
+
+    findings.push({
+      driftClass,
+      type: 'config-shadow',
+      service: obs.service,
+      targetId: `${obs.service}:${key}`,
+      message:
+        `${key} is running as ${isSecret ? '<set>' : describe(running)} but persisted .env holds ` +
+        `${isSecret ? 'a different value (DRIFT)' : describe(persisted)}. The running value comes ` +
+        `from a higher-precedence layer (PM2 in-process env); any start that does not apply that ` +
+        `layer uses the persisted value instead.${flagNote}${validatorNote}`,
+      remediation: NO_REPAIR,
+    });
+  }
+
+  return findings;
 }
 
 /** Variables the validator already owns — don't double-report them. */
@@ -645,48 +803,84 @@ function isValidatorOwned(service: ServiceName, key: string): boolean {
   return REQUIRED_IN_PRODUCTION[service].includes(key);
 }
 
+/**
+ * Compare the runtime against BOTH rebuild paths, reporting one finding per key
+ * that names which view diverged.
+ *
+ * P and Z are deliberately not merged. A value that lives only in PM2's stored
+ * env survives a `pm2 restart` (P matches) and vanishes from a zero-state
+ * rebuild (Z does not) — the precise blind spot that folding them together
+ * would reintroduce.
+ */
 function detectDirectDrift(
   obs: ServiceObservation,
-  effective: EnvMap,
-  freshStart: EnvMap,
+  runtime: EnvMap,
+  restart: EnvMap,
+  zeroState: EnvMap,
 ): DriftFinding[] {
   const findings: DriftFinding[] = [];
-  const isProduction = effective.NODE_ENV === 'production';
+  const isProduction = runtime.NODE_ENV === 'production';
 
   for (const key of DIRECT_COMPARE_KEYS) {
-    const now = effective[key];
-    const fresh = freshStart[key];
+    const now = runtime[key];
+    const onRestart = restart[key];
+    const onZeroState = zeroState[key];
 
-    if (now === fresh) {
-      // Identical — still worth flagging a localhost production URL, because
-      // "would come back the same" and "would come back correct" differ.
-      if (isProduction && PRODUCTION_URL_KEYS.includes(key as never) && isLocalhost(fresh)) {
+    const divergences: string[] = [];
+    if (onRestart !== now) {
+      divergences.push(`PM2 restart (P) would use ${describe(onRestart)}`);
+    }
+    if (onZeroState !== now) {
+      divergences.push(`zero-state rebuild (Z) would use ${describe(onZeroState)}`);
+    }
+
+    if (divergences.length === 0) {
+      // Identical across views — still worth flagging a localhost production
+      // URL, because "would come back the same" and "would come back correct"
+      // are different questions.
+      if (isProduction && PRODUCTION_URL_KEYS.includes(key as never) && isLocalhost(now)) {
         findings.push({
           driftClass: 'HIGH',
           type: 'production-url-drift',
           service: obs.service,
           targetId: `${obs.service}:${key}`,
-          message: `${key} is a localhost URL under NODE_ENV=production (${fresh})`,
+          message: `${key} is a localhost URL under NODE_ENV=production (${describe(now)})`,
           remediation: NO_REPAIR,
         });
       }
       continue;
     }
 
-    // One side absent and the validator already reports it — skip the duplicate.
-    if ((now === undefined || fresh === undefined) && isValidatorOwned(obs.service, key)) {
+    // Absent on a rebuild AND validator-owned — the validator reports it with
+    // better context. Skip the duplicate.
+    if (
+      (onRestart === undefined || onZeroState === undefined) &&
+      isValidatorOwned(obs.service, key)
+    ) {
       continue;
     }
 
-    const isUrlKey = PRODUCTION_URL_KEYS.includes(key as never);
+    // A production URL that a rebuild would resolve to localhost is a more
+    // specific — and more actionable — statement than "the views differ", so it
+    // keeps its own type.
+    const rebuildIsLocalhost =
+      isProduction &&
+      PRODUCTION_URL_KEYS.includes(key as never) &&
+      (isLocalhost(onRestart) || isLocalhost(onZeroState));
+
     findings.push({
-      driftClass: isUrlKey ? 'HIGH' : 'WARNING',
-      type: isUrlKey ? 'production-url-drift' : 'value-drift',
+      driftClass: classifyKey(
+        obs.service,
+        key,
+        onRestart === undefined || onZeroState === undefined,
+      ),
+      type: rebuildIsLocalhost ? 'production-url-drift' : 'reproducibility-drift',
       service: obs.service,
       targetId: `${obs.service}:${key}`,
       message:
-        `${key} differs between effective config and fresh start — ` +
-        `effective=${describe(now)} fresh-start=${describe(fresh)}`,
+        `${key} is running as ${describe(now)} but a rebuild would differ — ` +
+        divergences.join('; ') +
+        (rebuildIsLocalhost ? ' (a localhost URL under NODE_ENV=production)' : ''),
       remediation: NO_REPAIR,
     });
   }
