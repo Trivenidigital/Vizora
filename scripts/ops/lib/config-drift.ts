@@ -96,6 +96,128 @@ export interface ServiceObservation {
   ecosystemEnvDefault: EnvMap;
   /** Parsed `.env`, or `null` when the service loads no dotenv file (web). */
   dotenvVars: EnvMap | null;
+  /**
+   * Whether PM2 state was settled when this observation was taken. An unstable
+   * service is DEFERRED, never classified — see `assessStability`.
+   */
+  stability: StabilityVerdict;
+}
+
+/** One reading of a single PM2 instance's state. */
+export interface Pm2Sample {
+  /** `pm_id` — PM2's stable per-instance identifier. Required for matching. */
+  pmId?: number;
+  status?: string;
+  /** `pm2_env.restart_time` — increments on every restart. */
+  restartTime?: number;
+  /** `pm2_env.pm_uptime` — epoch ms of the current generation's start. */
+  uptimeMs?: number;
+  pid?: number;
+}
+
+export interface StabilityVerdict {
+  stable: boolean;
+  reason?: string;
+}
+
+/**
+ * Decide whether a service's PM2 state is settled enough to classify.
+ *
+ * Sampling mid-restart produces findings that evaporate moments later. Observed
+ * on prod 2026-08-12: a run at 17:00:52 landed during a reload and emitted five
+ * criticals; a run 115 seconds later reproduced none of them. Transient false
+ * positives are worse than a skipped cycle — an hourly detector loses nothing by
+ * waiting, and a detector that cries wolf gets muted.
+ *
+ * ─── Stability is SERVICE-WIDE, never per-instance ──────────────────────────
+ *
+ * middleware runs 2 instances in PM2 cluster mode, and `pm2 reload` rolls them
+ * one at a time. Assessing a single chosen instance would let this pass:
+ *
+ *     instance A   settled old generation, >90s, unchanged across samples
+ *     instance B   stopping / launching a new generation
+ *     → picked A → service classified STABLE mid-reload
+ *
+ * which is exactly the condition the guard exists to prevent, surviving
+ * whenever the chosen primary happens to be the settled sibling. So EVERY
+ * instance must satisfy EVERY condition, and the instance set itself must be
+ * identical across both samples — an appearing or disappearing instance is a
+ * reload in progress by definition.
+ *
+ * For the fork-mode services (realtime, web) this reduces to the single-instance
+ * check.
+ */
+export function assessStability(
+  first: Pm2Sample[],
+  second: Pm2Sample[],
+  nowMs: number,
+  minSettledMs: number,
+): StabilityVerdict {
+  if (first.length === 0 || second.length === 0) {
+    return { stable: false, reason: 'PM2 process not present in both samples' };
+  }
+  if (first.length !== second.length) {
+    return {
+      stable: false,
+      reason: `instance count changed between samples (${first.length} → ${second.length})`,
+    };
+  }
+
+  // `pm_id` is how an instance is identified across samples. Without it two
+  // instances cannot be told apart, so matching would be a guess.
+  if (first.some(s => s.pmId === undefined) || second.some(s => s.pmId === undefined)) {
+    return { stable: false, reason: 'pm_id missing — instances cannot be matched across samples' };
+  }
+
+  const secondById = new Map(second.map(s => [s.pmId as number, s]));
+  const firstIds = [...first.map(s => s.pmId as number)].sort((a, b) => a - b);
+  const secondIds = [...secondById.keys()].sort((a, b) => a - b);
+  if (firstIds.join(',') !== secondIds.join(',')) {
+    return {
+      stable: false,
+      reason: `instance set changed between samples (pm_ids ${firstIds.join('/')} → ${secondIds.join('/')})`,
+    };
+  }
+
+  for (const before of first) {
+    const after = secondById.get(before.pmId as number) as Pm2Sample;
+    const id = `pm_id ${before.pmId}`;
+
+    if (before.status !== 'online' || after.status !== 'online') {
+      return {
+        stable: false,
+        reason: `${id} status is ${before.status ?? 'unknown'}/${after.status ?? 'unknown'}, not online in both samples`,
+      };
+    }
+    if (before.restartTime !== after.restartTime) {
+      return {
+        stable: false,
+        reason: `${id} restart generation changed between samples (${before.restartTime} → ${after.restartTime})`,
+      };
+    }
+    if (before.pid !== after.pid) {
+      return {
+        stable: false,
+        reason: `${id} pid changed between samples (${before.pid} → ${after.pid})`,
+      };
+    }
+    // "older than minSettledMs" is a REQUIREMENT, so an unknown age cannot
+    // satisfy it. Skipping the check when `pm_uptime` is absent would let an
+    // instance that just restarted pass silently — the opposite of the guard's
+    // purpose. Defer as unknown instead.
+    if (typeof after.uptimeMs !== 'number') {
+      return { stable: false, reason: `${id} pm_uptime missing — generation age cannot be determined` };
+    }
+    const ageMs = nowMs - after.uptimeMs;
+    if (ageMs < minSettledMs) {
+      return {
+        stable: false,
+        reason: `${id} generation is ${Math.round(ageMs / 1000)}s old, below the ${Math.round(minSettledMs / 1000)}s settle threshold`,
+      };
+    }
+  }
+
+  return { stable: true };
 }
 
 export interface DriftFinding {
@@ -583,12 +705,37 @@ const NO_REPAIR = 'Investigate and correct the persisted configuration by hand. 
  *
  * Pure — never mutates `observations`, performs no I/O.
  */
+export interface DriftAnalysis {
+  findings: DriftFinding[];
+  /**
+   * Scopes this run SUCCESSFULLY EVALUATED. Only these may have stale findings
+   * resolved — see `resolveClearedFindings`. A service is evaluated only when
+   * every view was buildable: PM2 state present, stability settled, and `/proc`
+   * readable. A merely *degraded* observation is deliberately excluded, because
+   * a variable that lived only in the exec environment would look absent rather
+   * than unchanged, and resolving on that would be a false all-clear.
+   *
+   * `global` covers cross-service findings (the connection budget) and is
+   * evaluated only when every service was.
+   */
+  evaluated: string[];
+}
+
+/** Backwards-compatible wrapper — most callers only need the findings. */
 export function detectDrift(
   observations: ServiceObservation[],
   opts: { maxConnections: number | null },
 ): DriftFinding[] {
+  return analyzeDrift(observations, opts).findings;
+}
+
+export function analyzeDrift(
+  observations: ServiceObservation[],
+  opts: { maxConnections: number | null },
+): DriftAnalysis {
   const findings: DriftFinding[] = [];
   const unobservable: ServiceName[] = [];
+  const evaluated: string[] = [];
 
   for (const obs of observations) {
     // A view we could not build must never be silently treated as agreement.
@@ -613,6 +760,25 @@ export function detectDrift(
       continue; // never emit comparisons derived from views we could not build
     }
 
+    // Defer rather than guess while PM2 state is changing.
+    if (!obs.stability.stable) {
+      findings.push({
+        driftClass: 'WARNING',
+        type: 'observation-deferred',
+        service: obs.service,
+        targetId: `${obs.service}:stability`,
+        message:
+          `drift not evaluated for ${obs.service} — PM2 state is not settled: ` +
+          `${obs.stability.reason}. Absence of drift was NOT established; the next ` +
+          `cycle will classify it.`,
+        remediation:
+          'No action needed if the service was mid-restart. Persistent instability is ' +
+          'health-guardian\'s domain, not this detector\'s.',
+      });
+      unobservable.push(obs.service);
+      continue;
+    }
+
     if (obs.procEnviron === null) {
       findings.push({
         driftClass: 'WARNING',
@@ -627,6 +793,10 @@ export function detectDrift(
           'Check the agent can read /proc for the service user. Comparisons continue.',
       });
     }
+
+    // Fully evaluated: PM2 present, stability settled, /proc readable. Anything
+    // less is comparable but not trustworthy enough to CLEAR a prior finding.
+    if (obs.procEnviron !== null) evaluated.push(obs.service);
 
     const runtime = computeRuntime(obs);
     const restart = computeRestart(obs);
@@ -643,7 +813,12 @@ export function detectDrift(
 
   findings.push(...detectBudgetFindings(observations, opts.maxConnections, unobservable));
 
-  return findings;
+  // `global` only when every observed service was fully evaluated.
+  if (observations.length > 0 && evaluated.length === observations.length) {
+    evaluated.push('global');
+  }
+
+  return { findings, evaluated };
 }
 
 function detectZeroStateFailures(obs: ServiceObservation, zeroState: EnvMap): DriftFinding[] {
@@ -1014,7 +1189,7 @@ function detectBudgetFindings(
     driftClass: verdict === 'UNSAFE' ? 'CRITICAL' : 'WARNING',
     type: verdict === 'UNSAFE' ? 'connection-budget-unsafe' : 'connection-budget-unknown',
     service: 'middleware',
-    targetId: 'db-connection-budget',
+    targetId: 'global:db-connection-budget',
     message,
     remediation:
       verdict === 'UNSAFE'
@@ -1044,6 +1219,71 @@ function describe(value: string | undefined): string {
  * `status` is always `open` and `attempts` always 0 — this agent never
  * remediates, so it must never record having tried.
  */
+/**
+ * The scope an incident belongs to, recovered from its `targetId`.
+ *
+ * Every finding is scoped `<service>:<detail>` (or the bare service, or
+ * `global:` for cross-service findings like the connection budget), so the
+ * owning scope survives persistence and can be recovered on a later run.
+ */
+export function incidentScope(targetId: string): string {
+  const idx = targetId.indexOf(':');
+  return idx === -1 ? targetId : targetId.slice(0, idx);
+}
+
+/**
+ * Return RESOLVED copies of this agent's open incidents that the current run
+ * both COVERED and did not reproduce.
+ *
+ * ─── Why coverage is required, not just absence ─────────────────────────────
+ *
+ * Absence from `currentFindings` is NOT evidence a drift is gone. When a
+ * service is deferred (mid-restart) or its views could not be built, the
+ * detector deliberately skips classification and says so — "absence of drift
+ * was NOT established". Resolving on absence alone would contradict the guard's
+ * own semantics and silently clear a real CRITICAL during a reload, which is
+ * precisely when the operator most needs it to persist.
+ *
+ * So resolution requires the run to have SUCCESSFULLY EVALUATED the owning
+ * scope. Coverage is passed in explicitly rather than inferred from which
+ * finding types happen to be present — inference would re-couple resolution to
+ * the emission logic and break again the next time a new finding type is added.
+ *
+ * Without this the detector is write-only: `recordAgentRun` upserts by id and
+ * nothing ever clears, so a finding pins `systemStatus` at CRITICAL forever —
+ * even after the underlying configuration is corrected. Observed on prod
+ * 2026-08-12: five criticals from a transient mid-restart sample survived a
+ * later clean run, and the dashboard stayed red until the entries were removed
+ * by hand. A detector whose dashboard never clears is one people stop reading,
+ * which is the failure this whole workstream exists to remove.
+ *
+ * Only THIS agent's incidents are touched, and only `open` ones — never another
+ * agent's, and never an already-resolved row.
+ *
+ * Note these do NOT count toward `issuesFixed`, which stays 0 by design: a
+ * cleared drift means an operator fixed the configuration, not that the
+ * detector repaired anything.
+ */
+export function resolveClearedFindings(
+  existing: Incident[],
+  currentFindings: DriftFinding[],
+  evaluatedScopes: Iterable<string>,
+  resolvedAt: string,
+): Incident[] {
+  const stillPresent = new Set(
+    currentFindings.map(f => makeIncidentId(AGENT, f.type, f.targetId)),
+  );
+  const covered = new Set(evaluatedScopes);
+
+  return existing
+    .filter(i =>
+      i.agent === AGENT &&
+      i.status === 'open' &&
+      covered.has(incidentScope(i.targetId)) &&
+      !stillPresent.has(i.id))
+    .map(i => ({ ...i, status: 'resolved' as const, resolvedAt }));
+}
+
 export function findingsToIncidents(findings: DriftFinding[], detectedAt: string): Incident[] {
   return findings.map(f => ({
     id: makeIncidentId(AGENT, f.type, f.targetId),

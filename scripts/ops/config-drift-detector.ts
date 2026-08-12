@@ -51,11 +51,15 @@ import {
   AGENT,
   BUILD_TIME_EXCLUSION,
   buildMaxConnectionsCandidates,
-  detectDrift,
+  analyzeDrift,
   findingsToIncidents,
+  assessStability,
   parseDotenvText,
   parseProcEnviron,
+  resolveClearedFindings,
+  type DriftFinding,
   type EnvMap,
+  type Pm2Sample,
   type ServiceName,
   type ServiceObservation,
 } from './lib/config-drift.js';
@@ -82,6 +86,17 @@ const PM2_NAME_BY_SERVICE: Record<ServiceName, string> = {
 const SERVICES: ServiceName[] = ['middleware', 'realtime', 'web'];
 
 const PM2_TIMEOUT_MS = 15_000;
+
+/**
+ * Gap between the two `pm2 jlist` samples used to detect a restart in progress,
+ * and how long a generation must have been up before it is classified.
+ *
+ * An hourly detector loses nothing by waiting; a transient false positive costs
+ * trust permanently. 90s covers PM2's graceful reload (`kill_timeout` is 30s and
+ * `listen_timeout` 30s for middleware).
+ */
+const STABILITY_SAMPLE_GAP_MS = 5_000;
+const STABILITY_MIN_SETTLED_MS = 90_000;
 const ECOSYSTEM_TIMEOUT_MS = 10_000;
 const PSQL_TIMEOUT_MS = 5_000;
 
@@ -90,7 +105,28 @@ const PSQL_TIMEOUT_MS = 5_000;
 interface Pm2Process {
   name: string;
   pid?: number;
-  pm2_env?: Record<string, unknown> & { status?: string };
+  pm_id?: number;
+  pm2_env?: Record<string, unknown> & {
+    status?: string;
+    restart_time?: number;
+    pm_uptime?: number;
+  };
+}
+
+/** Block for `ms` without an async hop — `collect()` is synchronous. */
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/** Reduce PM2 process records to the fields stability assessment needs. */
+function toSamples(processes: Pm2Process[]): Pm2Sample[] {
+  return processes.map(p => ({
+    pmId: p.pm_id,
+    status: p.pm2_env?.status,
+    restartTime: p.pm2_env?.restart_time,
+    uptimeMs: p.pm2_env?.pm_uptime,
+    pid: p.pid,
+  }));
 }
 
 interface EcosystemApp {
@@ -253,6 +289,13 @@ function collect(): Collection {
   const { processes, error: pm2Error } = readPm2Processes();
   if (pm2Error) notes.push(`pm2 jlist failed: ${pm2Error}`);
 
+  // Second sample, taken after a short gap, so a restart in progress is visible
+  // as a changed generation rather than classified as drift.
+  sleepSync(STABILITY_SAMPLE_GAP_MS);
+  const { processes: processes2, error: pm2Error2 } = readPm2Processes();
+  if (pm2Error2) notes.push(`pm2 jlist (second sample) failed: ${pm2Error2}`);
+  const sampledAt = Date.now();
+
   const { apps, error: ecoError } = readEcosystemApps();
   if (ecoError) notes.push(`ecosystem.config.js evaluation failed: ${ecoError}`);
 
@@ -279,6 +322,20 @@ function collect(): Collection {
     }
 
     const primary = online[0] ?? instancesOfService[0];
+
+    // Stability is assessed across EVERY instance of the service, not the
+    // chosen primary. `pm2 reload` rolls a cluster one instance at a time, so
+    // judging one instance would certify middleware as stable while its sibling
+    // is mid-reload.
+    const second = processes2.filter(p => p.name === pm2Name);
+    const stability = assessStability(
+      toSamples(instancesOfService),
+      toSamples(second),
+      sampledAt,
+      STABILITY_MIN_SETTLED_MS,
+    );
+    if (!stability.stable) notes.push(`${service}: deferred — ${stability.reason}`);
+
     const procEnviron = readProcEnviron(primary?.pid);
     if (primary && procEnviron === null) {
       notes.push(`${service}: /proc/${primary.pid}/environ unreadable`);
@@ -294,6 +351,7 @@ function collect(): Collection {
       ecosystemEnvProduction: toEnvMap(app?.env_production),
       ecosystemEnvDefault: toEnvMap(app?.env),
       dotenvVars,
+      stability,
     });
 
     if (service === 'middleware') {
@@ -318,11 +376,14 @@ function collect(): Collection {
 export function runDetection(collection: Collection, maxConnections: number | null): {
   result: AgentResult;
   incidents: Incident[];
+  findings: DriftFinding[];
+  /** Scopes fully evaluated this run — only these may have findings resolved. */
+  evaluated: string[];
 } {
   const started = Date.now();
   const detectedAt = new Date().toISOString();
 
-  const findings = detectDrift(collection.observations, { maxConnections });
+  const { findings, evaluated } = analyzeDrift(collection.observations, { maxConnections });
   const incidents = findingsToIncidents(findings, detectedAt);
 
   return {
@@ -337,6 +398,8 @@ export function runDetection(collection: Collection, maxConnections: number | nu
       incidents,
     },
     incidents,
+    findings,
+    evaluated,
   };
 }
 
@@ -357,7 +420,7 @@ async function main(): Promise<void> {
     log(AGENT, `max_connections = ${maxConn.value} (source: ${maxConn.source})`);
   }
 
-  const { result, incidents } = runDetection(collection, maxConn.value);
+  const { result, incidents, findings, evaluated } = runDetection(collection, maxConn.value);
 
   // Report the v1 scope gap explicitly. Silence would read as "checked and fine".
   log(
@@ -380,9 +443,20 @@ async function main(): Promise<void> {
   }
 
   // Brief locked read -> merge -> write with no I/O in between.
+  //
+  // Resolution happens against FRESH state inside the lock: findings this run no
+  // longer reproduces are written back as `resolved`, so `systemStatus` can
+  // recover on its own. Without this the detector is write-only and one
+  // transient critical pins the dashboard permanently.
   const state = readOpsState();
   try {
-    recordAgentRun(state, result);
+    const cleared = resolveClearedFindings(state.incidents, findings, evaluated, result.timestamp);
+    if (cleared.length > 0) {
+      log(AGENT, `resolved ${cleared.length} finding(s) that no longer reproduce`);
+    }
+    // `issuesFixed` stays 0: a cleared drift means an operator corrected the
+    // configuration, not that this detector repaired anything.
+    recordAgentRun(state, { ...result, incidents: [...result.incidents, ...cleared] });
   } finally {
     writeOpsState(state);
   }
