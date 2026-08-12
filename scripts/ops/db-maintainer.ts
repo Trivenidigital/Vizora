@@ -34,6 +34,12 @@ import { log } from './lib/alerting.js';
 const AGENT = 'db-maintainer';
 
 /**
+ * Postgres container used to reach `psql` when it is not installed on the host —
+ * which is prod's actual shape. Set empty to disable the container fallback.
+ */
+const PG_CONTAINER = process.env.CONFIG_DRIFT_PG_CONTAINER ?? 'vizora-postgres';
+
+/**
  * High-churn PostgreSQL tables to VACUUM ANALYZE.
  *
  * `content_impressions` is the proof-of-play table — at ~12k rows/day/org
@@ -81,17 +87,152 @@ const LOGS_DIR = join(
   '..', '..', 'logs',
 );
 
+// ─── Postgres CLI Helpers ───────────────────────────────────────────────────
+
+interface PsqlCandidate {
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+  source: string;
+}
+
+/**
+ * Build ordered candidates for psql invocation.
+ * Tries host psql first (if available), then docker exec as fallback.
+ */
+function buildPsqlCandidates(databaseUrl: string): PsqlCandidate[] {
+  const candidates: PsqlCandidate[] = [];
+
+  // Try host psql first
+  candidates.push({
+    command: 'psql',
+    args: [databaseUrl],
+    source: 'host psql',
+  });
+
+  // Docker fallback
+  if (PG_CONTAINER) {
+    candidates.push({
+      command: 'docker',
+      args: ['exec', '-i', PG_CONTAINER, 'psql', '-U', 'postgres', '-d', 'vizora'],
+      source: 'docker exec psql',
+    });
+  }
+
+  return candidates;
+}
+
+/**
+ * Try to execute a psql command using ordered candidates (host first, container fallback).
+ * Returns the output on success or throws the last error encountered.
+ */
+function execPsql(
+  databaseUrl: string,
+  sqlCommand: string,
+  timeoutMs: number,
+): { output: string; source: string } {
+  const candidates = buildPsqlCandidates(databaseUrl);
+  const attempts: string[] = [];
+
+  for (const candidate of candidates) {
+    try {
+      const fullArgs = candidate.source === 'host psql'
+        ? [...candidate.args, '-c', sqlCommand]
+        : [...candidate.args, '-c', sqlCommand];
+
+      const output = execFileSync(candidate.command, fullArgs, {
+        stdio: 'pipe',
+        timeout: timeoutMs,
+        env: { ...process.env, ...candidate.env },
+        encoding: 'utf-8',
+      });
+
+      return { output, source: candidate.source };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      attempts.push(`${candidate.source}: ${msg}`);
+    }
+  }
+
+  const allAttempts = attempts.join('; ');
+  throw new Error(`All psql candidates failed: ${allAttempts}`);
+}
+
+/**
+ * Build ordered candidates for pg_dump invocation.
+ * Tries host pg_dump first (if available), then docker exec as fallback.
+ */
+function buildPgDumpCandidates(databaseUrl: string): PsqlCandidate[] {
+  const candidates: PsqlCandidate[] = [];
+
+  // Try host pg_dump first
+  candidates.push({
+    command: 'pg_dump',
+    args: [databaseUrl],
+    source: 'host pg_dump',
+  });
+
+  // Docker fallback
+  if (PG_CONTAINER) {
+    candidates.push({
+      command: 'docker',
+      args: ['exec', '-i', PG_CONTAINER, 'pg_dump', '-U', 'postgres', 'vizora'],
+      source: 'docker exec pg_dump',
+    });
+  }
+
+  return candidates;
+}
+
+/**
+ * Try to execute a pg_dump command using ordered candidates (host first, container fallback).
+ * Writes output to the specified file path.
+ * Returns the source on success or throws the last error encountered.
+ */
+function execPgDump(
+  databaseUrl: string,
+  outputPath: string,
+  timeoutMs: number,
+): string {
+  const candidates = buildPgDumpCandidates(databaseUrl);
+  const attempts: string[] = [];
+
+  for (const candidate of candidates) {
+    try {
+      const fullArgs = candidate.source === 'host pg_dump'
+        ? [...candidate.args, '-f', outputPath]
+        : [...candidate.args];
+
+      execFileSync(candidate.command, fullArgs, {
+        stdio: 'pipe',
+        timeout: timeoutMs,
+        env: { ...process.env, ...candidate.env },
+      });
+
+      return candidate.source;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      attempts.push(`${candidate.source}: ${msg}`);
+    }
+  }
+
+  const allAttempts = attempts.join('; ');
+  throw new Error(`All pg_dump candidates failed: ${allAttempts}`);
+}
+
 // ─── Task 1: PostgreSQL VACUUM ANALYZE ───────────────────────────────────────
 
 interface VacuumResult {
   table: string;
   success: boolean;
   error?: string;
+  source?: string;
 }
 
 /**
  * Run VACUUM ANALYZE on each high-churn table individually.
  * Catches errors per table so one failure doesn't block the rest.
+ * Uses host psql first, then falls back to docker exec if available.
  */
 function vacuumAnalyze(): VacuumResult[] {
   const databaseUrl = process.env.DATABASE_URL;
@@ -105,13 +246,9 @@ function vacuumAnalyze(): VacuumResult[] {
 
   for (const table of VACUUM_TABLES) {
     try {
-      // execFileSync avoids shell — no injection risk from DATABASE_URL.
-      execFileSync('psql', [databaseUrl, '-c', `VACUUM ANALYZE "${table}";`], {
-        timeout: VACUUM_TIMEOUT_MS,
-        stdio: 'pipe',
-      });
-      log(AGENT, `  VACUUM ANALYZE "${table}" — OK`);
-      results.push({ table, success: true });
+      const { source } = execPsql(databaseUrl, `VACUUM ANALYZE "${table}";`, VACUUM_TIMEOUT_MS);
+      log(AGENT, `  VACUUM ANALYZE "${table}" — OK (source: ${source})`);
+      results.push({ table, success: true, source });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       log(AGENT, `  VACUUM ANALYZE "${table}" — FAILED: ${msg}`);
@@ -135,8 +272,8 @@ interface AlertFirePruneResult {
 /**
  * Delete `alert_rule_fires` rows whose `lastFiredAt` is older than the
  * retention window (notifications #18). Bounds the table's rules×devices
- * growth. Uses execFileSync psql (no shell) like the VACUUM task; the
- * interval is a validated integer, so there is no injection surface.
+ * growth. Uses host psql first, then falls back to docker exec if available;
+ * the interval is a validated integer, so there is no injection surface.
  */
 function pruneAlertRuleFires(): AlertFirePruneResult {
   const databaseUrl = process.env.DATABASE_URL;
@@ -148,17 +285,13 @@ function pruneAlertRuleFires(): AlertFirePruneResult {
   const days = ALERT_RULE_FIRE_RETENTION_DAYS;
   log(AGENT, `Pruning alert_rule_fires older than ${days} days`);
   try {
-    const out = execFileSync(
-      'psql',
-      [
-        databaseUrl,
-        '-c',
-        `DELETE FROM alert_rule_fires WHERE "lastFiredAt" < NOW() - INTERVAL '${days} days';`,
-      ],
-      { timeout: VACUUM_TIMEOUT_MS, stdio: 'pipe', encoding: 'utf-8' },
+    const { output } = execPsql(
+      databaseUrl,
+      `DELETE FROM alert_rule_fires WHERE "lastFiredAt" < NOW() - INTERVAL '${days} days';`,
+      VACUUM_TIMEOUT_MS,
     );
     // psql prints the command tag "DELETE <n>" to stdout.
-    const match = out.match(/DELETE\s+(\d+)/);
+    const match = output.match(/DELETE\s+(\d+)/);
     const deleted = match ? parseInt(match[1], 10) : 0;
     log(AGENT, `  alert_rule_fires prune — OK (${deleted} deleted)`);
     return { deleted };
@@ -295,6 +428,7 @@ function pm2Flush(): boolean {
 /**
  * Run a database backup, compressing the dump with gzip.
  * If BACKUP_S3_BUCKET is set, the backup is created; otherwise skipped.
+ * Uses host pg_dump first, then falls back to docker exec if available.
  */
 function runBackup(): void {
   const bucket = process.env.BACKUP_S3_BUCKET;
@@ -322,17 +456,13 @@ function runBackup(): void {
   const tmpPathRaw = `/tmp/vizora-backup-${timestamp}.sql`;
 
   try {
-    // Two-step backup without shell interpolation to prevent command injection
-    // via DATABASE_URL containing shell metacharacters.
-    execFileSync('pg_dump', [databaseUrl, '-f', tmpPathRaw], {
-      timeout: 300_000, // 5 minutes
-      stdio: 'pipe',
-    });
+    // Two-step backup: pg_dump (with host/container fallback) then gzip
+    const pgDumpSource = execPgDump(databaseUrl, tmpPathRaw, 300_000);
     execFileSync('gzip', ['-f', tmpPathRaw], {
       timeout: 60_000,
       stdio: 'pipe',
     });
-    log(AGENT, `Backup created: ${filename}`);
+    log(AGENT, `Backup created: ${filename} (pg_dump source: ${pgDumpSource})`);
 
     // Upload to S3 if aws CLI is available
     const s3Dest = bucket.startsWith('s3://') ? bucket : `s3://${bucket}`;
