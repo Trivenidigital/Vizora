@@ -86,56 +86,111 @@ middleware/realtime shape would produce false results for web.
 
 ---
 
-## 2. The three views — A, B, C
+## 2. The three views — R, P, Z
 
-Per ruling constraint 4, the detector distinguishes **three views that are not
-interchangeable**:
+> **CORRECTED 2026-08-12 after the first live production cycle.** This section
+> previously described views A/B/C and rested on a mechanism claim that the
+> first real run disproved. Both the model and the claim are corrected below;
+> the superseded reasoning is preserved in §2.1 rather than deleted, because the
+> way it failed is the point.
+
+The detector distinguishes **three views that are not interchangeable**:
 
 | View | Name | Definition |
 |---|---|---|
-| **A** | process-start / PM2 state | the environment the running process was *launched* with, plus what PM2 holds and would re-inject |
-| **B** | persisted fresh-start config | what a process started from zero **now** would consume |
-| **C** | effective application config | what the application is **actually using**, after service-specific loading and defaults |
-
-**`/proc/<pid>/environ` is NOT view C.** It is the *immutable exec-time*
-environment — frozen at launch. dotenv mutates `process.env` **inside** the
-process after exec, so dotenv-supplied values never appear in `/proc` at all.
-That is precisely why `DATABASE_URL` was absent from `/proc` on a healthy service
-that was demonstrably using it.
-
-C is therefore **reconstructed** by applying the consuming application's own
-precedence rules — never read directly:
+| **R** | reconstructed effective runtime | what the application is **actually using** now |
+| **P** | PM2-managed restart | what `pm2 restart`/`reload` would reuse from PM2 metadata + config |
+| **Z** | canonical zero-state start | empty/minimal shell + ecosystem/config + dotenv, **without** relying on stale PM2 stored env |
 
 ```
-C  =  resolve( A.procEnviron , dotenv(.env) )     # exec env wins, dotenv fills under
-B  =  resolve( A.pm2Env ∪ ecosystem , dotenv(.env) )   # shell modelled EMPTY (§9.1)
+R  =  resolve( procEnviron ∪ pm2Env , dotenv(.env) )        # PM2 injects in-process
+P  =  resolve( pm2Env ∪ ecosystem.env_production , dotenv )  # PM2 metadata survives
+Z  =  resolve( ecosystem.env_production , dotenv )           # no PM2 stored env at all
 ```
 
-The primary drift signal is **B vs C** — *would it come back the same?* —
-alongside running B through the service's own validators — *would it come back
-at all?*
+**Keeping P and Z distinct is load-bearing.** If PM2's stored env is folded into
+the "fresh start" model, the detector can declare the system reproducible while
+the zero-state rebuild path is broken — recreating exactly the blind spot it
+exists to remove. A variable that lives *only* in PM2's stored env survives a
+`pm2 restart` (P matches R) and vanishes from a rebuild (Z does not). Nothing is
+called simply "fresh start".
 
-### Raw collection sources
+### `/proc` is an observation source, never runtime truth
 
-| Source | What it gives | How |
-|---|---|---|
-| `/proc/<pid>/environ` | A: exec-time env | NUL-separated; same-user or root |
-| `pm2 jlist` → `pm2_env` | A: what PM2 re-injects on restart | precedent: `health-guardian.ts:254` already runs `execSync('pm2 jlist')` |
-| `ecosystem.config.js` | B: declared env per service | §3 caveat on evaluation side effects |
-| `.env` via dotenv | fills under both B and C | the `dotenv` library — never bash |
+In PM2 **cluster mode** the exec environment carries almost nothing. Measured on
+prod:
 
-**The disagreement observed on 2026-08-11, on healthy middleware:**
+| service | exec_mode | `/proc` env keys | `NODE_ENV`/`DATABASE_URL`/`REDIS_URL`/`JWT_SECRET`/`PORT` |
+|---|---|---|---|
+| middleware | **cluster** | **25** | **all absent** |
+| realtime | fork | 74 | present |
+| web | fork | 72 | present |
+
+PM2 applies `pm2_env` onto `process.env` **inside the worker after exec**, which
+`/proc` cannot see — the same invisibility dotenv has. So **absence from `/proc`
+proves nothing about where a value came from.**
+
+### 2.1 Superseded claim — recorded, not deleted
+
+The original design read the 2026-08-11 observation as:
 
 ```
 pm2_env.DATABASE_URL   present, 152 chars, connection_limit=10, statement_timeout=30000
-/proc/<pid>/environ    DATABASE_URL ABSENT  (process got it from dotenv)
+/proc/<pid>/environ    DATABASE_URL ABSENT  ← "so the process got it from dotenv"
 .env                   present, 128 chars, connection_limit=30, NO statement_timeout
 ```
 
-So C (effective) resolved to the `.env` value — `connection_limit=30`, no
-`statement_timeout` — while B (fresh start) would have resolved to PM2's
-`connection_limit=10` value, because **process env wins over dotenv**. B ≠ C on a
-service reporting healthy. **A two-way comparison would have missed this.**
+and concluded that the running middleware was using the `.env` value. **That
+inference is unsupported.** In cluster mode *every* application variable is
+absent from `/proc`, so absence carries no information about ownership.
+
+What the runtime source of that historical `DATABASE_URL` actually was is
+**UNKNOWN** and now unknowable — the process has since restarted, and no
+behavioural discriminator between the 152-char and 128-char URLs was captured at
+the time. It is deliberately *not* re-attributed to PM2: replacing one
+unsupported inference with another would repeat the error.
+
+**The incident outcome stands independently of the mechanism claim.** Production
+demonstrably could not be recreated from its persisted configuration; that was
+established by the failed rebuild itself, not by this attribution. Only the
+explanation of *which layer supplied the running value* was wrong.
+
+This is a §9c post-hoc attribution failure, committed in the document arguing
+for §9c discipline: a mechanism was named as cause without verifying the data
+path that produced the outcome actually reached it.
+
+### The correction that caught it
+
+First live cycle reported `middleware NODE_ENV: effective=development`. Verified
+behaviourally before classifying: Swagger is gated on
+`process.env.NODE_ENV !== 'production'` (`main.ts:159`) and returns **404** on
+both public and loopback probes, so the running value is `production`. `/proc`
+has no `NODE_ENV` and `.env` says `development`, leaving PM2's in-process
+injection as the only possible source. The finding was a false positive produced
+by treating `/proc` as runtime truth.
+
+### Raw collection sources
+
+| Source | Feeds | How |
+|---|---|---|
+| `/proc/<pid>/environ` | R (supplementary) | NUL-separated; same-user or root. Degraded-but-usable when unreadable |
+| `pm2 jlist` → `pm2_env` | R, P | load-bearing — no view can be built without it |
+| `ecosystem.config.js` | P, Z | both `env_production` and the default `env` block |
+| `.env` via dotenv | R, P, Z (fills gaps) | the `dotenv` library — never bash |
+
+### Config shadowing — the primary reproducibility signal
+
+Because PM2's stored env feeds both R and P, those two rarely differ. The signal
+that actually encodes the hazard is **persisted `.env` disagreeing with R**: the
+running value comes from a higher-precedence layer, and any start that does not
+apply that layer uses the persisted value instead.
+
+The ecosystem default `env` block is deliberately **not** shadow-checked. It is
+the development block by construction on every PM2 app, so comparing it against
+a production runtime would fire on every service on every run — the alert
+fatigue this detector exists to avoid. Its real hazard, a production start that
+omits `--env production`, is a deployment-procedure concern (B2) and appears
+only as context on a finding that already fired on its own evidence.
 
 **No debug endpoint.** Nothing new is exposed over HTTP; all three sources are
 local reads.

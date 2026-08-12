@@ -98,6 +98,8 @@ interface EcosystemApp {
   cwd?: string;
   instances?: number;
   env_production?: Record<string, unknown>;
+  /** The default block — applied by a start WITHOUT `--env production`. */
+  env?: Record<string, unknown>;
 }
 
 /** Coerce a PM2/ecosystem env object to the string map the core compares. */
@@ -135,7 +137,13 @@ function readEcosystemApps(): { apps: EcosystemApp[]; error?: string } {
     const cfg = require(${JSON.stringify(ECOSYSTEM_PATH)});
     const apps = (cfg && cfg.apps) || [];
     process.stdout.write(JSON.stringify(apps.map(function (a) {
-      return { name: a.name, cwd: a.cwd, instances: a.instances, env_production: a.env_production || {} };
+      return {
+        name: a.name,
+        cwd: a.cwd,
+        instances: a.instances,
+        env_production: a.env_production || {},
+        env: a.env || {},
+      };
     })));
   `;
   try {
@@ -283,12 +291,18 @@ function collect(): Collection {
       instances,
       procEnviron,
       pm2Env: toEnvMap(primary?.pm2_env),
-      ecosystemEnv: toEnvMap(app?.env_production),
+      ecosystemEnvProduction: toEnvMap(app?.env_production),
+      ecosystemEnvDefault: toEnvMap(app?.env),
       dotenvVars,
     });
 
-    if (service === 'middleware' && procEnviron) {
-      databaseUrl = { ...(dotenvVars ?? {}), ...procEnviron }.DATABASE_URL;
+    if (service === 'middleware') {
+      // Same precedence as view R — PM2's in-process env wins over dotenv.
+      databaseUrl = {
+        ...(dotenvVars ?? {}),
+        ...(procEnviron ?? {}),
+        ...toEnvMap(primary?.pm2_env),
+      }.DATABASE_URL;
     }
   }
 

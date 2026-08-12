@@ -19,8 +19,9 @@ import {
   buildMaxConnectionsCandidates,
   compareSecretValues,
   computeConnectionBudget,
-  computeEffective,
-  computeFreshStart,
+  computeRestart,
+  computeRuntime,
+  computeZeroState,
   decomposePostgresUrl,
   decomposeRedisUrl,
   detectDrift,
@@ -87,49 +88,69 @@ function prodEnv(over: Partial<EnvMap> = {}): EnvMap {
 }
 
 /**
- * Middleware observation where every source agrees by default. Overrides let a
- * test perturb exactly one source, which is how each drift case is isolated.
+ * Fixtures mirror the real PM2 shape: PM2 stores the MERGED environment
+ * (ecosystem block layered over what it inherited), and applies it in-process.
+ * So `pm2Env` is a superset, not an independent source — perturbing it alone
+ * does not express drift. Drift is expressed by perturbing the PERSISTED
+ * sources, which is also the shape the 2026-08-11 incident actually had.
+ *
+ * Ecosystem blocks are transcribed from ecosystem.config.js: every app declares
+ * `env: { NODE_ENV: 'development', PORT }` and
+ * `env_production: { NODE_ENV: 'production', PORT }`.
  */
 function middlewareObs(over: Partial<ServiceObservation> = {}): ServiceObservation {
-  const env = prodEnv();
+  const dotenv = prodEnv();
+  const ecoProduction: EnvMap = { NODE_ENV: 'production', PORT: '3000' };
+  const ecoDefault: EnvMap = { NODE_ENV: 'development', PORT: '3000' };
+  const pm2 = { ...dotenv, ...ecoProduction };
   return {
     service: 'middleware',
     instances: 2,
-    procEnviron: { ...env },
-    pm2Env: { ...env },
-    ecosystemEnv: {},
-    dotenvVars: { ...env },
+    procEnviron: { ...pm2 },
+    pm2Env: { ...pm2 },
+    ecosystemEnvProduction: ecoProduction,
+    ecosystemEnvDefault: ecoDefault,
+    dotenvVars: dotenv,
     ...over,
   };
 }
 
 function realtimeObs(over: Partial<ServiceObservation> = {}): ServiceObservation {
-  const env = prodEnv({ REALTIME_PORT: '3002' });
-  delete env.MIDDLEWARE_PORT;
+  const dotenv = prodEnv({ REALTIME_PORT: '3002' });
+  delete dotenv.MIDDLEWARE_PORT;
+  const ecoProduction: EnvMap = { NODE_ENV: 'production', PORT: '3002' };
+  const ecoDefault: EnvMap = { NODE_ENV: 'development', PORT: '3002' };
+  const pm2 = { ...dotenv, ...ecoProduction };
   return {
     service: 'realtime',
     instances: 1,
-    procEnviron: { ...env },
-    pm2Env: { ...env },
-    ecosystemEnv: {},
-    dotenvVars: { ...env },
+    procEnviron: { ...pm2 },
+    pm2Env: { ...pm2 },
+    ecosystemEnvProduction: ecoProduction,
+    ecosystemEnvDefault: ecoDefault,
+    dotenvVars: dotenv,
     ...over,
   };
 }
 
-/** web: no .env in cwd at all (design §1) — dotenvVars is null, not empty. */
+/** web: no `.env` in cwd at all (design §1) — `dotenvVars` is null, not empty. */
 function webObs(over: Partial<ServiceObservation> = {}): ServiceObservation {
-  const env: EnvMap = {
+  const ecoProduction: EnvMap = {
     NODE_ENV: 'production',
     PORT: '3001',
+    NEXT_PUBLIC_GOOGLE_CLIENT_ID: 'gsi-client-id',
+    // Server-side proxy to middleware — localhost is CORRECT here.
     BACKEND_URL: 'http://localhost:3000',
   };
+  const ecoDefault: EnvMap = { NODE_ENV: 'development', PORT: '3001' };
+  const pm2 = { ...ecoProduction };
   return {
     service: 'web',
     instances: 1,
-    procEnviron: { ...env },
-    pm2Env: { ...env },
-    ecosystemEnv: { NEXT_PUBLIC_GOOGLE_CLIENT_ID: 'gsi-client-id' },
+    procEnviron: { ...pm2 },
+    pm2Env: { ...pm2 },
+    ecosystemEnvProduction: ecoProduction,
+    ecosystemEnvDefault: ecoDefault,
     dotenvVars: null,
     ...over,
   };
@@ -168,16 +189,15 @@ test('resolvePrecedence: null dotenv (web has no .env) is not an error', () => {
   assert.deepEqual(resolved, { A: 'x' });
 });
 
-test('computeEffective reconstructs C from exec env + dotenv, not /proc alone', () => {
-  // Case 18: /proc lacks DATABASE_URL; dotenv supplies it. C must contain it.
+test('computeRuntime reconstructs R from /proc + PM2 in-process env + dotenv', () => {
+  // /proc lacks DATABASE_URL; PM2 and dotenv both carry it. R must contain it.
   const obs = middlewareObs({
     procEnviron: (() => { const e = prodEnv(); delete e.DATABASE_URL; return e; })(),
   });
-  const effective = computeEffective(obs);
-  assert.equal(effective.DATABASE_URL, pgUrl(), 'C must be reconstructed, not read from /proc');
+  assert.equal(computeRuntime(obs).DATABASE_URL, pgUrl(), 'R must be reconstructed, not read from /proc');
 });
 
-test('computeFreshStart models the invoking shell as empty (§9.1)', () => {
+test('computeZeroState models the invoking shell as empty (§9.1)', () => {
   // JWT_SECRET reached the running process by operator shell inheritance only:
   // present in /proc, absent from PM2, ecosystem and .env.
   const env = prodEnv();
@@ -187,11 +207,29 @@ test('computeFreshStart models the invoking shell as empty (§9.1)', () => {
     pm2Env: { ...withoutJwt },
     dotenvVars: { ...withoutJwt },
   });
-  assert.equal(computeEffective(obs).JWT_SECRET, JWT_SECRET);
+  assert.equal(computeRuntime(obs).JWT_SECRET, JWT_SECRET);
   assert.equal(
-    computeFreshStart(obs).JWT_SECRET,
+    computeZeroState(obs).JWT_SECRET,
     undefined,
-    'a shell-inherited variable must be absent from B',
+    'a shell-inherited variable must be absent from Z',
+  );
+});
+
+test('P and Z are distinct: a PM2-only value survives restart but not a rebuild', () => {
+  // The blind spot the R/P/Z split exists to close. INTERNAL_API_SECRET lives
+  // ONLY in PM2 stored env — not in the ecosystem file, not in .env.
+  const withoutInternal = (() => { const e = prodEnv(); delete e.INTERNAL_API_SECRET; return e; })();
+  const obs = middlewareObs({
+    procEnviron: { ...withoutInternal },
+    pm2Env: { ...prodEnv() },
+    dotenvVars: { ...withoutInternal },
+  });
+  assert.equal(computeRuntime(obs).INTERNAL_API_SECRET, INTERNAL_SECRET, 'running fine today');
+  assert.equal(computeRestart(obs).INTERNAL_API_SECRET, INTERNAL_SECRET, 'pm2 restart reuses it');
+  assert.equal(
+    computeZeroState(obs).INTERNAL_API_SECRET,
+    undefined,
+    'a zero-state rebuild loses it — merging P and Z would hide exactly this',
   );
 });
 
@@ -418,7 +456,7 @@ test('case 1: all sources agree across all three services — no incident', () =
 
 test('case 2: DB password differs between B and C — CRITICAL', () => {
   const drifted = prodEnv({ DATABASE_URL: pgUrl('a-different-password') });
-  const findings = findingsFor([middlewareObs({ pm2Env: drifted, dotenvVars: drifted })]);
+  const findings = findingsFor([middlewareObs({ dotenvVars: drifted })]);
   const credential = findings.find(f => f.type === 'credential-drift');
   assert.ok(credential, `expected credential-drift, got ${types(findings)}`);
   assert.equal(credential.driftClass, 'CRITICAL');
@@ -426,7 +464,7 @@ test('case 2: DB password differs between B and C — CRITICAL', () => {
 
 test('case 3: Redis password present in C, absent in B — CRITICAL', () => {
   const noPw = prodEnv({ REDIS_URL: redisUrl(null) });
-  const findings = findingsFor([middlewareObs({ pm2Env: noPw, dotenvVars: noPw })]);
+  const findings = findingsFor([middlewareObs({ dotenvVars: noPw })]);
   const credential = findings.find(f => f.type === 'credential-drift' && f.targetId.includes('REDIS'));
   assert.ok(credential, `expected Redis credential-drift, got ${types(findings)}`);
   assert.equal(credential.driftClass, 'CRITICAL');
@@ -434,24 +472,24 @@ test('case 3: Redis password present in C, absent in B — CRITICAL', () => {
 
 test('case 4: API_BASE_URL absent from fresh start — CRITICAL', () => {
   const withoutApiBase = (() => { const e = prodEnv(); delete e.API_BASE_URL; return e; })();
-  const findings = findingsFor([middlewareObs({ pm2Env: withoutApiBase, dotenvVars: withoutApiBase })]);
-  const failure = findings.find(f => f.type === 'fresh-start-would-fail');
-  assert.ok(failure, `expected fresh-start-would-fail, got ${types(findings)}`);
+  const findings = findingsFor([middlewareObs({ dotenvVars: withoutApiBase })]);
+  const failure = findings.find(f => f.type === 'zero-state-would-fail');
+  assert.ok(failure, `expected zero-state-would-fail, got ${types(findings)}`);
   assert.equal(failure.driftClass, 'CRITICAL');
   assert.match(failure.message, /API_BASE_URL/);
 });
 
 test('case 5: MinIO defaults would be rejected by the fitness validator — CRITICAL', () => {
   const defaults = prodEnv({ MINIO_ACCESS_KEY: 'minioadmin', MINIO_SECRET_KEY: 'minioadmin' });
-  const findings = findingsFor([middlewareObs({ pm2Env: defaults, dotenvVars: defaults })]);
-  const failure = findings.find(f => f.type === 'fresh-start-would-fail');
-  assert.ok(failure, `expected fresh-start-would-fail, got ${types(findings)}`);
+  const findings = findingsFor([middlewareObs({ dotenvVars: defaults })]);
+  const failure = findings.find(f => f.type === 'zero-state-would-fail');
+  assert.ok(failure, `expected zero-state-would-fail, got ${types(findings)}`);
   assert.equal(failure.driftClass, 'CRITICAL');
 });
 
 test('case 6: localhost production URLs — HIGH', () => {
   const localhost = prodEnv({ CORS_ORIGIN: 'http://localhost:3001', APP_URL: 'http://localhost:3001' });
-  const findings = findingsFor([middlewareObs({ pm2Env: localhost, dotenvVars: localhost })]);
+  const findings = findingsFor([middlewareObs({ dotenvVars: localhost })]);
   const urlFindings = findings.filter(f => f.type === 'production-url-drift');
   assert.ok(urlFindings.length > 0, `expected production-url-drift, got ${types(findings)}`);
   assert.ok(urlFindings.every(f => f.driftClass === 'HIGH'));
@@ -477,7 +515,7 @@ test('case 7: connection budget over max_connections — CRITICAL', () => {
 
 test('case 8: statement_timeout present in C, absent in B — WARNING', () => {
   const noTimeout = prodEnv({ DATABASE_URL: pgUrl(PG_PW, 'connection_limit=10&pool_timeout=20') });
-  const findings = findingsFor([middlewareObs({ pm2Env: noTimeout, dotenvVars: noTimeout })]);
+  const findings = findingsFor([middlewareObs({ dotenvVars: noTimeout })]);
   const pool = findings.find(f => f.type === 'pool-parameter-drift');
   assert.ok(pool, `expected pool-parameter-drift, got ${types(findings)}`);
   assert.equal(pool.driftClass, 'WARNING');
@@ -493,27 +531,27 @@ test('case 16: max_connections unavailable reports UNKNOWN, never healthy', () =
 
 test('case 17: a shell-inherited required var is missing on fresh start — CRITICAL', () => {
   const withoutJwt = (() => { const e = prodEnv(); delete e.JWT_SECRET; return e; })();
-  const findings = findingsFor([middlewareObs({ pm2Env: withoutJwt, dotenvVars: withoutJwt })]);
-  const failure = findings.find(f => f.type === 'fresh-start-would-fail');
-  assert.ok(failure, `expected fresh-start-would-fail, got ${types(findings)}`);
+  const findings = findingsFor([middlewareObs({ dotenvVars: withoutJwt })]);
+  const failure = findings.find(f => f.type === 'zero-state-would-fail');
+  assert.ok(failure, `expected zero-state-would-fail, got ${types(findings)}`);
   assert.equal(failure.driftClass, 'CRITICAL');
   assert.match(failure.message, /JWT_SECRET/);
 });
 
-test('case 18: dotenv-supplied value absent from /proc is not a false missing', () => {
+test('a value absent from /proc but present in PM2+dotenv is not a false missing', () => {
   const procWithoutDb = (() => { const e = prodEnv(); delete e.DATABASE_URL; return e; })();
   const findings = findingsFor([middlewareObs({ procEnviron: procWithoutDb })]);
   assert.deepEqual(findings, [], `expected zero findings, got ${JSON.stringify(findings, null, 2)}`);
 });
 
-test('an unreadable /proc is reported, never treated as healthy (case 13)', () => {
+test('an unreadable /proc is reported as DEGRADED, and comparisons continue', () => {
+  // In cluster mode /proc legitimately carries no app config, so its absence
+  // must not block detection — PM2 stored env is the load-bearing source.
   const findings = findingsFor([middlewareObs({ procEnviron: null })]);
-  const unreadable = findings.find(f => f.type === 'observation-incomplete');
-  assert.ok(unreadable, `expected observation-incomplete, got ${types(findings)}`);
-  assert.ok(
-    !findings.some(f => f.type === 'credential-drift' || f.type === 'pool-parameter-drift'),
-    'must not emit comparison findings from a view it could not build',
-  );
+  const degraded = findings.find(f => f.type === 'observation-degraded');
+  assert.ok(degraded, `expected observation-degraded, got ${types(findings)}`);
+  assert.equal(degraded.driftClass, 'WARNING');
+  assert.ok(!findings.some(f => f.type === 'observation-incomplete'));
 });
 
 test('empty PM2 state is reported rather than read as "nothing configured"', () => {
@@ -524,13 +562,97 @@ test('empty PM2 state is reported rather than read as "nothing configured"', () 
   );
 });
 
+// ─── Cluster-mode regressions (first-cycle findings, 2026-08-12) ─────────────
+
+/**
+ * Prod's real cluster-mode shape: middleware's `/proc` carries 25 keys and none
+ * of the app's config, because PM2 applies its stored env inside the worker
+ * after exec. Modelling `/proc` as runtime truth produced a false
+ * `NODE_ENV: effective=development` finding on the first live cycle, disproved
+ * behaviourally (Swagger 404 on a gate reading `process.env.NODE_ENV`).
+ */
+function clusterModeMiddleware(over: Partial<ServiceObservation> = {}): ServiceObservation {
+  return middlewareObs({
+    // What cluster-mode /proc actually looks like: PM2 bookkeeping only.
+    procEnviron: { PM2_HOME: '/root/.pm2', HOME: '/root', PATH: '/usr/bin' },
+    ...over,
+  });
+}
+
+test('cluster mode: /proc missing NODE_ENV + PM2 production → runtime is production', () => {
+  const obs = clusterModeMiddleware();
+  assert.equal(
+    computeRuntime(obs).NODE_ENV,
+    'production',
+    'PM2 in-process env must win — /proc absence proves nothing in cluster mode',
+  );
+});
+
+test('cluster mode: no false runtime drift when PM2 and ecosystem agree', () => {
+  const findings = findingsFor([clusterModeMiddleware()]);
+  assert.ok(
+    !findings.some(f => f.type === 'reproducibility-drift' && f.targetId.endsWith('NODE_ENV')),
+    `the 2026-08-12 false positive must not recur, got ${JSON.stringify(findings, null, 2)}`,
+  );
+});
+
+test('PM2 production + persisted .env development → zero-state shadow hazard, CRITICAL', () => {
+  // Prod's actual state on 2026-08-12.
+  const obs = clusterModeMiddleware({
+    dotenvVars: prodEnv({ NODE_ENV: 'development' }),
+  });
+  const findings = findingsFor([obs]);
+  const shadow = findings.find(f => f.type === 'config-shadow' && f.targetId.endsWith('NODE_ENV'));
+
+  assert.ok(shadow, `expected config-shadow for NODE_ENV, got ${types(findings)}`);
+  assert.equal(shadow.driftClass, 'CRITICAL', 'NODE_ENV bypasses both production-only validators');
+  assert.match(shadow.message, /running as production/);
+  assert.match(shadow.message, /development/);
+  assert.match(shadow.message, /validators are gated/);
+});
+
+test('PM2 and persisted config agree → no shadow finding', () => {
+  const findings = findingsFor([clusterModeMiddleware()]);
+  assert.ok(
+    !findings.some(f => f.type === 'config-shadow'),
+    `no shadow expected when sources agree, got ${JSON.stringify(findings, null, 2)}`,
+  );
+});
+
+test('the ecosystem default env block alone never raises a shadow finding', () => {
+  // `env: { NODE_ENV: 'development' }` is the dev block on EVERY PM2 app.
+  // Flagging it would fire on every service on every run — permanent noise.
+  const obs = clusterModeMiddleware();
+  assert.equal(obs.ecosystemEnvDefault.NODE_ENV, 'development');
+  assert.ok(!findingsFor([obs]).some(f => f.type === 'config-shadow'));
+});
+
+test('/proc, PM2 and dotenv disagreeing resolves deterministically and is attributed', () => {
+  const obs = middlewareObs({
+    procEnviron: prodEnv({ APP_URL: 'https://from-proc.example' }),
+    pm2Env: prodEnv({ APP_URL: 'https://from-pm2.example' }),
+    dotenvVars: prodEnv({ APP_URL: 'https://from-dotenv.example' }),
+  });
+
+  // Deterministic precedence: PM2 in-process > /proc exec env > dotenv.
+  assert.equal(computeRuntime(obs).APP_URL, 'https://from-pm2.example');
+  assert.equal(computeZeroState(obs).APP_URL, 'https://from-dotenv.example');
+
+  const shadow = findingsFor([obs]).find(
+    f => f.type === 'config-shadow' && f.targetId.endsWith('APP_URL'),
+  );
+  assert.ok(shadow, 'a disagreement between runtime and persisted .env must be reported');
+  assert.match(shadow.message, /from-pm2\.example/, 'must name the running value');
+  assert.match(shadow.message, /from-dotenv\.example/, 'must name the persisted value');
+});
+
 // ─── Incident mapping + dedup (§7, case 12) ──────────────────────────────────
 
 test('budget is UNKNOWN when any service is unobservable, even with max_connections known', () => {
   // A sum over only the observable services is an UNDERCOUNT, and an undercount
   // can read as SAFE for a budget that is actually over.
   const findings = detectDrift(
-    [middlewareObs({ procEnviron: null }), realtimeObs()],
+    [middlewareObs({ pm2Env: {} }), realtimeObs()],
     { maxConnections: SAFE_MAX_CONNECTIONS },
   );
   assert.ok(
@@ -542,7 +664,7 @@ test('budget is UNKNOWN when any service is unobservable, even with max_connecti
 
 test('case 12: identical drift on two runs produces one stable incident id', () => {
   const drifted = prodEnv({ DATABASE_URL: pgUrl('other-password') });
-  const obs = () => middlewareObs({ pm2Env: drifted, dotenvVars: drifted });
+  const obs = () => middlewareObs({ dotenvVars: drifted });
 
   const first = findingsToIncidents(findingsFor([obs()]), '2026-08-12T10:00:00.000Z');
   const second = findingsToIncidents(findingsFor([obs()]), '2026-08-12T11:00:00.000Z');
@@ -563,7 +685,7 @@ test('drift classes map onto the existing ops Severity enum', () => {
 test('incidents never claim a remediation was applied', () => {
   const drifted = prodEnv({ DATABASE_URL: pgUrl('other-password') });
   const incidents = findingsToIncidents(
-    findingsFor([middlewareObs({ pm2Env: drifted, dotenvVars: drifted })]),
+    findingsFor([middlewareObs({ dotenvVars: drifted })]),
     '2026-08-12T10:00:00.000Z',
   );
   assert.ok(incidents.length > 0);
@@ -585,8 +707,8 @@ function allDriftFindings() {
   });
   return detectDrift(
     [
-      middlewareObs({ pm2Env: drifted, dotenvVars: drifted }),
-      realtimeObs({ procEnviron: null }),
+      middlewareObs({ dotenvVars: drifted }),
+      realtimeObs({ pm2Env: {} }),
       webObs(),
     ],
     { maxConnections: 50 },
