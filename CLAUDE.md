@@ -353,9 +353,11 @@ npx tsx scripts/ops/pm2-guard.ts app-reload --env production --dry-run   # prove
 npx tsx scripts/ops/pm2-guard.ts app-reload --env production
 ```
 
-The raw command below still works and is what the wrapper runs under the hood,
-but it reloads **all 18 apps** — on 2026-08-12 it started `ops-db-maintainer`
-(real VACUUM on prod) and re-registered a deliberately deleted cron entry:
+The raw ecosystem-wide command below still works, but the wrapper deliberately
+does **NOT** run it — the wrapper adds an exact `--only` selector first. Without
+that selector the command reloads **all 18 apps**: on 2026-08-12 it started
+`ops-db-maintainer` (real VACUUM on prod) and re-registered a deliberately
+deleted cron entry.
 
 ```bash
 pm2 reload ecosystem.config.js --env production   # never `pm2 restart all` / `reload all`
