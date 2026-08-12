@@ -300,19 +300,38 @@ export function buildMaintenanceIncidents(
   return incidents;
 }
 
-/** Counts for `AgentResult`. `issuesFixed` is 0 — this agent repairs nothing. */
+/**
+ * Counts for `AgentResult`. `issuesFixed` is 0 — this agent repairs nothing.
+ *
+ * ─── Exit-code rule ─────────────────────────────────────────────────────────
+ *
+ *   info-only incidents          → 0
+ *   any warning or critical      → 1
+ *   fatal agent failure          → 2  (set by the caller's catch block)
+ *
+ * `info` must NOT fail the process. `redis-cli` is not installed on the prod
+ * host and will not be, so `redis-unobservable` is a permanent info finding —
+ * treating it as process failure would make the agent exit non-zero every day
+ * forever, which is exactly the alert-fatigue pattern this whole workstream
+ * exists to remove. The finding is still recorded and still visible; it just
+ * stops masquerading as a failed run.
+ *
+ * Incident recording is deliberately unchanged: `issuesFound` still counts
+ * every incident regardless of severity.
+ */
 export function summarize(incidents: Incident[]): {
   issuesFound: number;
   issuesFixed: number;
   issuesEscalated: number;
   exitCode: number;
 } {
+  const actionable = incidents.filter(
+    i => i.severity === 'critical' || i.severity === 'warning',
+  );
   return {
     issuesFound: incidents.length,
     issuesFixed: 0,
     issuesEscalated: incidents.filter(i => i.severity === 'critical').length,
-    // Non-zero whenever anything went wrong — the previous implementation
-    // always exited 0, so even a total failure looked like success to PM2.
-    exitCode: incidents.length === 0 ? 0 : 1,
+    exitCode: actionable.length === 0 ? 0 : 1,
   };
 }
