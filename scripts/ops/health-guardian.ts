@@ -34,6 +34,7 @@ import {
   makeIncidentId,
 } from './lib/state.js';
 import { log, pingHeartbeat } from './lib/alerting.js';
+import { readEcosystemMemoryPolicy } from './lib/ecosystem.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -59,12 +60,26 @@ const TV_APK_URL = process.env.TV_APK_URL || 'https://vizora.cloud/downloads/viz
 const TV_PAGE_URL = process.env.TV_PAGE_URL || 'https://vizora.cloud/tv';
 const APK_CONTENT_TYPE = 'application/vnd.android.package-archive';
 
-/** Service definitions: name, health URL, PM2 process name, memory limit in bytes */
+/**
+ * Service definitions. `memoryLimitBytes` is DERIVED from `ecosystem.config.js`,
+ * never held here.
+ *
+ * This agent used to keep its own copy of each limit and reload any process
+ * above 85% of it. Those copies drifted: middleware's ecosystem limit was raised
+ * 512M → 640M specifically to stop restart churn, but the copy here stayed at
+ * 512M, so 85% remained 435MB against a process that idles at ~400MB and spikes
+ * to ~455MB. The churn never stopped, it just changed owner — six reloads on
+ * 2026-08-12 between 17:20 and 20:20.
+ *
+ * `null` means the limit could not be read. The memory check is then SKIPPED for
+ * that service: reloading a healthy production process against a guessed
+ * threshold is precisely the defect being removed here.
+ */
 interface ServiceDef {
   name: string;
   healthUrl: string;
   pm2Name: string;
-  memoryLimitBytes: number;
+  memoryLimitBytes: number | null;
 }
 
 function getServiceDefs(): ServiceDef[] {
@@ -72,24 +87,29 @@ function getServiceDefs(): ServiceDef[] {
   const realtimeUrl = process.env.REALTIME_URL || 'http://localhost:3002';
   const webUrl = process.env.WEB_URL || 'http://localhost:3001';
 
+  const policy = readEcosystemMemoryPolicy();
+  if (policy.error) {
+    log(AGENT, `WARNING: ecosystem memory policy unreadable (${policy.error}) — memory checks will be skipped`);
+  }
+
   return [
     {
       name: 'middleware',
       healthUrl: `${middlewareUrl}/api/v1/health/ready`,
       pm2Name: 'vizora-middleware',
-      memoryLimitBytes: 512 * 1024 * 1024, // 512 MB
+      memoryLimitBytes: policy.limits['vizora-middleware'] ?? null,
     },
     {
       name: 'realtime',
       healthUrl: `${realtimeUrl}/api/health`,
       pm2Name: 'vizora-realtime',
-      memoryLimitBytes: 512 * 1024 * 1024, // 512 MB
+      memoryLimitBytes: policy.limits['vizora-realtime'] ?? null,
     },
     {
       name: 'web',
       healthUrl: `${webUrl}/`,
       pm2Name: 'vizora-web',
-      memoryLimitBytes: 1024 * 1024 * 1024, // 1 GB
+      memoryLimitBytes: policy.limits['vizora-web'] ?? null,
     },
   ];
 }
@@ -445,8 +465,12 @@ async function main(): Promise<void> {
       const status = proc.pm2_env?.status;
       const memoryBytes = proc.monit?.memory ?? 0;
       const memoryMB = Math.round(memoryBytes / (1024 * 1024));
-      const memoryLimitMB = Math.round(svc.memoryLimitBytes / (1024 * 1024));
-      const memoryPct = svc.memoryLimitBytes > 0 ? (memoryBytes / svc.memoryLimitBytes) * 100 : 0;
+      // A null limit means the canonical policy could not be read. Percent stays
+      // 0 so the >85% branch cannot fire on an unknown threshold.
+      const memoryLimitMB = svc.memoryLimitBytes ? Math.round(svc.memoryLimitBytes / (1024 * 1024)) : 0;
+      const memoryPct = svc.memoryLimitBytes && svc.memoryLimitBytes > 0
+        ? (memoryBytes / svc.memoryLimitBytes) * 100
+        : 0;
       const procLabel = `${svc.pm2Name}:${proc.pm_id}`;
       const pm2ErroredIncidentId = makeIncidentId(AGENT, 'pm2-errored', procLabel);
       const existingPm2ErroredIncident = priorState.incidents.find(
