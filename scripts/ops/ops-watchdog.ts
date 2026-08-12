@@ -51,6 +51,11 @@ type StaleAgent = { agent: string; minsSinceRun: number; slaMinutes: number };
  * content-lifecycle runs every 15 min → 45 min SLA
  * schedule-doctor   runs every 15 min → 45 min SLA
  * ops-reporter      runs every 30 min → 90 min SLA
+ * config-drift-detector runs hourly → 180 min SLA
+ *
+ * config-drift-detector is watched here so the watchdog is itself watched —
+ * it is the agent that tells us production can still be recreated from its
+ * persisted config, so it going silent must not be silent.
  */
 const SLA_MINUTES_BY_AGENT: Record<string, number> = {
   'health-guardian':   15,
@@ -58,6 +63,7 @@ const SLA_MINUTES_BY_AGENT: Record<string, number> = {
   'content-lifecycle': 45,
   'schedule-doctor':   45,
   'ops-reporter':      90,
+  'config-drift-detector': 180,
 };
 
 function makeAgentSilentIncident(staleAgent: StaleAgent, detected: string): Incident {

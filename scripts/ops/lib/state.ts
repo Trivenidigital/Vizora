@@ -38,6 +38,7 @@ import { log } from './alerting.js';
 import type {
   OpsState,
   AgentResult,
+  Incident,
   RemediationAction,
   SystemStatus,
 } from './types.js';

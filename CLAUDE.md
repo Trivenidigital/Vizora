@@ -258,6 +258,15 @@ TV_DOWNLOAD_MONITOR_ENABLED  # 'true' makes health-guardian probe /tv + /downloa
                         # Default off — the URLs 404 until an approved APK is published; enable it
                         # in the SAME change that publishes the first APK, never before.
 TV_APK_URL, TV_PAGE_URL # Optional overrides for the two probed URLs (default the vizora.cloud ones)
+CONFIG_DRIFT_DETECTOR_ENABLED  # 'true' enables the B1 config-drift detector (ops, hourly).
+                        # READ-ONLY: compares each service's effective config against what a
+                        # fresh process would consume, and runs the services' own boot
+                        # validators against the fresh-start config. Never repairs, never
+                        # restarts, never writes a config file. Secrets are compared in memory
+                        # and only MATCH/DRIFT is emitted — no fingerprint ever reaches logs,
+                        # alerts or ops-state.json. Needs /proc read access for the service
+                        # PIDs plus `pm2 jlist`. Default off.
+                        # Design: docs/plans/2026-08-12-config-drift-detection-design.md
 ```
 
 > **`SMTP_PASS` / `SMTP_FROM` are not optional aliases.** `scripts/ops/lib/alerting.ts`
@@ -336,7 +345,11 @@ Available at `http://localhost:3000/api/v1/docs` in development mode only.
 - **Middleware**: **3350 / 3350 tests pass** across **167 / 167 suites**, 0 fail (verified 2026-08-03).
 - **Realtime**: **212 / 212 tests pass** across **10 / 10 suites**. 10 spec files. The historical Prisma-generate-in-test-env issue NO LONGER REPRODUCES.
 - **Web**: **1167 / 1167 tests pass** across **113 / 113 suites**, 0 skipped (verified 2026-08-03).
-- **Ops scripts**: **74 / 74 tests pass** via `pnpm test:ops` (node:test + tsx).
+- **Ops scripts**: **154 / 154 tests pass** via `pnpm test:ops` (node:test + tsx) — verified 2026-08-12.
+  Note `pnpm test:ops` runs under tsx, which strips types without checking them, and CI's
+  `typecheck` job covers only `display` while `lint` covers only `middleware/src` + `realtime/src`.
+  **Nothing type-checks `scripts/`** — a type error there reaches main silently (one had:
+  `lib/state.ts` used `Incident` without importing it). Run `tsc --noEmit` over touched ops files by hand.
 - **Aggregate**: 4517+ unit/integration tests passing, **ZERO failures**.
 - **TypeScript**: middleware `tsc --noEmit` exit 0; realtime + web pass via ts-jest (no separate type-check needed).
 - **Playwright (E2E)**: 24 spec files in `e2e-tests/`. Post-2026-05-09 fix (mass `/api/` → `/api/v1/` + h1 copy regex updates), estimated >90% pass rate. ~26 remaining failures concentrated in 9 specs (heaviest: 16-billing); see `docs/plans/2026-05-09-playwright-results.md`. Critical-path flows verified.
@@ -379,7 +392,7 @@ Automated deployment readiness checker. Runs 30 validation rules across content,
 
 ## Autonomous Operations System
 
-7 PM2 cron-managed agents providing 24/7 monitoring, auto-remediation, alerting, and a dead-man triad.
+8 PM2 cron-managed agents providing 24/7 monitoring, auto-remediation, alerting, and a dead-man triad.
 
 > **Keep this table aligned with `ecosystem.config.js`** when adding/removing PM2 entries under the `ops-*` namespace.
 
@@ -394,6 +407,7 @@ Automated deployment readiness checker. Runs 30 validation rules across content,
 | ops-reporter | Every 30min | Aggregate status, Slack/email alerts, dashboard update |
 | ops-watchdog | Every 15min | Detects when other ops agents stop firing past per-agent SLA (3× cron interval). Slack alert on stale. Internal dead-man — catches what `HEALTHCHECKS_HEALTH_GUARDIAN_URL` can't (one-agent-stuck vs whole-VPS-down). |
 | db-maintainer | Daily 3am | PostgreSQL vacuum, Redis cleanup, log rotation |
+| config-drift-detector | Hourly | **Read-only.** Detects when a *healthy* service can no longer be recreated from its persisted config. Compares effective config vs what a fresh process would consume, and runs each service's own boot validators against the fresh-start config. Never repairs (`issuesFixed` is always 0), never restarts, never writes a config file. Gated by `CONFIG_DRIFT_DETECTOR_ENABLED`, default off |
 
 **State:** `logs/ops-state.json` — shared state file with incidents and remediation audit trail. Read/write through `scripts/ops/lib/state.ts` (file-locked: `readOpsState` acquires, `writeOpsState` releases — every reader MUST pair with a writer).
 

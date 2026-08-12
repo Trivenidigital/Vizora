@@ -356,6 +356,38 @@ module.exports = {
       out_file: './logs/ops-db-maintainer-out.log',
       merge_logs: true,
     },
+    {
+      // B1 — detects when a HEALTHY service can no longer be recreated from its
+      // persisted configuration. Read-only: never repairs, never restarts a
+      // service, never writes a configuration file.
+      //
+      // Gated OFF by default (CONFIG_DRIFT_DETECTOR_ENABLED). Enable
+      // deliberately after reviewing the first runs — see
+      // docs/plans/2026-08-12-config-drift-detection-design.md.
+      name: 'ops-config-drift-detector',
+      script: 'npx',
+      args: 'tsx scripts/ops/config-drift-detector.ts',
+      instances: 1,
+      exec_mode: 'fork',
+      cron_restart: '0 * * * *', // Hourly — drift is slow-moving and the check is cheap
+      autorestart: false, // Don't restart on exit — cron handles scheduling
+      watch: false,
+      max_memory_restart: '128M',
+      env: {
+        NODE_ENV: 'development',
+        VALIDATOR_BASE_URL: 'http://localhost:3000',
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        VALIDATOR_BASE_URL: 'http://localhost:3000',
+      },
+      // Logging
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      max_size: '10M',
+      error_file: './logs/ops-config-drift-detector-error.log',
+      out_file: './logs/ops-config-drift-detector-out.log',
+      merge_logs: true,
+    },
     // -------- Customer-facing agents (D-agents) --------
     // Dry-run by default. Flip LIFECYCLE_LIVE=true to actually send nudges.
     {
