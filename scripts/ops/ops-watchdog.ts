@@ -64,6 +64,11 @@ const SLA_MINUTES_BY_AGENT: Record<string, number> = {
   'schedule-doctor':   45,
   'ops-reporter':      90,
   'config-drift-detector': 180,
+  // Daily at 03:00 → 3× interval = 72h. Lax by design (it is the documented
+  // 3×-interval convention), but it is coverage where there was none: on
+  // 2026-08-12 db-maintainer was found to have been failing every VACUUM for
+  // months with nothing watching whether it ran at all.
+  'db-maintainer': 4320,
 };
 
 function makeAgentSilentIncident(staleAgent: StaleAgent, detected: string): Incident {

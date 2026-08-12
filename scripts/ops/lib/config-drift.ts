@@ -48,6 +48,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { parse as parseDotenv } from 'dotenv';
 
 import { validateEnv } from '../../../middleware/src/modules/config/env.validation.js';
+import { decomposePostgresUrl, decomposeRedisUrl } from './pg-url.js';
 import type { Incident, Severity } from './types.js';
 import { makeIncidentId } from './state.js';
 
@@ -114,22 +115,6 @@ export interface ConnectionBudget {
   perService: Record<string, number | null>;
 }
 
-export interface PostgresParts {
-  scheme: string;
-  user?: string;
-  password?: string;
-  host: string;
-  port: string;
-  database: string;
-  params: Record<string, string>;
-}
-
-export interface RedisParts {
-  scheme: string;
-  password?: string;
-  host: string;
-  port: string;
-}
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -316,41 +301,13 @@ export function computeZeroStateDefaultFlag(obs: ServiceObservation): EnvMap {
  * be treated separately from everything else — a whole-URL comparison would
  * report "credentials drifted" for a pool-parameter change, which is the wrong
  * severity and the wrong remediation.
+ *
+ * Implementation lives in `pg-url.ts` so `db-maintainer` can share it without
+ * pulling this module's Zod/middleware dependency chain. Re-exported so this
+ * module's public surface is unchanged.
  */
-export function decomposePostgresUrl(url: string | undefined): PostgresParts | null {
-  if (!url) return null;
-  try {
-    const u = new URL(url);
-    const params: Record<string, string> = {};
-    u.searchParams.forEach((v, k) => { params[k] = v; });
-    return {
-      scheme: u.protocol.replace(':', ''),
-      user: u.username || undefined,
-      password: u.password || undefined,
-      host: u.hostname,
-      port: u.port,
-      database: u.pathname.replace(/^\//, ''),
-      params,
-    };
-  } catch {
-    return null;
-  }
-}
-
-export function decomposeRedisUrl(url: string | undefined): RedisParts | null {
-  if (!url) return null;
-  try {
-    const u = new URL(url);
-    return {
-      scheme: u.protocol.replace(':', ''),
-      password: u.password || undefined,
-      host: u.hostname,
-      port: u.port,
-    };
-  } catch {
-    return null;
-  }
-}
+export { decomposePostgresUrl, decomposeRedisUrl } from './pg-url.js';
+export type { PostgresParts, RedisParts } from './pg-url.js';
 
 /**
  * MinIO's EFFECTIVE credential. `middleware/src/main.ts:223` reads
