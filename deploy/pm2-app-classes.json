@@ -1,0 +1,50 @@
+{
+  "$comment": [
+    "AUTHORITATIVE operation class for every PM2 app in ecosystem.config.js.",
+    "",
+    "Used by scripts/ops/pm2-guard.ts to decide what a given operation is allowed",
+    "to touch. Classification is DECLARED here, never inferred from name prefixes:",
+    "'ops-*' and 'hermes-*' are conventions, and a convention that controls a",
+    "production mutation is one rename away from being wrong.",
+    "",
+    "Two tests keep this honest (scripts/ops/lib/pm2-guard.test.ts):",
+    "  1. exact coverage — every ecosystem app appears here, and nothing extra.",
+    "     Adding an app to ecosystem.config.js without classifying it FAILS CI,",
+    "     and the guard refuses to operate on an unclassified app.",
+    "  2. structural consistency — a declared 'app-service' must NOT have",
+    "     cron_restart, and every '*-cron' class MUST have it. That catches a",
+    "     mislabelled entry, e.g. db-maintainer declared as app-service.",
+    "",
+    "Classes:",
+    "  app-service       long-running HTTP/WS service; the only class an",
+    "                    application deploy may reload",
+    "  ops-cron          scripts/ops/* autonomous operations agents",
+    "  agent-cron        scripts/agents/* business agents",
+    "  hermes-cron       Hermes runtime skills + poller",
+    "  maintenance-cron  scheduled data/monitoring jobs"
+  ],
+  "classes": {
+    "vizora-middleware": "app-service",
+    "vizora-realtime": "app-service",
+    "vizora-web": "app-service",
+
+    "ops-health-guardian": "ops-cron",
+    "ops-content-lifecycle": "ops-cron",
+    "ops-fleet-manager": "ops-cron",
+    "ops-schedule-doctor": "ops-cron",
+    "ops-reporter": "ops-cron",
+    "ops-watchdog": "ops-cron",
+    "ops-db-maintainer": "ops-cron",
+    "ops-config-drift-detector": "ops-cron",
+
+    "agent-customer-lifecycle": "agent-cron",
+    "agent-support-triage": "agent-cron",
+
+    "hermes-vizora-customer-lifecycle": "hermes-cron",
+    "hermes-vizora-support-triage": "hermes-cron",
+    "hermes-insights-poller": "hermes-cron",
+
+    "cleanup-impressions": "maintenance-cron",
+    "vizora-validator": "maintenance-cron"
+  }
+}

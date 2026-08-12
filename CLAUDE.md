@@ -342,7 +342,22 @@ Customers install it by sideload from two permanent URLs — `https://vizora.clo
 
 PM2 via `ecosystem.config.js`: middleware runs 2 instances in cluster mode, realtime runs single instance (WebSocket state consistency), web runs single instance. All have memory limits, exponential backoff restart, and graceful shutdown.
 
-**The canonical production command ALWAYS passes `--env production`:**
+**Use the guarded wrapper for application deploys** — it resolves and prints the
+exact target set and the exact command, refuses anything outside the
+`app-service` class, and mutates via the ecosystem file with an exact `--only`
+selector — so `env_production` is genuinely applied and cron entries that merely
+exist in the file cannot be started:
+
+```bash
+npx tsx scripts/ops/pm2-guard.ts app-reload --env production --dry-run   # prove first
+npx tsx scripts/ops/pm2-guard.ts app-reload --env production
+```
+
+The raw ecosystem-wide command below still works, but the wrapper deliberately
+does **NOT** run it — the wrapper adds an exact `--only` selector first. Without
+that selector the command reloads **all 18 apps**: on 2026-08-12 it started
+`ops-db-maintainer` (real VACUUM on prod) and re-registered a deliberately
+deleted cron entry.
 
 ```bash
 pm2 reload ecosystem.config.js --env production   # never `pm2 restart all` / `reload all`
