@@ -1,6 +1,23 @@
 # B1 — Persisted-config / runtime drift detection (design)
 
-**Status: investigation + design. No code written, nothing deployed.**
+**Status: APPROVED FOR IMPLEMENTATION 2026-08-12, with six constraints.**
+
+## 0. Ruling — binding constraints
+
+The design was approved with three corrections and two decisions. All are now
+folded into the sections below; recorded here so the constraints are not lost.
+
+| # | Constraint | Where applied |
+|---|---|---|
+| 1 | Model canonical fresh-start shell env as **empty/minimal** | §3, §9.1 |
+| 2 | Query `SHOW max_connections` **read-only at runtime**; never declare the budget healthy when unavailable | §7, §9.6 |
+| 3 | Compare secrets **in memory**, emit only `MATCH`/`DRIFT` — **no fingerprints in any output** | §4 |
+| 4 | Implement the **verified service-specific precedence model**; `/proc` is *not* effective runtime truth | §2 |
+| 5 | **Exclude `NEXT_PUBLIC_*` intent checking from v1** until B2 establishes an authoritative build-input source | §5 |
+| 6 | No auto-repair; one focused PR; tests first; no deployment until review | §6, §8 |
+
+The `JwtModule` module-definition-order finding is **out of scope** and tracked
+separately in `docs/plans/2026-08-12-realtime-jwt-config-order-finding.md`.
 
 Scope is set by `2026-08-11-config-reproducibility-proposals.md` §4. Goal: detect
 when a **currently healthy** service can no longer be recreated from its persisted
@@ -69,17 +86,45 @@ middleware/realtime shape would produce false results for web.
 
 ---
 
-## 2. Runtime observation source
+## 2. The three views — A, B, C
 
-Three sources exist and **they disagree** — that disagreement is itself the signal.
+Per ruling constraint 4, the detector distinguishes **three views that are not
+interchangeable**:
 
-| Source | What it is | How |
+| View | Name | Definition |
 |---|---|---|
-| `/proc/<pid>/environ` | what the process **actually holds** | NUL-separated; requires same-user or root |
-| `pm2 jlist` → `pm2_env` | what PM2 **would inject on restart** | precedent: `health-guardian.ts:254` already runs `execSync('pm2 jlist')` |
-| `.env` via dotenv | what dotenv **would supply** for keys not already set | parse with the `dotenv` library |
+| **A** | process-start / PM2 state | the environment the running process was *launched* with, plus what PM2 holds and would re-inject |
+| **B** | persisted fresh-start config | what a process started from zero **now** would consume |
+| **C** | effective application config | what the application is **actually using**, after service-specific loading and defaults |
 
-**The three-way disagreement observed on 2026-08-11, on healthy middleware:**
+**`/proc/<pid>/environ` is NOT view C.** It is the *immutable exec-time*
+environment — frozen at launch. dotenv mutates `process.env` **inside** the
+process after exec, so dotenv-supplied values never appear in `/proc` at all.
+That is precisely why `DATABASE_URL` was absent from `/proc` on a healthy service
+that was demonstrably using it.
+
+C is therefore **reconstructed** by applying the consuming application's own
+precedence rules — never read directly:
+
+```
+C  =  resolve( A.procEnviron , dotenv(.env) )     # exec env wins, dotenv fills under
+B  =  resolve( A.pm2Env ∪ ecosystem , dotenv(.env) )   # shell modelled EMPTY (§9.1)
+```
+
+The primary drift signal is **B vs C** — *would it come back the same?* —
+alongside running B through the service's own validators — *would it come back
+at all?*
+
+### Raw collection sources
+
+| Source | What it gives | How |
+|---|---|---|
+| `/proc/<pid>/environ` | A: exec-time env | NUL-separated; same-user or root |
+| `pm2 jlist` → `pm2_env` | A: what PM2 re-injects on restart | precedent: `health-guardian.ts:254` already runs `execSync('pm2 jlist')` |
+| `ecosystem.config.js` | B: declared env per service | §3 caveat on evaluation side effects |
+| `.env` via dotenv | fills under both B and C | the `dotenv` library — never bash |
+
+**The disagreement observed on 2026-08-11, on healthy middleware:**
 
 ```
 pm2_env.DATABASE_URL   present, 152 chars, connection_limit=10, statement_timeout=30000
@@ -87,9 +132,10 @@ pm2_env.DATABASE_URL   present, 152 chars, connection_limit=10, statement_timeou
 .env                   present, 128 chars, connection_limit=30, NO statement_timeout
 ```
 
-So the running process used the `.env` value, PM2 would have injected a *different*
-one on restart, and neither matched the other. **A two-way comparison would have
-missed this.** The detector must be three-way.
+So C (effective) resolved to the `.env` value — `connection_limit=30`, no
+`statement_timeout` — while B (fresh start) would have resolved to PM2's
+`connection_limit=10` value, because **process env wins over dotenv**. B ≠ C on a
+service reporting healthy. **A two-way comparison would have missed this.**
 
 **No debug endpoint.** Nothing new is exposed over HTTP; all three sources are
 local reads.
@@ -159,43 +205,75 @@ is the wrong severity and the wrong remediation.
 either variable, so comparing `MINIO_ACCESS_KEY` alone can report a false match or
 a false drift. The comparator must model the fallback, not the variable name.
 
-### Fingerprint threat model
+### Secret handling — no fingerprints at all
 
-A plain unsalted `SHA-256` fingerprint turns this watchdog into an **offline
-password-verification oracle**. Anyone who reads `ops-state.json`, a Slack alert,
-or a log line can test guesses at zero cost. For low-entropy secrets this is not
-theoretical: `sha256("minioadmin")` is a published constant, so a single alert
-would confirm the deployment still uses defaults.
-
-**Proposal — per-run ephemeral HMAC key.**
+**Ruling constraint 3.** Secrets are compared **in memory** and immediately
+discarded. The only thing that ever leaves the comparison is a state token:
 
 ```
-key = crypto.randomBytes(32)      // generated per execution, never persisted
-fp  = HMAC-SHA256(key, value)     // truncated to 12 hex chars for display
+DATABASE_URL credential component : MATCH | DRIFT | BOTH_ABSENT | ONE_ABSENT
+REDIS credential component        : MATCH | DRIFT | BOTH_ABSENT | ONE_ABSENT
+MINIO effective credential        : MATCH | DRIFT | BOTH_ABSENT | ONE_ABSENT
 ```
 
-Rationale: the detector only ever compares fingerprints **within a single run**
-(running vs PM2-stored vs fresh-start). Cross-run stability is not required. An
-ephemeral key gives exactly the property needed — equality comparison inside the
-run — while making every emitted fingerprint **meaningless to anyone who later
-reads it**, including us. There is no key to manage, rotate, or leak.
+No hash, no HMAC, no truncated digest, no length, no derived token of any kind
+appears in an incident, log line, alert body, or `ops-state.json`.
 
-Rejected alternatives:
+**Why the earlier ephemeral-HMAC proposal was dropped.** It was a real
+improvement over unsalted SHA-256 — which would have made this watchdog an
+offline password-verification oracle, since `sha256("minioadmin")` is a published
+constant and one alert would have confirmed defaults were still in use. But the
+reasoning applies one step further than the draft took it: the detector compares
+two in-memory strings **inside a single run**, so it never needs an opaque token
+at all. Needing a test that proves "fingerprints differ across runs" was the tell
+— it meant fingerprints had become an observable output when nothing required
+them to be.
 
-- *Unsalted hash* — offline oracle, as above.
-- *Persistent on-box HMAC key* (e.g. `/etc/vizora/drift.key`, 0600 root) — works,
-  but introduces key management and a file whose compromise re-enables the oracle
-  for all historical alerts. Only worth it if cross-run fingerprint comparison is
-  ever needed; it is not.
-- *Exact length* — leaks meaningfully for short secrets. If length is reported at
-  all, bucket it (`<16` / `16–31` / `32+`).
-
-Presence (`set` / `unset`) is safe and is often the whole story — the Redis
+Equality is therefore a direct in-memory comparison, length-safe and
+timing-safe, with the operands dropped immediately afterward. Presence
+(`set`/`unset`) remains safe to report and is often the whole story — the Redis
 password was *absent*, not wrong.
+
+If some future comparison genuinely requires opaque tokens, the ephemeral-key
+HMAC remains the right primitive — but it stays **internal**, never emitted.
+Rejected for the record: unsalted hashes (offline oracle), a persistent on-box
+key (key management plus a file whose compromise retro-enables the oracle across
+all historical alerts), and exact length (leaks meaningfully for short secrets).
 
 ---
 
-## 5. Build-time-only values
+## 5. Build-time-only values — EXCLUDED FROM v1
+
+> **Ruling constraint 5 — `NEXT_PUBLIC_*` intent checking is NOT in B1 v1.**
+>
+> The reason is explicit, not a deferral of convenience: the investigation proved
+> that `.env` is *not* the intended source for these values, and that grepping the
+> bundle by string is ambiguous. There is currently **no authoritative record of
+> what the web build was intentionally produced with**. Shipping this dimension
+> now would mean inventing that source — and the only two options were a
+> permanently noisy warning or a hand-configured expectation that drifts and
+> recreates the exact problem this detector exists to catch.
+>
+> **B2 (canonical deployment procedure) establishes the authoritative build-input
+> record.** Once a build manifest states "this web build was produced with X/Y",
+> B1 compares the deployed build against that deterministic record instead of
+> reverse-engineering minified JavaScript.
+>
+> v1 scope, stated positively:
+>
+> ```text
+> runtime/fresh-start drift      INCLUDED
+> DB / Redis / MinIO             INCLUDED
+> production URLs / CORS         INCLUDED
+> pool parameters / budget       INCLUDED
+> NEXT_PUBLIC build-time intent  EXCLUDED — awaiting B2 build manifest
+> ```
+>
+> The detector reports this exclusion explicitly on every run rather than staying
+> silent about a dimension it does not cover. Silence would read as "checked and
+> fine".
+
+The evidence below is retained because B2 needs it.
 
 `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_SOCKET_URL` are compiled into `.next` and
 **cannot be observed from a running process's environment**. They were localhost
@@ -291,6 +369,22 @@ failure observable via `ops-watchdog`.
 
 **No class auto-repairs.** Alert only.
 
+### Mapping onto the existing ops `Severity` enum
+
+`lib/types.ts` defines `Severity = 'critical' | 'warning' | 'info'` — there is no
+`high`. Rather than widen a shared enum every other agent depends on, the drift
+class lives in the incident **`type`** and maps onto the framework's three levels:
+
+| Drift class | ops `severity` | `determineSystemStatus` effect |
+|---|---|---|
+| CRITICAL | `critical` | → `CRITICAL` |
+| HIGH | `warning` | → `DEGRADED` |
+| WARNING | `info` | no status change; recorded + on dashboard |
+
+This is a deliberate 1:1 mapping that preserves ordering. Pool/tuning drift
+landing at `info` is correct: it is recorded and visible without paging anyone,
+and `sendSlackAlert` only enumerates `critical` and `warning`.
+
 The connection-budget check deserves its CRITICAL rating on evidence: computed
 `2 × 30 + 30 = 90` against `max_connections = 50` would have taken the API down
 harder than the outage that actually occurred.
@@ -312,16 +406,16 @@ and `.env` text.
 | 6 | `CORS_ORIGIN`/`APP_URL` contain `localhost` under `NODE_ENV=production` | HIGH |
 | 7 | `2 × connection_limit=30 + 30 > max_connections=50` | CRITICAL |
 | 8 | `statement_timeout` present in running, absent in fresh-start | WARNING |
-| 9 | `.next/static/chunks` origin ≠ **intended build-time** `NEXT_PUBLIC_API_URL` | WARNING |
-| 9a | bundle matches intended origin, while `.env` still says `localhost` | **healthy — no incident** (regression against the false-positive-on-every-deploy bug) |
-| 9b | expected origin absent from the bundle entirely | `cannot determine`, never "matches" |
-| 9c | a hardcoded doc origin (`api.vizora.io`) present alongside the real one | not mistaken for the env-substituted value |
+| 9 | ~~build-time `NEXT_PUBLIC_*`~~ | **deferred to B2** — v1 asserts the exclusion is *reported*, not silent |
+| 16 | `max_connections` query fails | budget reported `UNKNOWN`, **never healthy** |
+| 17 | B is missing a var that C has only via operator shell inheritance | CRITICAL (empty-shell model, §9.1) |
+| 18 | `/proc` lacks a var that dotenv supplies | C reconstructs it; **no** false "missing" incident |
 | 10 | **no raw secret appears in any incident, log line, alert body, or `ops-state.json`** | asserted explicitly |
 | 11 | **the agent writes no configuration file** — `.env`, ecosystem and PM2 untouched | asserted explicitly |
 | 12 | two consecutive runs with identical drift | one incident, deduped via `makeIncidentId` |
 | 13 | `pm2 jlist` unavailable/times out | degrades to a reported failure, does not crash or half-report |
 | 14 | `.env` line unquoted with `&` | parsed correctly (regression against the bash-sourcing trap) |
-| 15 | ephemeral-key fingerprints differ across two runs for the same value | confirms no persistent oracle |
+| 15 | **no fingerprint, hash, or derived token of a secret appears in any output** | asserted explicitly (replaces the dropped "fingerprints differ across runs" test) |
 
 Tests 10, 11 and 15 are the safety properties; they should fail loudly rather than
 being incidental.
@@ -330,11 +424,19 @@ being incidental.
 
 ## 9. Unresolved assumptions — need a decision before coding
 
-1. **Invoking-shell environment.** `effective_fresh` depends on the operator's
-   shell at `pm2 start`, which is unknowable in advance. Proposal: model it as
-   **empty**, and make the §3 PM2 procedure mandate `env -u …` starts so reality
-   matches the model. Otherwise the detector's answer is only valid for one
-   specific operator invocation.
+1. ~~**Invoking-shell environment.**~~ **RESOLVED — modelled as empty (ruling).**
+   Predicting arbitrary SSH-shell state is not attempted; the point is
+   reproducibility. The invariant B2 must enforce:
+
+   ```text
+   Canonical fresh start begins from a defined minimal/empty environment.
+   Any required service variable must come from the documented PM2/ecosystem/
+   dotenv/config path, not operator shell inheritance.
+   ```
+
+   The detector models B with an empty shell, which makes any variable that only
+   ever arrived via operator shell inheritance show up as **missing on fresh
+   start** — correctly, and loudly.
 
 2. **`ecosystem.config.js` evaluation.** It is JS, and web's `env_production`
    block reads `web/.env.local` when required. Requiring it in-process is a side
@@ -359,10 +461,18 @@ being incidental.
    command, an explicit `web/.env.build`, or a constant in the detector's own
    config. This is the one input the detector cannot currently derive.
 
-6. **`max_connections` source.** Reading it requires a DB connection. Either query
-   it (adds a dependency and a credential use) or configure the expected value.
-   Querying is more truthful; configuring is more isolated. Leaning query, with
-   the check skipped-and-reported if the query fails.
+6. ~~**`max_connections` source.**~~ **RESOLVED — live read-only query (ruling).**
+   `SHOW max_connections` with a short timeout, using the existing production DB
+   identity and no elevated privilege. A configured expected value may exist only
+   as a *secondary* comparison, never as the source of truth — it would eventually
+   drift and recreate the very problem this detector exists to catch.
+
+   When the query cannot be performed the budget is **never** reported healthy:
+
+   ```text
+   DB_CONNECTION_BUDGET = UNKNOWN
+   reason = max_connections unavailable
+   ```
 
 ---
 
