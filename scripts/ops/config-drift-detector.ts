@@ -50,7 +50,7 @@ import type { AgentResult, Incident } from './lib/types.js';
 import {
   AGENT,
   BUILD_TIME_EXCLUSION,
-  decomposePostgresUrl,
+  buildMaxConnectionsCandidates,
   detectDrift,
   findingsToIncidents,
   parseDotenvText,
@@ -63,6 +63,12 @@ import {
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 const ENABLED = process.env.CONFIG_DRIFT_DETECTOR_ENABLED === 'true';
+
+/**
+ * Postgres container used to reach `psql` when it is not installed on the host —
+ * which is prod's actual shape. Set empty to disable the container fallback.
+ */
+const PG_CONTAINER = process.env.CONFIG_DRIFT_PG_CONTAINER ?? 'vizora-postgres';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ECOSYSTEM_PATH = join(REPO_ROOT, 'ecosystem.config.js');
@@ -179,40 +185,48 @@ function readServiceDotenv(serviceCwd: string): EnvMap | null {
 /**
  * Live, read-only `SHOW max_connections` (ruling constraint 2).
  *
- * Returns null on any failure — the core then reports the budget as UNKNOWN
+ * Tries each candidate in order and reports WHICH source answered — "unknown
+ * because unreachable" and "unknown because misconfigured" need different
+ * responses from an operator.
+ *
+ * Returns null on total failure; the core then reports the budget as UNKNOWN
  * rather than healthy. A configured expectation is deliberately NOT used as a
  * fallback source of truth: it would drift and recreate the very problem this
  * detector exists to catch.
- *
- * The password goes through `PGPASSWORD` in the child env, never argv.
  */
-function queryMaxConnections(databaseUrl: string | undefined): number | null {
-  const parts = decomposePostgresUrl(databaseUrl);
-  if (!parts) return null;
-
-  const args = ['-t', '-A', '-c', 'SHOW max_connections'];
-  if (parts.host) args.unshift('-h', parts.host);
-  if (parts.port) args.unshift('-p', parts.port);
-  if (parts.user) args.unshift('-U', parts.user);
-  if (parts.database) args.unshift('-d', parts.database);
-
-  try {
-    const env = { ...process.env };
-    if (parts.password) env.PGPASSWORD = parts.password;
-    // Never prompt — a hung password prompt would burn the whole timeout.
-    env.PGCONNECT_TIMEOUT = '3';
-
-    const out = execFileSync('psql', args, {
-      stdio: 'pipe',
-      timeout: PSQL_TIMEOUT_MS,
-      env,
-    }).toString().trim();
-
-    const value = Number.parseInt(out, 10);
-    return Number.isFinite(value) && value > 0 ? value : null;
-  } catch {
-    return null;
+function queryMaxConnections(databaseUrl: string | undefined): {
+  value: number | null;
+  source: string;
+  attempts: string[];
+} {
+  const candidates = buildMaxConnectionsCandidates(databaseUrl, PG_CONTAINER);
+  if (candidates.length === 0) {
+    return { value: null, source: 'none', attempts: ['no parseable DATABASE_URL'] };
   }
+
+  const attempts: string[] = [];
+
+  for (const candidate of candidates) {
+    try {
+      const out = execFileSync(candidate.command, candidate.args, {
+        stdio: 'pipe',
+        timeout: PSQL_TIMEOUT_MS,
+        env: { ...process.env, ...candidate.env },
+      }).toString().trim();
+
+      const value = Number.parseInt(out, 10);
+      if (Number.isFinite(value) && value > 0) {
+        return { value, source: candidate.source, attempts };
+      }
+      attempts.push(`${candidate.source}: unparseable output`);
+    } catch (err) {
+      // Message only — never the candidate env, which may hold PGPASSWORD.
+      const message = err instanceof Error ? err.message.split('\n')[0] : String(err);
+      attempts.push(`${candidate.source}: ${message}`);
+    }
+  }
+
+  return { value: null, source: 'none', attempts };
 }
 
 // ─── Observation assembly ───────────────────────────────────────────────────
@@ -321,12 +335,15 @@ async function main(): Promise<void> {
   const collection = collect();
   for (const note of collection.notes) log(AGENT, `collection: ${note}`);
 
-  const maxConnections = queryMaxConnections(collection.databaseUrl);
-  if (maxConnections === null) {
+  const maxConn = queryMaxConnections(collection.databaseUrl);
+  for (const attempt of maxConn.attempts) log(AGENT, `max_connections attempt — ${attempt}`);
+  if (maxConn.value === null) {
     log(AGENT, 'max_connections unavailable — connection budget will report UNKNOWN, not healthy');
+  } else {
+    log(AGENT, `max_connections = ${maxConn.value} (source: ${maxConn.source})`);
   }
 
-  const { result, incidents } = runDetection(collection, maxConnections);
+  const { result, incidents } = runDetection(collection, maxConn.value);
 
   // Report the v1 scope gap explicitly. Silence would read as "checked and fine".
   log(

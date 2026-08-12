@@ -323,6 +323,79 @@ export function effectiveMinioSecretKey(env: EnvMap): string | undefined {
   return env.MINIO_SECRET_KEY || env.AWS_SECRET_ACCESS_KEY || undefined;
 }
 
+// ─── max_connections query construction (ruling constraint 2) ───────────────
+
+export interface MaxConnectionsCandidate {
+  /** Reported alongside the result — "max_connections source" is part of the report. */
+  source: string;
+  command: string;
+  args: string[];
+  /** Extra child env. A secret belongs HERE and never in `args`. */
+  env: Record<string, string>;
+}
+
+/**
+ * Ordered candidates for reading `SHOW max_connections` live.
+ *
+ * Two paths exist because Postgres is not always reachable the same way. On the
+ * prod VPS `psql` is NOT installed on the host at all — Postgres runs in the
+ * `vizora-postgres` container — so a host-only implementation returns null
+ * forever and the budget reports UNKNOWN on every run. A permanently-unknown
+ * check is indistinguishable from a broken one, which is why this fallback
+ * exists rather than a configured expectation.
+ *
+ * Secret hygiene differs between the two, deliberately:
+ *
+ *   - host path: password via `PGPASSWORD` in the child env, never argv (argv is
+ *     world-readable through `ps`).
+ *   - container path: NO password anywhere. It connects over the container's
+ *     local Unix socket, which authenticates without one. `docker exec -e
+ *     PGPASSWORD=...` would have put the secret back into host argv — the exact
+ *     exposure the host path avoids — so the socket is strictly better here.
+ *
+ * The container path uses the user and database from `DATABASE_URL`, so it
+ * carries the same identity as the application rather than an elevated one.
+ */
+export function buildMaxConnectionsCandidates(
+  databaseUrl: string | undefined,
+  pgContainer: string,
+): MaxConnectionsCandidate[] {
+  const parts = decomposePostgresUrl(databaseUrl);
+  if (!parts) return [];
+
+  const query = ['-t', '-A', '-c', 'SHOW max_connections'];
+  const candidates: MaxConnectionsCandidate[] = [];
+
+  const hostArgs: string[] = [];
+  if (parts.host) hostArgs.push('-h', parts.host);
+  if (parts.port) hostArgs.push('-p', parts.port);
+  if (parts.user) hostArgs.push('-U', parts.user);
+  if (parts.database) hostArgs.push('-d', parts.database);
+  const hostEnv: Record<string, string> = { PGCONNECT_TIMEOUT: '3' };
+  // Never prompt — a hung password prompt would burn the whole timeout.
+  if (parts.password) hostEnv.PGPASSWORD = parts.password;
+  candidates.push({
+    source: 'host psql',
+    command: 'psql',
+    args: [...hostArgs, ...query],
+    env: hostEnv,
+  });
+
+  if (pgContainer) {
+    const containerArgs = ['exec', pgContainer, 'psql'];
+    if (parts.user) containerArgs.push('-U', parts.user);
+    if (parts.database) containerArgs.push('-d', parts.database);
+    candidates.push({
+      source: `docker exec ${pgContainer} psql`,
+      command: 'docker',
+      args: [...containerArgs, ...query],
+      env: {},
+    });
+  }
+
+  return candidates;
+}
+
 // ─── Secret comparison (ruling constraint 3) ────────────────────────────────
 
 /**

@@ -267,6 +267,13 @@ CONFIG_DRIFT_DETECTOR_ENABLED  # 'true' enables the B1 config-drift detector (op
                         # alerts or ops-state.json. Needs /proc read access for the service
                         # PIDs plus `pm2 jlist`. Default off.
                         # Design: docs/plans/2026-08-12-config-drift-detection-design.md
+CONFIG_DRIFT_PG_CONTAINER  # Postgres container for the read-only `SHOW max_connections` read
+                        # (default vizora-postgres). **`psql` is NOT installed on the prod
+                        # host** — Postgres runs in Docker — so host-only `psql` calls fail
+                        # there. Host psql is tried first, this is the fallback; empty disables
+                        # it. NOTE: `db-maintainer` still calls host `psql` directly and its
+                        # VACUUM has been silently failing on prod ("Vacuum: 0 OK, 7 failed",
+                        # empty error log). Tracked separately — do not assume vacuum runs.
 ```
 
 > **`SMTP_PASS` / `SMTP_FROM` are not optional aliases.** `scripts/ops/lib/alerting.ts`

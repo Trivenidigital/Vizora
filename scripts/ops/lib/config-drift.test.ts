@@ -16,6 +16,7 @@ import test from 'node:test';
 import {
   BUILD_TIME_EXCLUSION,
   DRIFT_CLASS_TO_SEVERITY,
+  buildMaxConnectionsCandidates,
   compareSecretValues,
   computeConnectionBudget,
   computeEffective,
@@ -238,6 +239,70 @@ test('effectiveMinioAccessKey models the documented fallback chain', () => {
   assert.equal(effectiveMinioAccessKey({ AWS_ACCESS_KEY_ID: 'b' }), 'b');
   assert.equal(effectiveMinioAccessKey({ MINIO_ACCESS_KEY: 'a', AWS_ACCESS_KEY_ID: 'b' }), 'a');
   assert.equal(effectiveMinioAccessKey({}), undefined);
+});
+
+// ─── max_connections query construction (ruling constraint 2) ────────────────
+
+test('buildMaxConnectionsCandidates offers host psql first, then the container', () => {
+  const candidates = buildMaxConnectionsCandidates(pgUrl(), 'vizora-postgres');
+  assert.equal(candidates.length, 2);
+  assert.equal(candidates[0].command, 'psql');
+  assert.equal(candidates[1].command, 'docker');
+});
+
+test('host psql candidate keeps the password in env, never in argv', () => {
+  const [host] = buildMaxConnectionsCandidates(pgUrl(), 'vizora-postgres');
+  assert.equal(host.env.PGPASSWORD, PG_PW, 'password must be passed via env');
+  assert.ok(
+    !host.args.some(a => a.includes(PG_PW)),
+    'argv is world-readable via ps — the password must never appear there',
+  );
+  assert.equal(host.env.PGCONNECT_TIMEOUT, '3', 'must not hang on a password prompt');
+});
+
+test('container candidate carries no password at all, in argv or env', () => {
+  const [, container] = buildMaxConnectionsCandidates(pgUrl(), 'vizora-postgres');
+  assert.ok(!container.args.some(a => a.includes(PG_PW)), 'password leaked into docker argv');
+  assert.equal(
+    JSON.stringify(container.env).includes(PG_PW),
+    false,
+    '`docker exec -e PGPASSWORD` would put the secret back into host argv — use socket auth',
+  );
+  assert.deepEqual(container.env, {});
+});
+
+test('container candidate uses the DATABASE_URL identity, not an elevated one', () => {
+  const [, container] = buildMaxConnectionsCandidates(pgUrl(), 'vizora-postgres');
+  assert.deepEqual(
+    container.args,
+    ['exec', 'vizora-postgres', 'psql', '-U', 'vizora', '-d', 'vizora', '-t', '-A', '-c', 'SHOW max_connections'],
+  );
+});
+
+test('both candidates read only — the statement is always SHOW max_connections', () => {
+  for (const candidate of buildMaxConnectionsCandidates(pgUrl(), 'vizora-postgres')) {
+    assert.equal(candidate.args[candidate.args.length - 1], 'SHOW max_connections');
+    assert.equal(candidate.args[candidate.args.length - 2], '-c');
+  }
+});
+
+test('an empty container name disables the fallback', () => {
+  const candidates = buildMaxConnectionsCandidates(pgUrl(), '');
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].command, 'psql');
+});
+
+test('an unparseable DATABASE_URL yields no candidates (budget stays UNKNOWN)', () => {
+  assert.deepEqual(buildMaxConnectionsCandidates('not-a-url', 'vizora-postgres'), []);
+  assert.deepEqual(buildMaxConnectionsCandidates(undefined, 'vizora-postgres'), []);
+});
+
+test('a passwordless DATABASE_URL sets no PGPASSWORD key', () => {
+  const [host] = buildMaxConnectionsCandidates(
+    'postgresql://postgres@localhost:5432/vizora',
+    'vizora-postgres',
+  );
+  assert.equal('PGPASSWORD' in host.env, false);
 });
 
 // ─── Secret comparison (§4, ruling constraint 3) ─────────────────────────────
