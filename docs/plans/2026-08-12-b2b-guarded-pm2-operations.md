@@ -33,8 +33,24 @@ Two properties follow directly:
 1. **The resolved target set must be printed and validated before mutation**, so
    "what will this touch?" is answered deterministically rather than discovered
    afterwards.
-2. **PM2 must be invoked by explicit service names.** Passing the ecosystem file
-   is precisely what lets PM2 decide to start entries that merely exist in it.
+2. **The mutation must apply `env_production` from the ecosystem file AND touch
+   exactly the resolved set** — which needs the ecosystem file plus an exact
+   `--only` selector, not bare process names.
+
+   Verified against the installed PM2 6.0.14 in an isolated `PM2_HOME` fixture,
+   because `--env` selects an `env_*` block from a *process file*: naming
+   already-registered processes reuses PM2's **stored** environment, the exact
+   mutable state that caused the incident.
+
+   ```text
+   reload <name> --env production                  → errored; ecosystem NOT re-read
+   reload <ecosystem> --only a,b --env production  → env_production applied, and the
+                                                     cron entry outside --only did NOT start
+   start  <ecosystem> --only c   --env production  → started exactly c
+   ```
+
+   So `--only` is honoured for `reload` on this version. The docs demonstrate it
+   for `start`, so it was proven rather than assumed.
 
 ---
 
@@ -60,17 +76,44 @@ Sample output:
 requested operation: app-reload
 environment: production
 
-resolved targets:
+evaluated app-service set:
   vizora-middleware  app-service       registered
   vizora-realtime    app-service       registered
   vizora-web         app-service       registered
+
+mutation target set:
+  vizora-middleware
+  vizora-realtime
+  vizora-web
 
 allowed class: app-service
 unexpected targets: none
 
 VERDICT: PASS
-invoking by explicit name: vizora-middleware vizora-realtime vizora-web
+
+exact command:
+  pm2 reload /opt/vizora/app/ecosystem.config.js --only vizora-middleware,vizora-realtime,vizora-web --env production
 ```
+
+For `app-start` the evaluated set and the **mutation set** differ — only missing
+services are started, and both are printed so the preflight is unambiguous:
+
+```text
+evaluated app-service set:
+  vizora-middleware  app-service       registered
+  vizora-realtime    app-service       registered
+  vizora-web         app-service       NOT REGISTERED
+
+mutation target set:
+  vizora-web
+
+exact command:
+  pm2 start /opt/vizora/app/ecosystem.config.js --only vizora-web --env production
+```
+
+The rendered command is produced by the SAME `buildPm2Argv()` the CLI executes —
+never a separately reconstructed string, which would let the preflight describe a
+command different from the one that runs.
 
 ---
 

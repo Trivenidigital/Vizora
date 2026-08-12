@@ -2,10 +2,13 @@
 /**
  * Vizora — guarded PM2 application operations (B2b)
  *
- * Resolves and PRINTS exactly what a PM2 operation would touch, validates the
- * whole set against the operation's allowed class, and only then invokes PM2 —
- * by explicit service names, never with `ecosystem.config.js` as the mutation
- * target.
+ * Resolves and PRINTS exactly what a PM2 operation would touch — and the exact
+ * command it will run — validates the whole set against the operation's allowed
+ * class, and only then invokes PM2, via the ecosystem file constrained by an
+ * exact `--only` selector.
+ *
+ * The printed command is produced by the SAME `buildPm2Argv()` that executes, so
+ * a dry run cannot describe an invocation different from the real one.
  *
  *   npx tsx scripts/ops/pm2-guard.ts app-reload --env production [--dry-run]
  *   npx tsx scripts/ops/pm2-guard.ts app-start  --env production [--dry-run]

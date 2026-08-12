@@ -302,7 +302,7 @@ test('both operations allow only app-service', () => {
 // ─── Report is emitted before mutation ───────────────────────────────────────
 
 test('the report names every target, its class and registration state', () => {
-  const report = renderReport(reload(), false);
+  const report = renderReport(reload(), false, 'ecosystem.config.js');
   for (const name of APP_SERVICES) assert.match(report, new RegExp(name));
   assert.match(report, /app-service/);
   assert.match(report, /registered/);
@@ -310,17 +310,76 @@ test('the report names every target, its class and registration state', () => {
   assert.match(report, /VERDICT: PASS/);
 });
 
-test('a refusal report states every reason and offers no invocation', () => {
-  const report = renderReport(reload({ environment: 'staging' }), false);
-  assert.match(report, /VERDICT: REFUSE/);
-  assert.match(report, /refusals:/);
-  assert.doesNotMatch(report, /invoking by explicit name/);
+test('the rendered command is EXACTLY buildPm2Argv — never a reconstructed string', () => {
+  // Dry-run is the pre-production proof. If the report built its own command
+  // string it could confidently display an invocation different from the one
+  // that executes — the same "displayed config is not consumed config" failure
+  // this whole workstream exists to remove.
+  for (const dryRun of [true, false]) {
+    const d = reload();
+    const argv = buildPm2Argv(d, '/opt/vizora/app/ecosystem.config.js');
+    const report = renderReport(d, dryRun, '/opt/vizora/app/ecosystem.config.js');
+    assert.ok(
+      report.includes(`pm2 ${argv!.join(' ')}`),
+      `report must contain the exact argv it will execute.\nargv:   pm2 ${argv!.join(' ')}\nreport:\n${report}`,
+    );
+  }
 });
 
-test('dry-run shows the exact command it would run, and says it is a dry run', () => {
-  const report = renderReport(reload(), true);
+test('the report distinguishes the evaluated set from the mutation target set', () => {
+  const d = evaluateOperation({
+    operation: 'app-start',
+    environment: 'production',
+    apps: FIXTURE_APPS,
+    manifest: FIXTURE_MANIFEST,
+    registered: ['vizora-middleware', 'vizora-realtime'],
+  });
+  const report = renderReport(d, true, 'ecosystem.config.js');
+
+  // Evaluated set shows all three with their registration state...
+  assert.match(report, /evaluated app-service set:/);
+  assert.match(report, /vizora-middleware\s+app-service\s+registered/);
+  assert.match(report, /vizora-web\s+app-service\s+NOT REGISTERED/);
+
+  // ...but the mutation set and command contain ONLY the missing service.
+  const mutationSection = report.slice(report.indexOf('mutation target set:'), report.indexOf('allowed class:'));
+  assert.match(mutationSection, /vizora-web/);
+  assert.doesNotMatch(mutationSection, /vizora-middleware/);
+  assert.doesNotMatch(mutationSection, /vizora-realtime/);
+  assert.match(report, /--only vizora-web /);
+});
+
+test('app-start with two missing renders exactly those two in the command', () => {
+  const d = evaluateOperation({
+    operation: 'app-start',
+    environment: 'production',
+    apps: FIXTURE_APPS,
+    manifest: FIXTURE_MANIFEST,
+    registered: ['vizora-middleware'],
+  });
+  const report = renderReport(d, true, 'ecosystem.config.js');
+  const only = buildPm2Argv(d, 'ecosystem.config.js')![3].split(',').sort();
+  assert.deepEqual(only, ['vizora-realtime', 'vizora-web']);
+  assert.match(report, /--only vizora-(realtime,vizora-web|web,vizora-realtime) /);
+});
+
+test('app-reload renders exactly the three services in the command', () => {
+  const report = renderReport(reload(), true, 'ecosystem.config.js');
+  assert.match(report, /--only vizora-middleware,vizora-realtime,vizora-web /);
+  assert.match(report, /ecosystem\.config\.js/);
+});
+
+test('a refusal report states every reason and prints NO executable command', () => {
+  const report = renderReport(reload({ environment: 'staging' }), false, 'ecosystem.config.js');
+  assert.match(report, /VERDICT: REFUSE/);
+  assert.match(report, /refusals:/);
+  assert.doesNotMatch(report, /exact command:/);
+  assert.doesNotMatch(report, /pm2 reload/);
+});
+
+test('dry-run marks the command as not executed', () => {
+  const report = renderReport(reload(), true, 'ecosystem.config.js');
   assert.match(report, /DRY RUN/);
-  assert.match(report, /would invoke: pm2 reload/);
-  assert.match(report, /--env production/);
-  assert.doesNotMatch(report, /invoking by explicit name/);
+  assert.match(report, /exact command:/);
+  assert.match(report, /\(dry run — not executed\)/);
 });

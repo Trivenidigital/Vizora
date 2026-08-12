@@ -290,7 +290,7 @@ export function renderReport(decision: GuardDecision, dryRun: boolean, ecosystem
   lines.push(`requested operation: ${decision.operation}${dryRun ? ' (DRY RUN)' : ''}`);
   lines.push(`environment: ${decision.environment}`);
   lines.push('');
-  lines.push('resolved targets:');
+  lines.push('evaluated app-service set:');
   if (decision.targets.length === 0) {
     lines.push('  (none)');
   } else {
@@ -302,6 +302,15 @@ export function renderReport(decision: GuardDecision, dryRun: boolean, ecosystem
       );
     }
   }
+
+  // The evaluated set and the MUTATION set differ for app-start: only missing
+  // services are started. Showing one number and mutating another is the same
+  // "displayed config is not the consumed config" failure this guard exists to
+  // remove, so both are printed explicitly.
+  lines.push('');
+  lines.push('mutation target set:');
+  lines.push(decision.invokeNames.length === 0 ? '  (none)' : decision.invokeNames.map(n => `  ${n}`).join('\n'));
+
   lines.push('');
   lines.push(`allowed class: ${ALLOWED_CLASS[decision.operation]}`);
   lines.push(
@@ -311,12 +320,16 @@ export function renderReport(decision: GuardDecision, dryRun: boolean, ecosystem
   );
   lines.push('');
   lines.push(`VERDICT: ${decision.verdict}`);
-  if (decision.verdict === 'PASS') {
-    lines.push(
-      dryRun
-        ? `would invoke: pm2 ${decision.operation === 'app-reload' ? 'reload' : 'start'} ${decision.invokeNames.join(' ')} --env ${decision.environment}`
-        : `invoking by explicit name: ${decision.invokeNames.join(' ')}`,
-    );
+
+  // Rendered from the SAME executable representation the CLI runs — never a
+  // separately reconstructed string, which would let the preflight describe a
+  // command different from the one that executes.
+  const argv = buildPm2Argv(decision, ecosystemPath);
+  if (argv) {
+    lines.push('');
+    lines.push('exact command:');
+    lines.push(`  pm2 ${argv.join(' ')}`);
+    if (dryRun) lines.push('  (dry run — not executed)');
   }
   return lines.join('\n');
 }

@@ -343,9 +343,10 @@ Customers install it by sideload from two permanent URLs — `https://vizora.clo
 PM2 via `ecosystem.config.js`: middleware runs 2 instances in cluster mode, realtime runs single instance (WebSocket state consistency), web runs single instance. All have memory limits, exponential backoff restart, and graceful shutdown.
 
 **Use the guarded wrapper for application deploys** — it resolves and prints the
-exact target set, refuses anything outside the `app-service` class, and invokes
-PM2 by explicit names so it cannot start cron entries that merely exist in the
-ecosystem file:
+exact target set and the exact command, refuses anything outside the
+`app-service` class, and mutates via the ecosystem file with an exact `--only`
+selector — so `env_production` is genuinely applied and cron entries that merely
+exist in the file cannot be started:
 
 ```bash
 npx tsx scripts/ops/pm2-guard.ts app-reload --env production --dry-run   # prove first
