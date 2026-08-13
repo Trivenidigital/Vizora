@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { DatabaseService } from '../database/database.service';
+import { RedisService } from '../redis/redis.service';
 import {
   DeviceJwtPayload,
+  deviceTokenGraceKey,
   hashDeviceToken,
   isCurrentDeviceToken,
+  isGraceAcceptedDeviceToken,
 } from '../common/device-token-auth.util';
 
 /**
@@ -34,6 +37,7 @@ export class DeviceAuthCheckService {
   constructor(
     private readonly jwtService: JwtService,
     private readonly db: DatabaseService,
+    private readonly redis: RedisService,
   ) {}
 
   async evaluate(token: string): Promise<DeviceAuthCheckResult> {
@@ -79,18 +83,46 @@ export class DeviceAuthCheckService {
 
     const presentedHash = hashDeviceToken(token);
 
-    // Genuinely-revoked states → 410. All are durable (never transient):
+    // Genuinely-revoked states → 410. All are durable (never transient), and all are
+    // evaluated BEFORE any grace lookup so a grace record can never revive a device that
+    // was deleted, moved tenants, or disabled:
     //  - row gone (deleted, incl. tenant-cascade delete)
     //  - org reassigned (device moved tenants; old binding dead)
     //  - admin-disabled (block == revoke per contract §3.1 DEVICE_REVOKED)
-    //  - token rotated away (re-pair/unpair issued a new hash)
     if (
       !display ||
       display.organizationId !== payload.organizationId ||
-      display.isDisabled ||
-      !isCurrentDeviceToken(display.jwtToken, presentedHash)
+      display.isDisabled
     ) {
       return { httpStatus: 410, body: { code: 'DEVICE_REVOKED' } };
+    }
+
+    // The token is not the one currently stored. That is either a genuine rotation-away
+    // (re-pair / unpair → revoked) or the device is mid-rotation and still physically
+    // holds the PREVIOUS token, which realtime deliberately keeps handshake-valid
+    // (device-handshake-auth.ts) while it waits for `token:refresh` to be persisted.
+    //
+    // Without this branch the two authorities disagreed: realtime accepted the old token
+    // on the socket while this endpoint answered 410, and a 410 is the one response that
+    // makes the player purge its pairing state. A normal, intended rotation could
+    // therefore unpair a healthy device — the mass-unpair primitive this service's own
+    // header warns about.
+    if (!isCurrentDeviceToken(display.jwtToken, presentedHash)) {
+      // Deliberately NOT wrapped in a catch. Realtime fails CLOSED here (treats a Redis
+      // error as "no grace") because rejecting a socket is harmless and retried. The same
+      // posture would be actively destructive here: it would turn a Redis blip into a
+      // fleet-wide 410 and unpair every device mid-rotation. So a grace-lookup failure
+      // propagates as 500, exactly like the DB read above — the device reads a 5xx as
+      // transport-layer and keeps its credentials. Same grace MODEL as realtime; opposite
+      // failure posture, because the consequence of being wrong is not symmetric.
+      const graceRaw = await this.redis.get(deviceTokenGraceKey(payload.sub));
+
+      // Accepts only when the presented hash is the recorded `prev` AND the DB still
+      // holds the recorded `next` — so a re-paired device (whose stored hash moved on)
+      // cannot be resurrected by a stale record.
+      if (!isGraceAcceptedDeviceToken(graceRaw, presentedHash, display.jwtToken)) {
+        return { httpStatus: 410, body: { code: 'DEVICE_REVOKED' } };
+      }
     }
 
     // 4. Device is genuinely valid. Entitlement suspension is a REVERSIBLE state

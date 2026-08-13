@@ -41,6 +41,62 @@ export function isCurrentDeviceToken(
   );
 }
 
+/**
+ * Device-JWT rotation grace (PR-8) — the record realtime writes when it rotates a
+ * near-expiry device token.
+ *
+ * The gateway rotates `Display.jwtToken` to hash(newToken) IMMEDIATELY, but the device
+ * may not have persisted the new token yet. The record keeps the old token acceptable
+ * for a bounded window:
+ *   prev — hash of the token the device physically still holds (the old one)
+ *   next — hash the stored token was rotated TO (must still equal Display.jwtToken)
+ *
+ * Binding acceptance to `next === Display.jwtToken` is what keeps revocation honest: a
+ * re-pair (or any other change to the stored hash) makes `next` stale, and the old token
+ * is rejected again. The grace only ever revives the exact prev→next rotation it recorded.
+ *
+ * These are a deliberate mirror of realtime/src/gateways/device-token-hash.ts — the SAME
+ * model, not a second one. `device-token-auth.util.spec.ts` imports realtime's
+ * implementation directly and asserts both agree case for case, so a divergence fails a
+ * test rather than stranding a fleet. (The two copies exist because consolidating into
+ * @vizora/database would force realtime to rebuild and redeploy; see the PR body.)
+ */
+export interface DeviceTokenGrace {
+  prev: string;
+  next: string;
+}
+
+export function deviceTokenGraceKey(deviceId: string): string {
+  return `device:token:grace:${deviceId}`;
+}
+
+/**
+ * True only when the presented hash is the recorded `prev` AND the DB still holds the
+ * recorded `next`. Any malformed/absent record is simply "no grace" — this function is
+ * pure and never decides revocation on its own; the caller does, and only after the
+ * durable revocation checks have already passed.
+ */
+export function isGraceAcceptedDeviceToken(
+  graceRaw: string | null | undefined,
+  presentedHash: string,
+  storedHash: string | null | undefined,
+): boolean {
+  if (!graceRaw) return false;
+  let grace: DeviceTokenGrace;
+  try {
+    grace = JSON.parse(graceRaw) as DeviceTokenGrace;
+  } catch {
+    return false;
+  }
+  if (!grace || typeof grace.prev !== 'string' || typeof grace.next !== 'string') {
+    return false;
+  }
+  return (
+    isCurrentDeviceToken(grace.prev, presentedHash) &&
+    isCurrentDeviceToken(storedHash, grace.next)
+  );
+}
+
 export function getDeviceTokenFromRequest(
   req: Request,
   options: { allowQueryToken?: boolean } = {},
