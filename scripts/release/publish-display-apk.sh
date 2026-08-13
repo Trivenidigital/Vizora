@@ -93,12 +93,17 @@ fi
 # --require-apksigner makes publication FAIL CLOSED when full cross-scheme
 # signature verification cannot run. keytool alone reads the v1 block only and
 # would miss a v2/v3 block signed with a different key.
-say "Verifying APK identity, signing key and integrity"
+#
+# --require-pinned-origins does the same for the backend the APK talks to. Every
+# other check is endpoint-blind: a build aimed at the wrong environment has a
+# valid package id, a correct version, the right certificate and a good hash.
+say "Verifying APK identity, signing key, backend origins and integrity"
 node "$REPO_ROOT/scripts/release/verify-display-apk.mjs" \
   --apk "$APK" \
   --against "$RELEASE_JSON" \
   --require-apksigner \
-  --require-pinned-cert
+  --require-pinned-cert \
+  --require-pinned-origins
 
 # ─── Confirm the page matches the artifact ───────────────────────────────────
 say "Confirming installer page matches release.json"

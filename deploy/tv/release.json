@@ -12,6 +12,32 @@
     "while either pair is null. Do not fill these in without the named human actually",
     "confirming. Never put the keystore, its password, or any private key in this repo."
   ],
+  "releaseOrigins": {
+    "_comment": [
+      "The backend origins a published Vizora Display APK is allowed to talk to.",
+      "",
+      "The verifier reads these back OUT OF THE PACKAGED APK — from the",
+      "__VIZORA_RELEASE_ORIGINS__ marker the bundle stamps in at build time — and",
+      "refuses to publish on mismatch. Everything else in this file describes the",
+      "artifact's identity; this describes its behaviour, which nothing checked until",
+      "vizora-tv#18.",
+      "",
+      "Why it was needed: until 1.3.13 the origins came from a gitignored, machine-local",
+      ".env, with a fallback to a DIFFERENT environment (api.vizora.io) when absent. An",
+      "APK aimed at the wrong backend has a valid package id, a correct version, the",
+      "right certificate and a perfectly good hash — it passed every check we had.",
+      "",
+      "Must stay in lockstep with release-origins.json in the vizora-tv repo, which is",
+      "what the build compiles from. Changing one without the other fails the gate,",
+      "which is the intended behaviour: the two are a matched pair, and a mismatch means",
+      "the build and the publish disagree about where customers are being pointed."
+    ],
+    "api": "https://vizora.cloud",
+    "realtime": "wss://vizora.cloud",
+    "dashboard": "https://vizora.cloud",
+    "pinnedBy": "Srini",
+    "pinnedAt": "2026-08-13"
+  },
   "signing": {
     "_comment": [
       "The canonical Vizora Android customer-signing identity.",

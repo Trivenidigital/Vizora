@@ -166,6 +166,169 @@ function parseAndroidManifest(buf) {
 
 // ─── APK reading ─────────────────────────────────────────────────────────────
 
+/** List the entry names inside an APK (a zip) using the bundled `unzip`. */
+function listEntries(apkPath) {
+  const out = execFileSync('unzip', ['-Z1', apkPath], {
+    encoding: 'utf8',
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  return out.split('\n').map(l => l.trim()).filter(Boolean);
+}
+
+/**
+ * Read the backend origins the bundle was COMPILED with, out of the packaged APK.
+ *
+ * This is the check that makes the endpoint a property of the artifact instead of
+ * a property of the build machine. Every other assertion here — package id,
+ * version, certificate, hash — is indifferent to what the binary talks to, which
+ * is how a mis-pointed APK could previously have passed the entire gate.
+ *
+ * Reads the `__VIZORA_RELEASE_ORIGINS__` marker that vizora-tv stamps into the
+ * bundle at build time. Deliberately NOT a scan for bare URLs: `api` and
+ * `dashboard` are both https://vizora.cloud today, so loose URL matching could
+ * report which hosts appear but never which value landed in which slot — and
+ * "the right hosts are in there somewhere" is exactly the fuzzy check that passes
+ * when it should not.
+ *
+ * @param apkPath path to the APK
+ * @returns {{origins: object|null, entry: string|null, problem: string|null}}
+ */
+export function readPackagedOrigins(apkPath, deps = {}) {
+  const list = deps.listEntries || listEntries;
+  const read = deps.extractEntry || extractEntry;
+
+  let entries;
+  try {
+    entries = list(apkPath);
+  } catch (err) {
+    return { origins: null, entry: null, problem: `could not list APK entries: ${err.message}` };
+  }
+
+  // The marker lives in the app bundle under the Capacitor web-asset root.
+  const candidates = entries.filter(e => /^assets\/public\/.*\.js$/.test(e));
+  if (candidates.length === 0) {
+    return {
+      origins: null,
+      entry: null,
+      problem: 'no packaged JS found under assets/public/ — this does not look like a Vizora Display APK',
+    };
+  }
+
+  // Single-quoted after terser, double-quoted unminified: accept either, and let
+  // the escape class handle a quote inside the JSON.
+  const MARKER = /__VIZORA_RELEASE_ORIGINS__\s*=\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')/;
+
+  const found = [];
+  for (const entry of candidates) {
+    let text;
+    try {
+      text = read(apkPath, entry).toString('utf8');
+    } catch {
+      continue; // an unreadable sibling chunk must not mask the real marker
+    }
+    const m = MARKER.exec(text);
+    if (!m) continue;
+
+    // The capture is the BODY of a JS string literal holding JSON, so it has to be
+    // unescaped before it can be parsed — and the two quote styles need different
+    // handling. In a double-quoted literal every inner `"` is already backslashed,
+    // so the body is a valid JSON-string body as-is. In a single-quoted literal the
+    // inner `"` are bare and must be escaped first. Treating both the same way
+    // double-escapes the already-escaped case and produces garbage.
+    let parsed;
+    try {
+      const body =
+        m[1] !== undefined
+          ? m[1]
+          : m[2].replace(/\\'/g, "'").replace(/"/g, '\\"');
+      parsed = JSON.parse(JSON.parse(`"${body}"`));
+    } catch (err) {
+      return { origins: null, entry, problem: `origins marker in ${entry} is not valid JSON: ${err.message}` };
+    }
+    found.push({ entry, parsed });
+  }
+
+  if (found.length === 0) {
+    return {
+      origins: null,
+      entry: null,
+      problem:
+        'no __VIZORA_RELEASE_ORIGINS__ marker in the packaged bundle. Either this APK predates the ' +
+        'marker (vizora-tv#18) or the build stripped it — a release cannot be verified without it.',
+    };
+  }
+
+  // More than one chunk carrying the marker is only a problem if they disagree;
+  // disagreement means the bundle was assembled from mismatched builds.
+  const distinct = [...new Set(found.map(f => JSON.stringify(f.parsed)))];
+  if (distinct.length > 1) {
+    return {
+      origins: null,
+      entry: found.map(f => f.entry).join(', '),
+      problem: `packaged chunks disagree about the compiled origins: ${distinct.join(' vs ')}`,
+    };
+  }
+
+  return { origins: found[0].parsed, entry: found[0].entry, problem: null };
+}
+
+/**
+ * Compare the origins read from the artifact against the pinned expectation.
+ * Pure, so the fail-closed behaviour is unit-testable without an APK fixture —
+ * same shape as evaluatePinnedCert below, and for the same reason.
+ *
+ * @param pinned   expected origins from release.json ({} / null when unset)
+ * @param actual   origins read out of the APK (null when unreadable)
+ * @param problem  why they could not be read, if they could not
+ * @param required true when publishing (--require-pinned-origins)
+ */
+export function evaluatePackagedOrigins(pinned, actual, problem, required) {
+  const name = 'compiled backend origins match the pinned expectation';
+  const keys = ['api', 'realtime', 'dashboard'];
+  const hasPin = pinned && keys.some(k => pinned[k]);
+
+  if (!hasPin) {
+    if (required) {
+      return {
+        name,
+        pass: false,
+        detail:
+          'NO ORIGINS PINNED — releaseOrigins is missing from release.json. Publishing without ' +
+          'a pinned expectation is how an APK aimed at the wrong backend reaches customers: every ' +
+          'other check here passes regardless of what the binary talks to.',
+      };
+    }
+    return {
+      name,
+      pass: true,
+      skipped: true,
+      detail: 'SKIPPED — no releaseOrigins pinned in release.json. Publish always requires it.',
+    };
+  }
+
+  if (!actual) {
+    return { name, pass: false, detail: `could not read the compiled origins: ${problem}` };
+  }
+
+  const mismatches = keys
+    .filter(k => pinned[k])
+    .filter(k => actual[k] !== pinned[k])
+    .map(k => `${k}: apk has ${actual[k] ?? '(absent)'}, pin expects ${pinned[k]}`);
+
+  if (mismatches.length) {
+    return {
+      name,
+      pass: false,
+      detail:
+        `MISMATCH — this APK talks to a different backend than the pin allows.\n        ` +
+        mismatches.join('\n        ') +
+        `\n        Do not publish it: customers installing this build would reach the wrong environment.`,
+    };
+  }
+
+  return { name, pass: true, detail: keys.filter(k => pinned[k]).map(k => `${k}=${actual[k]}`).join('  ') };
+}
+
 /** Extract a single entry from the APK (a zip) using the bundled `unzip`. */
 function extractEntry(apkPath, entryName) {
   try {
@@ -422,6 +585,7 @@ async function main() {
   let baseline = null;
   let baselineAbsent = false;
   let pinnedCert = '';
+  let pinnedOrigins = null;
   if (args.against) {
     const p = resolve(String(args.against));
     if (!existsSync(p)) {
@@ -432,6 +596,7 @@ async function main() {
     baseline = Object.prototype.hasOwnProperty.call(doc, 'published') ? doc.published : doc;
     if (!baseline) baselineAbsent = true;
     pinnedCert = normalizeFingerprint(doc?.signing?.canonicalCertSha256 || '');
+    pinnedOrigins = doc?.releaseOrigins || null;
   }
 
   const bytes = readFileSync(apkPath);
@@ -552,6 +717,22 @@ async function main() {
   // APK must match it.
   checks.push(evaluatePinnedCert(pinnedCert, cert.sha256, Boolean(args['require-pinned-cert'])));
 
+  // 3d. The backend this APK actually talks to.
+  //
+  // Read from the packaged bundle, not from the build config, because the config
+  // only says what we intended. Every check above is endpoint-blind — a build
+  // aimed at the wrong environment has a valid package id, a correct version, the
+  // right certificate and a perfectly good hash. This is the one that catches it.
+  const packagedOrigins = readPackagedOrigins(apkPath);
+  checks.push(
+    evaluatePackagedOrigins(
+      pinnedOrigins,
+      packagedOrigins.origins,
+      packagedOrigins.problem,
+      Boolean(args['require-pinned-origins']),
+    ),
+  );
+
   // 4. certificate matches the previously accepted release + versionCode increases
   if (baselineAbsent) {
     // Not a pass and not a failure — there is genuinely nothing to compare to.
@@ -633,6 +814,8 @@ async function main() {
     versionCode: manifest.versionCode,
     apkSha256,
     apkBytes: bytes.length,
+    compiledOrigins: packagedOrigins.origins,
+    compiledOriginsEntry: packagedOrigins.entry,
     signingCertSha256: cert.sha256,
     signingCertOwner: cert.owner,
     signingCertValidUntil: cert.validUntil,
@@ -658,6 +841,14 @@ async function main() {
     console.log(`  version         ${report.versionName} (versionCode ${report.versionCode})`);
     console.log(`  size            ${report.apkBytes} bytes`);
     console.log(`  apk sha256      ${formatFingerprint(report.apkSha256)}`);
+    console.log('');
+    if (report.compiledOrigins) {
+      console.log(`  api origin      ${report.compiledOrigins.api ?? '(absent)'}`);
+      console.log(`  realtime origin ${report.compiledOrigins.realtime ?? '(absent)'}`);
+      console.log(`  dashboard orig. ${report.compiledOrigins.dashboard ?? '(absent)'}`);
+    } else {
+      console.log(`  compiled origin unreadable — ${packagedOrigins.problem}`);
+    }
     console.log('');
     console.log(`  cert sha256     ${formatFingerprint(report.signingCertSha256)}`);
     console.log(`  cert owner      ${report.signingCertOwner}`);
