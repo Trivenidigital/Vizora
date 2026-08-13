@@ -29,9 +29,12 @@ describe('DeviceStatusIndicator', () => {
     mockGetDeviceStatus.mockReturnValue(null);
   });
 
-  it('renders with default offline status', () => {
+  it('renders Unknown before any status has arrived', () => {
+    // Was 'renders with default offline status'. Defaulting to Offline stated a
+    // fact the client had not been told: absence of data is not evidence the
+    // screen is down. See the 'unknown vs offline' block below.
     render(<DeviceStatusIndicator deviceId="device-1" />);
-    expect(screen.getByText('Offline')).toBeInTheDocument();
+    expect(screen.getByText('Unknown')).toBeInTheDocument();
   });
 
   it('subscribes to device on mount', () => {
@@ -80,5 +83,45 @@ describe('DeviceStatusIndicator', () => {
     unmount();
 
     expect(unsubscribe).toHaveBeenCalled();
+  });
+});
+
+describe('unknown vs offline', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockSubscribeToDevice.mockImplementation(() => () => {});
+  });
+
+  /**
+   * "We have no status for this device" and "this device is offline" are
+   * different claims. The component used to initialise to 'offline' and fall
+   * back to the offline config for anything unrecognised, so a device missing
+   * from the status map — including when the whole bootstrap fetch failed —
+   * rendered a red Offline badge identical to a device verified to be down.
+   */
+  it('reports Unknown, not Offline, when no status is available', () => {
+    mockGetDeviceStatus.mockReturnValue(undefined);
+
+    render(<DeviceStatusIndicator deviceId="dev-1" showLabel />);
+
+    expect(screen.getByText('Unknown')).toBeInTheDocument();
+    expect(screen.queryByText('Offline')).not.toBeInTheDocument();
+  });
+
+  it('still reports Offline when the server actually says offline', () => {
+    mockGetDeviceStatus.mockReturnValue({ deviceId: 'dev-1', status: 'offline', timestamp: Date.now() });
+
+    render(<DeviceStatusIndicator deviceId="dev-1" showLabel />);
+
+    expect(screen.getByText('Offline')).toBeInTheDocument();
+    expect(screen.queryByText('Unknown')).not.toBeInTheDocument();
+  });
+
+  it('falls back to Unknown for a status it does not recognise', () => {
+    mockGetDeviceStatus.mockReturnValue({ deviceId: 'dev-1', status: 'banana', timestamp: Date.now() });
+
+    render(<DeviceStatusIndicator deviceId="dev-1" showLabel />);
+
+    expect(screen.getByText('Unknown')).toBeInTheDocument();
   });
 });

@@ -46,6 +46,23 @@ const statusConfig = {
     label: 'Error',
     icon: 'alertTriangle',
   },
+  /**
+   * "We have no status for this device" is NOT the same claim as "this device
+   * is offline", and it must not look like one.
+   *
+   * This component used to initialise to 'offline' and fall back to the offline
+   * config for anything unrecognised, so a device merely missing from the status
+   * map - including the case where the whole bootstrap fetch failed - rendered a
+   * red Offline badge indistinguishable from a device verified to be down. An
+   * operator would go looking for a screen that is, as far as anyone knows, fine.
+   */
+  unknown: {
+    color: 'text-[var(--foreground-tertiary)]',
+    bgColor: 'bg-[var(--surface-hover)]',
+    dotColor: 'bg-[var(--foreground-tertiary)]',
+    label: 'Unknown',
+    icon: 'help',
+  },
 };
 
 export default function DeviceStatusIndicator({
@@ -55,7 +72,7 @@ export default function DeviceStatusIndicator({
   className = '',
 }: DeviceStatusIndicatorProps) {
   const { getDeviceStatus, subscribeToDevice } = useDeviceStatus();
-  const [status, setStatus] = useState<DeviceStatus>('offline');
+  const [status, setStatus] = useState<DeviceStatus | 'unknown'>('unknown');
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
@@ -80,7 +97,7 @@ export default function DeviceStatusIndicator({
     return unsubscribe;
   }, [deviceId]);
 
-  const config = statusConfig[status] || statusConfig.offline;
+  const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.unknown;
 
   const formatTime = () => {
     if (!lastUpdate) return '';

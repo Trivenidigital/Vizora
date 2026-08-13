@@ -609,7 +609,13 @@ export default function DevicesClient({
  <th className="eh-th cursor-pointer hover:bg-[var(--surface-hover)] select-none" onClick={() => handleSort('nickname')}>Device{getSortIcon('nickname')}</th>
  <th className="eh-th cursor-pointer hover:bg-[var(--surface-hover)] select-none" onClick={() => handleSort('status')}>Status{getSortIcon('status')}</th>
  <th className="eh-th cursor-pointer hover:bg-[var(--surface-hover)] select-none" onClick={() => handleSort('location')}>Location{getSortIcon('location')}</th>
- <th className="eh-th">Currently Playing</th>
+ {/* "Assigned", not "Currently Playing". This cell renders
+     device.currentPlaylistId - the operator's own assignment, written by
+     updateMany before any device is contacted. Nothing in the schema records
+     what a screen is actually showing: the delivery ack lives in Redis with a
+     TTL and is never persisted or exposed. For an offline device the old header
+     asserted a playlist was playing while the screen showed something else. */}
+ <th className="eh-th">Assigned Playlist</th>
  <th className="eh-th cursor-pointer hover:bg-[var(--surface-hover)] select-none" onClick={() => handleSort('lastSeen')}>Last Seen{getSortIcon('lastSeen')}</th>
  <th className="eh-th text-right">Actions</th>
  </tr>
