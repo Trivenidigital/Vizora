@@ -111,6 +111,23 @@ const HEARTBEAT_REPLAY_MAX_DELAY_MS = 300000;
 const HEARTBEAT_REPLAY_MAX_FAILURES = 5;
 const HEARTBEAT_DB_REFRESH_INTERVAL_MS = 60_000;
 
+// T2 heartbeat-reconcile. Two intervals, both per-device, both bounding COST not
+// CORRECTNESS — neither can turn a drift into a permanent "no drift" answer.
+//
+// RESOLVE: how often a heartbeat may consult the authoritative resolver. Every beat
+// would be correct but scales with fleet x beat-rate (a 10k fleet at 15s = ~660
+// resolves/s, ~2k queries/s); at 60s that is ~166/s regardless of beat rate. Detection
+// latency for cache-invisible drift is therefore <= RESOLVE + one beat. 60s is chosen to
+// match the template-refresh cron, the most frequent real source of such drift.
+//
+// SIGNAL: the floor between two reconcile signals to one device. A device whose pull
+// fails keeps reporting the old version, and without this it would be told to re-pull on
+// every beat — a self-inflicted pull storm from a device that cannot converge. It delays
+// a genuinely new drift by at most this window; it never suppresses one indefinitely.
+const RECONCILE_RESOLVE_INTERVAL_MS = 60_000;
+const RECONCILE_SIGNAL_COOLDOWN_MS = 60_000;
+const SENT_CONTENT_VERSION_TTL_S = 3600;
+
 // PR-8 — server-side device-JWT 90d refresh. Device tokens are signed 90d and
 // nothing previously re-issued them, so every device hard-expired 90 days after
 // pairing and could never re-auth (latent fleet-wide outage). When a device
@@ -206,6 +223,10 @@ export class DeviceGateway
   // 2.1: In-memory device status cache to avoid redundant DB writes
   private readonly deviceStatusCache: Map<string, string> = new Map();
   private readonly lastHeartbeatDbWrites: Map<string, number> = new Map();
+  // T2 heartbeat-reconcile throttles (per device, per process — a device is pinned to one
+  // socket on one process, so per-process state is the right scope).
+  private readonly reconcileResolvedAt: Map<string, number> = new Map();
+  private readonly reconcileSignalledAt: Map<string, number> = new Map();
 
   // 2.4: Connection rate limiting per IP
   private readonly connectionAttempts: Map<string, { count: number; resetAt: number }> = new Map();
@@ -693,6 +714,10 @@ export class DeviceGateway
       if (!activeDeviceIds.has(deviceId)) {
         this.deviceStatusCache.delete(deviceId);
         this.lastHeartbeatDbWrites.delete(deviceId);
+        // T2 reconcile throttles are per-connected-device; drop them with the rest so
+        // the maps track live devices rather than every device seen since boot.
+        this.reconcileResolvedAt.delete(deviceId);
+        this.reconcileSignalledAt.delete(deviceId);
         this.heartbeatService.forgetDevice(deviceId);
         cleaned++;
       }
@@ -1130,6 +1155,105 @@ export class DeviceGateway
     this.logger.log(`Device connected: ${deviceId} (${client.id})`);
   }
 
+  private contentVersionKey(deviceId: string): string {
+    return `device:content-version:${deviceId}`;
+  }
+
+  /**
+   * Cache the content version last SENT to a device, written at every send path so it
+   * cannot disagree with what was serialized. This is the CHEAP half of the reconcile
+   * compare: a device that misses a push falls below this value and is caught on its next
+   * heartbeat without touching the database. Fail-open — a Redis problem must never break
+   * a send.
+   */
+  private async recordSentContentVersion(deviceId: string, version: string): Promise<void> {
+    try {
+      await this.redisService.set(this.contentVersionKey(deviceId), version, SENT_CONTENT_VERSION_TTL_S);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Failed to cache sent content version for ${deviceId}: ${message}`);
+    }
+  }
+
+  /**
+   * T2 heartbeat-reconcile: does this device need to re-pull?
+   *
+   * Two comparisons, because one is not enough:
+   *
+   *  1. CHEAP — reported vs the last version we SENT (Redis, no DB). Catches the
+   *     missed-push case instantly. This is all the original T2 build did.
+   *
+   *  2. TRUTH — reported vs `resolveEffectiveContent`, at most once per device per
+   *     RECONCILE_RESOLVE_INTERVAL_MS. This exists because the cache is blind whenever the
+   *     authoritative version moves with no send to record it, and that is not a corner
+   *     case:
+   *       - `template-refresh.service.ts` regenerates template content every minute and
+   *         emits nothing, so content.updatedAt rises while the cache stays put;
+   *       - schedule windows open and close with no cron and no push at all;
+   *       - the cache TTLs out after an hour on a socket that saw no sends.
+   *     In every one of those the device and the cache agree on a stale value, so a
+   *     cache-only compare answers "no drift" forever — the silent-inert shape this
+   *     mechanism exists to fix.
+   *
+   * Uses the SAME resolver the pull endpoint and the pushes use. Computing the version by
+   * any other route (e.g. skipping PD-9 layout zones to save a query) would produce a
+   * version that never equals the one the device was given, and the device would reconcile
+   * on every beat forever.
+   *
+   * Fail-open: any error here answers "no reconcile". A heartbeat that carries this signal
+   * must never fail because of it — a failed heartbeat is what the offline scanner turns
+   * into a false "device offline".
+   */
+  private async shouldReconcileContent(
+    deviceId: string,
+    organizationId: string | undefined,
+    reportedVersion: unknown,
+  ): Promise<boolean> {
+    // A device that does not report a version does not participate. Note '' IS a
+    // participating value: the player initialises currentContentVersion to '' and sends it
+    // until it has applied versioned content, so '' means "showing nothing authoritative
+    // yet", not "unknown". When the server also has no content the two agree and nothing
+    // fires; when the server HAS content, '' is a real drift and the device is told to
+    // pull — which is how a device still running pre-versioned content gets caught up.
+    if (typeof reportedVersion !== 'string' || !organizationId) return false;
+
+    const now = Date.now();
+    const lastSignalled = this.reconcileSignalledAt.get(deviceId) ?? 0;
+    if (now - lastSignalled < RECONCILE_SIGNAL_COOLDOWN_MS) return false;
+
+    const signal = (reason: string): boolean => {
+      this.reconcileSignalledAt.set(deviceId, now);
+      this.logger.log(`Reconcile signalled to device ${deviceId} (${reason})`);
+      return true;
+    };
+
+    try {
+      const lastSent = await this.redisService.get(this.contentVersionKey(deviceId));
+      if (lastSent != null && lastSent !== reportedVersion) {
+        return signal('missed a send');
+      }
+
+      const lastResolved = this.reconcileResolvedAt.get(deviceId) ?? 0;
+      if (now - lastResolved < RECONCILE_RESOLVE_INTERVAL_MS) return false;
+      this.reconcileResolvedAt.set(deviceId, now);
+
+      const effective = await resolveEffectiveContent(
+        this.databaseService,
+        deviceId,
+        organizationId,
+        new Date(),
+      );
+      if (effective.version !== reportedVersion) {
+        return signal(`authoritative version drift (device '${reportedVersion}')`);
+      }
+      return false;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`Reconcile check failed for device ${deviceId} (heartbeat unaffected): ${message}`);
+      return false;
+    }
+  }
+
   /**
    * Send initial state to the device: config, playlist, pending commands.
    */
@@ -1194,6 +1318,10 @@ export class DeviceGateway
       } else {
         this.logger.log(`Device ${deviceId} has no effective content`);
       }
+      // T2 heartbeat-reconcile: remember what we just sent, so a device that later drifts
+      // below it (missed a subsequent push) is detected on its next heartbeat with no
+      // database work at all.
+      await this.recordSentContentVersion(deviceId, payload.version);
     } catch (playlistError: unknown) {
       const playlistErrorMsg = playlistError instanceof Error ? playlistError.stack || playlistError.message : 'Unknown error';
       this.logger.error(`Failed to fetch playlist for device ${deviceId}: ${playlistErrorMsg}`);
@@ -1551,6 +1679,10 @@ export class DeviceGateway
         }
         this.deviceSockets.delete(deviceId);
         this.lastHeartbeatDbWrites.delete(deviceId);
+        // T2 reconcile throttles are per-connected-device; drop them with the rest so
+        // the maps track live devices rather than every device seen since boot.
+        this.reconcileResolvedAt.delete(deviceId);
+        this.reconcileSignalledAt.delete(deviceId);
         // Drop the app-version dedup entry too, so that map tracks connected
         // devices rather than everything seen since boot. Costs one redundant
         // UPDATE when the device returns, which is the correct trade.
@@ -1736,7 +1868,18 @@ export class DeviceGateway
 
       void this.replayPendingDeliveries(client, deviceId);
 
+      // T2 heartbeat-reconcile: tell a drifted device to re-pull WITHOUT a disconnect —
+      // the connected-but-flaky-never-drops residual. The client acts on this by calling
+      // pullContent(), which fails safe to last-known-good (vizora-tv main.ts:1028-1029).
+      // Awaited rather than fired-and-forgotten because the answer rides on this ack.
+      const reconcileContent = await this.shouldReconcileContent(
+        deviceId,
+        client.data.organizationId,
+        data.contentVersion,
+      );
+
       return createSuccessResponse({
+        reconcileContent,
         nextHeartbeatIn: 15000,
         commands: [],
       });
@@ -2073,6 +2216,11 @@ export class DeviceGateway
           }),
         });
     const resolvedVersion = payload?.version ?? contentVersion(resolvedPlaylist as never, null);
+
+    // T2 heartbeat-reconcile: this live push is the MISS-able path — a device that misses
+    // it falls below the cached version and the very next heartbeat catches it with no DB
+    // work. Recorded before the emit so a device that misses the send is still detectable.
+    await this.recordSentContentVersion(deviceId, resolvedVersion);
 
     // Get all sockets in the device room
     const roomName = `device:${deviceId}`;
