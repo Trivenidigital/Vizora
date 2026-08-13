@@ -43,6 +43,13 @@ jest.mock('@sentry/nestjs', () => ({
  * and the wire.
  *
  * The fixture is EXPECTED OUTPUT ONLY. It is never fed into the thing under test.
+ *
+ * WHAT THIS DELIBERATELY DOES NOT COVER. Calling the handler directly bypasses the
+ * decorators around it — WsDeviceGuard and the @MessageBody() WsValidationPipe — so
+ * inbound `data` arrives un-whitelisted and un-transformed. That is the right scope
+ * for an ack-SHAPE contract (the outbound half), and the inbound half is covered by
+ * ws-validation.pipe.spec.ts, but do not read a green run here as "the heartbeat
+ * message contract is bound". It is not; only the response is.
  */
 const wire = JSON.parse(
   readFileSync(join(__dirname, 'ack-envelope.fixture.json'), 'utf8'),

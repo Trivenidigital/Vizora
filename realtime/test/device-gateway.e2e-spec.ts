@@ -294,10 +294,21 @@ describe('DeviceGateway (E2E)', () => {
       };
 
       client.emit('heartbeat', heartbeatData, (response) => {
+        // The ack is WRAPPED: handleHeartbeat returns createSuccessResponse(...), so
+        // the payload fields live under `.data`, not at the top level. This block
+        // previously asserted them at the top level — a shape the server has never
+        // produced. It never failed only because this suite does not boot in CI
+        // (the realtime e2e step is continue-on-error; it needs Prisma generate
+        // state plus a MongoDB service that no longer exists), so the contradiction
+        // sat here unexecuted. Corrected to match the contract asserted against the
+        // real handler in src/gateways/heartbeat-ack-contract.spec.ts.
+        //
+        // NOTE: unverified by execution for the same reason — this suite still does
+        // not run. If you repair it and this fails, fix the suite, not the shape.
         expect(response.success).toBe(true);
-        expect(response.nextHeartbeatIn).toBe(15000);
         expect(response.timestamp).toBeDefined();
-        expect(response.commands).toBeDefined();
+        expect(response.data.nextHeartbeatIn).toBe(15000);
+        expect(response.data.commands).toBeDefined();
         done();
       });
     });
