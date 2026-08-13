@@ -60,7 +60,8 @@ describe('Toast', () => {
 
     it('renders error toast with correct icon', () => {
       render(<Toast {...defaultProps} type="error" />);
-      expect(screen.getByTestId('icon-delete')).toBeInTheDocument();
+      // 'delete' is a trash can — it reads as "removed", not "failed".
+      expect(screen.getByTestId('icon-error')).toBeInTheDocument();
     });
 
     it('renders info toast with correct icon', () => {
@@ -73,14 +74,21 @@ describe('Toast', () => {
       expect(screen.getByTestId('icon-warning')).toBeInTheDocument();
     });
 
+    /*
+     * The specific shade is load-bearing, not cosmetic: these toasts carry a
+     * white label, and white on the -500 shades measures 2.15–3.76:1 against
+     * #FFFFFF — every variant failed WCAG AA. The shades asserted below are the
+     * lightest ones that clear 4.5:1 (success-700 5.02, error-600 4.83). Do not
+     * "tidy" these back to -500.
+     */
     it('applies success color class', () => {
       render(<Toast {...defaultProps} type="success" />);
-      expect(screen.getByRole('alert').className).toContain('bg-success-500');
+      expect(screen.getByRole('alert').className).toContain('bg-success-700');
     });
 
     it('applies error color class', () => {
       render(<Toast {...defaultProps} type="error" />);
-      expect(screen.getByRole('alert').className).toContain('bg-error-500');
+      expect(screen.getByRole('alert').className).toContain('bg-error-600');
     });
   });
 

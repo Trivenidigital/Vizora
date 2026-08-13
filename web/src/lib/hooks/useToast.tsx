@@ -31,7 +31,10 @@ export function useToast() {
 
   const ToastContainer = useCallback(
     () => (
-      <>
+      // One stack, newest at the bottom. `pointer-events-none` on the column so
+      // the empty space beside short toasts does not swallow clicks on the page
+      // underneath; each toast re-enables events for itself.
+      <div className="fixed top-4 right-4 z-50 flex flex-col items-end gap-3 pointer-events-none">
         {toasts.map((toast) => (
           <Toast
             key={toast.id}
@@ -40,7 +43,7 @@ export function useToast() {
             onClose={() => removeToast(toast.id)}
           />
         ))}
-      </>
+      </div>
     ),
     [toasts, removeToast]
   );
