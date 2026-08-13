@@ -173,3 +173,62 @@ Three corrections were needed this session, all the same shape — a conclusion 
 - Frontmatter `description` should start with "Use when..." and ONLY describe triggering conditions (not workflow)
 - Level 3 reference files (not `@`-linked) avoid burning context — loaded only when needed
 - Config-only changes (`.claude/`, `CLAUDE.md`) don't need builds or PM2 reload on deploy
+
+
+## Session: 2026-08-13 - UI wave (foundation + Devices correctness)
+
+### Read before write — I destroyed a 7,217-line file by assuming a path was new
+- Wrote the UI-wave plan straight to `tasks/todo.md` without reading it. It was a long-lived
+  tracker going back to PR #220; the write replaced all of it, and #314 merged the deletion.
+  Caught only because a later `git pull` reported `7,228 deletions` and I checked instead of
+  moving on. Restored byte-identical in #317, verified by comparing git blob hashes rather than
+  by eye.
+- **Rule:** on any existing `tasks/`, `docs/` or planning file, read it before writing. Treat an
+  unfamiliar path as occupied until proven otherwise. Creating a new file is cheap; a `Write`
+  to an established path is a destructive operation wearing an innocuous name.
+
+### Trace the data path before trusting what the UI says
+- The devices table labelled a column "Currently Playing" over `currentPlaylistId` — the
+  operator's own assignment, written before any device is contacted. No `deliveredAt`/
+  `acknowledgedAt`/`playing` column exists anywhere; the delivery ack covers two of four
+  channels, lives in Redis under a TTL, and is exposed by no API. So an offline device's row
+  asserted a playlist was on screen when it was not.
+- `DeviceStatusIndicator` defaulted to `'offline'` and fell back to offline for anything
+  unrecognised, so "no data" and "verified down" rendered identically — including when the
+  bootstrap fetch failed, which is swallowed. One failed request painted a healthy fleet as
+  offline.
+- **Rule:** before restyling anything that reports system state, follow the value to its writer.
+  A label is a claim; the backend either supports it or it does not. `assigned != delivered !=
+  acknowledged != playing`.
+
+### Measure rendered contrast; token substitution is not safe by inspection
+- Fixing the `.mkt` leak by copying the light semantic values across would have left three of
+  four families still failing as text (3.30 / 3.19 / 3.43 on white). Only computing showed it.
+- Checking one surface is not enough: `#dc2626` passes on a white card (4.83) and fails on the
+  page substrate (4.13).
+- `--focus-ring-color: var(--primary-ink)` kept failing inside `.mkt` even after `--primary-ink`
+  was redeclared there. Custom-property substitution resolves at computed-value time on the
+  element that declares it, so it had already resolved on `<html>` to the dark ink and inherited
+  in resolved. **Redeclaring a token does not re-resolve tokens that referenced it higher up.**
+- **Rule:** compute ratios against every substrate the text can sit on, and verify on live nodes.
+  A rule existing in the bundle does not prove an element receives it.
+
+### A new test proves nothing until it fails without the fix
+- Reverted the fix and re-ran, every time: the command-palette tests failed 3 of 5, the dialog
+  tests 7 of 8. The ones that passed either way were informative too — they marked the boundary
+  the fix did not own.
+- Existing suites had *pinned three defects*: `renders with default offline status`,
+  `bg-success-500`/`icon-delete` on Toast, and Modal's hardcoded `aria-labelledby="modal-title"`.
+  Green suites were protecting the bugs.
+- **Rule:** when a test starts failing after a fix, first ask whether it was asserting the defect.
+  And prove new tests fail against the unfixed code before claiming they cover anything.
+
+### Verification tooling needs verifying too
+- The clipping detector flagged every legitimate `overflow-x: auto` scroller until it walked
+  ancestor overflow instead of geometry — it reported "no improvement" on a fix that worked.
+- The focus-ring probe mounted on `<body>`, outside the `.mkt` wrapper, so it read root-scope
+  tokens and reported a ring no element on the page had. I nearly chased it as an app bug.
+- A CI monitor used shell `jq`, which is not installed here, so it emitted **silence** —
+  indistinguishable from "still running". Two PRs sat green unnoticed. `gh --jq` has jq embedded.
+- **Rule:** a measurement that disagrees with the code is as likely to be the instrument as the
+  subject. And silence from a monitor is not evidence of nothing happening.
