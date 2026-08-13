@@ -33,16 +33,36 @@ export default function Toast({ message, type, onClose, duration = 5000 }: Toast
     };
   }, [duration, startClose]);
 
+  /**
+   * Shades chosen so the white label clears WCAG AA (4.5:1), computed against
+   * #FFFFFF from the ramp in tailwind.theme.cjs rather than picked by eye:
+   *
+   *          -500    -600    -700
+   *  success 2.28    3.30    5.02  <-
+   *  error   3.76    4.83 <- 6.47
+   *  warning 2.15    3.19    5.02  <-
+   *  info    2.46    3.43    5.36  <-
+   *
+   * Every variant previously used -500, so all four failed — a toast is often
+   * the only report a user gets that their action succeeded or failed, which
+   * makes it a poor place to be unreadable. Each now takes the lightest shade
+   * that passes, keeping as much of the colour as legibility allows.
+   *
+   * These are fixed shades, not theme tokens, deliberately: a toast is a
+   * transient overlay that must stay legible in both themes, and the semantic
+   * tokens resolve to different values per theme.
+   */
   const colors = {
-    success: 'bg-success-500 text-white',
-    error: 'bg-error-500 text-white',
-    info: 'bg-info-500 text-white',
-    warning: 'bg-warning-500 text-white',
+    success: 'bg-success-700 text-white',
+    error: 'bg-error-600 text-white',
+    info: 'bg-info-700 text-white',
+    warning: 'bg-warning-700 text-white',
   };
 
   const icons: Record<ToastType, IconName> = {
     success: 'success',
-    error: 'delete',
+    // Was 'delete' — a trash can, which reads as "removed", not "failed".
+    error: 'error',
     info: 'info',
     warning: 'warning',
   };
@@ -52,7 +72,10 @@ export default function Toast({ message, type, onClose, duration = 5000 }: Toast
       role="alert"
       aria-live="assertive"
       aria-atomic="true"
-      className={`fixed top-4 right-4 z-50 flex items-center gap-3 px-6 py-4 rounded-lg shadow-lg text-white ${
+      // Positioning belongs to ToastContainer. Every toast used to carry
+      // `fixed top-4 right-4` itself, so a second toast landed exactly on top
+      // of the first and the earlier message was simply lost.
+      className={`pointer-events-auto flex items-center gap-3 px-6 py-4 rounded-lg shadow-lg text-white ${
         colors[type]
       } transform transition-all duration-300 ${
         isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
