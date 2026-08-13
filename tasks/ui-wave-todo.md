@@ -84,6 +84,32 @@ Reproduce in production before treating either as real; otherwise record as loca
 - Auth pages show fabricated figures ("2,500+ organizations trust Vizora", and a
   "24 Screens / 148 Content / 99.9% Uptime" panel) that are hardcoded, not tenant data.
 
+## Literal inventory is NOT a burn-down target
+
+Measured on main after the foundation phase:
+
+```
+token refs (theme-following)   3458
+neon #00E5A0 total              781
+  of which used as text         207
+raw Tailwind semantic literals 1050
+```
+
+**Operator instruction, verbatim in intent: do not treat these as a quota to burn down.**
+The goal is better product quality, not reaching zero literals.
+
+- **Pool B (neon as text)** — migrate a site only where it is semantically text AND fails the
+  design/contrast intent. Neon is legal and often correct as a fill, glow, gradient stop or
+  icon shape. A `text-` prefix is a strong hint, not a verdict; the "V" logo mark on the auth
+  screens sits on a dark filled badge and is fine exactly as it is.
+- **Pool C (raw Tailwind semantics)** — classify by family first: surface/background,
+  foreground/muted, border, status, interactive/selected, brand/decorative, chart/data,
+  intentional one-off. Migrate a family to tokens only where there are multiple real consumers.
+  Deliberate one-offs stay.
+
+Counting these down without reading them would replace a legible intentional accent with a
+token for no user-visible gain, and would churn files the wave never needed to touch.
+
 ## Known traps (measured, not assumed)
 
 - Pool C — **1,094** raw Tailwind semantic literals (`bg-red-500`, `text-amber-400`) across
