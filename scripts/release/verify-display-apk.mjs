@@ -37,6 +37,14 @@ import { pathToFileURL } from 'node:url';
 
 const DEFAULT_PACKAGE = 'com.vizora.display';
 
+/**
+ * The three compiled-in backend origins every release must pin and record.
+ *
+ * Named once so "all three are asserted" cannot drift into "whichever the data
+ * happened to contain" — the failure mode this list exists to prevent.
+ */
+const ORIGIN_KEYS = ['api', 'realtime', 'dashboard'];
+
 // ─── Binary AndroidManifest.xml (AXML) parsing ───────────────────────────────
 // Format reference: AOSP frameworks/base/libs/androidfw/include/androidfw/ResourceTypes.h
 
@@ -165,6 +173,543 @@ function parseAndroidManifest(buf) {
 }
 
 // ─── APK reading ─────────────────────────────────────────────────────────────
+
+/** List the entry names inside an APK (a zip) using the bundled `unzip`. */
+function listEntries(apkPath) {
+  const out = execFileSync('unzip', ['-Z1', apkPath], {
+    encoding: 'utf8',
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  return out.split('\n').map(l => l.trim()).filter(Boolean);
+}
+
+/**
+ * Read the DEFAULT backend origins the bundle was COMPILED with, out of the APK.
+ *
+ * Scope, stated precisely: this proves build provenance — which origins were
+ * compiled into the artifact as its defaults — and nothing more. It is NOT proof
+ * of where a running device ends up pointed. The client seeds `DEFAULT_CONFIG`
+ * from these values and then applies URL parameters and stored Preferences over
+ * them, and the guarded `update_config` path can move a paired device to another
+ * host in the same registrable domain. Effective runtime destination is a separate
+ * question with its own controls; do not let this check be read as covering it.
+ *
+ * What it does close is the original hole: every other assertion here — package
+ * id, version, certificate, hash — is indifferent to which origins were compiled
+ * in, which is how an APK built against the wrong environment passed the gate.
+ *
+ * Reads the `__VIZORA_RELEASE_ORIGINS__` marker that vizora-tv stamps into the
+ * bundle at build time. Deliberately NOT a scan for bare URLs: `api` and
+ * `dashboard` are both https://vizora.cloud today, so loose URL matching could
+ * report which hosts appear but never which value landed in which slot — and
+ * "the right hosts are in there somewhere" is exactly the fuzzy check that passes
+ * when it should not.
+ *
+ * @param apkPath path to the APK
+ * @returns {{origins: object|null, entry: string|null, problem: string|null}}
+ */
+export function readPackagedOrigins(apkPath, deps = {}) {
+  const list = deps.listEntries || listEntries;
+  const read = deps.extractEntry || extractEntry;
+
+  let entries;
+  try {
+    entries = list(apkPath);
+  } catch (err) {
+    return { origins: null, entry: null, problem: `could not list APK entries: ${err.message}` };
+  }
+
+  // The marker lives in the app bundle under the Capacitor web-asset root.
+  const candidates = entries.filter(e => /^assets\/public\/.*\.js$/.test(e));
+  if (candidates.length === 0) {
+    return {
+      origins: null,
+      entry: null,
+      problem: 'no packaged JS found under assets/public/ — this does not look like a Vizora Display APK',
+    };
+  }
+
+  // Single-quoted after terser, double-quoted unminified: accept either, and let
+  // the escape class handle a quote inside the JSON.
+  const MARKER = /__VIZORA_RELEASE_ORIGINS__\s*=\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')/;
+
+  const found = [];
+  for (const entry of candidates) {
+    let text;
+    try {
+      text = read(apkPath, entry).toString('utf8');
+    } catch {
+      continue; // an unreadable sibling chunk must not mask the real marker
+    }
+    const m = MARKER.exec(text);
+    if (!m) continue;
+
+    // The capture is the BODY of a JS string literal holding JSON, so it has to be
+    // unescaped before it can be parsed — and the two quote styles need different
+    // handling. In a double-quoted literal every inner `"` is already backslashed,
+    // so the body is a valid JSON-string body as-is. In a single-quoted literal the
+    // inner `"` are bare and must be escaped first. Treating both the same way
+    // double-escapes the already-escaped case and produces garbage.
+    let parsed;
+    try {
+      const body =
+        m[1] !== undefined
+          ? m[1]
+          : m[2].replace(/\\'/g, "'").replace(/"/g, '\\"');
+      parsed = JSON.parse(JSON.parse(`"${body}"`));
+    } catch (err) {
+      return { origins: null, entry, problem: `origins marker in ${entry} is not valid JSON: ${err.message}` };
+    }
+    found.push({ entry, parsed });
+  }
+
+  if (found.length === 0) {
+    return {
+      origins: null,
+      entry: null,
+      problem:
+        'no __VIZORA_RELEASE_ORIGINS__ marker in the packaged bundle. Either this APK predates the ' +
+        'marker (vizora-tv#18) or the build stripped it — a release cannot be verified without it.',
+    };
+  }
+
+  // More than one chunk carrying the marker is only a problem if they disagree;
+  // disagreement means the bundle was assembled from mismatched builds.
+  const distinct = [...new Set(found.map(f => JSON.stringify(f.parsed)))];
+  if (distinct.length > 1) {
+    return {
+      origins: null,
+      entry: found.map(f => f.entry).join(', '),
+      problem: `packaged chunks disagree about the compiled origins: ${distinct.join(' vs ')}`,
+    };
+  }
+
+  return { origins: found[0].parsed, entry: found[0].entry, problem: null };
+}
+
+/**
+ * Compare the origins read from the artifact against the pinned expectation.
+ * Pure, so the fail-closed behaviour is unit-testable without an APK fixture —
+ * same shape as evaluatePinnedCert below, and for the same reason.
+ *
+ * @param pinned   expected origins from release.json ({} / null when unset)
+ * @param actual   origins read out of the APK (null when unreadable)
+ * @param problem  why they could not be read, if they could not
+ * @param required true when publishing (--require-pinned-origins)
+ */
+export function evaluatePackagedOrigins(pinned, actual, problem, required) {
+  const name = 'compiled default origins match the pinned expectation';
+  const keys = ORIGIN_KEYS;
+
+  const isFilled = (obj, k) => typeof obj?.[k] === 'string' && obj[k].length > 0;
+  const pinnedKeys = keys.filter(k => isFilled(pinned, k));
+
+  // A PARTIAL pin is malformed data, not an absent one, and it fails closed in
+  // every mode — including outside publishing, exactly like a malformed cert pin.
+  //
+  // This is the shape of the bug that shipped in the first draft of this function:
+  // "a pin exists" was decided with .some(), then only the keys that happened to be
+  // present were compared. A releaseOrigins block carrying just `api` therefore
+  // passed on `api` alone while `realtime` and `dashboard` silently dropped out of
+  // the assertion — the check reporting PASS while covering one third of what it
+  // claims. Requiring all three up front is what makes "all three are asserted" a
+  // property of the code rather than of the data it happens to be handed.
+  if (pinnedKeys.length > 0 && pinnedKeys.length < keys.length) {
+    const missing = keys.filter(k => !isFilled(pinned, k));
+    return {
+      name,
+      pass: false,
+      detail:
+        `INCOMPLETE PIN — releaseOrigins must pin all of ${keys.join(', ')}; ` +
+        `missing or empty: ${missing.join(', ')}.\n        ` +
+        `A partial pin drops the unpinned origins from the comparison entirely, so a ` +
+        `mis-pointed one would pass unnoticed. Fix the pin rather than publishing against it.`,
+    };
+  }
+
+  if (pinnedKeys.length === 0) {
+    if (required) {
+      return {
+        name,
+        pass: false,
+        detail:
+          'NO ORIGINS PINNED — releaseOrigins is missing from release.json. Publishing without ' +
+          'a pinned expectation is how an APK compiled against the wrong backend reaches ' +
+          'customers: every other check here passes regardless of which origins it was built with.',
+      };
+    }
+    return {
+      name,
+      pass: true,
+      skipped: true,
+      detail: 'SKIPPED — no releaseOrigins pinned in release.json. Publish always requires it.',
+    };
+  }
+
+  if (!actual) {
+    return { name, pass: false, detail: `could not read the compiled origins: ${problem}` };
+  }
+
+  // The artifact must carry all three too. A marker missing a key is as unverifiable
+  // as a marker missing entirely, and must not pass on the strength of the others.
+  const absent = keys.filter(k => !isFilled(actual, k));
+  if (absent.length) {
+    return {
+      name,
+      pass: false,
+      detail:
+        `INCOMPLETE MARKER — the APK records no value for: ${absent.join(', ')}. ` +
+        `All of ${keys.join(', ')} must be present to verify the build.`,
+    };
+  }
+
+  const mismatches = keys
+    .filter(k => actual[k] !== pinned[k])
+    .map(k => `${k}: apk compiled with ${actual[k]}, pin expects ${pinned[k]}`);
+
+  if (mismatches.length) {
+    return {
+      name,
+      pass: false,
+      detail:
+        `MISMATCH — this APK was compiled against different origins than the pin allows.\n        ` +
+        mismatches.join('\n        ') +
+        `\n        Do not publish it: installs would default to the wrong environment.`,
+    };
+  }
+
+  return { name, pass: true, detail: keys.map(k => `${k}=${actual[k]}`).join('  ') };
+}
+
+/**
+ * Compare the artifact's compiled origins against the previously PUBLISHED
+ * artifact's, so a change of backend is a deliberate, visible act rather than
+ * something that slips through between releases — the same role
+ * `signingCertSha256` plays for the key.
+ *
+ * Absent baseline is an explicit SKIP, never a silent pass: releases predating the
+ * origins marker have nothing to compare against, and that must not read as a
+ * continuity check that ran and succeeded.
+ */
+export function evaluateOriginsBaseline(baselineOrigins, actual, transition, pinned) {
+  const name = 'compiled default origins match the previously published release';
+  const keys = ORIGIN_KEYS;
+  const isFilled = (obj, k) => typeof obj?.[k] === 'string' && obj[k].length > 0;
+  const complete = obj => Boolean(obj) && keys.every(k => isFilled(obj, k));
+  const describe = obj => keys.map(k => `${k}=${obj?.[k] ?? '(absent)'}`).join('  ');
+
+  // ABSENT is special; MALFORMED is not. A null baseline genuinely has nothing to
+  // compare against — 1.3.13 predates the origins marker — and that is the only
+  // case allowed to skip. A non-null baseline missing or emptying a key is bad
+  // data, and letting it skip would rebuild the exact escape hatch just removed
+  // from the policy-pin check: malformed input silently disabling the control.
+  if (baselineOrigins === null || baselineOrigins === undefined) {
+    return {
+      name,
+      pass: true,
+      skipped: true,
+      detail:
+        'SKIPPED — the published baseline records no compiled origins (it predates the ' +
+        "origins marker). This artifact's origins become the baseline once promoted to published.",
+    };
+  }
+
+  if (!complete(baselineOrigins)) {
+    const missing = keys.filter(k => !isFilled(baselineOrigins, k));
+    return {
+      name,
+      pass: false,
+      detail:
+        `INCOMPLETE BASELINE — published.compiledOrigins is present but missing or empty for: ` +
+        `${missing.join(', ')}.\n        ` +
+        `A partial baseline is corrupt release metadata, not an absent one. Treating it as ` +
+        `absent would let malformed data silently switch this check off. Repair the published ` +
+        `record — do not publish against it.`,
+    };
+  }
+
+  if (!actual) {
+    return { name, pass: false, detail: 'could not read the compiled origins from this APK' };
+  }
+
+  const changed = keys.filter(k => actual[k] !== baselineOrigins[k]);
+  if (changed.length === 0) {
+    return { name, pass: true, detail: 'unchanged from the published release' };
+  }
+
+  // ─── The artifact moves environments ───────────────────────────────────────
+  //
+  // `published` describes the artifact that is CURRENTLY LIVE. Editing it to the
+  // new origins so the gate goes green would falsify the record of what customers
+  // are actually running, to authorise a change that has not happened yet — the
+  // one file whose job is to be true about production. It stays immutable until
+  // the new candidate is genuinely published.
+  //
+  // A deliberate migration is therefore authorised OUT OF BAND, by an explicit
+  // transition that names where it is coming from and going to. That keeps the
+  // approval auditable and self-invalidating: once `from` no longer matches the
+  // live baseline, the transition has been consumed and cannot silently authorise
+  // a second, different move.
+  const detailChanged = changed
+    .map(k => `${k}: published ${baselineOrigins[k]} -> this build ${actual[k]}`)
+    .join('\n        ');
+
+  if (!transition) {
+    return {
+      name,
+      pass: false,
+      detail:
+        `UNAUTHORISED ORIGIN CHANGE — this build was compiled against different origins ` +
+        `than the published release:\n        ${detailChanged}\n        ` +
+        `If this move is intended, record an approved originTransition {from, to, approvedBy, ` +
+        `approvedAt} in release.json. Do NOT edit published.compiledOrigins to match: that ` +
+        `record describes what is live right now, and rewriting it to clear a gate would make ` +
+        `it a lie about production.`,
+    };
+  }
+
+  const problems = [];
+  if (!complete(transition.from)) problems.push('originTransition.from does not name all three origins');
+  else if (keys.some(k => transition.from[k] !== baselineOrigins[k])) {
+    problems.push(
+      `originTransition.from does not match the live published baseline ` +
+        `(transition says ${describe(transition.from)}; published is ${describe(baselineOrigins)}). ` +
+        `A stale transition must not authorise a different move than the one approved.`,
+    );
+  }
+
+  if (!complete(transition.to)) problems.push('originTransition.to does not name all three origins');
+  else {
+    if (keys.some(k => transition.to[k] !== actual[k])) {
+      problems.push(
+        `originTransition.to does not match what this APK was actually compiled with ` +
+          `(transition says ${describe(transition.to)}; apk has ${describe(actual)})`,
+      );
+    }
+    if (!complete(pinned)) {
+      problems.push('releaseOrigins is missing or incomplete, so the transition target cannot be corroborated');
+    } else if (keys.some(k => transition.to[k] !== pinned[k])) {
+      problems.push(
+        `originTransition.to does not match the releaseOrigins policy pin ` +
+          `(transition says ${describe(transition.to)}; pin is ${describe(pinned)})`,
+      );
+    }
+  }
+
+  if (!transition.approvedBy) problems.push('originTransition.approvedBy is empty — a migration needs a named approver');
+  if (!transition.approvedAt) problems.push('originTransition.approvedAt is empty');
+
+  if (problems.length) {
+    return {
+      name,
+      pass: false,
+      detail:
+        `ORIGIN TRANSITION REJECTED — the change is declared but not properly authorised:` +
+        `\n        ${detailChanged}\n        ` +
+        problems.map(p => `- ${p}`).join('\n        '),
+    };
+  }
+
+  return {
+    name,
+    pass: true,
+    detail:
+      `authorised migration by ${transition.approvedBy} on ${transition.approvedAt}:\n        ` +
+      detailChanged +
+      `\n        published.compiledOrigins stays as-is until this build is actually published.`,
+  };
+}
+
+/**
+ * Bind the `candidate` record in release.json to the APK actually being published.
+ *
+ * Without this the record and the artifact are related only by an operator copying
+ * fields correctly. Everything downstream trusts `candidate`: it is promoted to
+ * `published` after a successful publish and becomes the baseline the NEXT release's
+ * certificate, versionCode and compiled origins are compared against. A candidate
+ * that does not describe the bytes just published therefore poisons the next
+ * release's baseline — or, where a field is null, permanently SKIPs the check that
+ * depends on it, which reads as coverage and is not.
+ *
+ * `compiledOrigins` is three-state rather than merely present/absent: a pre-marker
+ * build must record null and a marker-era build must record all three, and which is
+ * correct is decided by the bytes. Neither an omission nor a stale value can pass as
+ * the other.
+ */
+export function evaluateCandidateBinding(candidate, actual, required) {
+  const name = 'candidate record matches this exact APK';
+
+  if (!candidate) {
+    if (required) {
+      return {
+        name,
+        pass: false,
+        detail:
+          'NO CANDIDATE RECORDED — release.json has no candidate block, so nothing ties the ' +
+          'release record to these bytes. Publishing would promote an unverified record.',
+      };
+    }
+    return { name, pass: true, skipped: true, detail: 'SKIPPED — no candidate block. Publish always requires one.' };
+  }
+
+  const problems = [];
+  const cmp = (field, expected, got, normalise = v => v) => {
+    if (expected === undefined || expected === null || expected === '') {
+      problems.push(`candidate.${field} is missing — it must describe the artifact being published`);
+      return;
+    }
+    if (normalise(expected) !== normalise(got)) {
+      problems.push(`candidate.${field} is ${expected} but the APK has ${got}`);
+    }
+  };
+
+  cmp('package', candidate.package, actual.package);
+  cmp('versionName', candidate.versionName, actual.versionName);
+  cmp('apkSha256', candidate.apkSha256, actual.apkSha256, normalizeFingerprint);
+  cmp('signingCertSha256', candidate.signingCertSha256, actual.signingCertSha256, normalizeFingerprint);
+
+  // versionCode is compared as an INTEGER, with no String() coercion on either side.
+  //
+  // It previously normalised both sides with String(v), so a candidate of "10144"
+  // satisfied a manifest 10144. That looked like harmless leniency and is not: this
+  // record is promoted into `published`, where the downgrade check requires an
+  // integer, so a string that passes here silently switches that check off for the
+  // NEXT release. A type error in a value that becomes a safety baseline is not a
+  // cosmetic difference — poisoning the promoted baseline is precisely what this
+  // binder exists to prevent.
+  if (!Number.isInteger(candidate.versionCode) || candidate.versionCode <= 0) {
+    problems.push(
+      `candidate.versionCode must be a positive integer — got ${JSON.stringify(candidate.versionCode)}. ` +
+        `This value is promoted into published.versionCode, where a non-integer disables the ` +
+        `Android downgrade check on the following release.`,
+    );
+  } else if (candidate.versionCode !== actual.versionCode) {
+    problems.push(`candidate.versionCode is ${candidate.versionCode} but the APK has ${actual.versionCode}`);
+  }
+
+  // Validate the TYPE before comparing, not as a precondition for comparing at all.
+  //
+  // This previously read `if (Number.isInteger(candidate.apkBytes) && ... !== ...)`,
+  // which meant a missing, null, or string-valued size skipped the comparison
+  // silently and the candidate still passed — the same malformed-data-narrows-the-
+  // check defect removed from the origins pin and the origins baseline, surviving
+  // here in the one field where it looked like a harmless guard.
+  if (!Number.isInteger(candidate.apkBytes) || candidate.apkBytes <= 0) {
+    problems.push(
+      `candidate.apkBytes must be a positive integer — got ${JSON.stringify(candidate.apkBytes)}. ` +
+        `A missing or non-numeric size cannot be compared, and must not pass as though it had been.`,
+    );
+  } else if (candidate.apkBytes !== actual.apkBytes) {
+    problems.push(`candidate.apkBytes is ${candidate.apkBytes} but the APK is ${actual.apkBytes} bytes`);
+  }
+
+  const isFilled = (obj, k) => typeof obj?.[k] === 'string' && obj[k].length > 0;
+  const co = candidate.compiledOrigins;
+  const apkHasMarker = Boolean(actual.compiledOrigins);
+
+  if (co === undefined) {
+    problems.push('candidate.compiledOrigins is absent — record null for a pre-marker build, or all three origins');
+  } else if (co === null) {
+    if (apkHasMarker) {
+      problems.push(
+        'candidate.compiledOrigins is null but this APK carries an origins marker. Record the three ' +
+          'compiled origins, or the next release inherits a permanently SKIPPED baseline check.',
+      );
+    }
+  } else if (!ORIGIN_KEYS.every(k => isFilled(co, k))) {
+    const missing = ORIGIN_KEYS.filter(k => !isFilled(co, k));
+    problems.push(`candidate.compiledOrigins is incomplete — missing or empty: ${missing.join(', ')}`);
+  } else if (!apkHasMarker) {
+    problems.push('candidate.compiledOrigins records origins but this APK carries no marker to corroborate them');
+  } else {
+    const wrong = ORIGIN_KEYS.filter(k => co[k] !== actual.compiledOrigins[k]);
+    if (wrong.length) {
+      problems.push(
+        'candidate.compiledOrigins disagrees with the APK: ' +
+          wrong.map(k => `${k} recorded ${co[k]}, apk has ${actual.compiledOrigins[k]}`).join('; '),
+      );
+    }
+  }
+
+  if (problems.length) {
+    return {
+      name,
+      pass: false,
+      detail:
+        `CANDIDATE DOES NOT DESCRIBE THIS APK:\n        ` +
+        problems.map(p => `- ${p}`).join('\n        ') +
+        `\n        This record is promoted to published after release and becomes the next release's ` +
+        `baseline. Fix it rather than publishing against it.`,
+    };
+  }
+
+  return {
+    name,
+    pass: true,
+    detail: `${candidate.versionName} (${candidate.versionCode}); sha, cert and origins all match the artifact`,
+  };
+}
+
+/**
+ * Enforce Gate A's exact-artifact binding mechanically.
+ *
+ * The release record has always SAID Gate A binds to one specific SHA-256 and that a
+ * rebuild voids it — but that lived only in prose. The publish script checked
+ * `artifactApprovedBy` was non-null and never compared the approved hash to the APK
+ * in front of it, so an approval for one binary would wave through a different one:
+ * exactly the failure the prose warns about.
+ */
+export function evaluateGateABinding(approval, candidateSha, actualSha, required) {
+  const name = 'Gate A approval is bound to this exact APK';
+  const approved = approval?.artifactApprovedSha256;
+
+  if (!approved) {
+    if (required) {
+      return {
+        name,
+        pass: false,
+        detail:
+          'NO APPROVED HASH RECORDED — approval.artifactApprovedSha256 is missing. Gate A must name the ' +
+          'exact binary it approves; an approver name alone cannot tell this APK from any other.',
+      };
+    }
+    return {
+      name,
+      pass: true,
+      skipped: true,
+      detail: 'SKIPPED — approval.artifactApprovedSha256 not set. Publish always requires it.',
+    };
+  }
+
+  if (!approval?.artifactApprovedBy) {
+    return {
+      name,
+      pass: false,
+      detail: 'approval.artifactApprovedSha256 is set but approval.artifactApprovedBy is empty — nobody approved it',
+    };
+  }
+
+  const a = normalizeFingerprint(approved);
+  const problems = [];
+  if (a !== normalizeFingerprint(actualSha)) {
+    problems.push(
+      `approved ${formatFingerprint(a)} but this APK is ${formatFingerprint(normalizeFingerprint(actualSha))}. ` +
+        `Approval binds to one binary; a rebuild produces different bytes and voids it.`,
+    );
+  }
+  if (candidateSha && a !== normalizeFingerprint(candidateSha)) {
+    problems.push(
+      `approved hash does not match candidate.apkSha256 ${formatFingerprint(normalizeFingerprint(candidateSha))} — ` +
+        `the approval and the release record disagree about which artifact this is`,
+    );
+  }
+
+  if (problems.length) {
+    return { name, pass: false, detail: `GATE A MISMATCH:\n        ` + problems.join('\n        ') };
+  }
+
+  return { name, pass: true, detail: `${formatFingerprint(a)} approved by ${approval.artifactApprovedBy}` };
+}
 
 /** Extract a single entry from the APK (a zip) using the bundled `unzip`. */
 function extractEntry(apkPath, entryName) {
@@ -422,6 +967,10 @@ async function main() {
   let baseline = null;
   let baselineAbsent = false;
   let pinnedCert = '';
+  let pinnedOrigins = null;
+  let originTransition = null;
+  let candidateRecord = null;
+  let approvalRecord = null;
   if (args.against) {
     const p = resolve(String(args.against));
     if (!existsSync(p)) {
@@ -432,6 +981,10 @@ async function main() {
     baseline = Object.prototype.hasOwnProperty.call(doc, 'published') ? doc.published : doc;
     if (!baseline) baselineAbsent = true;
     pinnedCert = normalizeFingerprint(doc?.signing?.canonicalCertSha256 || '');
+    pinnedOrigins = doc?.releaseOrigins || null;
+    originTransition = doc?.originTransition || null;
+    candidateRecord = doc?.candidate || null;
+    approvalRecord = doc?.approval || null;
   }
 
   const bytes = readFileSync(apkPath);
@@ -552,6 +1105,69 @@ async function main() {
   // APK must match it.
   checks.push(evaluatePinnedCert(pinnedCert, cert.sha256, Boolean(args['require-pinned-cert'])));
 
+  // 3d. The default origins this APK was COMPILED with.
+  //
+  // Read from the packaged bundle, not from the build config, because the config
+  // only says what we intended. Every check above is origin-blind — a build made
+  // against the wrong environment has a valid package id, a correct version, the
+  // right certificate and a perfectly good hash. This is the one that catches it.
+  //
+  // Build provenance only: the client layers URL params, stored Preferences and the
+  // guarded update_config path over these defaults at runtime.
+  const packagedOrigins = readPackagedOrigins(apkPath);
+  checks.push(
+    evaluatePackagedOrigins(
+      pinnedOrigins,
+      packagedOrigins.origins,
+      packagedOrigins.problem,
+      Boolean(args['require-pinned-origins']),
+    ),
+  );
+
+  // 3e. Release-over-release continuity for the origins, mirroring what
+  // signingCertSha256 does for the key: `published.compiledOrigins` is the baseline,
+  // so moving environments has to be a deliberate edit rather than a silent drift.
+  if (baseline) {
+    checks.push(
+      evaluateOriginsBaseline(baseline.compiledOrigins, packagedOrigins.origins, originTransition, pinnedOrigins),
+    );
+  }
+
+  // 3f. The release RECORD must describe these exact bytes.
+  //
+  // candidate is promoted to published after a successful publish and becomes the
+  // next release's baseline, so a candidate that does not match the artifact
+  // poisons that baseline — or, where a field is null, permanently skips the check
+  // built on it. Until now nothing compared the two: the hand-off was a note in the
+  // publish output telling a human to copy fields across correctly.
+  checks.push(
+    evaluateCandidateBinding(
+      candidateRecord,
+      {
+        package: manifest.package,
+        versionName: manifest.versionName,
+        versionCode: manifest.versionCode,
+        apkSha256,
+        apkBytes: bytes.length,
+        signingCertSha256: cert.sha256,
+        compiledOrigins: packagedOrigins.origins,
+      },
+      Boolean(args['require-candidate-binding']),
+    ),
+  );
+
+  // 3g. Gate A's exact-hash binding, mechanically. The record has always said the
+  // approval is bound to one SHA-256 and that a rebuild voids it; that sentence was
+  // never enforced by anything.
+  checks.push(
+    evaluateGateABinding(
+      approvalRecord,
+      candidateRecord?.apkSha256,
+      apkSha256,
+      Boolean(args['require-candidate-binding']),
+    ),
+  );
+
   // 4. certificate matches the previously accepted release + versionCode increases
   if (baselineAbsent) {
     // Not a pass and not a failure — there is genuinely nothing to compare to.
@@ -578,7 +1194,24 @@ async function main() {
             `A different key means every installed TV must be uninstalled and re-paired.`,
       );
     }
-    if (Number.isInteger(baseline.versionCode)) {
+    // The type test decides the VERDICT, never whether the comparison happens.
+    //
+    // This read `if (Number.isInteger(baseline.versionCode)) { ... }`, so a
+    // published.versionCode of "10142" — a string, which is exactly what promoting
+    // a string-typed candidate produces — made the downgrade check disappear
+    // silently. That is the delay-fuse version of the malformed-data hatch: the bad
+    // value enters as a candidate, passes, is promoted, and only then switches off
+    // a safety check on the FOLLOWING release. `published === null` is handled above
+    // as the legitimate no-baseline case; anything present must be well-formed.
+    if (!Number.isInteger(baseline.versionCode) || baseline.versionCode <= 0) {
+      check(
+        'versionCode strictly greater than published',
+        false,
+        `published.versionCode must be a positive integer — got ${JSON.stringify(baseline.versionCode)}. ` +
+          `A malformed baseline cannot establish the Android downgrade rule, and must not pass as ` +
+          `though it had.`,
+      );
+    } else {
       const strictlyGreater = manifest.versionCode > baseline.versionCode;
       const same = manifest.versionCode === baseline.versionCode;
       check(
@@ -633,6 +1266,8 @@ async function main() {
     versionCode: manifest.versionCode,
     apkSha256,
     apkBytes: bytes.length,
+    compiledOrigins: packagedOrigins.origins,
+    compiledOriginsEntry: packagedOrigins.entry,
     signingCertSha256: cert.sha256,
     signingCertOwner: cert.owner,
     signingCertValidUntil: cert.validUntil,
@@ -658,6 +1293,14 @@ async function main() {
     console.log(`  version         ${report.versionName} (versionCode ${report.versionCode})`);
     console.log(`  size            ${report.apkBytes} bytes`);
     console.log(`  apk sha256      ${formatFingerprint(report.apkSha256)}`);
+    console.log('');
+    if (report.compiledOrigins) {
+      console.log(`  api origin      ${report.compiledOrigins.api ?? '(absent)'}`);
+      console.log(`  realtime origin ${report.compiledOrigins.realtime ?? '(absent)'}`);
+      console.log(`  dashboard orig. ${report.compiledOrigins.dashboard ?? '(absent)'}`);
+    } else {
+      console.log(`  compiled origin unreadable — ${packagedOrigins.problem}`);
+    }
     console.log('');
     console.log(`  cert sha256     ${formatFingerprint(report.signingCertSha256)}`);
     console.log(`  cert owner      ${report.signingCertOwner}`);

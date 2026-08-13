@@ -93,12 +93,28 @@ fi
 # --require-apksigner makes publication FAIL CLOSED when full cross-scheme
 # signature verification cannot run. keytool alone reads the v1 block only and
 # would miss a v2/v3 block signed with a different key.
-say "Verifying APK identity, signing key and integrity"
+#
+# --require-pinned-origins does the same for the DEFAULT origins the APK was
+# compiled with (build provenance — runtime config can still be overridden on the
+# device). Every other check is origin-blind: a build made against the wrong
+# environment has a valid package id, a correct version, the right certificate and
+# a good hash.
+#
+# --require-candidate-binding ties the release RECORD to these exact bytes: the
+# candidate block must describe this APK (package, version, hash, certificate,
+# compiled origins) and Gate A's approved hash must equal both. Without it the
+# record and the artifact are related only by an operator copying fields
+# correctly, and candidate is what gets promoted to published — so a wrong
+# candidate poisons the NEXT release's baseline, or nulls a field and silently
+# skips the check built on it.
+say "Verifying APK identity, signing key, compiled origins, record binding and integrity"
 node "$REPO_ROOT/scripts/release/verify-display-apk.mjs" \
   --apk "$APK" \
   --against "$RELEASE_JSON" \
   --require-apksigner \
-  --require-pinned-cert
+  --require-pinned-cert \
+  --require-pinned-origins \
+  --require-candidate-binding
 
 # ─── Confirm the page matches the artifact ───────────────────────────────────
 say "Confirming installer page matches release.json"
@@ -219,5 +235,15 @@ cat <<EOF
 
   Remaining manual step: move the verified 'candidate' block in
   deploy/tv/release.json to 'published', commit, and open a PR. That block is
-  the baseline the NEXT release's signing certificate is compared against.
+  the baseline the NEXT release is compared against — its signing certificate,
+  its versionCode, and its compiledOrigins. Carry compiledOrigins across with
+  the rest: leaving it null keeps the origins continuity check permanently
+  SKIPPED, which looks like coverage without being any.
+
+  This promotion is the ONLY time published.compiledOrigins changes. It records
+  what customers are running, so it is never edited to make a gate pass.
+
+  If this release was an approved environment migration, clear originTransition
+  in the same commit — the move it authorised has now happened, and the block
+  would otherwise sit there pre-authorising a future one.
 EOF
