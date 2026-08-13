@@ -1,7 +1,7 @@
 // WebSocket Message DTOs
 // These DTOs provide type-safe validation for WebSocket message payloads
 
-import { IsString, IsNumber, IsOptional, IsObject, ValidateNested, Min, Max, MaxLength, IsEnum, IsBoolean, IsArray, IsNotEmpty } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsObject, ValidateNested, Min, Max, MaxLength, IsEnum, IsBoolean, IsArray, IsNotEmpty, ValidateIf } from 'class-validator';
 import { Type } from 'class-transformer';
 
 /**
@@ -97,6 +97,43 @@ export class HeartbeatMessageDto {
   @IsString()
   @MaxLength(32)
   playbackSource?: string;
+
+  // The effective-content version the device currently has rendered, so the
+  // server can detect drift and answer with `reconcileContent`.
+  //
+  // NOT whitelisting this is what the comment above warns about, and it happened:
+  // the player has sent `contentVersion` on EVERY heartbeat since v1.3.10
+  // (vizora-tv src/main.ts, initialised to '' so it is always serialised, never
+  // dropped as undefined), while this DTO never listed it. With
+  // forbidNonWhitelisted the pipe rejected the payload before the handler ran, so
+  // for four releases no heartbeat was processed: the Redis/DB status refresh and
+  // appVersion persistence never executed and the ack never reached the device.
+  //
+  // The four-release window is established by the CODE: the client shipped
+  // contentVersion in b08e3ae (2026-07-04), which is tagged into v1.3.10 through
+  // v1.3.13, and the pipe rejects it deterministically.
+  //
+  // Production corroborates but proves less, and the distinction is worth keeping
+  // honest: 0 devices carry metadata.appVersion, but persistAppVersionIfChanged
+  // only landed 2026-08-11 and just 3 devices have heartbeated since, so the DB
+  // speaks to a ~2-day window, not to four releases. Device rows still looked
+  // recent throughout because handleConnection writes lastHeartbeat on CONNECT —
+  // which is why this hid for so long.
+  //
+  // Bounded like appVersion: it is device-supplied and reaches a JSONB row.
+  //
+  // 64 is a CONTRACT ON THE GENERATOR, not a guess. The effective-content version
+  // is an ISO-8601 timestamp — max(updatedAt) across the resolved content — which
+  // is 24 chars and monotonic, so it compares correctly with the deployed client's
+  // string `>` in vizora-tv utils.ts:56. Anyone writing a version generator MUST
+  // keep that shape: a fixed-width hash or an ISO timestamp, never a per-item
+  // concatenation. The client's own computePlaylistSignature style would exceed
+  // this at two playlist items, and a version that changes without INCREASING is
+  // silently ignored by the shipped client regardless of length.
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  contentVersion?: string;
 }
 
 /**
@@ -121,9 +158,21 @@ export class ContentImpressionDto {
   @Max(100)
   completionPercentage?: number;
 
+  // BOTH shipped clients send `Date.now()` — a NUMBER:
+  //   vizora-tv src/main.ts:1774, :1808, :2026
+  //   display/src/electron/device-client.ts:552-554
+  // This was declared `@IsString()`, so every impression either client has ever
+  // emitted was rejected by the pipe before handleContentImpression ran. The
+  // content_impressions table holds 0 rows, lifetime — the discriminating fact.
+  //
+  // Accept both rather than swapping one strict type for another: the number is
+  // what is deployed in the field and cannot be changed retroactively, while an
+  // ISO string is the more useful wire format for anything written later. The
+  // handler already normalises.
   @IsOptional()
+  @ValidateIf((o: ContentImpressionDto) => typeof o.timestamp !== 'number')
   @IsString()
-  timestamp?: string;
+  timestamp?: string | number;
 }
 
 /**
