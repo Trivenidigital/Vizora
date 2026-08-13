@@ -6,7 +6,7 @@
  *   1. PostgreSQL VACUUM ANALYZE on high-churn tables (after asserting they exist)
  *   2. Prune stale `alert_rule_fires` dedup rows
  *   3. Redis memory & key reporting
- *   4. Log rotation (truncate .log files older than 7 days)
+ *   4. Log retention (trim oversized .log files to their most recent bytes)
  *   5. Database backup (only when BACKUP_S3_BUCKET is set)
  *
  * Exit codes:
@@ -14,14 +14,22 @@
  *   1 — maintenance completed but something failed (incidents recorded)
  *   2 — fatal error (agent could not complete)
  *
- * ─── Ordering rule: `pm2 flush` runs FIRST, never mid-run ────────────────────
+ * ─── `pm2 flush` is GONE. Do not reintroduce it ──────────────────────────────
  *
- * `pm2 flush` truncates PM2's log files. It used to run as task 4, which
- * deleted the per-table VACUUM failure reasons this agent had already written
- * in the same run — so `Vacuum: 0 OK, 7 failed` reached the operator with no
- * cause, and `ops-db-maintainer-error.log` was 0 bytes. Flushing at the START
- * keeps the hygiene benefit (clears the previous cycle) while guaranteeing that
- * everything this run produces survives it. Do not move it back.
+ * `pm2 flush` takes no target: it truncates the logs of EVERY app PM2 manages.
+ * Database maintenance was therefore destroying middleware, realtime, web and
+ * all fourteen agents' diagnostic history as a side effect, daily at 03:00.
+ * That has now materially harmed two separate investigations.
+ *
+ * An earlier repair moved the flush to the START of the run so this agent's own
+ * output would survive it. That fixed self-erasure but not the cross-service
+ * destruction, which was always the larger problem: the evidence being deleted
+ * belonged to services that had nothing to do with this agent.
+ *
+ * It was also buying almost nothing — measured on prod 2026-08-13, the entire
+ * log corpus was 184 KB against 42 GB free. Disk is now bounded by
+ * `lib/log-retention.ts`, which trims oversized files to their most recent
+ * bytes and never empties one.
  *
  * Security note: `execFileSync` everywhere (no shell). Database credentials are
  * passed via `PGPASSWORD` in the child environment and NEVER as arguments —
@@ -30,9 +38,10 @@
 
 import 'dotenv/config';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, statSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import type { AgentResult } from './lib/types.js';
+import { applyLogRetention, type LogRetentionResult } from './lib/log-retention.js';
 import {
   readOpsState,
   writeOpsState,
@@ -58,8 +67,6 @@ import {
 const PG_CONTAINER = process.env.CONFIG_DRIFT_PG_CONTAINER ?? 'vizora-postgres';
 
 const VACUUM_TIMEOUT_MS = 120_000; // 2 minutes per table
-const PM2_FLUSH_TIMEOUT_MS = 10_000;
-const LOG_MAX_AGE_DAYS = 7;
 const REDIS_TIMEOUT_MS = 10_000;
 
 /**
@@ -241,35 +248,24 @@ function checkRedis(): RedisStatus {
   return status;
 }
 
-// ─── Task 4: log rotation ────────────────────────────────────────────────────
+// ─── Task 4: log retention ───────────────────────────────────────────────────
 
-interface LogRotationResult { truncated: string[]; errors: string[] }
-
-/** Truncate (not delete) .log files older than the window — PM2 holds handles. */
-function rotateLogs(): LogRotationResult {
-  const result: LogRotationResult = { truncated: [], errors: [] };
-
-  let files: string[];
-  try {
-    files = readdirSync(LOGS_DIR).filter(f => f.endsWith('.log'));
-  } catch {
-    log(AGENT, `Logs directory not readable: ${LOGS_DIR}`);
-    return result;
+/**
+ * Bound log size without destroying history. See `lib/log-retention.ts` for why
+ * this is size-based rather than age-based, and why `pm2 flush` is not here.
+ */
+function retainLogs(): LogRetentionResult {
+  const result = applyLogRetention(LOGS_DIR);
+  for (const t of result.trimmed) {
+    log(AGENT, `Log retention: trimmed ${t.file} ${t.wasBytes} -> ${t.nowBytes} bytes`);
   }
-
-  const cutoff = Date.now() - LOG_MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
-  for (const file of files) {
-    const filePath = join(LOGS_DIR, file);
-    try {
-      if (statSync(filePath).mtimeMs < cutoff) {
-        writeFileSync(filePath, '');
-        result.truncated.push(file);
-      }
-    } catch (err) {
-      result.errors.push(`${file}: ${err instanceof Error ? err.message : err}`);
-    }
+  for (const e of result.errors) {
+    log(AGENT, `Log retention error: ${e}`);
   }
-  log(AGENT, `Log rotation: ${result.truncated.length} truncated, ${result.errors.length} errors`);
+  log(
+    AGENT,
+    `Log retention: ${result.trimmed.length} trimmed, ${result.untouched} left alone, ${result.errors.length} errors`,
+  );
   return result;
 }
 
@@ -344,27 +340,12 @@ function runBackup(): { attempted: boolean; ok: boolean; error?: string } {
   }
 }
 
-// ─── PM2 flush ───────────────────────────────────────────────────────────────
-
-/** Runs FIRST — see the ordering rule in the module docblock. */
-function pm2Flush(): boolean {
-  try {
-    execFileSync('pm2', ['flush'], { timeout: PM2_FLUSH_TIMEOUT_MS, stdio: 'pipe' });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
   const startTime = Date.now();
 
-  // FIRST, before any diagnostics exist to destroy.
-  const flushOk = pm2Flush();
   log(AGENT, '=== DB Maintainer starting ===');
-  log(AGENT, `  pm2 flush (run first, so this run's logs survive): ${flushOk ? 'OK' : 'FAILED'}`);
 
   try {
     const tableCheck = findMissingTables();
@@ -380,7 +361,7 @@ async function main(): Promise<void> {
       redis: checkRedis(),
       backup: runBackup(),
     };
-    const logRotation = rotateLogs();
+    const logRetention = retainLogs();
 
     const detectedAt = new Date().toISOString();
     const incidents = buildMaintenanceIncidents(report, detectedAt);
@@ -410,7 +391,7 @@ async function main(): Promise<void> {
     log(AGENT, `  Vacuum: ${vacuumOk} OK, ${report.vacuum.length - vacuumOk} not OK`);
     log(AGENT, `  alert_rule_fires pruned: ${report.prune.deleted ?? 'n/a'}`);
     log(AGENT, `  Redis: ${report.redis.available ? 'available' : `UNAVAILABLE (${report.redis.reason})`}`);
-    log(AGENT, `  Logs truncated: ${logRotation.truncated.length}`);
+    log(AGENT, `  Logs trimmed: ${logRetention.trimmed.length} (none emptied — see lib/log-retention.ts)`);
     log(AGENT, `  Issues: ${counts.issuesFound} (${counts.issuesEscalated} critical), repaired 0 by design`);
 
     for (const incident of incidents) {
