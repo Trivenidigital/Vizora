@@ -54,11 +54,11 @@ import { compareSecretValues, type SecretVerdict } from './secret-compare.js';
 export type RedisConsistency =
   /** URL password and REDIS_PASSWORD agree. */
   | 'CONSISTENT'
-  /** Both representations present and DISAGREE — clients cannot authenticate. */
+  /** Both present and DISAGREE — a rebuild would leave clients unable to auth. */
   | 'PASSWORD_DRIFT'
-  /** Server is password-protected but the client URL carries no password. */
+  /** REDIS_PASSWORD set, URL carries none — a rebuild would require auth clients omit. */
   | 'URL_MISSING_PASSWORD'
-  /** Client URL carries a password but the server is not configured with one. */
+  /** URL carries a password, REDIS_PASSWORD unset — a rebuild could not start Redis. */
   | 'SERVER_MISSING_PASSWORD'
   /** Neither side uses a password — valid for a local unauthenticated Redis. */
   | 'NO_PASSWORD_EITHER_SIDE'

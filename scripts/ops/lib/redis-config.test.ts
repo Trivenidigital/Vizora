@@ -291,3 +291,109 @@ test('findings are phrased as what a REBUILD would do, never as a live outage', 
     assert.match(r.detail, /zero-state rebuild would/, r.detail);
   }
 });
+
+test('the FINDING message and remediation are counterfactual, not just the detail', async () => {
+  // The previous guard asserted only on checkRedisConsistency().detail, so
+  // rewording the DriftFinding message back to present tense stayed green —
+  // the exact regression this change exists to prevent.
+  const { analyzeDrift } = await import('./config-drift.js');
+  const env = {
+    NODE_ENV: 'production',
+    DATABASE_URL: 'postgresql://vizora:pw@localhost:5432/vizora',
+    REDIS_URL: 'redis://:one@localhost:6379',
+    REDIS_PASSWORD: 'two',
+    API_BASE_URL: 'https://vizora.cloud',
+    CORS_ORIGIN: 'https://vizora.cloud',
+    JWT_SECRET: 'j'.repeat(48),
+    DEVICE_JWT_SECRET: 'd'.repeat(48),
+    INTERNAL_API_SECRET: 'i'.repeat(48),
+    MINIO_ACCESS_KEY: 'accesskey',
+    MINIO_SECRET_KEY: 'secretkey1234567',
+    PORT: '3000',
+  };
+  const { findings } = analyzeDrift(
+    [{
+      service: 'middleware' as const,
+      instances: 1,
+      procEnviron: { ...env },
+      pm2Env: { ...env },
+      ecosystemEnvProduction: { NODE_ENV: 'production', PORT: '3000' },
+      ecosystemEnvDefault: {},
+      dotenvVars: { ...env },
+      stability: { stable: true },
+    }],
+    { maxConnections: 100 },
+  );
+  const f = findings.find(x => x.type === 'redis-representation-drift');
+  assert.ok(f);
+  assert.match(f.message, /would/, 'message must be counterfactual');
+  assert.equal(f.driftClass, 'CRITICAL', 'severity drives whether it alerts at all');
+});
+
+test('the unparseable finding carries HIGH and does not duplicate its own sentence', async () => {
+  const { analyzeDrift } = await import('./config-drift.js');
+  const env = {
+    NODE_ENV: 'production',
+    DATABASE_URL: 'postgresql://vizora:pw@localhost:5432/vizora',
+    REDIS_URL: 'redis://:bad%pw@localhost:6379',
+    REDIS_PASSWORD: 'bad%pw',
+    API_BASE_URL: 'https://vizora.cloud',
+    CORS_ORIGIN: 'https://vizora.cloud',
+    JWT_SECRET: 'j'.repeat(48),
+    DEVICE_JWT_SECRET: 'd'.repeat(48),
+    INTERNAL_API_SECRET: 'i'.repeat(48),
+    MINIO_ACCESS_KEY: 'accesskey',
+    MINIO_SECRET_KEY: 'secretkey1234567',
+    PORT: '3000',
+  };
+  const obs = {
+    service: 'middleware' as const,
+    instances: 1,
+    procEnviron: { ...env },
+    pm2Env: { ...env },
+    ecosystemEnvProduction: { NODE_ENV: 'production', PORT: '3000' },
+    ecosystemEnvDefault: {},
+    dotenvVars: { ...env },
+    stability: { stable: true },
+  };
+  const f = analyzeDrift([obs], { maxConnections: 100 })
+    .findings.find(x => x.type === 'redis-url-unparseable');
+  assert.ok(f);
+  assert.equal(f.driftClass, 'HIGH');
+  assert.equal((f.message.match(/could not be parsed/g) ?? []).length, 1, 'no duplicated sentence');
+  assert.ok(f.remediation.length > 0);
+});
+
+test('an ABSENT REDIS_URL emits NO finding from analyzeDrift', async () => {
+  // The previous test with this name only called checkRedisConsistency, so the
+  // gating line it claimed to cover was untested — deleting it left the suite
+  // green while an absent URL started emitting "is set but could not be parsed".
+  const { analyzeDrift } = await import('./config-drift.js');
+  const env: Record<string, string> = {
+    NODE_ENV: 'production',
+    DATABASE_URL: 'postgresql://vizora:pw@localhost:5432/vizora',
+    API_BASE_URL: 'https://vizora.cloud',
+    CORS_ORIGIN: 'https://vizora.cloud',
+    JWT_SECRET: 'j'.repeat(48),
+    DEVICE_JWT_SECRET: 'd'.repeat(48),
+    INTERNAL_API_SECRET: 'i'.repeat(48),
+    MINIO_ACCESS_KEY: 'accesskey',
+    MINIO_SECRET_KEY: 'secretkey1234567',
+    PORT: '3000',
+  };
+  const { findings } = analyzeDrift(
+    [{
+      service: 'middleware' as const,
+      instances: 1,
+      procEnviron: { ...env },
+      pm2Env: { ...env },
+      ecosystemEnvProduction: { NODE_ENV: 'production', PORT: '3000' },
+      ecosystemEnvDefault: {},
+      dotenvVars: { ...env },
+      stability: { stable: true },
+    }],
+    { maxConnections: 100 },
+  );
+  assert.deepEqual(findings.filter(f => f.type === 'redis-url-unparseable'), []);
+  assert.deepEqual(findings.filter(f => f.type === 'redis-representation-drift'), []);
+});

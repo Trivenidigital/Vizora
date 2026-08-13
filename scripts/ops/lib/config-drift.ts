@@ -739,7 +739,10 @@ function detectRedisRepresentationFindings(observations: ServiceObservation[]): 
   // it is INVISIBLE to every other check: `new URL` accepts a bare `%`, so
   // middleware's Zod `z.string().url()` passes and no zero-state-would-fail
   // fires — while ioredis throws URIError at client construction and every
-  // service crash-loops. Staying silent here is the silent-failure shape.
+  // realtime crash-loops (its Redis client is constructed in the provider
+  // constructor with no catch). MIDDLEWARE DOES NOT: it catches and explicitly
+  // does not rethrow, so it boots Redis-degraded and silent. Either way,
+  // staying silent HERE is the silent-failure shape.
   // (A merely ABSENT REDIS_URL is not reported: the services fall back to
   // redis://localhost:6379 by design, and realtime's own presence validator
   // already covers requiring it.)
@@ -750,7 +753,7 @@ function detectRedisRepresentationFindings(observations: ServiceObservation[]): 
       type: 'redis-url-unparseable',
       service: obs.service,
       targetId: 'global:REDIS_URL parse',
-      message: `REDIS_URL is set but could not be parsed — ${result.detail}`,
+      message: result.detail,
       remediation:
         'Check REDIS_URL for characters that need percent-encoding (a bare %, /, # or ? ' +
         'in the password). It may still satisfy a URL validator while failing at client ' +
