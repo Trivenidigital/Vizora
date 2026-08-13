@@ -569,7 +569,19 @@ export function evaluateCandidateBinding(candidate, actual, required) {
   cmp('apkSha256', candidate.apkSha256, actual.apkSha256, normalizeFingerprint);
   cmp('signingCertSha256', candidate.signingCertSha256, actual.signingCertSha256, normalizeFingerprint);
 
-  if (Number.isInteger(candidate.apkBytes) && candidate.apkBytes !== actual.apkBytes) {
+  // Validate the TYPE before comparing, not as a precondition for comparing at all.
+  //
+  // This previously read `if (Number.isInteger(candidate.apkBytes) && ... !== ...)`,
+  // which meant a missing, null, or string-valued size skipped the comparison
+  // silently and the candidate still passed — the same malformed-data-narrows-the-
+  // check defect removed from the origins pin and the origins baseline, surviving
+  // here in the one field where it looked like a harmless guard.
+  if (!Number.isInteger(candidate.apkBytes) || candidate.apkBytes <= 0) {
+    problems.push(
+      `candidate.apkBytes must be a positive integer — got ${JSON.stringify(candidate.apkBytes)}. ` +
+        `A missing or non-numeric size cannot be compared, and must not pass as though it had been.`,
+    );
+  } else if (candidate.apkBytes !== actual.apkBytes) {
     problems.push(`candidate.apkBytes is ${candidate.apkBytes} but the APK is ${actual.apkBytes} bytes`);
   }
 

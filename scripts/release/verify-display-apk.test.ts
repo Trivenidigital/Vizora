@@ -566,3 +566,48 @@ test('Gate A hash comparison ignores colons and case', () => {
     APK_SHA, APK_SHA, true);
   assert.equal(v.pass, true);
 });
+
+// apkBytes had the last surviving instance of "malformed data narrows the check":
+// the comparison was gated on Number.isInteger(...), so a missing, null or
+// string-valued size skipped it entirely and the candidate still passed. It must
+// be a positive integer AND match, with every other shape failing closed.
+
+test('NEGATIVE: a MISSING candidate.apkBytes is rejected, not skipped', () => {
+  const { apkBytes, ...noSize } = GOOD_CANDIDATE;
+  const v = evaluateCandidateBinding(noSize, ARTIFACT, true);
+  assert.equal(v.pass, false, 'an absent size must not pass as though it had been compared');
+  assert.match(v.detail, /apkBytes must be a positive integer/);
+});
+
+test('NEGATIVE: a null candidate.apkBytes is rejected', () => {
+  const v = evaluateCandidateBinding({ ...GOOD_CANDIDATE, apkBytes: null }, ARTIFACT, true);
+  assert.equal(v.pass, false);
+  assert.match(v.detail, /apkBytes must be a positive integer/);
+});
+
+test('NEGATIVE: a STRING candidate.apkBytes is rejected even when it looks right', () => {
+  // "1250365" would compare equal under a loose ==; it must still fail on type.
+  const v = evaluateCandidateBinding({ ...GOOD_CANDIDATE, apkBytes: '1250365' }, ARTIFACT, true);
+  assert.equal(v.pass, false, 'a string size must not satisfy a numeric field');
+  assert.match(v.detail, /apkBytes must be a positive integer/);
+});
+
+test('NEGATIVE: a WRONG integer candidate.apkBytes is rejected', () => {
+  const v = evaluateCandidateBinding({ ...GOOD_CANDIDATE, apkBytes: 999 }, ARTIFACT, true);
+  assert.equal(v.pass, false);
+  assert.match(v.detail, /candidate\.apkBytes is 999 but the APK is 1250365 bytes/);
+});
+
+test('NEGATIVE: a non-integer numeric candidate.apkBytes is rejected', () => {
+  const v = evaluateCandidateBinding({ ...GOOD_CANDIDATE, apkBytes: 1250365.5 }, ARTIFACT, true);
+  assert.equal(v.pass, false);
+  assert.match(v.detail, /apkBytes must be a positive integer/);
+});
+
+test('NEGATIVE: a zero or negative candidate.apkBytes is rejected', () => {
+  for (const bad of [0, -1250365]) {
+    const v = evaluateCandidateBinding({ ...GOOD_CANDIDATE, apkBytes: bad }, ARTIFACT, true);
+    assert.equal(v.pass, false, `apkBytes ${bad} must fail`);
+    assert.match(v.detail, /apkBytes must be a positive integer/);
+  }
+});
