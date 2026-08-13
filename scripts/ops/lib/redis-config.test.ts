@@ -204,3 +204,90 @@ test('a consistent deployment produces no Redis representation finding', async (
   );
   assert.deepEqual(findings.filter(f => f.type === 'redis-representation-drift'), []);
 });
+
+// ─── Client-equivalence: forms ioredis accepts must not read as "no password" ──
+
+test('the ?password= query form is read, not reported as missing', () => {
+  // ioredis honours it via defaults(result, parsed.query). Reading only the
+  // userinfo would have emitted a false CRITICAL every hour for a working
+  // configuration.
+  const r = checkRedisConsistency('redis://localhost:6379?password=' + PW, PW);
+  assert.equal(r.verdict, 'CONSISTENT');
+});
+
+test('userinfo wins over the query form, mirroring the client merge order', () => {
+  const r = checkRedisConsistency(`redis://:${PW}@localhost:6379?password=other`, PW);
+  assert.equal(r.verdict, 'CONSISTENT');
+});
+
+test('percent-encoded passwords compare decoded, as the client sends them', () => {
+  // ioredis parses with legacy url.parse(url, true, true), which decodes auth.
+  // Comparing the encoded text against a raw REDIS_PASSWORD would be a false
+  // PASSWORD_DRIFT on any password containing @ : / or +.
+  assert.equal(checkRedisConsistency('redis://:p%40ss@h:6379', 'p@ss').verdict, 'CONSISTENT');
+  assert.equal(checkRedisConsistency('redis://:pa%2Fss@h:6379', 'pa/ss').verdict, 'CONSISTENT');
+});
+
+test('an ACL username form compares only the password', () => {
+  assert.equal(checkRedisConsistency(`redis://default:${PW}@h:6379`, PW).verdict, 'CONSISTENT');
+});
+
+test('rediss:// TLS scheme is handled like redis://', () => {
+  assert.equal(checkRedisConsistency(`rediss://:${PW}@h:6379`, PW).verdict, 'CONSISTENT');
+});
+
+// ─── The promised URL_UNAVAILABLE finding actually exists ────────────────────
+
+test('an unparseable REDIS_URL raises a finding rather than staying silent', async () => {
+  // A bare % satisfies `new URL` (so middleware's Zod .url() passes and no
+  // zero-state-would-fail fires) but throws URIError inside ioredis at client
+  // construction. Silence here was the whole silent-failure shape.
+  const { analyzeDrift } = await import('./config-drift.js');
+  const env = {
+    NODE_ENV: 'production',
+    DATABASE_URL: 'postgresql://vizora:pw@localhost:5432/vizora',
+    REDIS_URL: 'redis://:bad%pw@localhost:6379',
+    REDIS_PASSWORD: 'bad%pw',
+    API_BASE_URL: 'https://vizora.cloud',
+    CORS_ORIGIN: 'https://vizora.cloud',
+    JWT_SECRET: 'j'.repeat(48),
+    DEVICE_JWT_SECRET: 'd'.repeat(48),
+    INTERNAL_API_SECRET: 'i'.repeat(48),
+    MINIO_ACCESS_KEY: 'accesskey',
+    MINIO_SECRET_KEY: 'secretkey1234567',
+    PORT: '3000',
+  };
+  const { findings } = analyzeDrift(
+    [{
+      service: 'middleware' as const,
+      instances: 1,
+      procEnviron: { ...env },
+      pm2Env: { ...env },
+      ecosystemEnvProduction: { NODE_ENV: 'production', PORT: '3000' },
+      ecosystemEnvDefault: {},
+      dotenvVars: { ...env },
+      stability: { stable: true },
+    }],
+    { maxConnections: 100 },
+  );
+  const f = findings.filter(x => x.type === 'redis-url-unparseable');
+  assert.equal(f.length, 1, JSON.stringify(findings.map(x => x.type)));
+  assert.ok(!f[0]!.message.includes('bad%pw'), 'must not echo the URL');
+});
+
+test('an ABSENT REDIS_URL raises nothing here — the services have a documented fallback', () => {
+  assert.equal(checkRedisConsistency(undefined, undefined).verdict, 'URL_UNAVAILABLE');
+});
+
+test('findings are phrased as what a REBUILD would do, never as a live outage', () => {
+  // Step 1 of a rotation (edit .env, container not yet recreated) is a
+  // legitimate transient state where Redis is healthy and these disagree. A
+  // present-tense claim would page hourly through it and get the detector muted.
+  for (const r of [
+    checkRedisConsistency(URL_WITH, 'rotated'),
+    checkRedisConsistency('redis://localhost:6379', PW),
+    checkRedisConsistency(URL_WITH, undefined),
+  ]) {
+    assert.match(r.detail, /zero-state rebuild would/, r.detail);
+  }
+});

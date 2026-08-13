@@ -35,6 +35,17 @@
  * REDIS_URL. This module checks that invariant; it never rewrites either
  * value, and it never emits a fingerprint — only MATCH/DRIFT, exactly as the
  * B1 ruling requires for secrets.
+ *
+ * ─── Every finding is COUNTERFACTUAL, never present tense ───────────────────
+ *
+ * The caller evaluates ZERO-STATE config: "would a rebuild come up able to
+ * talk to Redis?" It does not observe the running server. Step 1 of a password
+ * rotation — edit `.env`, container not yet recreated — is a legitimate
+ * transient state in which Redis is 100% healthy while these values disagree.
+ * A present-tense "clients cannot authenticate" would page hourly through that
+ * window and teach the operator to mute the detector, which is precisely the
+ * failure the stability guard in config-drift.ts exists to prevent. Phrase
+ * every detail as what a REBUILD would do.
  */
 
 import { decomposeRedisUrl } from './pg-url.js';
@@ -94,17 +105,19 @@ export function checkRedisConsistency(
     return {
       verdict: 'URL_MISSING_PASSWORD',
       detail:
-        'REDIS_PASSWORD is set (the server will require auth) but REDIS_URL carries ' +
-        'no password — every client would be rejected with NOAUTH',
+        'REDIS_PASSWORD is set but REDIS_URL carries no password — a zero-state ' +
+        'rebuild would start a server requiring auth and clients sending none, ' +
+        'and every client would then be rejected with NOAUTH',
     };
   }
   if (!hasServerPassword) {
     return {
       verdict: 'SERVER_MISSING_PASSWORD',
       detail:
-        'REDIS_URL carries a password but REDIS_PASSWORD is unset — docker-compose ' +
-        'would refuse to start Redis, and a server started without auth would ' +
-        'reject the AUTH command clients send',
+        'REDIS_URL carries a password but REDIS_PASSWORD is unset — a zero-state ' +
+        'rebuild would fail to start Redis at all (docker-compose requires the ' +
+        'variable), and a server brought up without auth would reject the AUTH ' +
+        'command clients send',
     };
   }
 
@@ -117,8 +130,9 @@ export function checkRedisConsistency(
     : {
         verdict: 'PASSWORD_DRIFT',
         detail:
-          'REDIS_URL password component does NOT match REDIS_PASSWORD — the server ' +
-          'and its clients are configured with different credentials',
+          'REDIS_URL password component does NOT match REDIS_PASSWORD — a ' +
+          'zero-state rebuild would come up with server and clients holding ' +
+          'different credentials',
       };
 }
 

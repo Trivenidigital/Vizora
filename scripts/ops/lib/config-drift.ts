@@ -44,7 +44,6 @@
  * Nothing here repairs anything — `issuesFixed` is always 0 by design.
  */
 
-import { createHash, timingSafeEqual } from 'node:crypto';
 import { parse as parseDotenv } from 'dotenv';
 
 import { validateEnv } from '../../../middleware/src/modules/config/env.validation.js';
@@ -719,10 +718,12 @@ export interface DriftAnalysis {
  * Nothing in either file references the other, so rotating one and not the
  * other breaks Redis for every service with no warning anywhere.
  *
- * Emitted ONCE rather than per service: both values come from the same `.env`,
- * which every service loads, so this is a property of the deployment. Three
- * identical findings for one root cause would be noise, and would dedup to
- * three separate incidents.
+ * Emitted ONCE rather than per service. On prod middleware/.env and
+ * realtime/.env are both SYMLINKS to the same file and no ecosystem block
+ * carries REDIS_*, so this is a property of the deployment rather than of a
+ * service; web loads no dotenv file at all and self-excludes. Three identical
+ * findings for one root cause would be noise and would dedup to three
+ * separate incidents.
  *
  * Checked against the ZERO-STATE config — the question is whether a restart
  * would come up able to talk to Redis.
@@ -733,6 +734,30 @@ function detectRedisRepresentationFindings(observations: ServiceObservation[]): 
 
   const zeroState = computeZeroState(obs);
   const result = checkRedisConsistency(zeroState.REDIS_URL, zeroState.REDIS_PASSWORD);
+
+  // An unparseable REDIS_URL is its own failure with its own remediation, and
+  // it is INVISIBLE to every other check: `new URL` accepts a bare `%`, so
+  // middleware's Zod `z.string().url()` passes and no zero-state-would-fail
+  // fires — while ioredis throws URIError at client construction and every
+  // service crash-loops. Staying silent here is the silent-failure shape.
+  // (A merely ABSENT REDIS_URL is not reported: the services fall back to
+  // redis://localhost:6379 by design, and realtime's own presence validator
+  // already covers requiring it.)
+  if (result.verdict === 'URL_UNAVAILABLE') {
+    if (!zeroState.REDIS_URL) return [];
+    return [{
+      driftClass: 'HIGH',
+      type: 'redis-url-unparseable',
+      service: obs.service,
+      targetId: 'global:REDIS_URL parse',
+      message: `REDIS_URL is set but could not be parsed — ${result.detail}`,
+      remediation:
+        'Check REDIS_URL for characters that need percent-encoding (a bare %, /, # or ? ' +
+        'in the password). It may still satisfy a URL validator while failing at client ' +
+        'construction. ' + NO_REPAIR,
+    }];
+  }
+
   if (!isRedisBroken(result)) return [];
 
   return [{
@@ -740,7 +765,7 @@ function detectRedisRepresentationFindings(observations: ServiceObservation[]): 
     type: 'redis-representation-drift',
     service: obs.service,
     targetId: 'global:REDIS representation',
-    message: `Redis server and client configuration disagree — ${result.detail}`,
+    message: `Redis server and client configuration would disagree after a rebuild — ${result.detail}`,
     remediation: NO_REPAIR,
   }];
 }
