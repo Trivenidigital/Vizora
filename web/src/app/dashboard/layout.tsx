@@ -263,16 +263,20 @@ export default function DashboardLayout({
                   key={item.name}
                   href={item.href}
                   onClick={() => setSidebarOpen(false)}
-                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                  aria-current={active ? 'page' : undefined}
+                  className={`flex items-center gap-2.5 px-3 py-3 min-h-[44px] rounded-lg text-sm font-medium transition-all duration-150 ${
                     active
-                      ? 'bg-[var(--primary)]/10 text-[var(--primary)] border-l-2 border-[var(--primary)]'
+                      ? 'bg-[var(--primary)]/10 text-[var(--primary-ink)] border-l-2 border-[var(--primary-ink)]'
                       : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]'
                   }`}
                 >
-                  <Icon name={item.icon} size="md" className={active ? 'text-[var(--primary)]' : 'text-[var(--foreground-tertiary)]'} />
+                  {/* Ink, not neon: these are small marks on a tinted surface. The
+                      neon reads only as a large fill - at icon/dot size on a light
+                      substrate it is 1.65:1 and effectively invisible. */}
+                  <Icon name={item.icon} size="md" className={active ? 'text-[var(--primary-ink)]' : 'text-[var(--foreground-tertiary)]'} />
                   <span className="flex-1">{item.name}</span>
                   {active && (
-                    <span className="w-2 h-2 bg-[var(--primary)] rounded-full shadow-neon-sm"></span>
+                    <span className="w-2 h-2 bg-[var(--primary-ink)] rounded-full shadow-neon-sm"></span>
                   )}
                 </Link>
               );

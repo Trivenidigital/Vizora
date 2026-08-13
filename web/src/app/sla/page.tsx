@@ -12,7 +12,7 @@ export default function SLAPage() {
       {/* Header */}
       <header className="border-b border-[var(--border)]/30 bg-[var(--surface)]/80 backdrop-blur-sm">
         <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="text-lg font-semibold text-[var(--foreground)] hover:text-[var(--primary)] transition-colors">
+          <Link href="/" className="text-lg font-semibold text-[var(--foreground)] hover:text-[var(--primary-ink)] transition-colors">
             Vizora
           </Link>
           <nav className="flex items-center gap-4 text-sm text-[var(--foreground-secondary)]">
@@ -160,7 +160,7 @@ export default function SLAPage() {
             <ul className="list-disc pl-6 space-y-1">
               <li>
                 Email:{' '}
-                <a href="mailto:support@vizora.cloud" className="text-[var(--primary)] hover:underline">
+                <a href="mailto:support@vizora.cloud" className="text-[var(--primary-ink)] hover:underline">
                   support@vizora.cloud
                 </a>
               </li>
@@ -191,7 +191,7 @@ export default function SLAPage() {
             <h2 className="text-xl font-semibold text-[var(--foreground)] mb-3">10. Contact</h2>
             <p>
               For SLA-related questions or to request service credits, contact us at{' '}
-              <a href="mailto:support@vizora.cloud" className="text-[var(--primary)] hover:underline">
+              <a href="mailto:support@vizora.cloud" className="text-[var(--primary-ink)] hover:underline">
                 support@vizora.cloud
               </a>
             </p>

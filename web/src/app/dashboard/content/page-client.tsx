@@ -1283,7 +1283,7 @@ export default function ContentClient() {
  </span>
  )}
  {getPendingCount() > 0 && (
- <span className="inline-flex items-center gap-1 text-xs text-[var(--primary)]">
+ <span className="inline-flex items-center gap-1 text-xs text-[var(--primary-ink)]">
  {getPendingCount()} pending
  </span>
  )}
@@ -1357,7 +1357,7 @@ export default function ContentClient() {
 
  {/* Clear all link */}
  {hasActiveFilters && (
- <button onClick={clearAllFilters} className="text-sm text-[var(--primary)] hover:underline whitespace-nowrap">
+ <button onClick={clearAllFilters} className="text-sm text-[var(--primary-ink)] hover:underline whitespace-nowrap">
  Clear all
  </button>
  )}
@@ -1374,7 +1374,7 @@ export default function ContentClient() {
  <button
  type="button"
  onClick={loadContentTags}
- className="text-sm text-[var(--primary)] hover:underline"
+ className="text-sm text-[var(--primary-ink)] hover:underline"
  >
  Retry
  </button>
@@ -1403,7 +1403,7 @@ export default function ContentClient() {
  setSelectedItems(new Set());
  setContentPage(1);
  }}
- className="mt-3 text-sm text-[var(--primary)] hover:underline"
+ className="mt-3 text-sm text-[var(--primary-ink)] hover:underline"
  >
  Clear tag filters
  </button>
@@ -1494,7 +1494,7 @@ export default function ContentClient() {
  </span>
  <button
  onClick={() => setSelectedItems(new Set())}
- className="text-sm text-[var(--primary)] hover:underline"
+ className="text-sm text-[var(--primary-ink)] hover:underline"
  >
  Clear selection
  </button>
@@ -1612,7 +1612,7 @@ export default function ContentClient() {
  aria-label="Select all content items"
  checked={selectedItems.size === filteredContent.length && filteredContent.length > 0}
  onChange={toggleSelectAll}
- className="rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
+ className="rounded border-[var(--border)] text-[var(--primary-ink)] focus:ring-[var(--primary-ink)]"
  />
  </th>
  )}
@@ -1633,7 +1633,7 @@ export default function ContentClient() {
  aria-label={`Select ${item.title}`}
  checked={selectedItems.has(item.id)}
  onChange={() => toggleSelectItem(item.id)}
- className="rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)]"
+ className="rounded border-[var(--border)] text-[var(--primary-ink)] focus:ring-[var(--primary-ink)]"
  onClick={(e) => e.stopPropagation()}
  />
  </td>
@@ -1643,7 +1643,7 @@ export default function ContentClient() {
  role="button"
  tabIndex={0}
  aria-label={`Preview ${item.title}`}
- className="flex items-center gap-3 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--primary)] rounded"
+ className="flex items-center gap-3 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--primary-ink)] rounded"
  aria-busy={isContentDetailLoading(item.id)}
  aria-disabled={isContentDetailLoading(item.id)}
  onClick={() => handlePreview(item)}
@@ -1782,7 +1782,7 @@ export default function ContentClient() {
  checked={selectedItems.has(item.id)}
  onChange={() => toggleSelectItem(item.id)}
  onClick={(e) => e.stopPropagation()}
- className="w-5 h-5 rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--primary)] bg-[var(--surface)] shadow-sm"
+ className="w-5 h-5 rounded border-[var(--border)] text-[var(--primary-ink)] focus:ring-[var(--primary-ink)] bg-[var(--surface)] shadow-sm"
  />
  </div>
  )}

@@ -592,6 +592,12 @@ export default function DevicesClient({
  </div>
  )}
  <div className="eh-dash-card overflow-hidden">
+ {/* The card clips to keep its rounded corners, and <main> sets
+     overflow-x-hidden - so without this scroller the widest columns
+     (Last Seen, and the row-action buttons entirely) were cut off with
+     no way to reach them, even at 1440px. Measured: 263px beyond the
+     viewport with document scrollWidth === clientWidth. */}
+ <div className="overflow-x-auto">
  <table className="min-w-full divide-y divide-[var(--border)]">
  <thead className="bg-[var(--background)]">
  <tr>
@@ -652,6 +658,7 @@ export default function DevicesClient({
  ))}
  </tbody>
  </table>
+ </div>
  </div>
 
  {totalItems > 0 && (

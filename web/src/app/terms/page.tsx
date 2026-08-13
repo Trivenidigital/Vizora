@@ -12,7 +12,7 @@ export default function TermsOfServicePage() {
       {/* Header */}
       <header className="border-b border-[var(--border)]/30 bg-[var(--surface)]/80 backdrop-blur-sm">
         <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="text-lg font-semibold text-[var(--foreground)] hover:text-[var(--primary)] transition-colors">
+          <Link href="/" className="text-lg font-semibold text-[var(--foreground)] hover:text-[var(--primary-ink)] transition-colors">
             Vizora
           </Link>
           <nav className="flex items-center gap-4 text-sm text-[var(--foreground-secondary)]">
@@ -88,7 +88,7 @@ export default function TermsOfServicePage() {
             <h2 className="text-xl font-semibold text-[var(--foreground)] mb-3">7. Data and Privacy</h2>
             <p>
               Your use of Vizora is also governed by our{' '}
-              <Link href="/privacy" className="text-[var(--primary)] hover:underline">
+              <Link href="/privacy" className="text-[var(--primary-ink)] hover:underline">
                 Privacy Policy
               </Link>
               , which describes how we collect, use, and protect your data.
@@ -124,7 +124,7 @@ export default function TermsOfServicePage() {
             <h2 className="text-xl font-semibold text-[var(--foreground)] mb-3">11. Contact</h2>
             <p>
               For questions about these terms, contact us at{' '}
-              <a href="mailto:legal@vizora.cloud" className="text-[var(--primary)] hover:underline">
+              <a href="mailto:legal@vizora.cloud" className="text-[var(--primary-ink)] hover:underline">
                 legal@vizora.cloud
               </a>
             </p>

@@ -143,6 +143,42 @@ describe('OrganizationsService', () => {
     });
   });
 
+  describe('getBranding', () => {
+    /**
+     * The web client writes whatever this returns onto `--primary`, which
+     * drives the sidebar, focus rings and buttons across the authenticated
+     * app. This default silently drifted to the Tailwind sky scale, so every
+     * organisation that had never opened Settings -> Customization rendered a
+     * sky-blue dashboard against a green marketing site. Pin it.
+     */
+    it('falls back to the Vizora brand palette, not a generic blue', async () => {
+      mockDatabaseService.organization.findUnique.mockResolvedValue({
+        ...mockOrganization,
+        settings: {},
+      });
+
+      const result = await service.getBranding('org-123');
+
+      expect(result).toEqual(
+        expect.objectContaining({
+          primaryColor: '#00E5A0',
+          secondaryColor: '#00B4D8',
+          accentColor: '#00CC8E',
+        }),
+      );
+    });
+
+    it('prefers the organization’s stored branding over the default', async () => {
+      const branding = { primaryColor: '#123456', name: 'Custom' };
+      mockDatabaseService.organization.findUnique.mockResolvedValue({
+        ...mockOrganization,
+        settings: { branding },
+      });
+
+      await expect(service.getBranding('org-123')).resolves.toEqual(branding);
+    });
+  });
+
   describe('findBySlug', () => {
     it('should return organization by slug', async () => {
       mockDatabaseService.organization.findUnique.mockResolvedValue(mockOrganization);
