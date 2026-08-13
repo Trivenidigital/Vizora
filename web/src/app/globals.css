@@ -4,27 +4,43 @@
 
 @layer base {
   :root {
-    /* Light Mode — Electric Horizon (warm cream) */
-    --background: #F0ECE8;
-    --background-secondary: #E8E3DD;
-    --background-tertiary: #DDD7D0;
-    --foreground: #1A1A1A;
-    --foreground-secondary: #3D3632;
-    --foreground-tertiary: #5A5248;
+    /*
+     * Light Mode — Electric Horizon (cool grey), the SAME substrate as the
+     * marketing site.
+     *
+     * This block used to be a warm-cream palette (#F0ECE8 / taupe borders)
+     * while `.mkt` painted the public pages cool grey (#E9EEEF). Both were
+     * labelled "Electric Horizon"; they were different palettes, so logging in
+     * changed the product's colour temperature. These values are now identical
+     * to the `.mkt` base-token reset below — one light palette serves both
+     * surfaces, and `.mkt` keeps re-declaring them only so it can win over
+     * `.dark` on public routes while a dark-mode user is signed in.
+     *
+     * Contrast on this substrate, computed:
+     *   --foreground           #0A222E on #E9EEEF = 14.00:1
+     *   --foreground-secondary #3E5860 on #E9EEEF =  6.48:1
+     *   --foreground-tertiary  #4E656C on #E9EEEF =  5.02:1  (micro labels, .eh-th)
+     */
+    --background: #E9EEEF;
+    --background-secondary: #E2EAEC;
+    --background-tertiary: #DCE5E7;
+    --foreground: #0A222E;
+    --foreground-secondary: #3E5860;
+    --foreground-tertiary: #4E656C;
 
     /* Surface and Cards */
     --surface: #FFFFFF;
-    --surface-secondary: #F5F2EE;
-    --surface-hover: #E8E3DD;
+    --surface-secondary: #F4F8F8;
+    --surface-hover: #E8EEEF;
 
     /* Borders */
-    --border: #D1CBC5;
-    --border-light: #E8E3DD;
-    --border-dark: #B5AEA6;
+    --border: #D3DBDD;
+    --border-light: #E2EAEC;
+    --border-dark: #B7C4C7;
 
-    /* Semantic Colors - Light Mode */
-    --primary: #00CC8E;
-    --primary-light: #00E5A0;
+    /* Semantic Colors - Light Mode — same fill ramp the marketing scope uses */
+    --primary: #00B27C;
+    --primary-light: #00CC8E;
     --primary-lighter: #A7F3D0;
     --primary-lightest: #ECFDF5;
 
