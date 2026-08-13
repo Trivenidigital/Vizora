@@ -36,7 +36,24 @@ function escalatedPm2Incident(detected: string): Incident {
 }
 
 function startHealthyServer(): Promise<{ server: Server; baseUrl: string }> {
-  const server = createServer((_req, res) => {
+  const server = createServer((req, res) => {
+    const url = req.url ?? '/';
+
+    // A healthy web service serves HTML that references build assets, and
+    // serves those assets. health-guardian now follows one of them, so a fake
+    // "healthy" server has to be healthy in the way the probe actually checks.
+    if (url === '/') {
+      res.writeHead(200, { 'content-type': 'text/html', connection: 'close' });
+      return res.end(
+        '<html><head><script src="/_next/static/chunks/test-chunk.js"></script>' +
+        '</head><body>ok</body></html>',
+      );
+    }
+    if (url.startsWith('/_next/static/')) {
+      res.writeHead(200, { 'content-type': 'application/javascript', connection: 'close' });
+      return res.end('console.log("chunk");');
+    }
+
     res.writeHead(200, {
       'content-type': 'application/json',
       connection: 'close',

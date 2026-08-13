@@ -35,6 +35,7 @@ import {
 } from './lib/state.js';
 import { log, pingHeartbeat } from './lib/alerting.js';
 import { readEcosystemMemoryPolicy } from './lib/ecosystem.js';
+import { probeWebAssets, type ProbeFetch } from './lib/web-assets.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -80,6 +81,10 @@ interface ServiceDef {
   healthUrl: string;
   pm2Name: string;
   memoryLimitBytes: number | null;
+  /** Follow a reference from the served HTML before declaring this healthy. */
+  probeAssets?: boolean;
+  /** Origin the referenced asset paths are resolved against. */
+  assetBaseUrl?: string;
 }
 
 function getServiceDefs(): ServiceDef[] {
@@ -110,6 +115,9 @@ function getServiceDefs(): ServiceDef[] {
       healthUrl: `${webUrl}/`,
       pm2Name: 'vizora-web',
       memoryLimitBytes: policy.limits['vizora-web'] ?? null,
+      // A 200 on the HTML shell is NOT proof the app works — see probeWebAssets.
+      probeAssets: true,
+      assetBaseUrl: webUrl,
     },
   ];
 }
@@ -137,6 +145,40 @@ async function checkEndpoint(url: string): Promise<{ ok: boolean; status?: numbe
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+/**
+ * Follow an asset the served HTML actually references.
+ *
+ * WEB_HEALTH_FALSE_GREEN: on 2026-08-12 an OOM-killed `next build` wiped
+ * `.next` while the running next-server kept serving HTML from already-open
+ * file handles. `/` returned 200 while every `/_next/static/*` it referenced
+ * returned 500, and this agent reported web healthy for 5h45m because it only
+ * asked the shell. A shell that renders is not a working app.
+ *
+ * FAIL-CLOSED: anything that cannot establish usability — an HTML failure, a
+ * non-2xx asset, or HTML with no verifiable build references — is unhealthy.
+ * Decision logic lives in `lib/web-assets.ts` so it is testable without a
+ * server; this only supplies the timeout-bounded fetch.
+ */
+async function probeWebAssetHealth(baseUrl: string): Promise<{ ok: boolean; detail: string }> {
+  const boundedFetch: ProbeFetch = async (url: string) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
+    try {
+      const res = await fetch(url, { method: 'GET', signal: controller.signal });
+      // The body MUST be consumed inside the timeout window, for two reasons:
+      // an unread body leaves the socket open and keeps this cron process
+      // alive past its work (the same shape as the pingHeartbeat timer leak in
+      // lib/alerting.ts), and a lazy read after clearTimeout would be unbounded.
+      const body = await res.text();
+      return { ok: res.ok, status: res.status, text: async () => body };
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  return probeWebAssets(baseUrl, boundedFetch);
+}
+
 
 // ─── APK Download Surface Check ──────────────────────────────────────────────
 
@@ -311,7 +353,16 @@ async function main(): Promise<void> {
     const existingIncident = priorState.incidents.find(i => i.id === incidentId);
 
     log(AGENT, `Checking ${svc.name}: ${svc.healthUrl}`);
-    const result = await checkEndpoint(svc.healthUrl);
+    let result = await checkEndpoint(svc.healthUrl);
+
+    // The HTML shell answering 200 is necessary but not sufficient for web.
+    if (result.ok && svc.probeAssets && svc.assetBaseUrl) {
+      const assets = await probeWebAssetHealth(svc.assetBaseUrl);
+      log(AGENT, `${svc.name}: asset probe — ${assets.detail}`);
+      if (!assets.ok) {
+        result = { ok: false, status: result.status, error: `referenced assets unhealthy: ${assets.detail}` };
+      }
+    }
 
     if (result.ok) {
       log(AGENT, `${svc.name}: healthy (status ${result.status})`);
