@@ -39,11 +39,16 @@
  * hash, HMAC, truncated digest, length, or derived token of any kind reaches an
  * incident, log line, alert body, or `ops-state.json`.
  *
- * This module is PURE: no file, network, subprocess or database I/O, and it
- * never mutates its inputs. Collection lives in `config-drift-detector.ts`.
+ * This module is ALMOST pure: no network, subprocess or database I/O, and it
+ * never mutates its inputs. The two dotenv helpers below read the filesystem,
+ * deliberately — they are shared with the pm2 guard so that
+ * which-file-does-a-service-read has exactly one answer. Nothing else here may
+ * acquire I/O; `pg-url.ts` exists so lighter consumers can skip this module. Collection lives in `config-drift-detector.ts`.
  * Nothing here repairs anything — `issuesFixed` is always 0 by design.
  */
 
+import { existsSync, readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { parse as parseDotenv } from 'dotenv';
 
 import { validateEnv } from '../../../middleware/src/modules/config/env.validation.js';
@@ -355,6 +360,49 @@ export function parseDotenvText(text: string): EnvMap {
 }
 
 /** Parse NUL-separated `/proc/<pid>/environ` content. */
+/**
+ * Parse the `.env` a service's dotenv call would load FROM ITS OWN cwd.
+ *
+ * `ecosystem.config.js` sets `cwd: './middleware' | './realtime' | './web'`, and
+ * middleware's `import 'dotenv/config'` plus Nest's `envFilePath` both resolve
+ * under `process.cwd()` in production. So the repo-root `.env` is NOT what the
+ * services read — on prod they agree only because `middleware/.env` is a
+ * SYMLINK to it, which this follows naturally.
+ *
+ * Returns null when the service has no `.env` — that is web's real shape, and
+ * it is NOT the same as an empty file.
+ *
+ * Shared by the drift detector and the pm2 guard deliberately: a second
+ * interpretation of which file a service loads is exactly how a startup guard
+ * ends up asserting a configuration nobody runs.
+ */
+/**
+ * Where a service's dotenv file lives, derived from its ecosystem entry.
+ *
+ * Shared for the same reason as `readServiceDotenv` itself: D1 was never a bug
+ * in the loader, it was a bug in the argument. Two copies of this expression is
+ * two interpretations of which file a service reads, which is precisely how a
+ * startup guard ends up asserting a configuration nobody runs.
+ */
+export function serviceCwdFor(
+  repoRoot: string,
+  service: ServiceName,
+  appCwd: string | undefined,
+): string {
+  return appCwd ? resolve(repoRoot, appCwd) : join(repoRoot, service);
+}
+
+export function readServiceDotenv(serviceCwd: string): EnvMap | null {
+  const envPath = join(serviceCwd, '.env');
+  if (!existsSync(envPath)) return null;
+  try {
+    return parseDotenvText(readFileSync(envPath, 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
+/** Parse NUL-separated `/proc/<pid>/environ` content. */
 export function parseProcEnviron(raw: string): EnvMap {
   const out: EnvMap = {};
   for (const pair of raw.split('\0')) {
@@ -553,8 +601,11 @@ import { checkRedisConsistency, isRedisBroken } from './redis-config.js';
  * incident — fixing the first revealed the second — so stopping at the presence
  * check would produce a false all-clear.
  *
- * Returns human-readable failure descriptions. Validator messages are static
- * and never echo the offending value; nothing here adds one.
+ * Returns human-readable failure descriptions. Nothing here adds a value, and
+ * most validator messages are static — but zod's `invalid_enum_value` DOES echo
+ * the received value. The only enum fields are LOG_LEVEL and NODE_ENV, neither
+ * secret-bearing, so this is not a leak today; it is not the blanket guarantee
+ * an earlier version of this comment claimed. Pinned by a test.
  */
 export function validateFreshStart(service: ServiceName, env: EnvMap): string[] {
   const failures: string[] = [];

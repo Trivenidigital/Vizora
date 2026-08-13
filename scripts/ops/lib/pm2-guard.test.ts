@@ -383,3 +383,125 @@ test('dry-run marks the command as not executed', () => {
   assert.match(report, /exact command:/);
   assert.match(report, /\(dry run — not executed\)/);
 });
+
+// ─── B3 wiring coverage ──────────────────────────────────────────────────────
+
+test('every app-service has a startup-assertion validator mapping', async () => {
+  // An app-service absent from SERVICE_BY_APP would be reloaded with NOTHING
+  // asserted about it. deploy/pm2-app-classes.json already has a coverage test;
+  // this is its mirror for the assertion side.
+  const { readFileSync } = await import('node:fs');
+  const { dirname, join } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+
+  const opsDir = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const repoRoot = join(opsDir, '..', '..');
+  const classes = JSON.parse(
+    readFileSync(join(repoRoot, 'deploy', 'pm2-app-classes.json'), 'utf-8'),
+  ).classes as Record<string, string>;
+  const guardSource = readFileSync(join(opsDir, 'pm2-guard.ts'), 'utf-8');
+
+  const appServices = Object.entries(classes)
+    .filter(([, cls]) => cls === 'app-service')
+    .map(([name]) => name);
+
+  assert.ok(appServices.length > 0, 'no app-services found — the check would be vacuous');
+  const unmapped = appServices.filter(n => !guardSource.includes(`'${n}': '`));
+  assert.deepEqual(unmapped, [], 'app-services missing from SERVICE_BY_APP');
+});
+
+// ─── D1: per-service cwd resolution (the repair itself) ──────────────────────
+
+test('each service reads ITS OWN cwd/.env, not the repo root', async () => {
+  // THE D1 REGRESSION GUARD. Prod hides this: middleware/.env and realtime/.env
+  // are symlinks to the root file, so the buggy and fixed resolutions read
+  // identical bytes there. Only a layout where <cwd>/.env differs from
+  // <root>/.env discriminates — so build one.
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { readServiceDotenv, serviceCwdFor } = await import('./config-drift.js');
+
+  const root = mkdtempSync(join(tmpdir(), 'vizora-cwd-'));
+  try {
+    writeFileSync(join(root, '.env'), 'WHICH_FILE=root\n');
+    mkdirSync(join(root, 'middleware'));
+    writeFileSync(join(root, 'middleware', '.env'), 'WHICH_FILE=service\nONLY_IN_SERVICE=1\n');
+    mkdirSync(join(root, 'web'));
+
+    const mwCwd = serviceCwdFor(root, 'middleware', './middleware');
+    const mw = readServiceDotenv(mwCwd);
+    assert.equal(mw?.WHICH_FILE, 'service', 'must read the service file, not the repo root');
+    assert.equal(mw?.ONLY_IN_SERVICE, '1');
+
+    // web has no .env — null, NOT an empty object and NOT the root file.
+    assert.equal(readServiceDotenv(serviceCwdFor(root, 'web', './web')), null);
+
+    // No cwd in the ecosystem entry falls back to <root>/<service>.
+    assert.equal(serviceCwdFor(root, 'middleware', undefined), join(root, 'middleware'));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('SERVICE_BY_APP maps every app-service to a DISTINCT valid service', async () => {
+  // The previous version grepped the source for the key, so `'vizora-realtime':
+  // 'middleware'` passed while realtime vanished from the report entirely.
+  const { SERVICE_BY_APP } = await import('../pm2-guard.js');
+  const { readFileSync } = await import('node:fs');
+  const { dirname, join } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+
+  const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+  const classes = JSON.parse(
+    readFileSync(join(repoRoot, 'deploy', 'pm2-app-classes.json'), 'utf-8'),
+  ).classes as Record<string, string>;
+  const appServices = Object.entries(classes)
+    .filter(([, c]) => c === 'app-service')
+    .map(([n]) => n);
+
+  assert.ok(appServices.length > 0);
+  const mapped = appServices.map(n => SERVICE_BY_APP[n]);
+  assert.deepEqual(mapped.filter(Boolean).length, appServices.length, 'every app-service mapped');
+  assert.equal(new Set(mapped).size, mapped.length, 'mappings must be distinct');
+  for (const s of mapped) assert.ok(['middleware', 'realtime', 'web'].includes(s!), `bad: ${s}`);
+});
+
+test('readPersistedConfigs itself reads each service cwd — pins the D1 repair', async () => {
+  // Testing serviceCwdFor/readServiceDotenv in isolation was not enough: a
+  // mutation setting `serviceCwd = REPO_ROOT` inside readPersistedConfigs
+  // survived, which is D1 verbatim. This exercises the repaired line.
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { readPersistedConfigs } = await import('../pm2-guard.js');
+
+  const root = mkdtempSync(join(tmpdir(), 'vizora-rpc-'));
+  try {
+    writeFileSync(join(root, '.env'), 'WHICH_FILE=root\n');
+    mkdirSync(join(root, 'middleware'));
+    writeFileSync(join(root, 'middleware', '.env'), 'WHICH_FILE=service\n');
+    mkdirSync(join(root, 'web'));
+
+    const apps = [
+      { name: 'vizora-middleware', cwd: './middleware', env_production: { NODE_ENV: 'production' } },
+      { name: 'vizora-web', cwd: './web', env_production: { NODE_ENV: 'production' } },
+    ];
+    const { configs, notes } = readPersistedConfigs(
+      ['vizora-middleware', 'vizora-web'],
+      apps,
+      root,
+    );
+
+    const mw = configs.find(c => c.service === 'middleware');
+    assert.equal(mw?.dotenvVars?.WHICH_FILE, 'service', 'must read middleware/.env, not the root');
+
+    const web = configs.find(c => c.service === 'web');
+    assert.equal(web?.dotenvVars, null, 'web has no .env and must not inherit the root one');
+
+    assert.ok(notes.some(n => n.includes('middleware') && n.includes('loaded')));
+    assert.ok(notes.some(n => n.includes('web') && n.includes('NOT FOUND')));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

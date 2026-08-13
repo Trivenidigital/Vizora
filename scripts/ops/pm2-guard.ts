@@ -57,6 +57,18 @@ import {
   type EcosystemAppSummary,
   type Operation,
 } from './lib/pm2-guard.js';
+import {
+  anyServiceWouldFail,
+  assertCanRestart,
+  renderStartupAssertions,
+  type PersistedServiceConfig,
+} from './lib/startup-assertions.js';
+import {
+  readServiceDotenv,
+  serviceCwdFor,
+  type EnvMap,
+  type ServiceName,
+} from './lib/config-drift.js';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ECOSYSTEM_PATH = join(REPO_ROOT, 'ecosystem.config.js');
@@ -76,11 +88,92 @@ function usage(): string {
   ].join('\n');
 }
 
-function readEcosystemApps(): EcosystemAppSummary[] {
+/** Raw ecosystem entry — only the fields this guard reads. */
+interface EcosystemApp {
+  name: string;
+  cron_restart?: string;
+  cwd?: string;
+  env_production?: Record<string, unknown>;
+}
+
+/**
+ * Load the ecosystem ONCE per invocation.
+ *
+ * It used to be `require`d twice, and web's `env_production` block is an IIFE
+ * that reads `web/.env.local` from disk, so a second evaluation repeated that
+ * side effect for nothing.
+ */
+function readEcosystem(): EcosystemApp[] {
   const require = createRequire(import.meta.url);
   delete require.cache[require.resolve(ECOSYSTEM_PATH)];
-  const config = require(ECOSYSTEM_PATH) as { apps?: { name: string; cron_restart?: string }[] };
-  return (config.apps ?? []).map(a => ({ name: a.name, cronRestart: a.cron_restart }));
+  return (require(ECOSYSTEM_PATH) as { apps?: EcosystemApp[] }).apps ?? [];
+}
+
+function summarizeApps(apps: EcosystemApp[]): EcosystemAppSummary[] {
+  return apps.map(a => ({ name: a.name, cronRestart: a.cron_restart }));
+}
+
+/** PM2 app name -> the ServiceName its validators are registered under. */
+export const SERVICE_BY_APP: Record<string, ServiceName> = {
+  'vizora-middleware': 'middleware',
+  'vizora-realtime': 'realtime',
+  'vizora-web': 'web',
+};
+
+/**
+ * B3 — build each targeted service's fresh-start config from persisted state.
+ *
+ * Reads only what a fresh process would consume: the ecosystem
+ * `env_production` block plus THAT SERVICE'S OWN `.env`. No `/proc`, no
+ * `pm2 jlist` env — the question is about a process that does not exist yet.
+ *
+ * The dotenv file is resolved through `readServiceDotenv(resolve(REPO_ROOT,
+ * app.cwd))`, the same loader the drift detector uses. An earlier revision read
+ * the repo-root `.env` for every service, which is wrong in both directions:
+ * the services set `cwd` per service and resolve dotenv under it, and on prod
+ * the two files agree only because `middleware/.env` is a SYMLINK. With that
+ * symlink missing this would have reported "would boot" for a service that
+ * exits 1 on start — the exact failure the gate exists to prevent.
+ */
+export function readPersistedConfigs(
+  names: string[],
+  apps: EcosystemApp[],
+  /** Injected so the per-service cwd resolution — the D1 repair — is testable. */
+  repoRoot: string = REPO_ROOT,
+): { configs: PersistedServiceConfig[]; notes: string[] } {
+  const configs: PersistedServiceConfig[] = [];
+  const notes: string[] = [];
+
+  for (const name of names) {
+    const service = SERVICE_BY_APP[name];
+    if (!service) {
+      // Never silently skip: an app-service absent from the map would be
+      // reloaded with nothing asserted about it.
+      notes.push(`${name}: no validator mapping — NOT asserted`);
+      continue;
+    }
+    // A many-to-one SERVICE_BY_APP would otherwise silently drop a service, so
+    // record it rather than `continue` quietly. (Cluster instances share one
+    // ecosystem entry and one name, so clustering cannot reach this.)
+    if (configs.some(c => c.service === service)) {
+      notes.push(`${name}: maps to ${service}, already asserted — NOT asserted separately`);
+      continue;
+    }
+
+    const app = apps.find(a => a.name === name);
+    const serviceCwd = serviceCwdFor(repoRoot, service, app?.cwd);
+    const dotenvVars = readServiceDotenv(serviceCwd);
+    notes.push(
+      `${service}: dotenv ${join(serviceCwd, '.env')} ${dotenvVars ? 'loaded' : 'NOT FOUND'}`,
+    );
+
+    const envProduction: EnvMap = {};
+    for (const [k, v] of Object.entries(app?.env_production ?? {})) {
+      if (v !== undefined && v !== null) envProduction[k] = String(v);
+    }
+    configs.push({ service, ecosystemEnvProduction: envProduction, dotenvVars });
+  }
+  return { configs, notes };
 }
 
 function readManifest(): Record<string, string> {
@@ -108,11 +201,13 @@ function main(): void {
     return;
   }
 
+  let ecosystemApps: EcosystemApp[];
   let apps: EcosystemAppSummary[];
   let manifest: Record<string, string>;
   let registered: string[];
   try {
-    apps = readEcosystemApps();
+    ecosystemApps = readEcosystem();
+    apps = summarizeApps(ecosystemApps);
     manifest = readManifest();
     registered = readRegistered();
   } catch (err) {
@@ -126,12 +221,44 @@ function main(): void {
   }
 
   const decision = evaluateOperation({ operation, environment, apps, manifest, registered });
-  process.stdout.write(`${renderReport(decision, dryRun, ECOSYSTEM_PATH)}\n`);
 
   if (decision.verdict !== 'PASS') {
+    process.stdout.write(`${renderReport(decision, dryRun, ECOSYSTEM_PATH)}\n`);
     process.exitCode = 1;
     return;
   }
+
+  // B3 — the targets are classified and the command is resolved, but a reload
+  // still takes these processes DOWN before bringing them back. Assert they
+  // could actually come back, using each service's own validators, BEFORE
+  // anything prints `VERDICT: PASS` or the exact command: printing a
+  // copy-pasteable invocation above a refusal hands the operator the bypass.
+  // Runs for --dry-run too, so the check is provable without risk.
+  let assertionNotes: string[] = [];
+  let assertions: ReturnType<typeof assertCanRestart> = [];
+  try {
+    const persisted = readPersistedConfigs(decision.invokeNames, ecosystemApps);
+    assertionNotes = persisted.notes;
+    assertions = assertCanRestart(persisted.configs);
+  } catch (err) {
+    // Same contract as the resolution step: cannot evaluate ⇒ never mutate.
+    process.stderr.write(
+      `pm2-guard: cannot assert restart safety — ${err instanceof Error ? err.message : err}\n` +
+      'Refusing without mutating.\n',
+    );
+    process.exitCode = 2;
+    return;
+  }
+
+  if (anyServiceWouldFail(assertions)) {
+    process.stdout.write(`${renderStartupAssertions(assertions, assertionNotes)}\n`);
+    process.exitCode = 1;
+    return;
+  }
+
+  process.stdout.write(`${renderReport(decision, dryRun, ECOSYSTEM_PATH)}\n`);
+  process.stdout.write(`\n${renderStartupAssertions(assertions, assertionNotes)}\n`);
+
   if (dryRun) {
     process.stdout.write('\ndry run — PM2 was not invoked.\n');
     return;
@@ -155,4 +282,9 @@ function main(): void {
   }
 }
 
-main();
+// Only run when invoked directly. Without this the module cannot be imported,
+// which is why the D1 repair (per-service cwd resolution) shipped with no test
+// of its own — a source mutation re-introducing the bug passed the whole suite.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main();
+}
