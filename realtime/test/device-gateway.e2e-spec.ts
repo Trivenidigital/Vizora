@@ -307,8 +307,10 @@ describe('DeviceGateway (E2E)', () => {
         // not run. If you repair it and this fails, fix the suite, not the shape.
         expect(response.success).toBe(true);
         expect(response.timestamp).toBeDefined();
-        expect(response.data.nextHeartbeatIn).toBe(15000);
-        expect(response.data.commands).toBeDefined();
+        // Optional-chained: an error ack has no `data` key at all, and a clean
+        // assertion failure is more useful there than a TypeError.
+        expect(response.data?.nextHeartbeatIn).toBe(15000);
+        expect(response.data?.commands).toBeDefined();
         done();
       });
     });

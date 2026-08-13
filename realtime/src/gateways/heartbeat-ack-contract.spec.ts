@@ -36,11 +36,17 @@ jest.mock('@sentry/nestjs', () => ({
  * A mutation-sensitive checker pointed at the wrong function is still the wrong
  * function. So this drives the REAL handler through Nest DI — the same class,
  * the same constructor, the same method the socket dispatches to — and asserts
- * the value it returns. handleHeartbeat's return value IS the ack: it is the only
- * @SubscribeMessage('heartbeat') in the repo, and neither globally-registered
- * interceptor rewrites payloads (MetricsInterceptor taps, SentryInterceptor
- * catches+rethrows; app.module.ts:49,53). Nothing sits between this return value
- * and the wire.
+ * the value it returns.
+ *
+ * handleHeartbeat's return value IS the ack. It is the only
+ * @SubscribeMessage('heartbeat') in the repo, and no global enhancer can rewrite
+ * it: Nest's socket module builds its InterceptorsContextCreator WITHOUT an
+ * applicationConfig (@nestjs/websockets socket-module.js getContextCreator), so
+ * APP_INTERCEPTOR-registered interceptors never reach WS handlers at all. That is
+ * structural, not a property of the two we happen to register today — a future
+ * global map() interceptor still could not silently un-bind this test. Only the
+ * gateway's own local enhancers apply (device.gateway.ts:156,1792,1793), and none
+ * touch the return value. RedisIoAdapter overrides only createIOServer.
  *
  * The fixture is EXPECTED OUTPUT ONLY. It is never fed into the thing under test.
  *
@@ -69,7 +75,10 @@ describe('heartbeat ack — wire contract with the TV client', () => {
     getPendingPlaylist: jest.fn().mockResolvedValue(null),
     get: jest.fn().mockResolvedValue(null),
     set: jest.fn().mockResolvedValue(undefined),
-    setNx: jest.fn().mockResolvedValue(false), // token-refresh cooldown already held: skip
+    // Never actually consulted on this path: maybeRefreshDeviceToken returns early at
+    // device.gateway.ts:1458 because the test socket carries no deviceTokenHash/exp.
+    // Present so a future change that DOES reach it fails loudly rather than on undefined.
+    setNx: jest.fn().mockResolvedValue(false),
     delete: jest.fn().mockResolvedValue(undefined),
     exists: jest.fn().mockResolvedValue(false),
   };
@@ -80,7 +89,9 @@ describe('heartbeat ack — wire contract with the TV client', () => {
     playlist: { findFirst: jest.fn().mockResolvedValue(null) },
   };
 
-  // emit() is needed only by onModuleDestroy's 'server:shutdown' broadcast in afterEach.
+  // Not on the heartbeat path: `server.sockets.sockets` is read only by
+  // sweepInvalidatedSessions (device.gateway.ts:775), and emit() only by onModuleDestroy.
+  // Present so gateway construction and teardown do not throw.
   const mockServer = { emit: jest.fn(), sockets: { sockets: new Map<string, unknown>() } };
 
   const stamp = new Date('2026-01-01T00:00:00Z');
@@ -154,9 +165,10 @@ describe('heartbeat ack — wire contract with the TV client', () => {
     gateway = module.get<DeviceGateway>(DeviceGateway);
     (gateway as unknown as { server: unknown }).server = mockServer;
 
-    // device-1's ACTIVE socket is socket-1. isActiveDeviceSocket() consults both maps,
-    // so this is what selects the main success path over the superseded-socket one.
-    mockServer.sockets.sockets.set('socket-1', {});
+    // device-1's ACTIVE socket is socket-1. isActiveDeviceSocket() (device.gateway.ts:304)
+    // is exactly `deviceSockets.get(deviceId) === client.id`, so THIS map alone selects
+    // the main success path over the superseded-socket one — which is why the superseded
+    // test simply beats from a socket with a different id.
     (gateway as unknown as { deviceSockets: Map<string, string> }).deviceSockets.set(
       'device-1',
       'socket-1',
@@ -201,8 +213,20 @@ describe('heartbeat ack — wire contract with the TV client', () => {
       serverHasContent();
       expect((await beat(socket(), '2025-06-01T00:00:00.000Z')).data!.reconcileContent).toBe(true);
 
+      // BOTH throttles must be cleared, not just the signal one. shouldReconcileContent
+      // short-circuits on `now - lastResolved < RECONCILE_RESOLVE_INTERVAL_MS` when the
+      // cache does not already suspect drift (device.gateway.ts:1239), and the first beat
+      // stamps reconcileResolvedAt. Clearing only reconcileSignalledAt made the `false`
+      // below come from the RESOLVE THROTTLE rather than from version agreement — it
+      // stayed false even for a version that flagrantly disagreed. That is the exact
+      // defect this file exists to prevent, reproduced inside it.
       (gateway as unknown as { reconcileSignalledAt: Map<string, number> }).reconcileSignalledAt.clear();
+      (gateway as unknown as { reconcileResolvedAt: Map<string, number> }).reconcileResolvedAt.clear();
+
+      const resolvesBefore = mockDatabaseService.display.findFirst.mock.calls.length;
       expect((await beat(socket(), SERVER_VERSION)).data!.reconcileContent).toBe(false);
+      // …and prove the false came from a real resolve + version compare, not a short-circuit.
+      expect(mockDatabaseService.display.findFirst.mock.calls.length).toBeGreaterThan(resolvesBefore);
     });
 
     it('does NOT emit `revoked` — revocation rides the separate device:revoked event', async () => {
