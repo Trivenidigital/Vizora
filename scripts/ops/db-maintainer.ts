@@ -56,6 +56,7 @@ import {
   readOpsState,
   writeOpsState,
   recordAgentRun,
+  makeIncidentId,
 } from './lib/state.js';
 import { log, sendInlineAlert } from './lib/alerting.js';
 import {
@@ -375,6 +376,27 @@ async function main(): Promise<void> {
 
     const detectedAt = new Date().toISOString();
     const incidents = buildMaintenanceIncidents(report, detectedAt);
+
+    // Retention is now the ONLY thing bounding disk, so its failures cannot be
+    // log-only. Without this a read-only logs/ produces "36 errors", exit 0 and
+    // a green dashboard — printed into the very file it failed to bound. Which
+    // is the same silent-maintenance-failure shape this agent was rebuilt to
+    // remove.
+    if (logRetention.errors.length > 0) {
+      incidents.push({
+        id: makeIncidentId(AGENT, 'log-retention-failed', 'logs-dir'),
+        agent: AGENT,
+        type: 'log-retention-failed',
+        severity: 'warning',
+        target: 'logs',
+        targetId: 'logs-dir',
+        detected: detectedAt,
+        message: `Log retention reported ${logRetention.errors.length} error(s): ${logRetention.errors.slice(0, 3).join('; ')}`,
+        remediation: 'Check logs/ permissions and free disk; retention is the only bound on log growth',
+        status: 'open',
+        attempts: 0,
+      });
+    }
     const counts = summarize(incidents);
     const durationMs = Date.now() - startTime;
 

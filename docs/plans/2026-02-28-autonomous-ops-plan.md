@@ -294,8 +294,8 @@ Runs daily at 3am. Maintenance only — no issue detection.
 
 1. **PostgreSQL**: `VACUUM ANALYZE` on high-churn tables (Content, Display, Schedule, Playlist, AuditLog, User) via psql
 2. **Redis**: Report memory usage and key count via redis-cli
-3. **Log rotation**: Truncate .log files older than 7 days in logs/
-4. **PM2 flush**: `pm2 flush` to clear PM2's internal log buffer
+3. **Log rotation**: Trim oversized .log files to their most recent bytes (never empty them) in logs/
+4. **No PM2 flush** (removed 2026-08-13): `pm2 flush` truncates EVERY app's logs, destroying unrelated services' evidence
 5. **Backup verification**: Check BACKUP_S3_BUCKET if configured (placeholder for future)
 
 Uses `execSync` with hardcoded psql/redis-cli/pm2 commands only.
