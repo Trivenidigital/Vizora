@@ -284,7 +284,7 @@ jobs:
           builtBy=github-actions
           runId=${{ github.run_id }}
           builtAt=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          nextVersion=$(node -p "require('./web/package.json').dependencies.next")
+          nextVersion=$(cd web && node -p "require('next/package.json').version")
           NEXT_PUBLIC_API_URL=https://vizora.cloud
           NEXT_PUBLIC_SOCKET_URL=https://vizora.cloud
           BACKEND_URL=https://vizora.cloud
@@ -292,9 +292,21 @@ jobs:
           echo "--- build-metadata.env ---"
           cat web/.next/build-metadata.env
 
+      # Refuse to RETAIN an artifact that would fail the deployment eligibility
+      # check. Production validates again before any swap, but an artifact that
+      # cannot be deployed should never occupy a retention slot or be mistaken
+      # for a recovery candidate.
+      - name: Validate web build artifact
+        run: npx tsx scripts/ops/validate-web-artifact.ts web/.next
+
       # `next start` needs the whole .next tree, not just static/. `cache/` is
       # excluded: it is build-time only (tsbuildinfo, optimised images) and is
       # the bulk of the size.
+      #
+      # `include-hidden-files` is REQUIRED: `.next` is a dotfile directory and
+      # upload-artifact@v4 excludes hidden paths by default. Without it the
+      # upload silently finds nothing — which is exactly how the first run of
+      # this workflow failed ("No files were found with the provided path").
       - name: Upload web build artifact
         uses: actions/upload-artifact@v4
         with:
@@ -302,6 +314,7 @@ jobs:
           path: |
             web/.next
             !web/.next/cache
+          include-hidden-files: true
           retention-days: 30
           if-no-files-found: error
 
