@@ -19,7 +19,12 @@ import { MetricsService } from '../metrics/metrics.service';
 import { DatabaseService } from '../database/database.service';
 // T2 — the SINGLE resolver + wire serializer both delivery channels use, so the
 // realtime push and the device pull (GET /devices/me/content) can never disagree.
-import { resolveEffectiveContent, serializeDeviceContent } from '@vizora/database';
+import {
+  resolveEffectiveContent,
+  serializeDeviceContent,
+  contentVersion,
+  type DeviceContentPayload,
+} from '@vizora/database';
 import { StorageService } from '../storage/storage.service';
 import { WsValidationPipe } from './pipes/ws-validation.pipe';
 import {
@@ -1908,8 +1913,15 @@ export class DeviceGateway
       return 'skipped';
     }
 
+    // Carry a `version` so the device applies this through the same version-wins gate
+    // as the other two channels instead of the legacy signature fallback. Computed with
+    // the SHARED contentVersion, so a queued snapshot and a freshly resolved payload of
+    // the same content produce the same stamp. This queue is a best-effort optimisation:
+    // its correctness is backstopped by sendInitialState resolving authoritative truth
+    // on this same connect.
     const result = await this.emitWithDeliveryAck(client, 'playlist:update', {
       playlist: safePendingPlaylist,
+      version: contentVersion(safePendingPlaylist as never, null),
       timestamp: new Date().toISOString(),
     });
 
@@ -2010,21 +2022,57 @@ export class DeviceGateway
 
   // Admin methods (called from API)
   async sendPlaylistUpdate(deviceId: string, playlist: Playlist): Promise<{ delivered: boolean; reason?: string }> {
-    // Resolve minio:// URLs to API-served URLs before sending to device
-    // Devices authenticate content requests via Authorization header with their stored JWT
-    const resolvedPlaylist = redactDevicePlaylist({
-      ...playlist,
-      items: (playlist.items || []).map((item: PlaylistContentItem) => {
-        const resolvedUrl = this.resolveContentUrl(item);
-        return {
-          ...item,
-          content: item.content ? {
-            ...item.content,
-            url: resolvedUrl,
-          } : item.content,
-        };
-      }),
-    });
+    // T2 — a LIVE push goes through the SAME resolver + serializer as the connect-time
+    // push and the device pull, so every channel agrees on both the content and its
+    // `version`. Without this, an assignment pushed while a schedule is active would
+    // send raw currentPlaylist and override the schedule until the next pull
+    // (pending-decisions.md follow-up #3).
+    //
+    // The device's version-wins gate needs a `version` on the wire or it falls back to
+    // the legacy signature path, so attaching it here is what makes version-wins live
+    // on the push channel at all.
+    let payload: DeviceContentPayload | null = null;
+    try {
+      const display = await this.databaseService.display.findUnique({
+        where: { id: deviceId },
+        select: { organizationId: true },
+      });
+      if (display?.organizationId) {
+        const effective = await resolveEffectiveContent(
+          this.databaseService,
+          deviceId,
+          display.organizationId,
+          new Date(),
+        );
+        if (effective.playlist) {
+          payload = serializeDeviceContent(effective, {
+            contentBaseUrl: process.env.API_BASE_URL || 'http://localhost:3000',
+          });
+        }
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`sendPlaylistUpdate: resolver failed for device ${deviceId}, falling back to the supplied playlist: ${message}`);
+    }
+
+    // Fallback: the resolver found nothing (or threw) — push what the caller supplied
+    // rather than dropping the update. Keeps the pre-T2 behaviour as the floor.
+    const resolvedPlaylist = payload
+      ? (payload.playlist as unknown as Playlist)
+      : redactDevicePlaylist({
+          ...playlist,
+          items: (playlist.items || []).map((item: PlaylistContentItem) => {
+            const resolvedUrl = this.resolveContentUrl(item);
+            return {
+              ...item,
+              content: item.content ? {
+                ...item.content,
+                url: resolvedUrl,
+              } : item.content,
+            };
+          }),
+        });
+    const resolvedVersion = payload?.version ?? contentVersion(resolvedPlaylist as never, null);
 
     // Get all sockets in the device room
     const roomName = `device:${deviceId}`;
@@ -2044,7 +2092,12 @@ export class DeviceGateway
     let failureReason = 'ack_timeout';
     for (const socket of sockets) {
       const result = await this.emitWithDeliveryAck(socket as any, 'playlist:update', {
+        // Same envelope keys as the connect-time push (source/version/playlist), so the
+        // two channels are inspectable as one shape. `timestamp` is retained for the
+        // existing delivery-ack logging contract.
+        source: payload?.source ?? 'currentPlaylist',
         playlist: resolvedPlaylist,
+        version: resolvedVersion,
         timestamp: new Date().toISOString(),
       });
       if (result.delivered) {

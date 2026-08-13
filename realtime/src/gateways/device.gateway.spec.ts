@@ -1550,6 +1550,84 @@ describe('DeviceGateway', () => {
       mockServer.in.mockClear();
     });
 
+    // T2 — a live push must carry a version and must be resolver-authoritative.
+    // Without a version on the wire the deployed client falls back to its legacy
+    // signature path and version-wins stays dormant on this channel no matter what
+    // the pull endpoint returns.
+    describe('resolver coherence (T2)', () => {
+      const stamp = new Date('2026-01-01T00:00:00Z');
+      const suppliedPlaylist = {
+        id: 'p-supplied',
+        name: 'Supplied',
+        items: [{ id: 'i-1', contentId: 'c-1', content: { id: 'c-1', name: 'Image', url: 'minio://bucket/file.jpg' } }],
+      };
+
+      it('carries a version on the wire', async () => {
+        mockDatabaseService.display.findUnique.mockResolvedValue({
+          id: 'device-1', organizationId: 'org-1', isDisabled: false,
+          nickname: 'Test Device', deviceIdentifier: 'test-id', jwtToken: hashToken('valid-token'),
+        });
+        mockDatabaseService.display.findFirst.mockResolvedValue({ timezone: 'UTC', isDisabled: false, currentPlaylistId: 'p-1' });
+        mockDatabaseService.schedule.findMany.mockResolvedValue([]);
+        mockDatabaseService.playlist.findFirst.mockResolvedValue({
+          id: 'p-1', name: 'Current', updatedAt: stamp,
+          items: [{ contentId: 'c-1', order: 0, duration: 10, updatedAt: stamp, content: { id: 'c-1', name: 'i', type: 'image', url: '', updatedAt: stamp } }],
+        });
+
+        await gateway.sendPlaylistUpdate('device-1', suppliedPlaylist as any);
+
+        const [, payload] = mockRemoteSocket.emit.mock.calls.find(([event]: [string]) => event === 'playlist:update')!;
+        expect(payload.version).toBe(stamp.toISOString());
+      });
+
+      it('an ACTIVE schedule wins over the pushed playlist (the push is resolver-authoritative)', async () => {
+        mockDatabaseService.display.findUnique.mockResolvedValue({
+          id: 'device-1', organizationId: 'org-1', isDisabled: false,
+          nickname: 'Test Device', deviceIdentifier: 'test-id', jwtToken: hashToken('valid-token'),
+        });
+        mockDatabaseService.display.findFirst.mockResolvedValue({ timezone: 'UTC', isDisabled: false, currentPlaylistId: 'p-supplied' });
+        mockDatabaseService.schedule.findMany.mockResolvedValue([{
+          id: 'sch-1', daysOfWeek: [0, 1, 2, 3, 4, 5, 6], startTime: null, endTime: null, priority: 10, updatedAt: stamp,
+          playlist: { id: 'p-sched', name: 'Scheduled', updatedAt: stamp, items: [{ contentId: 'c-s', order: 0, duration: 5, updatedAt: stamp, content: { id: 'c-s', name: 's', type: 'image', url: '', updatedAt: stamp } }] },
+        }]);
+
+        await gateway.sendPlaylistUpdate('device-1', suppliedPlaylist as any);
+
+        const [, payload] = mockRemoteSocket.emit.mock.calls.find(([event]: [string]) => event === 'playlist:update')!;
+        expect(payload.playlist.id).toBe('p-sched');
+        expect(payload.source).toBe('schedule');
+      });
+
+      it('resolver finds nothing → still pushes the supplied playlist (never drops an update)', async () => {
+        mockDatabaseService.display.findUnique.mockResolvedValue({
+          id: 'device-1', organizationId: 'org-1', isDisabled: false,
+          nickname: 'Test Device', deviceIdentifier: 'test-id', jwtToken: hashToken('valid-token'),
+        });
+        mockDatabaseService.display.findFirst.mockResolvedValue({ timezone: 'UTC', isDisabled: false, currentPlaylistId: null });
+        mockDatabaseService.schedule.findMany.mockResolvedValue([]);
+
+        const result = await gateway.sendPlaylistUpdate('device-1', suppliedPlaylist as any);
+
+        expect(result).toEqual({ delivered: true });
+        const [, payload] = mockRemoteSocket.emit.mock.calls.find(([event]: [string]) => event === 'playlist:update')!;
+        expect(payload.playlist.id).toBe('p-supplied');
+      });
+
+      it('resolver THROWS → falls back to the supplied playlist rather than failing the push', async () => {
+        mockDatabaseService.display.findUnique.mockResolvedValue({
+          id: 'device-1', organizationId: 'org-1', isDisabled: false,
+          nickname: 'Test Device', deviceIdentifier: 'test-id', jwtToken: hashToken('valid-token'),
+        });
+        mockDatabaseService.display.findFirst.mockRejectedValue(new Error('db down'));
+
+        const result = await gateway.sendPlaylistUpdate('device-1', suppliedPlaylist as any);
+
+        expect(result).toEqual({ delivered: true });
+        const [, payload] = mockRemoteSocket.emit.mock.calls.find(([event]: [string]) => event === 'playlist:update')!;
+        expect(payload.playlist.id).toBe('p-supplied');
+      });
+    });
+
     it('should resolve minio:// URLs before sending', async () => {
       const playlist = {
         id: 'p-1',
@@ -2508,7 +2586,10 @@ describe('DeviceGateway', () => {
         organizationId: 'org-1',
         deviceIdentifier: 'test-id',
       });
-      mockDatabaseService.display.findUnique.mockResolvedValue({ id: 'device-1', organizationId: 'org-1' });
+      mockDatabaseService.display.findUnique.mockResolvedValue({
+          id: 'device-1', organizationId: 'org-1', isDisabled: false,
+          nickname: 'Test Device', deviceIdentifier: 'test-id', jwtToken: hashToken('valid-token'),
+        });
 
       // 10 connections should be fine
       for (let i = 0; i < 10; i++) {
@@ -2539,7 +2620,10 @@ describe('DeviceGateway', () => {
         organizationId: 'org-1',
         deviceIdentifier: 'test-id',
       });
-      mockDatabaseService.display.findUnique.mockResolvedValue({ id: 'device-1', organizationId: 'org-1' });
+      mockDatabaseService.display.findUnique.mockResolvedValue({
+          id: 'device-1', organizationId: 'org-1', isDisabled: false,
+          nickname: 'Test Device', deviceIdentifier: 'test-id', jwtToken: hashToken('valid-token'),
+        });
 
       // Use a unique IP
       const testIp = '10.0.0.99';
