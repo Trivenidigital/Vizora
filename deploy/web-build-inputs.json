@@ -1,5 +1,4 @@
 {
-  "$schema": "./web-build-inputs.md",
   "$comment": [
     "Authoritative record of every NEXT_PUBLIC_* the web app consumes, and how each one",
     "reaches production. Enforced by scripts/ops/web-build-inputs.test.ts, which fails CI",
@@ -25,8 +24,8 @@
       "consumedOnServer": true,
       "buildInput": "ci",
       "productionValue": "https://vizora.cloud",
-      "defaultIfAbsent": "http://localhost:3000/api/v1",
-      "why": "Client display components derive an API origin from it; server-side api client and next.config images.remotePatterns also read it. next.config.security.js rejects a loopback origin in a production build."
+      "defaultIfAbsent": "differs by consumer, deliberately recorded in full: (1) lib/api/client.ts and lib/server-api.ts fall back to http://localhost:3000/api/v1 on the server branch, with a console.warn in production; (2) the display client components (DisplayClient.tsx, ContentRenderer.tsx, ContentScreen.tsx) fall back to window.location.origin; (3) next.config.js omits two images.remotePatterns entries; (4) next.config.security.js omits the origin from CSP connect-src/img-src/media-src.",
+      "why": "Consumer (2) is not merely a URL default -- apiOrigin joins baseOrigin in the Set that gates whether a device token is appended to a device-content/*/file URL (DisplayClient.tsx authenticateDisplayContentUrl). Absent, that set narrows to the page origin, so this variable participates in a trust decision and not only in addressing. next.config.security.js additionally rejects a loopback origin in a production build."
     },
     {
       "name": "NEXT_PUBLIC_SOCKET_URL",
@@ -34,7 +33,7 @@
       "consumedOnServer": true,
       "buildInput": "ci",
       "productionValue": "https://vizora.cloud",
-      "defaultIfAbsent": "http://localhost:3002 in development; empty string in production, which useSocket relies on for SAME-ORIGIN connection",
+      "defaultIfAbsent": "differs by consumer: lib/hooks/useSocket.ts falls back to http://localhost:3002 in development and to the EMPTY STRING in production, which engine.io resolves to location.hostname/port (same-origin); app/display/hooks/useDeviceConnection.ts falls back UNCONDITIONALLY to http://localhost:3002 with no production branch -- on a display device that would attempt a loopback connection.",
       "why": "Feeds the browser socket connection and the CSP connect-src. next.config.security.js THROWS when it is unset in a production build, so the same-origin empty-string path is unreachable in a real prod build -- but useSocket still implements it, and that behaviour must be preserved if the interlock ever changes."
     },
     {
@@ -61,7 +60,7 @@
       "consumedOnServer": false,
       "buildInput": "intentionally-unset",
       "productionValue": null,
-      "defaultIfAbsent": "GoogleSignInButton renders nothing -- it gates on `if (!mounted || !GOOGLE_CLIENT_ID) return`",
+      "defaultIfAbsent": "the GoogleSignInButton EFFECT early-returns, so the GSI script never loads and no button is rendered into the ref. The component itself still renders its container div (deliberately, to avoid an SSR/client hydration mismatch), collapsed to 0 height.",
       "why": "Google Sign-In is not configured: prod .env has NEXT_PUBLIC_GOOGLE_CLIENT_ID= (empty). ENABLING IT REQUIRES A CI BUILD INPUT. Setting it in prod .env and reloading PM2 -- which ecosystem.config.js is written to support -- injects it into the SSR process only; the browser bundle reads an empty process shim and the button stays hidden with no error anywhere."
     }
   ]
