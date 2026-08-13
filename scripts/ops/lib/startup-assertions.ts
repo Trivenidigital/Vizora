@@ -54,6 +54,13 @@ export interface StartupAssertion {
   service: ServiceName;
   /** Human-readable reasons a fresh start would fail. Empty means it would boot. */
   failures: string[];
+  /**
+   * False when NO validator applies to this service, so an empty `failures`
+   * proves nothing. `web` is the case today: it has no required production
+   * variables, no port rule and no Zod schema. Reporting OK there would be
+   * false assurance — the same false-green shape these guards exist to remove.
+   */
+  checked: boolean;
 }
 
 /**
@@ -87,8 +94,17 @@ export function assertCanRestart(configs: PersistedServiceConfig[]): StartupAsse
   return configs.map(config => ({
     service: config.service,
     failures: validateFreshStart(config.service, freshStartEnv(config)),
+    checked: SERVICES_WITH_VALIDATORS.has(config.service),
   }));
 }
+
+/**
+ * Services that actually have boot validators to run.
+ *
+ * `web` has none — no REQUIRED_IN_PRODUCTION entries, no port enforcement, no
+ * Zod schema — so nothing can be asserted about it here.
+ */
+const SERVICES_WITH_VALIDATORS = new Set<ServiceName>(['middleware', 'realtime']);
 
 /** True when any service would fail to come back. */
 export function anyServiceWouldFail(assertions: StartupAssertion[]): boolean {
@@ -98,9 +114,15 @@ export function anyServiceWouldFail(assertions: StartupAssertion[]): boolean {
 /**
  * Operator-facing summary.
  *
- * Validator messages are static: they never interpolate the configured value,
- * and nothing here adds one, so this output is safe to paste into a ticket or
- * an alert.
+ * Nothing here interpolates a configured value. The validators mostly do not
+ * either — min-length, `.url()` and the custom refines all emit static text.
+ *
+ * ONE EXCEPTION, verified rather than assumed: zod's `invalid_enum_value`
+ * echoes the received value. The only enum fields are `LOG_LEVEL` and
+ * `NODE_ENV`, neither secret-bearing, so this is not a leak today — but it is
+ * not the blanket guarantee an earlier version of this comment claimed, and
+ * the day a secret-bearing field becomes an enum the output stops being safe
+ * to paste. Pinned by a test so that change is loud.
  *
  * One message does contain a credential-looking literal — `MINIO_SECRET_KEY
  * must be set and not equal to "minioadmin" in production`. That string lives
@@ -109,10 +131,20 @@ export function anyServiceWouldFail(assertions: StartupAssertion[]): boolean {
  * default", which is precisely the finding. Pinned by a test so it is not
  * mistaken for an echo later.
  */
-export function renderStartupAssertions(assertions: StartupAssertion[]): string {
+export function renderStartupAssertions(
+  assertions: StartupAssertion[],
+  notes: string[] = [],
+): string {
   const lines: string[] = ['Startup assertions (would these services come back if restarted?)', ''];
 
+  for (const note of notes) lines.push(`  note    ${note}`);
+  if (notes.length > 0) lines.push('');
+
   for (const a of assertions) {
+    if (!a.checked) {
+      lines.push(`  SKIPPED ${a.service} — no boot validators exist for this service`);
+      continue;
+    }
     if (a.failures.length === 0) {
       lines.push(`  OK      ${a.service} — persisted config would boot`);
       continue;
@@ -125,8 +157,13 @@ export function renderStartupAssertions(assertions: StartupAssertion[]): string 
     lines.push(
       '',
       'REFUSING to proceed. These services are running now, but could not be',
-      'recreated from what is persisted — so a reload would take them down and',
-      'they would not come back. Fix the configuration, not this check.',
+      'recreated from persisted config alone — so a reload would take them down',
+      'and they would not come back.',
+      '',
+      'Note the "alone": a value currently supplied by the PM2 daemon environment',
+      '(the pattern ecosystem.config.js documents for LIFECYCLE_LIVE) is NOT',
+      'modelled here and would be reported missing. Check that before concluding',
+      'the configuration is broken.',
       '',
       'Nothing was changed. No credential was read, written or logged.',
     );

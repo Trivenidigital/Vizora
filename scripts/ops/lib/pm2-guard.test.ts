@@ -383,3 +383,29 @@ test('dry-run marks the command as not executed', () => {
   assert.match(report, /exact command:/);
   assert.match(report, /\(dry run — not executed\)/);
 });
+
+// ─── B3 wiring coverage ──────────────────────────────────────────────────────
+
+test('every app-service has a startup-assertion validator mapping', async () => {
+  // An app-service absent from SERVICE_BY_APP would be reloaded with NOTHING
+  // asserted about it. deploy/pm2-app-classes.json already has a coverage test;
+  // this is its mirror for the assertion side.
+  const { readFileSync } = await import('node:fs');
+  const { dirname, join } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+
+  const opsDir = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const repoRoot = join(opsDir, '..', '..');
+  const classes = JSON.parse(
+    readFileSync(join(repoRoot, 'deploy', 'pm2-app-classes.json'), 'utf-8'),
+  ).classes as Record<string, string>;
+  const guardSource = readFileSync(join(opsDir, 'pm2-guard.ts'), 'utf-8');
+
+  const appServices = Object.entries(classes)
+    .filter(([, cls]) => cls === 'app-service')
+    .map(([name]) => name);
+
+  assert.ok(appServices.length > 0, 'no app-services found — the check would be vacuous');
+  const unmapped = appServices.filter(n => !guardSource.includes(`'${n}': '`));
+  assert.deepEqual(unmapped, [], 'app-services missing from SERVICE_BY_APP');
+});

@@ -40,7 +40,7 @@
 
 import 'dotenv/config';
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -54,7 +54,6 @@ import {
   analyzeDrift,
   findingsToIncidents,
   assessStability,
-  parseDotenvText,
   parseProcEnviron,
   resolveClearedFindings,
   type DriftFinding,
@@ -62,6 +61,7 @@ import {
   type Pm2Sample,
   type ServiceName,
   type ServiceObservation,
+  readServiceDotenv,
 } from './lib/config-drift.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -209,22 +209,6 @@ function readProcEnviron(pid: number | undefined): EnvMap | null {
   }
 }
 
-/**
- * Parse the `.env` a service's dotenv call would load from its cwd.
- *
- * Returns null when the service has no `.env` — that is web's real shape, and
- * it is NOT the same as an empty file.
- */
-function readServiceDotenv(serviceCwd: string): EnvMap | null {
-  const envPath = join(serviceCwd, '.env');
-  if (!existsSync(envPath)) return null;
-  try {
-    // Follows the symlink (middleware/.env -> /opt/vizora/app/.env) naturally.
-    return parseDotenvText(readFileSync(envPath, 'utf-8'));
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Live, read-only `SHOW max_connections` (ruling constraint 2).

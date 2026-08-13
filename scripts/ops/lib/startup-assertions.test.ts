@@ -1,11 +1,16 @@
 /**
  * B3 — startup assertions block a deploy that could not come back.
  *
- * The failure classes here are the ones actually observed on 2026-08-12, when
- * a reload selected the wrong environment and services came up in development
- * mode with Swagger exposed. The assertion runs the services' REAL validators
- * (via B1's validateFreshStart), so these tests pin the WIRING and the refusal
- * semantics — not a transcription of the schemas, which would drift.
+ * These pin the WIRING and the refusal semantics — not a transcription of the
+ * schemas, which would drift. The assertion runs the services' REAL validators
+ * via B1's validateFreshStart.
+ *
+ * NOT the 2026-08-12 incident. An earlier draft of this docblock claimed it
+ * was; that is false and worth stating, because the next reader would trust
+ * the wrong control. A full development-mode config PASSES every assertion
+ * here (NODE_ENV=development skips the presence check and the superRefine, and
+ * the port is still 3000). That incident is caught one layer up, by
+ * evaluateOperation refusing any environment that is not production.
  */
 
 import assert from 'node:assert/strict';
@@ -98,6 +103,45 @@ test('one bad service blocks the whole operation', () => {
   assert.equal(anyServiceWouldFail(assertions), true);
 });
 
+test('web is SKIPPED, not OK — no validators exist for it', () => {
+  // web has no required production variables, no port rule and no Zod schema,
+  // so an empty failures list proves nothing. Reporting OK there would be the
+  // same false-green shape these guards exist to remove.
+  const assertions = assertCanRestart([
+    { service: 'web', ecosystemEnvProduction: { NODE_ENV: 'production' }, dotenvVars: null },
+  ]);
+  assert.equal(assertions[0]?.checked, false);
+  assert.deepEqual(assertions[0]?.failures, []);
+
+  const report = renderStartupAssertions(assertions);
+  assert.match(report, /SKIPPED web/);
+  assert.doesNotMatch(report, /OK\s+web/);
+});
+
+test('a dotenv file that was not found is reported as such, not as missing variables', () => {
+  // The false-positive shape: reading the wrong path produced six alarming
+  // "missing required production variable" lines with no hint that a file
+  // lookup had failed.
+  const report = renderStartupAssertions(
+    assertCanRestart([{ service: 'middleware', ecosystemEnvProduction: { NODE_ENV: 'production', PORT: '3000' }, dotenvVars: null }]),
+    ['middleware: dotenv /opt/vizora/app/middleware/.env NOT FOUND'],
+  );
+  assert.match(report, /NOT FOUND/);
+  assert.match(report, /BLOCKED middleware/);
+});
+
+test('the refusal says "persisted config alone" and names the daemon-env caveat', () => {
+  // A value supplied by the PM2 daemon environment is not modelled, so an
+  // absolute "could not be recreated" would be a falsehood in exactly the case
+  // where the operator must decide whether to bypass — and the first misfire
+  // teaches them to run raw pm2, discarding the whole guard.
+  const broken = healthyMiddleware();
+  delete broken.dotenvVars!.JWT_SECRET;
+  const report = renderStartupAssertions(assertCanRestart([broken]));
+  assert.match(report, /persisted config alone/);
+  assert.match(report, /PM2 daemon environment/);
+});
+
 test('every requested service is reported, in order', () => {
   const assertions = assertCanRestart([
     healthyMiddleware(),
@@ -152,6 +196,23 @@ test('NO CONFIGURED SECRET VALUE reaches the report', () => {
   ]) {
     assert.ok(!report.includes(canary), `report echoed a configured value: ${canary}`);
   }
+});
+
+test('Zod enum DOES echo the received value — pinned, not assumed', () => {
+  // The docblock used to claim validator messages never interpolate the
+  // configured value. False: zod's invalid_enum_value echoes it. The only two
+  // enum fields are LOG_LEVEL and NODE_ENV, neither secret-bearing, so this is
+  // not a live leak — but the previous canary test used min-length/url/refine
+  // fields, which structurally CANNOT echo, so it proved nothing about the
+  // mechanism. This pins the real behaviour, and fails the day someone makes a
+  // secret-bearing field an enum.
+  const broken = healthyMiddleware();
+  broken.dotenvVars!.LOG_LEVEL = 'CANARY-LOGLEVEL-VALUE';
+
+  const report = renderStartupAssertions(assertCanRestart([broken]));
+
+  assert.match(report, /CANARY-LOGLEVEL-VALUE/, 'enum echo is expected; if this stops, update the docs');
+  assert.match(report, /LOG_LEVEL/);
 });
 
 test('naming a KNOWN-DEFAULT credential is not a leak', () => {

@@ -44,6 +44,8 @@
  * Nothing here repairs anything — `issuesFixed` is always 0 by design.
  */
 
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { parse as parseDotenv } from 'dotenv';
 
 import { validateEnv } from '../../../middleware/src/modules/config/env.validation.js';
@@ -355,6 +357,32 @@ export function parseDotenvText(text: string): EnvMap {
 }
 
 /** Parse NUL-separated `/proc/<pid>/environ` content. */
+/**
+ * Parse the `.env` a service's dotenv call would load FROM ITS OWN cwd.
+ *
+ * `ecosystem.config.js` sets `cwd: './middleware' | './realtime' | './web'`, and
+ * middleware's `import 'dotenv/config'` plus Nest's `envFilePath` both resolve
+ * under `process.cwd()` in production. So the repo-root `.env` is NOT what the
+ * services read — on prod they agree only because `middleware/.env` is a
+ * SYMLINK to it, which this follows naturally.
+ *
+ * Returns null when the service has no `.env` — that is web's real shape, and
+ * it is NOT the same as an empty file.
+ *
+ * Shared by the drift detector and the pm2 guard deliberately: a second
+ * interpretation of which file a service loads is exactly how a startup guard
+ * ends up asserting a configuration nobody runs.
+ */
+export function readServiceDotenv(serviceCwd: string): EnvMap | null {
+  const envPath = join(serviceCwd, '.env');
+  if (!existsSync(envPath)) return null;
+  try {
+    return parseDotenvText(readFileSync(envPath, 'utf-8'));
+  } catch {
+    return null;
+  }
+}
+
 export function parseProcEnviron(raw: string): EnvMap {
   const out: EnvMap = {};
   for (const pair of raw.split('\0')) {
