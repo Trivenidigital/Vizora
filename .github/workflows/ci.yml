@@ -266,6 +266,45 @@ jobs:
           BACKEND_URL: https://vizora.cloud
         run: npx nx build @vizora/web
 
+      # Provenance for the built client. Binds the artifact to the exact source
+      # commit and records the public build inputs that were actually applied —
+      # all non-secret by definition, since NEXT_PUBLIC_* values are embedded in
+      # the browser bundle anyway.
+      #
+      # This exists because on 2026-08-12 an in-place `next build` on the prod
+      # VPS was OOM-killed mid-compile and destroyed the live artifact, and there
+      # was no retained build to restore from. It also gives B2c a machine-
+      # readable record of what the deployed client was built from, instead of
+      # reverse-engineering intended values out of minified chunks.
+      - name: Write web build metadata
+        run: |
+          cat > web/.next/build-metadata.env <<META
+          sourceCommit=${{ github.sha }}
+          sourceRef=${{ github.ref }}
+          builtBy=github-actions
+          runId=${{ github.run_id }}
+          builtAt=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          nextVersion=$(node -p "require('./web/package.json').dependencies.next")
+          NEXT_PUBLIC_API_URL=https://vizora.cloud
+          NEXT_PUBLIC_SOCKET_URL=https://vizora.cloud
+          BACKEND_URL=https://vizora.cloud
+          META
+          echo "--- build-metadata.env ---"
+          cat web/.next/build-metadata.env
+
+      # `next start` needs the whole .next tree, not just static/. `cache/` is
+      # excluded: it is build-time only (tsbuildinfo, optimised images) and is
+      # the bulk of the size.
+      - name: Upload web build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-next-${{ github.sha }}
+          path: |
+            web/.next
+            !web/.next/cache
+          retention-days: 30
+          if-no-files-found: error
+
       - name: Build realtime
         run: npx nx build @vizora/realtime
 
