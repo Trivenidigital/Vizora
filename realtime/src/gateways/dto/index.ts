@@ -1,7 +1,7 @@
 // WebSocket Message DTOs
 // These DTOs provide type-safe validation for WebSocket message payloads
 
-import { IsString, IsNumber, IsOptional, IsObject, ValidateNested, Min, Max, MaxLength, IsEnum, IsBoolean, IsArray, IsNotEmpty } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsObject, ValidateNested, Min, Max, MaxLength, IsEnum, IsBoolean, IsArray, IsNotEmpty, ValidateIf } from 'class-validator';
 import { Type } from 'class-transformer';
 
 /**
@@ -109,10 +109,16 @@ export class HeartbeatMessageDto {
   // for four releases no heartbeat was processed: the Redis/DB status refresh and
   // appVersion persistence never executed and the ack never reached the device.
   //
-  // Proof it was live, not theoretical: 0 of 24 production devices carried
-  // metadata.appVersion, which only the post-validation heartbeat path writes.
-  // Device rows still looked recent because handleConnection writes lastHeartbeat
-  // on CONNECT — which is why this hid for so long.
+  // The four-release window is established by the CODE: the client shipped
+  // contentVersion in b08e3ae (2026-07-04), which is tagged into v1.3.10 through
+  // v1.3.13, and the pipe rejects it deterministically.
+  //
+  // Production corroborates but proves less, and the distinction is worth keeping
+  // honest: 0 devices carry metadata.appVersion, but persistAppVersionIfChanged
+  // only landed 2026-08-11 and just 3 devices have heartbeated since, so the DB
+  // speaks to a ~2-day window, not to four releases. Device rows still looked
+  // recent throughout because handleConnection writes lastHeartbeat on CONNECT —
+  // which is why this hid for so long.
   //
   // Bounded like appVersion: it is device-supplied and reaches a JSONB row.
   @IsOptional()
@@ -143,9 +149,21 @@ export class ContentImpressionDto {
   @Max(100)
   completionPercentage?: number;
 
+  // BOTH shipped clients send `Date.now()` — a NUMBER:
+  //   vizora-tv src/main.ts:1774, :1808, :2026
+  //   display/src/electron/device-client.ts:552-554
+  // This was declared `@IsString()`, so every impression either client has ever
+  // emitted was rejected by the pipe before handleContentImpression ran. The
+  // content_impressions table holds 0 rows, lifetime — the discriminating fact.
+  //
+  // Accept both rather than swapping one strict type for another: the number is
+  // what is deployed in the field and cannot be changed retroactively, while an
+  // ISO string is the more useful wire format for anything written later. The
+  // handler already normalises.
   @IsOptional()
+  @ValidateIf((o: ContentImpressionDto) => typeof o.timestamp !== 'number')
   @IsString()
-  timestamp?: string;
+  timestamp?: string | number;
 }
 
 /**

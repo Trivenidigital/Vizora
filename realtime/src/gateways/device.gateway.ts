@@ -1676,7 +1676,7 @@ export class DeviceGateway
 
   @SubscribeMessage('heartbeat')
   @UseGuards(WsDeviceGuard)
-  @UsePipes(new WsValidationPipe())
+  @UsePipes(new WsValidationPipe(true))
   async handleHeartbeat(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: HeartbeatMessageDto,
@@ -1798,7 +1798,7 @@ export class DeviceGateway
 
   @SubscribeMessage('content:impression')
   @UseGuards(WsDeviceGuard)
-  @UsePipes(new WsValidationPipe())
+  @UsePipes(new WsValidationPipe(true))
   async handleContentImpression(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: ContentImpressionDto,

@@ -11,6 +11,15 @@ import { WsException } from '@nestjs/websockets';
 export class WsValidationPipe implements PipeTransform {
   private readonly logger = new Logger(WsValidationPipe.name);
 
+  /**
+   * When true, an unknown property is STRIPPED rather than rejected.
+   *
+   * Opt-in per handler, and deliberately not the default: control-plane messages
+   * should still fail loudly on anything unrecognised. See the rationale at the
+   * validate() call below for why telemetry is different.
+   */
+  constructor(private readonly tolerateUnknown = false) {}
+
   async transform(value: unknown, metadata: ArgumentMetadata) {
     const { metatype, type } = metadata;
 
@@ -47,10 +56,28 @@ export class WsValidationPipe implements PipeTransform {
     // Transform plain object to class instance
     const object = plainToInstance(metatype, value);
 
-    // Validate the object
+    // Validate the object.
+    //
+    // `tolerateUnknown` exists because the cost of rejecting is wildly asymmetric
+    // between message classes. For CONTROL-PLANE messages (join:organization,
+    // join:room, screenshot responses) an unexpected field is suspicious and
+    // throwing is right. For device→server TELEMETRY it is catastrophic: an
+    // unknown field costs nothing if ignored, but rejecting the envelope drops the
+    // whole heartbeat and takes a live device offline fleet-wide.
+    //
+    // That is not hypothetical — it happened twice. `contentVersion` on the
+    // heartbeat (v1.3.10+) and `timestamp: Date.now()` on content:impression
+    // (since the repo's first commit) each rejected 100% of their event, silently,
+    // for months. Widening the DTO after each incident is whack-a-mole; the DTO's
+    // own comment shows the trap was already known and stepped into anyway.
+    //
+    // `whitelist: true` still STRIPS unknown properties, so nothing unvalidated
+    // reaches a handler — the security property is unchanged. Only the failure
+    // mode changes: an unrecognised telemetry field is now dropped instead of
+    // taking the device down with it.
     const errors = await validate(object, {
       whitelist: true, // Strip properties not in DTO
-      forbidNonWhitelisted: true, // Throw error on unknown properties
+      forbidNonWhitelisted: !this.tolerateUnknown,
       forbidUnknownValues: true,
     });
 
