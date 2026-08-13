@@ -374,9 +374,35 @@ export class ContentService {
       }
     }
 
+    // Version monotonicity (Vizora#325). Deleting the Content row cascades its
+    // PlaylistItem rows away (schema.prisma onDelete: Cascade), so the resolver loses
+    // that content's `updatedAt` entirely — not filtered, absent. Capture the affected
+    // playlists BEFORE the delete (afterwards the join rows are gone and it is
+    // unanswerable), then bump them in the SAME transaction as the delete so no
+    // resolve can observe a half-applied state.
+    const affectedPlaylistIds = Array.from(
+      new Set(
+        (
+          await this.db.playlistItem.findMany({
+            where: { contentId: id, playlist: { organizationId } },
+            select: { playlistId: true },
+          })
+        ).map((row) => row.playlistId),
+      ),
+    );
+
     // Defense-in-depth: include organizationId in where clause to prevent TOCTOU races
-    const deleted = await this.db.content.deleteMany({
-      where: { id, organizationId },
+    const deleted = await this.db.$transaction(async (tx) => {
+      const result = await tx.content.deleteMany({
+        where: { id, organizationId },
+      });
+      if (result.count > 0 && affectedPlaylistIds.length > 0) {
+        await tx.playlist.updateMany({
+          where: { id: { in: affectedPlaylistIds } },
+          data: { updatedAt: new Date() },
+        });
+      }
+      return result;
     });
 
     // Decrement storage usage only if this request actually removed the row.
@@ -701,6 +727,23 @@ export class ContentService {
           where: { id: content.id },
           data: { status: 'expired' },
         });
+
+        // Version monotonicity (Vizora#325). Every branch above STRUCTURALLY changes
+        // PlaylistItem rows — repointed to the replacement, or deleted outright. Once a
+        // row is gone the resolver cannot see its content's `updatedAt` at all, so the
+        // unfiltered-item-set rule that covers archive/expiry cannot help here: the
+        // stamp is not filtered, it is absent. Without this touch the effective version
+        // can fall below what the device already holds, and the shipped client then
+        // refuses the corrected payload (vizora-tv src/utils.ts gates on `>`).
+        //
+        // In the SAME transaction as the structural change, so a version can never be
+        // computed from a half-applied state.
+        if (distinctPlaylistIds.length > 0) {
+          await tx.playlist.updateMany({
+            where: { id: { in: distinctPlaylistIds } },
+            data: { updatedAt: new Date() },
+          });
+        }
 
         for (const playlistId of distinctPlaylistIds) {
           affectedPlaylists.push({
