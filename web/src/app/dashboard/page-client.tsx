@@ -277,13 +277,22 @@ export default function DashboardClient({
 
  const buildRecentActivity = (content: any[], playlists: any[], statuses = deviceStatuses) => {
  const devicesList = Object.values(statuses);
+ /**
+  * No `|| new Date()` fallbacks here, deliberately.
+  *
+  * "Recent Activity" is a timeline: an entry whose timestamp is invented is a
+  * lie about when something happened, and it sorts to the top precisely
+  * because it is fake. Every device row used to render the current time for
+  * this reason. Entries genuinely lacking a timestamp are dropped by the
+  * `item.time` filter below rather than back-filled.
+  */
  const activity = [
  ...devicesList.slice(0, 3).map((d: any) => ({
  type: 'device',
  iconName: getValidIconName('devices'),
  title: d.metadata?.nickname || 'Unnamed Device',
  subtitle: `${d.status || 'unknown'} - ${d.metadata?.location || 'No location'}`,
- time: d.metadata?.lastSeen || new Date().toISOString(),
+ time: d.metadata?.lastSeen,
  })),
  ...content.slice(0, 3).map((c: any) => {
  const contentType = c.type?.toLowerCase() || '';
@@ -295,7 +304,7 @@ export default function DashboardClient({
  iconName: getValidIconName(iconName),
  title: c.title || 'Untitled',
  subtitle: `${c.type || 'file'} - ${c.status || 'ready'}`,
- time: c.createdAt || new Date().toISOString(),
+ time: c.createdAt,
  };
  }),
  ...playlists.slice(0, 3).map((p: any) => ({
@@ -303,11 +312,20 @@ export default function DashboardClient({
  iconName: getValidIconName('playlists'),
  title: p.name || 'Untitled Playlist',
  subtitle: `${p.items?.length || 0} items`,
- time: p.updatedAt || p.createdAt || new Date().toISOString(),
+ time: p.updatedAt || p.createdAt,
  })),
  ]
- .filter((item) => item.title && item.time && item.iconName)
- .sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
+ .filter((item) => item.title && item.iconName)
+ // Timestamped entries first, newest first; undated ones keep their place at
+ // the end rather than being dropped. Requiring a timestamp here would hide
+ // real records whenever the API omits one — trading a fabricated date for a
+ // missing row, which is not an improvement.
+ .sort((a, b) => {
+ if (!a.time && !b.time) return 0;
+ if (!a.time) return 1;
+ if (!b.time) return -1;
+ return new Date(b.time).getTime() - new Date(a.time).getTime();
+ })
  .slice(0, 8);
 
  setRecentActivity(activity);
@@ -602,12 +620,17 @@ export default function DashboardClient({
  <div className="text-xs text-[var(--foreground-tertiary)]">{item.subtitle}</div>
  </div>
  <div className="text-xs text-[var(--foreground-tertiary)] whitespace-nowrap">
- {new Date(item.time).toLocaleString(undefined, {
+ {item.time ? (
+ new Date(item.time).toLocaleString(undefined, {
  month: 'short',
  day: 'numeric',
  hour: '2-digit',
  minute: '2-digit',
- })}
+ })
+ ) : (
+ // Say "unknown" rather than render the current time or "Invalid Date".
+ <span title="No timestamp reported for this item">Unknown</span>
+ )}
  </div>
  </div>
  ))}

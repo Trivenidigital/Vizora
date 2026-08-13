@@ -29,6 +29,35 @@ interface DeviceStatusContextType {
 
 const DeviceStatusContext = createContext<DeviceStatusContextType | undefined>(undefined);
 
+/**
+ * Merge a live status update onto what we already know about a device.
+ *
+ * The `device:status` socket payload carries liveness only — status, timestamp,
+ * heartbeat — and no `metadata`. The previous code stored it with
+ * `{ ...prev, [id]: data }`, REPLACING the entry and so discarding the
+ * nickname, location and lastSeen that the initial REST load had supplied.
+ *
+ * The visible effect: the dashboard's Recent Activity showed "Unnamed Device —
+ * No location" for every device the moment its first status event arrived,
+ * while the devices page (which keeps its own REST list) showed the real names.
+ * The lastSeen loss was worse than cosmetic — the caller fell back to
+ * `new Date()`, so every row displayed a fabricated "just now" timestamp.
+ *
+ * Identity is therefore preserved across status updates, and only fields the
+ * server actually sent are allowed to win.
+ */
+export function mergeStatus(
+  previous: DeviceStatusUpdate | undefined,
+  update: DeviceStatusUpdate,
+): DeviceStatusUpdate {
+  if (!previous) return update;
+  const metadata =
+    previous.metadata || update.metadata
+      ? { ...previous.metadata, ...update.metadata }
+      : undefined;
+  return { ...previous, ...update, ...(metadata ? { metadata } : {}) };
+}
+
 interface DeviceStatusProviderProps {
   children: ReactNode;
   user?: { organizationId: string } | null;
@@ -91,8 +120,10 @@ export function DeviceStatusProvider({ children, user }: DeviceStatusProviderPro
     if (!isConnected) return;
 
     const unsubscribe = on('device:status', (data: DeviceStatusUpdate) => {
+      const merged = mergeStatus(deviceStatusesRef.current[data.deviceId], data);
+
       setDeviceStatuses(prev => {
-        const next = { ...prev, [data.deviceId]: data };
+        const next = { ...prev, [data.deviceId]: merged };
         deviceStatusesRef.current = next;
         return next;
       });
@@ -100,7 +131,7 @@ export function DeviceStatusProvider({ children, user }: DeviceStatusProviderPro
       // Notify subscribers outside state setter to avoid side-effect anti-pattern
       const subs = subscribersRef.current[data.deviceId];
       if (subs) {
-        subs.forEach(callback => callback(data));
+        subs.forEach(callback => callback(merged));
       }
     });
 
@@ -112,9 +143,13 @@ export function DeviceStatusProvider({ children, user }: DeviceStatusProviderPro
     if (!isConnected) return;
 
     const unsubscribe = on('device:status:batch', (data: DeviceStatusUpdate[]) => {
+      const merged = data.map(update =>
+        mergeStatus(deviceStatusesRef.current[update.deviceId], update),
+      );
+
       setDeviceStatuses(prev => {
         const updated = { ...prev };
-        data.forEach(update => {
+        merged.forEach(update => {
           updated[update.deviceId] = update;
         });
         deviceStatusesRef.current = updated;
@@ -122,7 +157,7 @@ export function DeviceStatusProvider({ children, user }: DeviceStatusProviderPro
       });
 
       // Notify subscribers outside state setter to avoid side-effect anti-pattern
-      data.forEach(update => {
+      merged.forEach(update => {
         const subs = subscribersRef.current[update.deviceId];
         if (subs) {
           subs.forEach(callback => callback(update));
