@@ -117,7 +117,9 @@ scripts/ops/
 - PostgreSQL: `VACUUM ANALYZE` on high-churn tables (Content, Display, Schedule, AuditLog)
 - PostgreSQL: `REINDEX` on frequently queried indexes
 - Redis: Clear expired keys, report memory usage
-- Logs: Rotate PM2 logs older than 7 days (archive then flush)
+- Logs: size-based retention — trim oversized `logs/*.log` to their most recent bytes.
+  (Superseded the original age-then-flush design 2026-08-13: `pm2 flush` truncated every
+  app's logs, and age-based emptying deleted the last words of services that had stopped.)
 - MinIO: Report storage usage per bucket
 - Backup verification: Check latest backup exists and is <24h old
 

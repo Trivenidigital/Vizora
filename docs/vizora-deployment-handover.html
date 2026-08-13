@@ -940,7 +940,7 @@ pm2 logs vizora-middleware --lines 50   <span class="comment"># Specific service
             <tr><td>Restart a service</td><td><code>pm2 restart vizora-middleware</code></td></tr>
             <tr><td>Graceful reload (zero-downtime)</td><td><code>pm2 reload all</code></td></tr>
             <tr><td>Stop all</td><td><code>pm2 stop all</code></td></tr>
-            <tr><td>Clear logs</td><td><code>pm2 flush</code></td></tr>
+            <tr><td>Trim oversized logs (never <code>pm2 flush</code> — it wipes every app)</td><td><code>npx tsx scripts/ops/db-maintainer.ts</code></td></tr>
             <tr><td>Monitor resources</td><td><code>pm2 monit</code></td></tr>
         </tbody>
     </table>
