@@ -121,9 +121,18 @@ export class HeartbeatMessageDto {
   // which is why this hid for so long.
   //
   // Bounded like appVersion: it is device-supplied and reaches a JSONB row.
+  //
+  // 64 is a CONTRACT ON THE GENERATOR, not a guess. The effective-content version
+  // is an ISO-8601 timestamp — max(updatedAt) across the resolved content — which
+  // is 24 chars and monotonic, so it compares correctly with the deployed client's
+  // string `>` in vizora-tv utils.ts:56. Anyone writing a version generator MUST
+  // keep that shape: a fixed-width hash or an ISO timestamp, never a per-item
+  // concatenation. The client's own computePlaylistSignature style would exceed
+  // this at two playlist items, and a version that changes without INCREASING is
+  // silently ignored by the shipped client regardless of length.
   @IsOptional()
   @IsString()
-  @MaxLength(128)
+  @MaxLength(64)
   contentVersion?: string;
 }
 

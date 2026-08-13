@@ -166,14 +166,14 @@ describe('WsValidationPipe', () => {
       const shipped = {
         uptime: 3600,
         appVersion: '1.3.13',
-        contentVersion: 'playlist-abc@7',
+        contentVersion: '2026-08-13T05:00:00.000Z', // real format: monotonic ISO, not a concatenated signature
         metrics: { cpuUsage: 0, memoryUsage: 42.5 },
         currentContent: { contentId: 'c1' },
         screenState: 'playing',
         playbackSource: 'live',
       };
       const result = await pipe.transform(shipped, hbMeta);
-      expect(result.contentVersion).toBe('playlist-abc@7');
+      expect(result.contentVersion).toBe('2026-08-13T05:00:00.000Z');
       expect(result.appVersion).toBe('1.3.13');
     });
 
@@ -188,8 +188,15 @@ describe('WsValidationPipe', () => {
       expect(result.contentVersion).toBe('');
     });
 
+    it('accepts an ISO-8601 version — the format the resolver actually emits', async () => {
+      // 24 chars. The cap is a contract on the generator, so pin the real shape
+      // rather than only the boundary: a version must be monotonic and short.
+      const iso = { uptime: 10, contentVersion: '2026-08-13T05:00:00.000Z' };
+      expect((await pipe.transform(iso, hbMeta)).contentVersion).toBe('2026-08-13T05:00:00.000Z');
+    });
+
     it('rejects an oversized contentVersion (it lands in a JSONB row)', async () => {
-      const huge = { uptime: 10, contentVersion: 'x'.repeat(129) };
+      const huge = { uptime: 10, contentVersion: 'x'.repeat(65) };
       await expect(pipe.transform(huge, hbMeta)).rejects.toThrow(WsException);
     });
 
