@@ -213,9 +213,15 @@ export class RedisService implements OnModuleDestroy {
    * When the device reconnects, sendInitialState() delivers this
    * instead of the DB query (it's fresher — represents a missed update).
    */
-  async setPendingPlaylist(deviceId: string, playlist: Playlist): Promise<void> {
+  async setPendingPlaylist(deviceId: string, playlist: Playlist, version = ''): Promise<void> {
     const key = `device:pending-playlist:${deviceId}`;
-    await this.redis.setex(key, 1800, JSON.stringify(playlist)); // 30 minutes
+    // Stored as { playlist, version } so the resolver's version travels WITH the content
+    // it describes. It used to be recomputed at replay time from the serialized playlist,
+    // which no longer carries playlist.updatedAt or item.updatedAt — so the recomputed
+    // stamp could never equal the resolver's, and every replay provoked a needless
+    // reconcile. A version has to be carried, not re-derived from something with its
+    // inputs stripped.
+    await this.redis.setex(key, 1800, JSON.stringify({ playlist, version })); // 30 minutes
   }
 
   async deletePendingPlaylist(deviceId: string): Promise<void> {
@@ -232,7 +238,7 @@ export class RedisService implements OnModuleDestroy {
    * atomicity. On transient Redis errors, EXEC rolls back and the key
    * survives — the next reconnect attempt will find it.
    */
-  async getPendingPlaylist(deviceId: string): Promise<Playlist | null> {
+  async getPendingPlaylist(deviceId: string): Promise<{ playlist: Playlist; version: string } | null> {
     const key = `device:pending-playlist:${deviceId}`;
     const multi = this.redis.multi();
     multi.get(key);
@@ -240,7 +246,15 @@ export class RedisService implements OnModuleDestroy {
     const results = await multi.exec();
     if (!results || !results[0] || !results[0][1]) return null;
     try {
-      return JSON.parse(results[0][1] as string);
+      const parsed = JSON.parse(results[0][1] as string);
+      // Entries written before the { playlist, version } shape are bare playlists. They
+      // drain within the 30-minute TTL, so this only spans a deploy: deliver them with an
+      // empty version (the device then takes its legacy signature path) rather than
+      // dropping an operator's queued assignment on the floor.
+      if (parsed && typeof parsed === 'object' && 'playlist' in parsed) {
+        return { playlist: parsed.playlist as Playlist, version: typeof parsed.version === 'string' ? parsed.version : '' };
+      }
+      return { playlist: parsed as Playlist, version: '' };
     } catch {
       return null;
     }

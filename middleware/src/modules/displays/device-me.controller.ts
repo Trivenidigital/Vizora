@@ -1,5 +1,6 @@
-import { Controller, Get, Req } from '@nestjs/common';
+import { Controller, Get, Req, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { DeviceMeThrottlerGuard } from './device-me.throttler.guard';
 import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
 import { resolveEffectiveContent, serializeDeviceContent } from '@vizora/database';
@@ -41,6 +42,7 @@ export class DeviceMeController {
    * This is a per-connect/reconnect poll path → throttled against a fleet reconnect storm.
    */
   @Public()
+  @UseGuards(DeviceMeThrottlerGuard) // per-device-token, not per-IP (see the guard)
   @Throttle({ default: { limit: 40, ttl: 60000 } })
   @Get('content')
   async getMyContent(@Req() req: Request) {

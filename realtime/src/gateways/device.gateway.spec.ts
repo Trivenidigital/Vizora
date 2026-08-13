@@ -1033,9 +1033,31 @@ describe('DeviceGateway', () => {
         mockRedisService.get.mockResolvedValue(null);
       });
 
-      it('DRIFT via the cheap path: reported != last version sent → reconcileContent true', async () => {
+      it('DRIFT the cache spots: reported != last version sent → reconcileContent true', async () => {
+        // The cache decides whether to look SOONER; the resolver decides whether to signal.
+        // It cannot signal alone any more — that is what allowed the unassigned-content
+        // loop to be driven from a path that never consulted truth (F1).
         mockRedisService.get.mockResolvedValue(VERSION); // last sent
+        serverHasContent();
         const result = await beat('2025-06-01T00:00:00.000Z'); // device is behind
+        expect(result.data).toHaveProperty('reconcileContent', true);
+      });
+
+      it('a cache mismatch alone is NOT enough — the resolver has to confirm', async () => {
+        mockRedisService.get.mockResolvedValue(VERSION);   // cache says the device is behind
+        mockDatabaseService.display.findFirst.mockResolvedValue({ timezone: 'UTC', isDisabled: false, currentPlaylistId: null });
+        mockDatabaseService.schedule.findMany.mockResolvedValue([]); // ...but there is nothing to show
+        expect((await beat('2025-06-01T00:00:00.000Z')).data).toHaveProperty('reconcileContent', false);
+      });
+
+      it('a cache mismatch makes the check happen despite the resolve throttle', async () => {
+        serverHasContent();
+        await beat(VERSION);                       // resolves once, no drift
+        expect(mockDatabaseService.display.findFirst).toHaveBeenCalledTimes(1);
+        (gateway as any).reconcileSignalledAt.clear();
+        mockRedisService.get.mockResolvedValue('something-else'); // a send happened meanwhile
+        const result = await beat('2025-06-01T00:00:00.000Z');
+        expect(mockDatabaseService.display.findFirst).toHaveBeenCalledTimes(2); // not throttled out
         expect(result.data).toHaveProperty('reconcileContent', true);
       });
 
@@ -1106,6 +1128,7 @@ describe('DeviceGateway', () => {
       });
 
       it('signals at most once per cooldown, so a device that cannot converge is not stormed', async () => {
+        serverHasContent();
         mockRedisService.get.mockResolvedValue(VERSION);
         expect((await beat('stale')).data).toHaveProperty('reconcileContent', true);
         // The device pulls, fails safe, and reports the same stale version on the next beat.
@@ -1126,6 +1149,54 @@ describe('DeviceGateway', () => {
         const result = await beat('2025-06-01T00:00:00.000Z');
         expect(mockDatabaseService.display.findFirst).toHaveBeenCalledTimes(2);
         expect(result.data).toHaveProperty('reconcileContent', true);
+      });
+
+      // F1 — found by composition review of #294+#297+#300 on main, not by any of their
+      // own test suites. #300 introduced it: the compare signalled on a version difference
+      // without checking whether there was anything for the device to converge TO.
+      describe('unassigned content must not produce a forever loop', () => {
+        const unassigned = () => {
+          mockDatabaseService.display.findFirst.mockResolvedValue({ timezone: 'UTC', isDisabled: false, currentPlaylistId: null });
+          mockDatabaseService.schedule.findMany.mockResolvedValue([]);
+        };
+
+        it('is signalled ZERO times across many windows, not merely once', async () => {
+          // The property is "never", not "not right now" — the original defect signalled
+          // happily on window 1 too, so a single-window assertion would have passed.
+          unassigned();
+          const signals: boolean[] = [];
+          for (let window = 0; window < 6; window++) {
+            (gateway as any).reconcileSignalledAt.clear(); // cooldown expires
+            (gateway as any).reconcileResolvedAt.clear();  // resolve throttle expires
+            const result = await beat('2026-03-01T00:00:00.000Z'); // device cannot adopt null
+            signals.push((result.data as any).reconcileContent);
+          }
+          expect(signals).toEqual([false, false, false, false, false, false]);
+        });
+
+        it('is silent even when the CACHE disagrees (the path that could signal without resolving)', async () => {
+          unassigned();
+          mockRedisService.get.mockResolvedValue('2026-05-01T00:00:00.000Z'); // stale cache
+          for (let window = 0; window < 3; window++) {
+            (gateway as any).reconcileSignalledAt.clear();
+            (gateway as any).reconcileResolvedAt.clear();
+            expect((await beat('2026-03-01T00:00:00.000Z')).data).toHaveProperty('reconcileContent', false);
+          }
+        });
+
+        it('CONTROL: with content present the same drift IS signalled every window', async () => {
+          // Proves the silence above comes from "nothing to converge to" and not from the
+          // test accidentally disabling the mechanism.
+          serverHasContent();
+          const signals: boolean[] = [];
+          for (let window = 0; window < 6; window++) {
+            (gateway as any).reconcileSignalledAt.clear();
+            (gateway as any).reconcileResolvedAt.clear();
+            const result = await beat('2025-06-01T00:00:00.000Z');
+            signals.push((result.data as any).reconcileContent);
+          }
+          expect(signals).toEqual([true, true, true, true, true, true]);
+        });
       });
 
       it('leaves the rest of the ack contract intact (commands stays, shape unchanged)', async () => {
@@ -1185,7 +1256,7 @@ describe('DeviceGateway', () => {
       });
       const pendingPlaylist = { id: 'playlist-pending', items: [] };
       const pendingCommand = { type: 'reload', timestamp: '2026-05-31T00:00:00.000Z' };
-      mockRedisService.getPendingPlaylist.mockResolvedValueOnce(pendingPlaylist);
+      mockRedisService.getPendingPlaylist.mockResolvedValueOnce({ playlist: pendingPlaylist, version: 'v-queued' });
       mockRedisService.getDeviceCommands.mockResolvedValueOnce([pendingCommand]);
       (gateway as any).deviceSockets.set('device-1', 'socket-1');
 
@@ -1198,6 +1269,16 @@ describe('DeviceGateway', () => {
       expect(result.data.commands).toEqual([]);
       expect(mockRedisService.getPendingPlaylist).toHaveBeenCalledWith('device-1');
       expect(mockRedisService.getDeviceCommands).toHaveBeenCalledWith('device-1');
+      // F2 — the version must be the one CARRIED with the queued record, not one
+      // re-derived from the serialized playlist at replay time. The serialized form has
+      // had playlist.updatedAt and item.updatedAt stripped, and PD-7 deliberately makes
+      // playlist.updatedAt the newest stamp, so a re-derived version is always older than
+      // truth and provokes a reconcile on every single replay.
+      expect(emit).toHaveBeenCalledWith(
+        'playlist:update',
+        expect.objectContaining({ version: 'v-queued' }),
+        expect.any(Function),
+      );
       expect(emit).toHaveBeenCalledWith(
         'playlist:update',
         expect.objectContaining({
@@ -1242,7 +1323,7 @@ describe('DeviceGateway', () => {
           },
         ],
       };
-      mockRedisService.getPendingPlaylist.mockResolvedValueOnce(pendingPlaylist);
+      mockRedisService.getPendingPlaylist.mockResolvedValueOnce({ playlist: pendingPlaylist, version: 'v-queued' });
       (gateway as any).deviceSockets.set('device-1', 'socket-1');
 
       const result = await (gateway as any).deliverPendingPlaylist(client, 'device-1');
@@ -1327,7 +1408,7 @@ describe('DeviceGateway', () => {
         emit,
       });
       (gateway as any).deviceSockets.set('device-1', 'socket-1');
-      mockRedisService.getPendingPlaylist.mockResolvedValueOnce({
+      mockRedisService.getPendingPlaylist.mockResolvedValueOnce({ version: 'v-queued', playlist: {
         id: 'playlist-pending',
         items: [
           {
@@ -1343,7 +1424,7 @@ describe('DeviceGateway', () => {
             },
           },
         ],
-      });
+      } });
 
       await gateway.handleHeartbeat(client as any, {} as any);
       for (let i = 0; i < 8; i += 1) {
@@ -1895,7 +1976,7 @@ describe('DeviceGateway', () => {
       const displayLookup = new Promise(resolve => {
         resolveDisplay = resolve;
       });
-      mockRedisService.getPendingPlaylist.mockResolvedValueOnce(oldPlaylist);
+      mockRedisService.getPendingPlaylist.mockResolvedValueOnce({ playlist: oldPlaylist, version: 'v-queued' });
       mockDatabaseService.display.findUnique.mockReturnValueOnce(displayLookup);
       (gateway as any).deviceSockets.set('device-1', 'socket-1');
 
@@ -1951,6 +2032,7 @@ describe('DeviceGateway', () => {
       expect(mockRedisService.setPendingPlaylist).toHaveBeenCalledWith(
         'device-1',
         expect.objectContaining({ id: 'p-1' }),
+        expect.any(String), // the resolver's version, carried with the record
       );
     });
 
@@ -1977,6 +2059,7 @@ describe('DeviceGateway', () => {
       expect(mockRedisService.setPendingPlaylist).toHaveBeenCalledWith(
         'device-1',
         expect.objectContaining({ id: 'p-stale' }),
+        expect.any(String),
       );
     });
 
@@ -1994,6 +2077,7 @@ describe('DeviceGateway', () => {
       expect(mockRedisService.setPendingPlaylist).toHaveBeenCalledWith(
         'device-1',
         expect.objectContaining({ id: 'p-1' }),
+        expect.any(String), // the resolver's version, carried with the record
       );
     });
 
