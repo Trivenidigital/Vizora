@@ -565,9 +565,27 @@ export function evaluateCandidateBinding(candidate, actual, required) {
 
   cmp('package', candidate.package, actual.package);
   cmp('versionName', candidate.versionName, actual.versionName);
-  cmp('versionCode', candidate.versionCode, actual.versionCode, v => String(v));
   cmp('apkSha256', candidate.apkSha256, actual.apkSha256, normalizeFingerprint);
   cmp('signingCertSha256', candidate.signingCertSha256, actual.signingCertSha256, normalizeFingerprint);
+
+  // versionCode is compared as an INTEGER, with no String() coercion on either side.
+  //
+  // It previously normalised both sides with String(v), so a candidate of "10144"
+  // satisfied a manifest 10144. That looked like harmless leniency and is not: this
+  // record is promoted into `published`, where the downgrade check requires an
+  // integer, so a string that passes here silently switches that check off for the
+  // NEXT release. A type error in a value that becomes a safety baseline is not a
+  // cosmetic difference — poisoning the promoted baseline is precisely what this
+  // binder exists to prevent.
+  if (!Number.isInteger(candidate.versionCode) || candidate.versionCode <= 0) {
+    problems.push(
+      `candidate.versionCode must be a positive integer — got ${JSON.stringify(candidate.versionCode)}. ` +
+        `This value is promoted into published.versionCode, where a non-integer disables the ` +
+        `Android downgrade check on the following release.`,
+    );
+  } else if (candidate.versionCode !== actual.versionCode) {
+    problems.push(`candidate.versionCode is ${candidate.versionCode} but the APK has ${actual.versionCode}`);
+  }
 
   // Validate the TYPE before comparing, not as a precondition for comparing at all.
   //
@@ -1176,7 +1194,24 @@ async function main() {
             `A different key means every installed TV must be uninstalled and re-paired.`,
       );
     }
-    if (Number.isInteger(baseline.versionCode)) {
+    // The type test decides the VERDICT, never whether the comparison happens.
+    //
+    // This read `if (Number.isInteger(baseline.versionCode)) { ... }`, so a
+    // published.versionCode of "10142" — a string, which is exactly what promoting
+    // a string-typed candidate produces — made the downgrade check disappear
+    // silently. That is the delay-fuse version of the malformed-data hatch: the bad
+    // value enters as a candidate, passes, is promoted, and only then switches off
+    // a safety check on the FOLLOWING release. `published === null` is handled above
+    // as the legitimate no-baseline case; anything present must be well-formed.
+    if (!Number.isInteger(baseline.versionCode) || baseline.versionCode <= 0) {
+      check(
+        'versionCode strictly greater than published',
+        false,
+        `published.versionCode must be a positive integer — got ${JSON.stringify(baseline.versionCode)}. ` +
+          `A malformed baseline cannot establish the Android downgrade rule, and must not pass as ` +
+          `though it had.`,
+      );
+    } else {
       const strictlyGreater = manifest.versionCode > baseline.versionCode;
       const same = manifest.versionCode === baseline.versionCode;
       check(

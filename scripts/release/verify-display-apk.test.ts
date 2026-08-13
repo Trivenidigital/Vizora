@@ -611,3 +611,46 @@ test('NEGATIVE: a zero or negative candidate.apkBytes is rejected', () => {
     assert.match(v.detail, /apkBytes must be a positive integer/);
   }
 });
+
+// versionCode is the delay-fuse case: a string that passes the candidate binder is
+// promoted into published.versionCode, where the downgrade check requires an
+// integer — so a "harmless" type error switches off a safety check one release
+// later. Strict on both sides.
+
+test('NEGATIVE: a STRING candidate.versionCode is rejected even when the value is right', () => {
+  const v = evaluateCandidateBinding({ ...GOOD_CANDIDATE, versionCode: '10144' }, ARTIFACT, true);
+  assert.equal(v.pass, false, '"10144" must not satisfy an integer versionCode');
+  assert.match(v.detail, /versionCode must be a positive integer/);
+  assert.match(v.detail, /disables the Android downgrade check/);
+});
+
+test('NEGATIVE: a missing candidate.versionCode is rejected', () => {
+  const { versionCode, ...noVc } = GOOD_CANDIDATE;
+  const v = evaluateCandidateBinding(noVc, ARTIFACT, true);
+  assert.equal(v.pass, false);
+  assert.match(v.detail, /versionCode must be a positive integer/);
+});
+
+test('NEGATIVE: a null candidate.versionCode is rejected', () => {
+  const v = evaluateCandidateBinding({ ...GOOD_CANDIDATE, versionCode: null }, ARTIFACT, true);
+  assert.equal(v.pass, false);
+  assert.match(v.detail, /versionCode must be a positive integer/);
+});
+
+test('NEGATIVE: fractional / zero / negative candidate.versionCode are rejected', () => {
+  for (const bad of [10144.5, 0, -10144]) {
+    const v = evaluateCandidateBinding({ ...GOOD_CANDIDATE, versionCode: bad }, ARTIFACT, true);
+    assert.equal(v.pass, false, `versionCode ${bad} must fail`);
+    assert.match(v.detail, /versionCode must be a positive integer/);
+  }
+});
+
+test('NEGATIVE: a wrong integer candidate.versionCode still fails on value', () => {
+  const v = evaluateCandidateBinding({ ...GOOD_CANDIDATE, versionCode: 10143 }, ARTIFACT, true);
+  assert.equal(v.pass, false);
+  assert.match(v.detail, /candidate\.versionCode is 10143 but the APK has 10144/);
+});
+
+test('a correct integer candidate.versionCode passes', () => {
+  assert.equal(evaluateCandidateBinding(GOOD_CANDIDATE, ARTIFACT, true).pass, true);
+});
