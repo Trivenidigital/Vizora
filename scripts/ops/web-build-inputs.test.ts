@@ -17,7 +17,9 @@ import { fileURLToPath } from 'node:url';
 
 import {
   checkManifest,
+  extractBuildStepValues,
   extractBuildStepVars,
+  extractMetadataValues,
   extractMetadataVars,
   extractPublicVars,
   type BuildInputManifest,
@@ -54,6 +56,7 @@ test('the manifest accounts for every NEXT_PUBLIC_* the web app consumes', () =>
     consumed,
     extractBuildStepVars(workflow),
     extractMetadataVars(workflow),
+    { buildStep: extractBuildStepValues(workflow), metadata: extractMetadataValues(workflow) },
   );
   assert.deepEqual(
     findings,

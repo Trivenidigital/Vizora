@@ -63,12 +63,21 @@ export function extractPublicVars(source: string): string[] {
  * production build input that does not exist.
  */
 export function extractBuildStepVars(workflowYaml: string): string[] {
+  return Object.keys(extractBuildStepValues(workflowYaml)).sort();
+}
+
+/** `NAME -> value` as actually supplied to the CI web build step. */
+export function extractBuildStepValues(workflowYaml: string): Record<string, string> {
   const marker = workflowYaml.indexOf('name: Build web');
-  if (marker === -1) return [];
+  if (marker === -1) return {};
   // The step ends at its `run:` line.
   const runAt = workflowYaml.indexOf('\n        run:', marker);
   const step = workflowYaml.slice(marker, runAt === -1 ? undefined : runAt);
-  return extractPublicVars(step);
+  const out: Record<string, string> = {};
+  for (const m of step.matchAll(/^\s*(NEXT_PUBLIC_[A-Z0-9_]+):\s*(\S+)\s*$/gm)) {
+    out[m[1]!] = m[2]!;
+  }
+  return out;
 }
 
 /**
@@ -80,13 +89,18 @@ export function extractBuildStepVars(workflowYaml: string): string[] {
  * artifact explicitly says it does not carry.
  */
 export function extractMetadataVars(workflowYaml: string): string[] {
+  return Object.keys(extractMetadataValues(workflowYaml)).sort();
+}
+
+/** `NAME -> value` as actually written into build-metadata.env. */
+export function extractMetadataValues(workflowYaml: string): Record<string, string> {
   const marker = workflowYaml.indexOf('name: Write web build metadata');
-  if (marker === -1) return [];
+  if (marker === -1) return {};
   const end = workflowYaml.indexOf('\n      - name:', marker + 1);
   const step = workflowYaml.slice(marker, end === -1 ? undefined : end);
-  const found = new Set<string>();
-  for (const m of step.matchAll(/^\s*(NEXT_PUBLIC_[A-Z0-9_]+)=/gm)) found.add(m[1]!);
-  return [...found].sort();
+  const out: Record<string, string> = {};
+  for (const m of step.matchAll(/^\s*(NEXT_PUBLIC_[A-Z0-9_]+)=(\S*)\s*$/gm)) out[m[1]!] = m[2]!;
+  return out;
 }
 
 /**
@@ -101,6 +115,13 @@ export function checkManifest(
   consumed: string[],
   buildStep: string[],
   recordedInMetadata: string[],
+  /**
+   * Actual values, when available. Names alone are not enough: CI could build
+   * with a different origin than the manifest declares, or the build step and
+   * the metadata step could drift apart — which would defeat the whole point of
+   * recording provenance in the artifact.
+   */
+  values: { buildStep?: Record<string, string>; metadata?: Record<string, string> } = {},
 ): ManifestFinding[] {
   const findings: ManifestFinding[] = [];
   const declared = new Map(manifest.variables.map(v => [v.name, v]));
@@ -144,6 +165,9 @@ export function checkManifest(
     if (!entry.why?.trim()) {
       findings.push({ variable: entry.name, problem: 'missing `why`' });
     }
+    if (!entry.defaultIfAbsent?.trim()) {
+      findings.push({ variable: entry.name, problem: 'missing `defaultIfAbsent`' });
+    }
 
     if (entry.buildInput === 'ci') {
       if (!supplied.has(entry.name)) {
@@ -160,6 +184,25 @@ export function checkManifest(
           problem:
             'declared as a CI build input but not recorded in build-metadata.env — ' +
             'the artifact would carry no provenance for it',
+        });
+      }
+
+      const built = values.buildStep?.[entry.name];
+      if (built !== undefined && entry.productionValue !== null && built !== entry.productionValue) {
+        findings.push({
+          variable: entry.name,
+          problem:
+            `CI builds with "${built}" but the manifest declares ` +
+            `"${entry.productionValue}" — the record does not describe the artifact`,
+        });
+      }
+      const recordedValue = values.metadata?.[entry.name];
+      if (recordedValue !== undefined && built !== undefined && recordedValue !== built) {
+        findings.push({
+          variable: entry.name,
+          problem:
+            `build-metadata.env records "${recordedValue}" but the build used ` +
+            `"${built}" — the artifact's own provenance would be wrong`,
         });
       }
     } else {

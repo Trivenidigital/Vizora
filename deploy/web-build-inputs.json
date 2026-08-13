@@ -24,7 +24,7 @@
       "consumedOnServer": true,
       "buildInput": "ci",
       "productionValue": "https://vizora.cloud",
-      "defaultIfAbsent": "differs by consumer, deliberately recorded in full: (1) lib/api/client.ts and lib/server-api.ts fall back to http://localhost:3000/api/v1 on the server branch, with a console.warn in production; (2) the display client components (DisplayClient.tsx, ContentRenderer.tsx, ContentScreen.tsx) fall back to window.location.origin; (3) next.config.js omits two images.remotePatterns entries; (4) next.config.security.js omits the origin from CSP connect-src/img-src/media-src.",
+      "defaultIfAbsent": "differs by consumer, deliberately recorded in full: (1) lib/api/client.ts falls back to http://localhost:3000/api/v1 on its server branch and warns in production; lib/server-api.ts falls back to the same value unconditionally, with no branch and no warning; (2) the display client components (DisplayClient.tsx, ContentRenderer.tsx, ContentScreen.tsx) fall back to window.location.origin; (3) next.config.js omits two images.remotePatterns entries; (4) next.config.security.js omits the origin from CSP connect-src/img-src/media-src.",
       "why": "Consumer (2) is not merely a URL default -- apiOrigin joins baseOrigin in the Set that gates whether a device token is appended to a device-content/*/file URL (DisplayClient.tsx authenticateDisplayContentUrl). Absent, that set narrows to the page origin, so this variable participates in a trust decision and not only in addressing. next.config.security.js additionally rejects a loopback origin in a production build."
     },
     {
@@ -57,11 +57,11 @@
     {
       "name": "NEXT_PUBLIC_GOOGLE_CLIENT_ID",
       "consumedInClientBundle": true,
-      "consumedOnServer": false,
+      "consumedOnServer": true,
       "buildInput": "intentionally-unset",
       "productionValue": null,
       "defaultIfAbsent": "the GoogleSignInButton EFFECT early-returns, so the GSI script never loads and no button is rendered into the ref. The component itself still renders its container div (deliberately, to avoid an SSR/client hydration mismatch), collapsed to 0 height.",
-      "why": "Google Sign-In is not configured: prod .env has NEXT_PUBLIC_GOOGLE_CLIENT_ID= (empty). ENABLING IT REQUIRES A CI BUILD INPUT. Setting it in prod .env and reloading PM2 -- which ecosystem.config.js is written to support -- injects it into the SSR process only; the browser bundle reads an empty process shim and the button stays hidden with no error anywhere."
+      "why": "Google Sign-In is not configured: prod .env has NEXT_PUBLIC_GOOGLE_CLIENT_ID= (empty). ENABLING IT REQUIRES A CI BUILD INPUT. ecosystem.config.js reads it from web/.env.local (NOT the root .env, despite its own comment) and injects it at PM2 start -- that reaches the SSR process only; the browser bundle reads an empty process shim and the button stays hidden with no error anywhere. So editing the root .env does nothing at all, and editing web/.env.local does nothing the user can see."
     }
   ]
 }

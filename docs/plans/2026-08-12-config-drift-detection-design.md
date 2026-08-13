@@ -303,6 +303,10 @@ all historical alerts), and exact length (leaks meaningfully for short secrets).
 >
 > The reason is explicit, not a deferral of convenience: the investigation proved
 > that `.env` is *not* the intended source for these values, and that grepping the
+> **SUPERSEDED 2026-08-13 (B2c):** the authoritative record now exists at
+> `deploy/web-build-inputs.json`, enforced in CI. The statements below about it
+> not existing describe the state at the time of writing.
+
 > bundle by string is ambiguous. There is currently **no authoritative record of
 > what the web build was intentionally produced with**. Shipping this dimension
 > now would mean inventing that source — and the only two options were a

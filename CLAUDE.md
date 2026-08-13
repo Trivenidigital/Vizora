@@ -144,7 +144,9 @@ MFA_ENCRYPTION_KEY      # AES-256-GCM key (min 32 chars) for TOTP-secret encrypt
 INTERNAL_API_SECRET     # Required in prod — service-to-service auth (middleware ↔ realtime)
 BCRYPT_ROUNDS           # Password hashing rounds (10-15, default 12)
 GOOGLE_CLIENT_ID        # Optional — Google OAuth client ID
-NEXT_PUBLIC_GOOGLE_CLIENT_ID  # Same value, exposed to frontend for GSI button (rebuild web on change)
+NEXT_PUBLIC_GOOGLE_CLIENT_ID  # Same value, for the GSI button. REBUILD REQUIRED — it is a
+                              #   build input, not a runtime one. See the NEXT_PUBLIC_* section
+                              #   below and deploy/web-build-inputs.json (currently unset)
 NEXT_SERVER_ACTIONS_ENCRYPTION_KEY  # Stable Next.js Server-Action key — KEEP CONSTANT across deploys
 ```
 
