@@ -5,11 +5,15 @@
  *
  * ─── Why this exists ────────────────────────────────────────────────────────
  *
- * `db-maintainer` used to call `pm2 flush` on every daily run. `pm2 flush`
- * takes no target: it truncates the logs of EVERY app PM2 manages —
- * middleware, realtime, web, and all fourteen agents — as a side effect of
- * database maintenance. That destroyed cross-service diagnostic history daily
- * at 03:00 and has now materially harmed two separate investigations.
+ * `db-maintainer` used to call `pm2 flush` on every daily run. Called bare,
+ * `pm2 flush` truncates the logs of EVERY app PM2 manages — middleware,
+ * realtime, web, and the other fifteen apps — as a side effect of database
+ * maintenance. That destroyed cross-service diagnostic history daily at 03:00
+ * and has now materially harmed two separate investigations.
+ *
+ * `pm2 flush [api]` does accept a target, so a scoped flush was available. It
+ * is still not the fix: emptying is the wrong primitive. A targeted flush
+ * destroys that agent's own history and bounds nothing else.
  *
  * It was also buying almost nothing. Measured on prod 2026-08-13: the entire
  * log corpus was 184 KB against 42 GB free, i.e. under ~2 MB/day. The trade
@@ -37,8 +41,15 @@ import { join } from 'node:path';
 
 /** 5 MiB per file before trimming. */
 export const DEFAULT_MAX_BYTES = 5 * 1024 * 1024;
-/** Bytes of the tail that survive a trim. */
-export const DEFAULT_KEEP_TAIL_BYTES = 1 * 1024 * 1024;
+/**
+ * Bytes of the tail that survive a trim — half the cap.
+ *
+ * A trim only fires during an anomaly, and the anomaly that produces it is
+ * usually a crash loop, whose ROOT CAUSE is at the start of the burst while the
+ * tail holds only the latest repetition. Keeping half rather than a fifth
+ * halves what that costs, at no added complexity.
+ */
+export const DEFAULT_KEEP_TAIL_BYTES = 2.5 * 1024 * 1024;
 
 export interface LogRetentionOptions {
   maxBytes?: number;
@@ -71,6 +82,11 @@ export function trimMarker(nowIso: string, dropped: number, kept: number): strin
  * PM2 holds these files open in append mode, where each write targets the
  * current end-of-file, so rewriting a shorter file does not strand the writer
  * at a stale offset or leave a sparse hole.
+ *
+ * There is a narrow read-then-write window: lines appended between the tail
+ * read and the rewrite are lost. It is sub-millisecond, applies only to files
+ * already over the cap, and the alternative — holding a lock across the rewrite
+ * of a file PM2 is actively writing — is worse than losing a line at 03:00.
  */
 function trimToTail(
   filePath: string,
@@ -88,9 +104,12 @@ function trimToTail(
     closeSync(fd);
   }
 
-  // Drop the partial first line so the file never starts mid-record.
+  // Drop the partial first line so the file never starts mid-record. When the
+  // tail holds no newline at all there is no line to drop, so strip any
+  // replacement char left by a read that began mid-UTF-8-sequence.
   const firstNewline = tail.indexOf('\n');
   if (firstNewline !== -1) tail = tail.slice(firstNewline + 1);
+  else tail = tail.replace(/^\uFFFD+/, '');
 
   const kept = Buffer.byteLength(tail, 'utf8');
   const contents = trimMarker(nowIso, size - kept, kept) + tail;

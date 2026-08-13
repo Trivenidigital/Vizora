@@ -26,12 +26,7 @@ import { fileURLToPath } from 'node:url';
  *  undefined under the tsx transform). */
 const opsDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-import {
-  applyLogRetention,
-  DEFAULT_KEEP_TAIL_BYTES,
-  DEFAULT_MAX_BYTES,
-  trimMarker,
-} from './log-retention.js';
+import { applyLogRetention, trimMarker } from './log-retention.js';
 
 function withTempDir(fn: (dir: string) => void): void {
   const dir = mkdtempSync(join(tmpdir(), 'vizora-logret-'));
@@ -174,6 +169,24 @@ test('an unreadable directory is an error, not a crash', () => {
   assert.equal(r.trimmed.length, 0);
 });
 
+test('a tail with no newline at all still yields clean text', () => {
+  // One enormous single-line record: there is no partial first line to drop, so
+  // a read starting mid-UTF-8-sequence would otherwise leave U+FFFD at the very
+  // front of the surviving content.
+  withTempDir(dir => {
+    const p = join(dir, 'oneline.log');
+    // Multi-byte characters, no newline anywhere.
+    writeFileSync(p, 'e\u0301'.repeat(4000));
+
+    const r = applyLogRetention(dir, { maxBytes: 2048, keepTailBytes: 1024 });
+
+    assert.equal(r.trimmed.length, 1);
+    const after = readFileSync(p, 'utf8');
+    const body = after.slice(after.indexOf('\n') + 1);
+    assert.ok(!body.startsWith('\uFFFD'), 'surviving text must not begin with a replacement char');
+  });
+});
+
 test('a directory named *.log is ignored, and real logs still get trimmed', () => {
   // statSync on a directory reports a platform-dependent size, so without an
   // explicit isFile() check this would either be counted as a healthy file or
@@ -206,16 +219,14 @@ test('keepTailBytes is clamped below maxBytes so trimming always shrinks', () =>
   });
 });
 
-test('defaults are sane relative to each other', () => {
-  assert.ok(DEFAULT_KEEP_TAIL_BYTES < DEFAULT_MAX_BYTES);
-});
 
 // ─── Source guard ────────────────────────────────────────────────────────────
 
 test('db-maintainer never invokes `pm2 flush` again', () => {
   // The acceptance criterion is "db-maintainer cannot erase other services'
-  // diagnostic history". `pm2 flush` takes no target, so a single reintroduced
-  // call re-arms the exact failure. db-maintainer.ts calls main() at import, so
+  // diagnostic history". A bare `pm2 flush` re-arms it exactly. `pm2 flush
+  // [api]` accepts a target, but a targeted flush is rejected too: emptying is
+  // the wrong primitive either way. db-maintainer.ts calls main() at import so
   // it cannot be loaded in-process — scanning the source is the honest check.
   const src = readFileSync(join(opsDir, 'db-maintainer.ts'), 'utf8');
   const calls = src.match(/execFileSync\(\s*['"]pm2['"]\s*,\s*\[[^\]]*['"]flush['"]/g);

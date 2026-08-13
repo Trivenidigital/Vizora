@@ -16,10 +16,15 @@
  *
  * ─── `pm2 flush` is GONE. Do not reintroduce it ──────────────────────────────
  *
- * `pm2 flush` takes no target: it truncates the logs of EVERY app PM2 manages.
+ * Called bare, `pm2 flush` truncates the logs of EVERY app PM2 manages.
  * Database maintenance was therefore destroying middleware, realtime, web and
- * all fourteen agents' diagnostic history as a side effect, daily at 03:00.
- * That has now materially harmed two separate investigations.
+ * the other fifteen PM2 apps' diagnostic history as a side effect, daily at
+ * 03:00. That has now materially harmed two separate investigations.
+ *
+ * `pm2 flush [api]` DOES accept a target, so a scoped flush was available — but
+ * targeting is not the fix, because emptying is the wrong primitive. A targeted
+ * `pm2 flush ops-db-maintainer` still destroys this agent's own history and
+ * still bounds nothing else. The guards below reject a flush of any shape.
  *
  * An earlier repair moved the flush to the START of the run so this agent's own
  * output would survive it. That fixed self-erasure but not the cross-service
@@ -27,9 +32,14 @@
  * belonged to services that had nothing to do with this agent.
  *
  * It was also buying almost nothing — measured on prod 2026-08-13, the entire
- * log corpus was 184 KB against 42 GB free. Disk is now bounded by
- * `lib/log-retention.ts`, which trims oversized files to their most recent
+ * log corpus was 184 KB against 42 GB free. `<repo>/logs/*.log` is now bounded
+ * by `lib/log-retention.ts`, which trims oversized files to their most recent
  * bytes and never empties one.
+ *
+ * Scope note: PM2's own daemon log (`$PM2_HOME/pm2.log`, 71 KB on prod
+ * 2026-08-13) lives outside that directory and is NOT covered here. The bare
+ * flush used to truncate it incidentally; nothing bounds it now. Left as a
+ * separate concern rather than widening this agent's blast radius back out.
  *
  * Security note: `execFileSync` everywhere (no shell). Database credentials are
  * passed via `PGPASSWORD` in the child environment and NEVER as arguments —
