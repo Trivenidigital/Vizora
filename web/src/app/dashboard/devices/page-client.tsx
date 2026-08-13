@@ -11,6 +11,7 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import EmptyState from '@/components/EmptyState';
 import SearchFilter from '@/components/SearchFilter';
 import DeviceStatusIndicator from '@/components/DeviceStatusIndicator';
+import { formatLastSeen } from '@/lib/format-last-seen';
 import DeviceGroupSelector from '@/components/DeviceGroupSelector';
 import DevicePreviewModal from '@/components/DevicePreviewModal';
 import PlaylistQuickSelect from '@/components/PlaylistQuickSelect';
@@ -633,7 +634,7 @@ export default function DevicesClient({
  </div>
  </div>
  </td>
- <td className="eh-td"><DeviceStatusIndicator deviceId={device.id} showLabel showTime /></td>
+ <td className="eh-td"><DeviceStatusIndicator deviceId={device.id} status={device.status ?? null} showLabel /></td>
  <td className="eh-td text-sm text-[var(--foreground-secondary)]">{device.location || '\u2014'}</td>
  <td className="eh-td text-sm">
  <PlaylistQuickSelect
@@ -645,7 +646,22 @@ export default function DevicesClient({
  onUpdate={() => { loadDevices(); }}
  />
  </td>
- <td className="eh-td text-sm text-[var(--foreground-tertiary)]">{(device.lastSeen || device.lastHeartbeat) ? new Date(String(device.lastSeen || device.lastHeartbeat)).toLocaleString() : 'Never'}</td>
+ {/* Relative time carries freshness at a glance; the exact timestamp stays
+     available on hover and to assistive tech via <time dateTime>. "Online" is
+     a recent observation, not a live guarantee, so the operator needs to see
+     HOW recent without the badge hedging itself into uselessness. */}
+ <td className="eh-td text-sm text-[var(--foreground-tertiary)]">
+ {(device.lastSeen || device.lastHeartbeat) ? (
+ <time
+ dateTime={new Date(String(device.lastSeen || device.lastHeartbeat)).toISOString()}
+ title={new Date(String(device.lastSeen || device.lastHeartbeat)).toLocaleString()}
+ >
+ {formatLastSeen(String(device.lastSeen || device.lastHeartbeat))}
+ </time>
+ ) : (
+ 'Never'
+ )}
+ </td>
  <td className="eh-td text-right text-sm font-medium">
  <div className="flex justify-end gap-2">
  <button onClick={() => handlePreview(device)} className="eh-icon-btn" title="Preview device screen">Preview</button>

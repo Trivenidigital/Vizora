@@ -8,6 +8,21 @@ interface DeviceStatusIndicatorProps {
   showLabel?: boolean;
   showTime?: boolean;
   className?: string;
+  /**
+   * Authoritative status supplied by the caller.
+   *
+   * When present this component does NOT consult DeviceStatusContext. The
+   * devices table keeps `device.status` on each row (realtime updates land
+   * there via handleDeviceStatusChange) and sorts, filters and writes its
+   * assign-toast copy from it — while the badge read a SECOND, independently
+   * bootstrapped store. The two could disagree, so a row could sort as offline
+   * while displaying Online. Passing the row's own value makes one source
+   * authoritative for both what is shown and what is sorted.
+   *
+   * Callers with no row data (e.g. the device detail page) omit it and keep
+   * using the context.
+   */
+  status?: DeviceStatus | 'unknown' | null;
 }
 
 const statusConfig = {
@@ -70,6 +85,7 @@ export default function DeviceStatusIndicator({
   showLabel = true,
   showTime = false,
   className = '',
+  status: statusProp,
 }: DeviceStatusIndicatorProps) {
   const { getDeviceStatus, subscribeToDevice } = useDeviceStatus();
   const [status, setStatus] = useState<DeviceStatus | 'unknown'>('unknown');
@@ -77,6 +93,10 @@ export default function DeviceStatusIndicator({
   const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
+    // Caller owns the status: do not open a second subscription whose result
+    // would be computed and then discarded, once per row.
+    if (statusProp !== undefined) return undefined;
+
     // Subscribe to device status updates
     const unsubscribe = subscribeToDevice(deviceId, (update) => {
       setStatus(update.status);
@@ -95,9 +115,12 @@ export default function DeviceStatusIndicator({
     }
 
     return unsubscribe;
-  }, [deviceId]);
+  }, [deviceId, statusProp]);
 
-  const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.unknown;
+  // A caller-supplied status wins outright; `null` is a deliberate "no evidence"
+  // and must render Unknown rather than falling through to the subscription.
+  const effectiveStatus = statusProp !== undefined ? (statusProp ?? 'unknown') : status;
+  const config = statusConfig[effectiveStatus as keyof typeof statusConfig] || statusConfig.unknown;
 
   const formatTime = () => {
     if (!lastUpdate) return '';
