@@ -642,12 +642,26 @@ export class OrganizationsService {
     const org = await this.db.organization.findUnique({ where: { id: orgId } });
     if (!org) throw new NotFoundException('Organization not found');
     const settings = (org.settings as Record<string, unknown>) || {};
+    /**
+     * The fallback is the Vizora brand, NOT a neutral placeholder.
+     *
+     * The web client applies whatever this returns onto `--primary`
+     * (web/src/lib/customization.ts), which drives the sidebar, focus rings and
+     * buttons across the whole authenticated app. This previously returned the
+     * Tailwind sky scale (#0284c7/#38bdf8/#0ea5e9), so every organisation that
+     * had never opened Settings -> Customization rendered a sky-blue dashboard
+     * while the marketing site rendered Electric Horizon green - which is most
+     * of what made the app look like a different product at login.
+     *
+     * These three values must stay in sync with `defaultBrandConfig` in
+     * web/src/lib/customization.ts.
+     */
     return settings.branding || {
       name: org.name,
       logoUrl: org.logoUrl,
-      primaryColor: '#0284c7',
-      secondaryColor: '#38bdf8',
-      accentColor: '#0ea5e9',
+      primaryColor: '#00E5A0',
+      secondaryColor: '#00B4D8',
+      accentColor: '#00CC8E',
       fontFamily: 'sans',
       showPoweredBy: true,
       customDomain: '',

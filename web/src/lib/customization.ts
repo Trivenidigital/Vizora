@@ -88,6 +88,66 @@ export function getAccentColor(): string {
   return currentBrandConfig.accentColor || currentBrandConfig.primaryColor;
 }
 
+/* ---------- contrast helpers ---------- */
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+function relativeLuminance({ r, g, b }: { r: number; g: number; b: number }): number {
+  const f = (v: number) => {
+    const s = v / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+
+function contrastRatio(a: string, b: string): number {
+  const ca = hexToRgb(a);
+  const cb = hexToRgb(b);
+  if (!ca || !cb) return 1;
+  const la = relativeLuminance(ca);
+  const lb = relativeLuminance(cb);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+function toHex({ r, g, b }: { r: number; g: number; b: number }): string {
+  const h = (v: number) => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0');
+  return `#${h(r)}${h(g)}${h(b)}`;
+}
+
+/**
+ * Return a version of `color` that is readable as TEXT on `background`.
+ *
+ * Brand colours are chosen to look good as fills, not as glyphs - Vizora's own
+ * neon is 1.65:1 on white, which is illegible. This walks the colour toward
+ * black (on a light background) or white (on a dark one) until it clears the
+ * WCAG AA threshold for normal text, preserving hue as far as possible.
+ *
+ * Exported for tests: the ratios must be computed, not asserted by hand.
+ */
+export function readableInk(color: string, background: string, minRatio = 4.5): string {
+  const base = hexToRgb(color);
+  const bg = hexToRgb(background);
+  if (!base || !bg) return color;
+  if (contrastRatio(color, background) >= minRatio) return color;
+
+  // Blend toward whichever endpoint moves away from the background.
+  const target = relativeLuminance(bg) > 0.5 ? { r: 0, g: 0, b: 0 } : { r: 255, g: 255, b: 255 };
+  for (let t = 0.05; t <= 1.0001; t += 0.05) {
+    const candidate = toHex({
+      r: base.r + (target.r - base.r) * t,
+      g: base.g + (target.g - base.g) * t,
+      b: base.b + (target.b - base.b) * t,
+    });
+    if (contrastRatio(candidate, background) >= minRatio) return candidate;
+  }
+  return toHex(target);
+}
+
 /**
  * Apply CSS variables for customization
  */
@@ -103,6 +163,13 @@ export function applyCSSVariables(config: BrandConfig = currentBrandConfig): voi
   // Only override if not using the default Vizora color to avoid flash
   if (config.id !== 'default') {
     root.style.setProperty('--primary', config.primaryColor);
+    // `--primary` is a FILL colour and a tenant may legitimately pick one that
+    // is unreadable as text (the Vizora neon itself is 1.65:1 on white). Derive
+    // a text-safe ink per theme so brand-coloured labels stay legible.
+    // These feed the theme-scoped `--primary-ink` rules rather than setting it
+    // directly - an inline value would override both themes at once.
+    root.style.setProperty('--brand-ink-light', readableInk(config.primaryColor, '#FFFFFF'));
+    root.style.setProperty('--brand-ink-dark', readableInk(config.primaryColor, '#0C2229'));
   }
 
   // Font family

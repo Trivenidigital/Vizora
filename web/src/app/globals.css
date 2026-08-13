@@ -28,6 +28,27 @@
     --primary-lighter: #A7F3D0;
     --primary-lightest: #ECFDF5;
 
+    /*
+     * Brand INK - the text/border-safe brand colour.
+     *
+     * `--primary` is a FILL colour. On a light substrate the neon greens are
+     * 1.65:1 (#00E5A0) and 2.2:1 (#00CC8E) against white, so using them for
+     * small text or borders is unreadable and fails WCAG AA. Anything that
+     * paints glyphs or 1px strokes must use `--primary-ink` instead; fills,
+     * dots, glows and icon shapes keep `--primary`.
+     *
+     * Light: #00745B on --surface (#FFFFFF) = 5.75:1  (AA for normal text)
+     * Dark:  #00E5A0 on --surface (#0C2229) = 11.6:1  (neon is already safe)
+     *
+     * When an organisation supplies its own brand colour, applyCSSVariables()
+     * derives a contrast-safe ink per theme and publishes it as
+     * `--brand-ink-light` / `--brand-ink-dark`. It deliberately does NOT set
+     * `--primary-ink` directly: that is an inline style on <html>, which would
+     * beat BOTH the light and dark class rules and leave one theme unreadable.
+     * Feeding the theme-scoped rules instead keeps each theme in control.
+     */
+    --primary-ink: var(--brand-ink-light, #00745B);
+
     --success: #16a34a;
     --success-light: #22c55e;
     --success-lighter: #bbf7d0;
@@ -108,6 +129,9 @@
     --primary-light: #34D399;
     --primary-lighter: #6EE7B7;
     --primary-lightest: #D1FAE5;
+
+    /* On the deep-teal substrate the neon IS the readable colour (11.6:1). */
+    --primary-ink: var(--brand-ink-dark, #00E5A0);
 
     --success: #22c55e;
     --success-light: #4ade80;
