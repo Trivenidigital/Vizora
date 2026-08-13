@@ -345,7 +345,22 @@ export default function DevicesClient({
  try {
  setActionLoading(true);
  const result = await apiClient.bulkAssignPlaylist(displayIds, bulkPlaylistId);
- toast.success(`Playlist assigned to ${result.updated} device(s)`);
+ // `updated` proves PERSISTENCE, not delivery: the assignment writes
+ // currentPlaylistId and the realtime notify is fire-and-forget. A non-online
+ // device keeps playing its cached playlist until it reconnects, which reads
+ // as "the assignment didn't work" unless we say otherwise. Same copy as the
+ // Publish flow on the playlists page.
+ //
+ // The promise is backed by the server: on reconnect the gateway delivers the
+ // pending playlist, or falls back to the DB's currentPlaylistId — so a
+ // deferred assignment is genuinely applied, not lost.
+ const delayedCount = devices.filter(
+ (device) => selectedDeviceIds.has(device.id) && device.status !== 'online',
+ ).length;
+ const delayedSuffix = delayedCount > 0
+ ? '. Non-online devices will update when they come online.'
+ : '';
+ toast.success(`Playlist assigned to ${result.updated} device(s)${delayedSuffix}`);
  setSelectedDeviceIds(new Set());
  setIsBulkPlaylistModalOpen(false);
  setBulkPlaylistId('');
