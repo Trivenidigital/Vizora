@@ -168,7 +168,7 @@ export default function RegisterContent() {
           </div>
           <p className="text-[var(--foreground-tertiary)] text-sm">
             Join 2,500+ organizations managing their displays.{' '}
-            <span className="text-[#00E5A0] font-medium">Free for 30 days.</span>
+            <span className="text-[var(--primary-ink)] font-medium">Free for 30 days.</span>
           </p>
         </div>
 
@@ -181,7 +181,7 @@ export default function RegisterContent() {
           </p>
 
           {error && (
-            <div className="flex items-start gap-3 bg-[var(--error)]/10 border border-[var(--error)]/30 text-[var(--error)] px-4 py-3 rounded-lg mb-6">
+            <div className="flex items-start gap-3 bg-[var(--error)]/10 border border-[var(--error)]/30 text-[var(--error-ink)] px-4 py-3 rounded-lg mb-6">
               <svg className="w-5 h-5 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
               </svg>
@@ -197,7 +197,7 @@ export default function RegisterContent() {
           )}
 
           {success && (
-            <div className="flex items-center gap-3 bg-[var(--success)]/10 border border-[var(--success)]/30 text-[var(--success)] px-4 py-3 rounded-lg mb-6">
+            <div className="flex items-center gap-3 bg-[var(--success)]/10 border border-[var(--success)]/30 text-[var(--success-ink)] px-4 py-3 rounded-lg mb-6">
               <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
               </svg>
@@ -325,7 +325,7 @@ export default function RegisterContent() {
                   aria-invalid={!!errors.password}
                 />
                 {errors.password && (
-                  <p className="mt-1 text-xs text-[var(--error)]" role="alert">
+                  <p className="mt-1 text-xs text-[var(--error-ink)]" role="alert">
                     {errors.password}
                   </p>
                 )}
@@ -357,14 +357,14 @@ export default function RegisterContent() {
                   aria-invalid={!!errors.confirmPassword}
                 />
                 {errors.confirmPassword && (
-                  <p className="mt-1 text-xs text-[var(--error)]" role="alert">
+                  <p className="mt-1 text-xs text-[var(--error-ink)]" role="alert">
                     {errors.confirmPassword}
                   </p>
                 )}
                 {passwordMatch !== null && !errors.confirmPassword && (
                   <p
                     className={`mt-1 text-xs flex items-center gap-1 ${
-                      passwordMatch ? 'text-[var(--success)]' : 'text-[var(--error)]'
+                      passwordMatch ? 'text-[var(--success-ink)]' : 'text-[var(--error-ink)]'
                     }`}
                   >
                     {passwordMatch ? (
@@ -411,7 +411,7 @@ export default function RegisterContent() {
               </label>
             </div>
             {errors.agreeTerms && (
-              <p className="text-xs text-[var(--error)] -mt-3" role="alert">
+              <p className="text-xs text-[var(--error-ink)] -mt-3" role="alert">
                 {errors.agreeTerms}
               </p>
             )}

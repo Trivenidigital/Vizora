@@ -8,7 +8,7 @@ const devices = [
 
 const statusColors = {
   online: { dot: 'bg-[#00E5A0]', text: 'text-[#00E5A0]' },
-  offline: { dot: 'bg-[var(--error)]', text: 'text-[var(--error)]' },
+  offline: { dot: 'bg-[var(--error)]', text: 'text-[var(--error-ink)]' },
 };
 
 export default function MiniDashboard() {

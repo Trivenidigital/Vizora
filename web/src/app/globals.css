@@ -94,6 +94,26 @@
     --info-lighter: #A5F3FC;
     --info-lightest: #ECFEFF;
 
+    /*
+     * Semantic INK — the text-safe variants, same rule as --primary-ink.
+     *
+     * The semantic families above are FILL colours; as small text they fail on
+     * a light substrate. Measured against --surface (#FFFFFF) and --background
+     * (#E9EEEF), the values they replace are:
+     *
+     *   success #16a34a  3.30 / 2.82   ->  #166534  7.13 / 6.09
+     *   warning #d97706  3.19 / 2.72   ->  #92400e  7.09 / 6.06
+     *   error   #dc2626  4.83 / 4.13   ->  #b91c1c  6.47 / 5.53
+     *   info    #0097B8  3.43 / 2.93   ->  #0E7490  5.36 / 4.58
+     *
+     * Note error passed on white and still failed on the page substrate, which
+     * is why the threshold is checked against both and not just the card.
+     */
+    --success-ink: #166534;
+    --warning-ink: #92400e;
+    --error-ink: #b91c1c;
+    --info-ink: #0E7490;
+
     /* Accent Colors */
     --accent-warm: #F59E0B;
     --accent-warm-light: #FBBF24;
@@ -181,6 +201,18 @@
     --info-light: #22D3EE;
     --info-lighter: #67E8F9;
     --info-lightest: #CFFAFE;
+
+    /*
+     * On the deep-teal substrate the fill values are already readable, with one
+     * exception: #ef4444 measures 4.37:1 on --surface (#0C2229), just under AA.
+     * Error text was failing in DARK too, independently of the light rebrand.
+     *   success #22c55e 7.22   warning #fbbf24 9.86   info #00B4D8 6.67
+     *   error   #ef4444 4.37  ->  #f87171 5.95
+     */
+    --success-ink: #22c55e;
+    --warning-ink: #fbbf24;
+    --error-ink: #f87171;
+    --info-ink: #00B4D8;
 
     /* Accent Colors */
     --accent-warm: #F59E0B;
@@ -292,6 +324,63 @@ body {
   --border-dark: #B7C4C7;
   --primary: #00B27C;
   --primary-light: #00CC8E;
+
+  /*
+   * The semantic families MUST be redeclared here.
+   *
+   * `.mkt` re-tunes the base tokens but previously left success/warning/error/
+   * info alone. Those are declared on `:root` and on `.dark` — and `.dark`
+   * lives on <html>, so for a signed-in dark-mode user visiting a light
+   * marketing or auth page the DARK values inherited straight through. Every
+   * validation message on the four auth screens rendered #ef4444 at 3.21:1 on
+   * this substrate, and success at 1.95:1.
+   *
+   * These are the light values, matching `:root`.
+   */
+  --success: #16a34a;
+  --success-light: #22c55e;
+  --success-lighter: #bbf7d0;
+  --success-lightest: #f0fdf4;
+  --warning: #d97706;
+  --warning-light: #fbbf24;
+  --warning-lighter: #fde68a;
+  --warning-lightest: #fffbeb;
+  --error: #dc2626;
+  --error-light: #ef4444;
+  --error-lighter: #fecaca;
+  --error-lightest: #fef2f2;
+  --info: #0097B8;
+  --info-light: #00B4D8;
+  --info-lighter: #A5F3FC;
+  --info-lightest: #ECFEFF;
+  --success-ink: #166534;
+  --warning-ink: #92400e;
+  --error-ink: #b91c1c;
+  --info-ink: #0E7490;
+
+  /* --primary-ink leaks the same way the semantic families did. `.mkt` sets
+     --primary but not its ink, so for a signed-in dark-mode user every brand
+     link on these light pages ("Sign up free", "Terms of Service") rendered the
+     dark neon at 1.41:1 on #E9EEEF. Measured, not assumed. */
+  --primary-ink: var(--brand-ink-light, #00745B);
+
+  /*
+   * Re-declared, not inherited — and this one is genuinely counter-intuitive.
+   *
+   * `--focus-ring-color: var(--primary-ink)` is declared on :root, and custom
+   * property substitution happens at COMPUTED-VALUE time on the element that
+   * declares it. So it resolves once on <html> — to the DARK ink for a
+   * dark-mode user — and inherits into `.mkt` ALREADY RESOLVED. Redefining
+   * --primary-ink here cannot retroactively change it; the indirection has to
+   * be restated inside this scope.
+   *
+   * Measured before this line: 1.41:1 focus ring on the light auth pages.
+   */
+  --focus-ring-color: var(--primary-ink);
+
+  /* Native controls, scrollbars and autofill follow this. `html.dark` sets it
+     to dark, which reached these light pages too. */
+  color-scheme: light;
 }
 
 /* shared utilities, re-tuned for the light substrate — scoped, non-invasive */

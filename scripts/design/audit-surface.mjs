@@ -211,7 +211,16 @@ const SCAN = ({ vw, isMobile }) => {
         ['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName) ||
         el.getAttribute('role') === 'button' ||
         el.getAttribute('role') === 'link';
-      if (interactive && (rect.width < 44 || rect.height < 44)) {
+      /*
+       * Skip-links and other sr-only affordances are deliberately collapsed
+       * (1x1, clipped) until focused. Counting them as undersized targets
+       * reports a defect for doing accessibility correctly.
+       */
+      const srOnly =
+        rect.width <= 1 &&
+        rect.height <= 1 &&
+        (cs.position === 'absolute' || cs.clip !== 'auto' || cs.overflow === 'hidden');
+      if (interactive && !srOnly && (rect.width < 44 || rect.height < 44)) {
         touch.push({ el: label(el), w: Math.round(rect.width), h: Math.round(rect.height) });
       }
     }
@@ -267,12 +276,21 @@ const SCAN = ({ vw, isMobile }) => {
     probe.style.color = 'var(--focus-ring-color)';
     probe.style.position = 'absolute';
     probe.style.opacity = '0';
-    document.body.appendChild(probe);
+    /*
+     * Mount the probe INSIDE the scope the content lives in, not on <body>.
+     * Custom properties cascade, so a probe on <body> resolves the root-scope
+     * value while the real controls inside a scoped wrapper (`.mkt`) resolve a
+     * different one. Measuring from the wrong place reported a 1.65:1 focus
+     * ring on the auth pages that no focusable element there actually has.
+     */
+    const scope = document.querySelector('.mkt') || document.body;
+    scope.appendChild(probe);
     const resolved = parse(getComputedStyle(probe).color);
     probe.remove();
     if (!resolved) return null;
 
     const surfaces = [
+      ['scope', parse(getComputedStyle(scope).backgroundColor)],
       ['body', parse(getComputedStyle(document.body).backgroundColor)],
       ['card', (() => {
         const card = document.querySelector('.eh-dash-card, [class*="surface"]');
@@ -303,6 +321,22 @@ const slug = (r) => (r === '/' ? 'root' : r.replace(/^\//, '').replace(/[^a-z0-9
 
 const browser = await chromium.launch();
 
+/**
+ * --public audits signed-OUT routes: the marketing pages, the legal pages and
+ * the four auth screens. Those live inside the `.mkt` scope, which is this
+ * wave's visual benchmark, so they need regression checking on every CSS
+ * change — and they cannot be reached through a login.
+ *
+ * Skipping the login also skips the tenant-identity guard. That is safe here
+ * and only here: these routes render no tenant data, so there is nothing to
+ * photograph by accident. The local-origin guard above still applies.
+ */
+const PUBLIC_ONLY = process.argv.includes('--public');
+let storageState;
+
+if (PUBLIC_ONLY) {
+  console.log('public mode — no login, no tenant data reachable');
+} else {
 // Log in once, then reuse the session across every theme/viewport context.
 console.log('login…');
 const bootstrap = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -341,8 +375,9 @@ if (!found) {
   );
 }
 console.log(`  tenant verified: ${EXPECTED_TENANT}`);
-const storageState = await bootstrap.storageState();
+storageState = await bootstrap.storageState();
 await bootstrap.close();
+}
 
 const report = [];
 
@@ -351,7 +386,7 @@ for (const theme of THEMES) {
     const height = VIEWPORT_HEIGHT[vw] || 900;
     const isMobile = vw <= 500;
     const ctx = await browser.newContext({
-      storageState,
+      ...(storageState ? { storageState } : {}),
       viewport: { width: vw, height },
       colorScheme: theme === 'dark' ? 'dark' : 'light',
       deviceScaleFactor: 1,

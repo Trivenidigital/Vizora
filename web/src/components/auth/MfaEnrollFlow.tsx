@@ -126,7 +126,7 @@ export default function MfaEnrollFlow({
       </div>
 
       {error && (
-        <div className="px-4 py-3 rounded-lg bg-[var(--error)]/10 border border-[var(--error)]/30 text-[var(--error)] text-sm">
+        <div className="px-4 py-3 rounded-lg bg-[var(--error)]/10 border border-[var(--error)]/30 text-[var(--error-ink)] text-sm">
           {error}
         </div>
       )}
