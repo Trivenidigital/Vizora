@@ -65,7 +65,7 @@ export type DriftClass = 'CRITICAL' | 'HIGH' | 'WARNING';
  * The only thing a secret comparison may emit. Never a value, never a
  * derivation of one.
  */
-export type SecretVerdict = 'MATCH' | 'DRIFT' | 'BOTH_ABSENT' | 'ONE_ABSENT';
+export type { SecretVerdict } from './secret-compare.js';
 
 export type BudgetVerdict = 'SAFE' | 'UNSAFE' | 'UNKNOWN';
 
@@ -518,25 +518,15 @@ export function buildMaxConnectionsCandidates(
 }
 
 // ─── Secret comparison (ruling constraint 3) ────────────────────────────────
+//
+// Implementation moved to `secret-compare.ts` so low-level modules (e.g.
+// `redis-config.ts`) can compare secrets without importing this module's
+// Zod/middleware dependency chain. Re-exported so this module's public surface
+// is unchanged.
+export { compareSecretValues } from './secret-compare.js';
+import { compareSecretValues } from './secret-compare.js';
+import { checkRedisConsistency, isRedisBroken } from './redis-config.js';
 
-/**
- * Compare two secrets in memory and return ONLY a state token.
- *
- * Both operands are hashed to fixed-length digests so the comparison is
- * constant-time and length-independent; the digests are internal and are never
- * returned, logged, persisted or transmitted. Nothing derived from either value
- * escapes this function.
- */
-export function compareSecretValues(a: string | undefined, b: string | undefined): SecretVerdict {
-  const aSet = a !== undefined && a !== null;
-  const bSet = b !== undefined && b !== null;
-  if (!aSet && !bSet) return 'BOTH_ABSENT';
-  if (aSet !== bSet) return 'ONE_ABSENT';
-
-  const da = createHash('sha256').update(a as string, 'utf8').digest();
-  const db = createHash('sha256').update(b as string, 'utf8').digest();
-  return timingSafeEqual(da, db) ? 'MATCH' : 'DRIFT';
-}
 
 // ─── Fresh-start validation (design §1) ─────────────────────────────────────
 
@@ -721,6 +711,41 @@ export interface DriftAnalysis {
   evaluated: string[];
 }
 
+/**
+ * B4 — do the Redis SERVER and its CLIENTS agree on the password?
+ *
+ * `REDIS_URL` is the only thing application code reads; `REDIS_PASSWORD` is
+ * read only by docker-compose, where it becomes the server's `--requirepass`.
+ * Nothing in either file references the other, so rotating one and not the
+ * other breaks Redis for every service with no warning anywhere.
+ *
+ * Emitted ONCE rather than per service: both values come from the same `.env`,
+ * which every service loads, so this is a property of the deployment. Three
+ * identical findings for one root cause would be noise, and would dedup to
+ * three separate incidents.
+ *
+ * Checked against the ZERO-STATE config — the question is whether a restart
+ * would come up able to talk to Redis.
+ */
+function detectRedisRepresentationFindings(observations: ServiceObservation[]): DriftFinding[] {
+  const obs = observations.find(o => o.dotenvVars !== null && Object.keys(o.pm2Env).length > 0);
+  if (!obs) return [];
+
+  const zeroState = computeZeroState(obs);
+  const result = checkRedisConsistency(zeroState.REDIS_URL, zeroState.REDIS_PASSWORD);
+  if (!isRedisBroken(result)) return [];
+
+  return [{
+    driftClass: 'CRITICAL',
+    type: 'redis-representation-drift',
+    service: obs.service,
+    targetId: 'global:REDIS representation',
+    message: `Redis server and client configuration disagree — ${result.detail}`,
+    remediation: NO_REPAIR,
+  }];
+}
+
+
 /** Backwards-compatible wrapper — most callers only need the findings. */
 export function detectDrift(
   observations: ServiceObservation[],
@@ -811,6 +836,7 @@ export function analyzeDrift(
     findings.push(...detectPoolDrift(obs, runtime, zeroState));
   }
 
+  findings.push(...detectRedisRepresentationFindings(observations));
   findings.push(...detectBudgetFindings(observations, opts.maxConnections, unobservable));
 
   // `global` only when every observed service was fully evaluated.
