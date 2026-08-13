@@ -131,7 +131,7 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
               >
                 <Image
                   src="/product/dashboard-fleet.png"
-                  alt="The Vizora devices view: a fleet of displays across Seattle-area locations, each row showing a live online status, the playlist it is currently playing, and when it was last seen."
+                  alt="The Vizora devices view: a fleet of displays across Seattle-area locations, each row showing its connection status, the playlist assigned to it, and when it last checked in."
                   width={2880}
                   height={1800}
                   sizes="(min-width: 1248px) 544px, (min-width: 1024px) 46vw, 92vw"
