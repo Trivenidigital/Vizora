@@ -57,9 +57,17 @@ import {
   type EcosystemAppSummary,
   type Operation,
 } from './lib/pm2-guard.js';
+import {
+  anyServiceWouldFail,
+  assertCanRestart,
+  renderStartupAssertions,
+  type PersistedServiceConfig,
+} from './lib/startup-assertions.js';
+import { parseDotenvText, type EnvMap, type ServiceName } from './lib/config-drift.js';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ECOSYSTEM_PATH = join(REPO_ROOT, 'ecosystem.config.js');
+const DOTENV_PATH = join(REPO_ROOT, '.env');
 const MANIFEST_PATH = join(REPO_ROOT, 'deploy', 'pm2-app-classes.json');
 const PM2_TIMEOUT_MS = 60_000;
 
@@ -81,6 +89,52 @@ function readEcosystemApps(): EcosystemAppSummary[] {
   delete require.cache[require.resolve(ECOSYSTEM_PATH)];
   const config = require(ECOSYSTEM_PATH) as { apps?: { name: string; cron_restart?: string }[] };
   return (config.apps ?? []).map(a => ({ name: a.name, cronRestart: a.cron_restart }));
+}
+
+/** PM2 app name -> the ServiceName its validators are registered under. */
+const SERVICE_BY_APP: Record<string, ServiceName> = {
+  'vizora-middleware': 'middleware',
+  'vizora-realtime': 'realtime',
+  'vizora-web': 'web',
+};
+
+/**
+ * B3 — build each targeted service's fresh-start config from persisted state.
+ *
+ * Deliberately reads only what a fresh process would consume: the ecosystem
+ * `env_production` block and `.env`. No `/proc`, no `pm2 jlist` env — the
+ * question is about a process that does not exist yet, so a running process
+ * cannot answer it.
+ */
+function readPersistedConfigs(names: string[]): PersistedServiceConfig[] {
+  const require = createRequire(import.meta.url);
+  delete require.cache[require.resolve(ECOSYSTEM_PATH)];
+  const config = require(ECOSYSTEM_PATH) as {
+    apps?: { name: string; env_production?: Record<string, unknown> }[];
+  };
+
+  let dotenvVars: EnvMap | null = null;
+  try {
+    dotenvVars = parseDotenvText(readFileSync(DOTENV_PATH, 'utf-8'));
+  } catch {
+    // Absent .env is itself a finding: the validators below will report the
+    // variables that are consequently missing. Nothing is assumed here.
+    dotenvVars = null;
+  }
+
+  const out: PersistedServiceConfig[] = [];
+  for (const name of names) {
+    const service = SERVICE_BY_APP[name];
+    if (!service) continue;
+    if (out.some(c => c.service === service)) continue; // cluster: one config
+    const app = (config.apps ?? []).find(a => a.name === name);
+    const envProduction: EnvMap = {};
+    for (const [k, v] of Object.entries(app?.env_production ?? {})) {
+      if (v !== undefined && v !== null) envProduction[k] = String(v);
+    }
+    out.push({ service, ecosystemEnvProduction: envProduction, dotenvVars });
+  }
+  return out;
 }
 
 function readManifest(): Record<string, string> {
@@ -132,6 +186,22 @@ function main(): void {
     process.exitCode = 1;
     return;
   }
+
+  // B3 — the targets are classified and the command is resolved, but a reload
+  // still takes these processes DOWN before bringing them back. Assert they
+  // could actually come back, using each service's own validators, before any
+  // mutation. Runs even for --dry-run so the check can be proved without risk.
+  const assertions = assertCanRestart(readPersistedConfigs(decision.invokeNames));
+  if (assertions.length > 0) {
+    process.stdout.write(`
+${renderStartupAssertions(assertions)}
+`);
+  }
+  if (anyServiceWouldFail(assertions)) {
+    process.exitCode = 1;
+    return;
+  }
+
   if (dryRun) {
     process.stdout.write('\ndry run — PM2 was not invoked.\n');
     return;

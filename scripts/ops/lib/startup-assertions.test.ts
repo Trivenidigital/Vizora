@@ -1,0 +1,171 @@
+/**
+ * B3 — startup assertions block a deploy that could not come back.
+ *
+ * The failure classes here are the ones actually observed on 2026-08-12, when
+ * a reload selected the wrong environment and services came up in development
+ * mode with Swagger exposed. The assertion runs the services' REAL validators
+ * (via B1's validateFreshStart), so these tests pin the WIRING and the refusal
+ * semantics — not a transcription of the schemas, which would drift.
+ */
+
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import {
+  anyServiceWouldFail,
+  assertCanRestart,
+  freshStartEnv,
+  renderStartupAssertions,
+  type PersistedServiceConfig,
+} from './startup-assertions.js';
+
+/** A middleware config that really would boot. */
+function healthyMiddleware(): PersistedServiceConfig {
+  return {
+    service: 'middleware',
+    ecosystemEnvProduction: {
+      NODE_ENV: 'production',
+      PORT: '3000',
+    },
+    dotenvVars: {
+      DATABASE_URL: 'postgresql://vizora:pw@localhost:5432/vizora',
+      REDIS_URL: 'redis://:pw@localhost:6379',
+      JWT_SECRET: 'a'.repeat(48),
+      DEVICE_JWT_SECRET: 'b'.repeat(48),
+      INTERNAL_API_SECRET: 'c'.repeat(48),
+      MINIO_ACCESS_KEY: 'realaccesskey',
+      MINIO_SECRET_KEY: 'realsecretkey123456',
+      CORS_ORIGIN: 'https://vizora.cloud',
+      API_BASE_URL: 'https://vizora.cloud',
+    },
+  };
+}
+
+// ─── Precedence ──────────────────────────────────────────────────────────────
+
+test('the fresh-start env is built from persisted config only', () => {
+  const env = freshStartEnv(healthyMiddleware());
+  assert.equal(env.NODE_ENV, 'production');
+  assert.equal(env.PORT, '3000');
+  assert.equal(env.JWT_SECRET, 'a'.repeat(48));
+});
+
+test('the ecosystem block wins over .env, matching a real production start', () => {
+  // A reload applies env_production on top of whatever the dotenv file says.
+  // Getting this backwards would validate a configuration nobody ever runs.
+  const config = healthyMiddleware();
+  config.dotenvVars = { ...config.dotenvVars, NODE_ENV: 'development' };
+
+  assert.equal(freshStartEnv(config).NODE_ENV, 'production');
+});
+
+// ─── Refusal semantics ───────────────────────────────────────────────────────
+
+test('a config that would boot does not block', () => {
+  const assertions = assertCanRestart([healthyMiddleware()]);
+  assert.deepEqual(assertions[0]?.failures, [], JSON.stringify(assertions));
+  assert.equal(anyServiceWouldFail(assertions), false);
+});
+
+test('THE INCIDENT SHAPE: a missing required production variable blocks', () => {
+  const broken = healthyMiddleware();
+  delete broken.dotenvVars!.JWT_SECRET;
+
+  const assertions = assertCanRestart([broken]);
+
+  assert.ok(assertions[0]!.failures.length > 0);
+  assert.match(assertions[0]!.failures.join(' '), /JWT_SECRET/);
+  assert.equal(anyServiceWouldFail(assertions), true);
+});
+
+test('a wrong port blocks — the service exits non-zero on mismatch', () => {
+  const broken = healthyMiddleware();
+  broken.ecosystemEnvProduction.PORT = '3005';
+
+  const failures = assertCanRestart([broken])[0]!.failures;
+
+  assert.ok(failures.some(f => /port/i.test(f)), failures.join(' | '));
+});
+
+test('one bad service blocks the whole operation', () => {
+  const broken = healthyMiddleware();
+  delete broken.dotenvVars!.DATABASE_URL;
+
+  const assertions = assertCanRestart([healthyMiddleware(), broken]);
+
+  assert.deepEqual(assertions[0]?.failures, []);
+  assert.ok(assertions[1]!.failures.length > 0);
+  assert.equal(anyServiceWouldFail(assertions), true);
+});
+
+test('every requested service is reported, in order', () => {
+  const assertions = assertCanRestart([
+    healthyMiddleware(),
+    {
+      service: 'realtime',
+      ecosystemEnvProduction: { NODE_ENV: 'production', PORT: '3002' },
+      dotenvVars: {},
+    },
+  ]);
+  assert.deepEqual(assertions.map(a => a.service), ['middleware', 'realtime']);
+});
+
+// ─── Reporting ───────────────────────────────────────────────────────────────
+
+test('the report names the blocked service and says nothing changed', () => {
+  const broken = healthyMiddleware();
+  delete broken.dotenvVars!.JWT_SECRET;
+
+  const report = renderStartupAssertions(assertCanRestart([broken]));
+
+  assert.match(report, /BLOCKED middleware/);
+  assert.match(report, /REFUSING to proceed/);
+  assert.match(report, /Nothing was changed/);
+});
+
+test('a healthy report does not tell the operator it refused', () => {
+  const report = renderStartupAssertions(assertCanRestart([healthyMiddleware()]));
+  assert.match(report, /OK\s+middleware/);
+  assert.doesNotMatch(report, /REFUSING/);
+});
+
+test('NO CONFIGURED SECRET VALUE reaches the report', () => {
+  // The whole point of running the real validators is that their messages are
+  // static. If one ever starts echoing the offending value, this catches it
+  // before the string reaches a terminal, a CI log or an alert.
+  //
+  // Canary values are used rather than realistic ones so a match can only mean
+  // an echo — a realistic value could coincide with static text (see the next
+  // test, which is exactly that case).
+  const broken = healthyMiddleware();
+  broken.dotenvVars!.JWT_SECRET = 'CANARY-JWT-SHOULD-NEVER-APPEAR';
+  broken.dotenvVars!.DEVICE_JWT_SECRET = 'CANARY-DEVICE-SHOULD-NEVER-APPEAR';
+  broken.dotenvVars!.DATABASE_URL = 'postgresql://u:CANARY-DB-PASSWORD@localhost:5432/v';
+
+  const report = renderStartupAssertions(assertCanRestart([broken]));
+
+  assert.ok(report.includes('BLOCKED'), 'the fixture must actually fail, or this proves nothing');
+  for (const canary of [
+    'CANARY-JWT-SHOULD-NEVER-APPEAR',
+    'CANARY-DEVICE-SHOULD-NEVER-APPEAR',
+    'CANARY-DB-PASSWORD',
+  ]) {
+    assert.ok(!report.includes(canary), `report echoed a configured value: ${canary}`);
+  }
+});
+
+test('naming a KNOWN-DEFAULT credential is not a leak', () => {
+  // The MinIO rule reads: MINIO_SECRET_KEY must be set and not equal to
+  // "minioadmin" in production. That literal lives in middleware's own
+  // validator source, so the message is identical whatever the operator
+  // configured — it reveals only "your value equals the published default",
+  // which IS the finding. Pinned so nobody "fixes" the leak test by deleting
+  // the MinIO rule, and so nobody mistakes this string for an echo.
+  const broken = healthyMiddleware();
+  broken.dotenvVars!.MINIO_SECRET_KEY = 'minioadmin';
+
+  const report = renderStartupAssertions(assertCanRestart([broken]));
+
+  assert.match(report, /MINIO_SECRET_KEY/);
+  assert.match(report, /minioadmin/);
+});
