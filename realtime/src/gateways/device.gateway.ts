@@ -17,6 +17,14 @@ import { PlaylistService } from '../services/playlist.service';
 import { NotificationService } from '../services/notification.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { DatabaseService } from '../database/database.service';
+// T2 — the SINGLE resolver + wire serializer both delivery channels use, so the
+// realtime push and the device pull (GET /devices/me/content) can never disagree.
+import {
+  resolveEffectiveContent,
+  serializeDeviceContent,
+  contentVersion,
+  type DeviceContentPayload,
+} from '@vizora/database';
 import { StorageService } from '../storage/storage.service';
 import { WsValidationPipe } from './pipes/ws-validation.pipe';
 import {
@@ -54,11 +62,7 @@ import {
   authenticateDeviceHandshake,
   DeviceHandshakePayload,
 } from './device-handshake-auth';
-import {
-  redactDeviceContentMetadata,
-  redactDevicePayload,
-  redactDevicePlaylist,
-} from '../services/device-content-payload';
+import { redactDevicePlaylist } from '../services/device-content-payload';
 
 interface DevicePayload {
   sub: string; // device ID
@@ -1148,29 +1152,13 @@ export class DeviceGateway
       const deliveryStatus = await this.deliverPendingPlaylist(client, deviceId);
       if (deliveryStatus !== 'none' && deliveryStatus !== 'skipped') return;
 
-      this.logger.debug(`Fetching playlist for device: ${deviceId}`);
+      // Config (qrOverlay from display metadata). Lighter fetch — the content itself
+      // now comes from the shared resolver below, not a currentPlaylist include.
       const display = await this.databaseService.display.findUnique({
         where: { id: deviceId },
-        include: {
-          currentPlaylist: {
-            include: {
-              items: {
-                include: {
-                  content: true,
-                },
-                orderBy: {
-                  order: 'asc',
-                },
-              },
-            },
-          },
-        },
+        select: { metadata: true },
       });
-
-      // Extract qrOverlay from display metadata for initial config
       const displayMetadata = (display?.metadata as Record<string, any>) || {};
-
-      // Send initial configuration including qrOverlay
       client.emit('config', {
         heartbeatInterval: 15000, // 15 seconds
         cacheSize: 524288000, // 500MB
@@ -1178,60 +1166,33 @@ export class DeviceGateway
         qrOverlay: displayMetadata.qrOverlay || null,
       });
 
-      this.logger.debug(`Display found: ${!!display}, hasPlaylist: ${!!display?.currentPlaylist}, playlistId: ${display?.currentPlaylistId || 'none'}`);
+      // T2 — resolve the AUTHORITATIVE effective content (active schedule ?? current
+      // playlist) via the SAME resolver + serializer the pull endpoint
+      // (GET /devices/me/content) uses, so this push and that pull are byte-identical
+      // at the wire and the device's shouldApplyContent makes the same decision on
+      // either channel. This closes C-7 on the push path (schedule content is now
+      // delivered on connect, which the currentPlaylist-only fetch never did), and by
+      // resolving the DB truth on EVERY (re)connect it delivers the authoritative
+      // content without depending on a best-effort pending queue (Finding-2 strand).
+      //
+      // Layout zones (PD-9) are resolved INSIDE the shared resolver, so layouts are
+      // identical on both channels — this replaces the realtime-only
+      // resolveLayoutContent that made push != pull for layouts.
+      const effective = await resolveEffectiveContent(
+        this.databaseService,
+        deviceId,
+        orgId,
+        new Date(),
+      );
+      const payload = serializeDeviceContent(effective, {
+        contentBaseUrl: process.env.API_BASE_URL || 'http://localhost:3000',
+      });
 
-      if (display?.currentPlaylist) {
-        // Transform playlist to the format expected by the display client
-        // Content URLs use the API base path — devices authenticate via
-        // Authorization header with their stored JWT, not via URL query params
-        const resolvedItems = await Promise.all(
-          display.currentPlaylist.items.map(async (item: any) => {
-            const resolvedUrl = this.resolveContentUrl(item);
-            const baseItem = {
-              id: item.id,
-              contentId: item.contentId,
-              duration: item.duration || 10,
-              order: item.order,
-              content: item.content ? {
-                id: item.content.id,
-                name: item.content.name,
-                type: item.content.type,
-                url: resolvedUrl,
-                thumbnail: item.content.thumbnail,
-                mimeType: item.content.mimeType,
-                duration: item.content.duration,
-                metadata: redactDeviceContentMetadata(item.content.metadata),
-              } : null,
-            };
-
-            // Resolve layout content inline so devices receive self-contained data
-            if (baseItem.content?.type === 'layout') {
-              baseItem.content = await this.resolveLayoutContent(baseItem.content, orgId);
-            }
-
-            return baseItem;
-          }),
-        );
-
-        const playlist = redactDevicePlaylist({
-          id: display.currentPlaylist.id,
-          name: display.currentPlaylist.name,
-          items: resolvedItems,
-          totalDuration: display.currentPlaylist.items.reduce(
-            (sum: number, item: any) => sum + (item.duration || 10),
-            0
-          ),
-          loopPlaylist: true,
-        });
-
-        client.emit('playlist:update', {
-          playlist,
-          timestamp: new Date().toISOString(),
-        });
-
-        this.logger.log(`Sent current playlist to device: ${deviceId} (playlist: ${display.currentPlaylist.name})`);
+      if (payload.playlist) {
+        client.emit('playlist:update', payload);
+        this.logger.log(`Sent effective content (source=${payload.source}) to device: ${deviceId} (playlist: ${payload.playlist.name})`);
       } else {
-        this.logger.log(`Device ${deviceId} has no assigned playlist`);
+        this.logger.log(`Device ${deviceId} has no effective content`);
       }
     } catch (playlistError: unknown) {
       const playlistErrorMsg = playlistError instanceof Error ? playlistError.stack || playlistError.message : 'Unknown error';
@@ -1952,8 +1913,15 @@ export class DeviceGateway
       return 'skipped';
     }
 
+    // Carry a `version` so the device applies this through the same version-wins gate
+    // as the other two channels instead of the legacy signature fallback. Computed with
+    // the SHARED contentVersion, so a queued snapshot and a freshly resolved payload of
+    // the same content produce the same stamp. This queue is a best-effort optimisation:
+    // its correctness is backstopped by sendInitialState resolving authoritative truth
+    // on this same connect.
     const result = await this.emitWithDeliveryAck(client, 'playlist:update', {
       playlist: safePendingPlaylist,
+      version: contentVersion(safePendingPlaylist as never, null),
       timestamp: new Date().toISOString(),
     });
 
@@ -2054,21 +2022,57 @@ export class DeviceGateway
 
   // Admin methods (called from API)
   async sendPlaylistUpdate(deviceId: string, playlist: Playlist): Promise<{ delivered: boolean; reason?: string }> {
-    // Resolve minio:// URLs to API-served URLs before sending to device
-    // Devices authenticate content requests via Authorization header with their stored JWT
-    const resolvedPlaylist = redactDevicePlaylist({
-      ...playlist,
-      items: (playlist.items || []).map((item: PlaylistContentItem) => {
-        const resolvedUrl = this.resolveContentUrl(item);
-        return {
-          ...item,
-          content: item.content ? {
-            ...item.content,
-            url: resolvedUrl,
-          } : item.content,
-        };
-      }),
-    });
+    // T2 — a LIVE push goes through the SAME resolver + serializer as the connect-time
+    // push and the device pull, so every channel agrees on both the content and its
+    // `version`. Without this, an assignment pushed while a schedule is active would
+    // send raw currentPlaylist and override the schedule until the next pull
+    // (pending-decisions.md follow-up #3).
+    //
+    // The device's version-wins gate needs a `version` on the wire or it falls back to
+    // the legacy signature path, so attaching it here is what makes version-wins live
+    // on the push channel at all.
+    let payload: DeviceContentPayload | null = null;
+    try {
+      const display = await this.databaseService.display.findUnique({
+        where: { id: deviceId },
+        select: { organizationId: true },
+      });
+      if (display?.organizationId) {
+        const effective = await resolveEffectiveContent(
+          this.databaseService,
+          deviceId,
+          display.organizationId,
+          new Date(),
+        );
+        if (effective.playlist) {
+          payload = serializeDeviceContent(effective, {
+            contentBaseUrl: process.env.API_BASE_URL || 'http://localhost:3000',
+          });
+        }
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      this.logger.warn(`sendPlaylistUpdate: resolver failed for device ${deviceId}, falling back to the supplied playlist: ${message}`);
+    }
+
+    // Fallback: the resolver found nothing (or threw) — push what the caller supplied
+    // rather than dropping the update. Keeps the pre-T2 behaviour as the floor.
+    const resolvedPlaylist = payload
+      ? (payload.playlist as unknown as Playlist)
+      : redactDevicePlaylist({
+          ...playlist,
+          items: (playlist.items || []).map((item: PlaylistContentItem) => {
+            const resolvedUrl = this.resolveContentUrl(item);
+            return {
+              ...item,
+              content: item.content ? {
+                ...item.content,
+                url: resolvedUrl,
+              } : item.content,
+            };
+          }),
+        });
+    const resolvedVersion = payload?.version ?? contentVersion(resolvedPlaylist as never, null);
 
     // Get all sockets in the device room
     const roomName = `device:${deviceId}`;
@@ -2088,7 +2092,12 @@ export class DeviceGateway
     let failureReason = 'ack_timeout';
     for (const socket of sockets) {
       const result = await this.emitWithDeliveryAck(socket as any, 'playlist:update', {
+        // Same envelope keys as the connect-time push (source/version/playlist), so the
+        // two channels are inspectable as one shape. `timestamp` is retained for the
+        // existing delivery-ack logging contract.
+        source: payload?.source ?? 'currentPlaylist',
         playlist: resolvedPlaylist,
+        version: resolvedVersion,
         timestamp: new Date().toISOString(),
       });
       if (result.delivered) {
@@ -2405,102 +2414,4 @@ export class DeviceGateway
     this.logger.log(`Sent QR overlay update to ${sockets.length} active socket(s) for device: ${deviceId}`);
   }
 
-  /**
-   * Resolve layout content by fetching all zone playlists and content inline.
-   * Returns a self-contained layout object that devices can render without
-   * additional API calls.
-   */
-  private async resolveLayoutContent(content: any, organizationId: string): Promise<any> {
-    const metadata = (redactDeviceContentMetadata(content.metadata) as Record<string, any>) || {};
-    const zones = metadata.zones || [];
-
-    const resolvedZones = await Promise.all(
-      zones.map(async (zone: any) => {
-        const resolved: any = { ...zone };
-
-        // Resolve playlist content for zone
-        if (zone.playlistId) {
-          try {
-            const playlist = await this.databaseService.playlist.findFirst({
-              where: { id: zone.playlistId, organizationId },
-              include: {
-                items: {
-                  include: { content: true },
-                  orderBy: { order: 'asc' },
-                },
-              },
-            });
-
-            if (playlist) {
-              resolved.resolvedPlaylist = {
-                id: playlist.id,
-                name: playlist.name,
-                items: (playlist.items || []).map((item: any) => {
-                  const resolvedUrl = this.resolveContentUrl(item);
-                  return {
-                    id: item.id,
-                    contentId: item.contentId,
-                    duration: item.duration || 10,
-                    order: item.order,
-                    content: item.content ? {
-                      id: item.content.id,
-                      name: item.content.name,
-                      type: item.content.type,
-                      url: resolvedUrl,
-                      thumbnail: item.content.thumbnail,
-                      mimeType: item.content.mimeType,
-                      duration: item.content.duration,
-                    } : null,
-                  };
-                }),
-              };
-            }
-          } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            this.logger.warn(`Failed to resolve playlist ${zone.playlistId} for layout zone ${zone.id}: ${errorMessage}`);
-          }
-        }
-
-        // Resolve single content for zone
-        if (zone.contentId) {
-          try {
-            const zoneContent = await this.databaseService.content.findFirst({
-              where: { id: zone.contentId, organizationId },
-            });
-
-            if (zoneContent) {
-              const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
-              let contentUrl = zoneContent.url || '';
-              if (contentUrl.startsWith('minio://')) {
-                contentUrl = `${apiBaseUrl}/api/v1/device-content/${zoneContent.id}/file`;
-              }
-
-              resolved.resolvedContent = {
-                id: zoneContent.id,
-                name: zoneContent.name,
-                type: zoneContent.type,
-                url: contentUrl,
-                thumbnail: zoneContent.thumbnail,
-                mimeType: zoneContent.mimeType,
-                duration: zoneContent.duration,
-              };
-            }
-          } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            this.logger.warn(`Failed to resolve content ${zone.contentId} for layout zone ${zone.id}: ${errorMessage}`);
-          }
-        }
-
-        return resolved;
-      }),
-    );
-
-    return redactDevicePayload({
-      ...content,
-      metadata: {
-        ...metadata,
-        zones: resolvedZones,
-      },
-    });
-  }
 }

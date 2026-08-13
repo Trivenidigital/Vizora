@@ -304,6 +304,14 @@ export class PlaylistsService {
       },
     });
 
+    // Touch the parent Playlist row so the device content `version` stays
+    // monotonic on in-place item edits — contentVersion reads playlist.updatedAt,
+    // and PlaylistItem has no updatedAt of its own.
+    await this.db.playlist.updateMany({
+      where: { id: playlistId, organizationId },
+      data: { updatedAt: new Date() },
+    });
+
     // Notify displays about the playlist change
     this.notifyPlaylistChangeAfterItemUpdate(organizationId, playlistId);
 
@@ -321,6 +329,14 @@ export class PlaylistsService {
     if (result.count === 0) {
       throw new NotFoundException('Playlist item not found');
     }
+
+    // Touch the parent Playlist row so the device content `version` stays
+    // monotonic on in-place item edits — contentVersion reads playlist.updatedAt,
+    // and PlaylistItem has no updatedAt of its own.
+    await this.db.playlist.updateMany({
+      where: { id: playlistId, organizationId },
+      data: { updatedAt: new Date() },
+    });
 
     const updatedItem = await this.db.playlistItem.findFirst({
       where: { id: itemId, playlistId },
@@ -343,6 +359,15 @@ export class PlaylistsService {
     if (result.count === 0) {
       throw new NotFoundException('Playlist item not found');
     }
+
+    // Touch the parent Playlist row so the device content `version` stays
+    // monotonic — a deleted item can't refresh itself, so this parent bump is the
+    // ONLY thing that moves the version on removal (contentVersion reads
+    // playlist.updatedAt).
+    await this.db.playlist.updateMany({
+      where: { id: playlistId, organizationId },
+      data: { updatedAt: new Date() },
+    });
 
     const deletedItem = { id: itemId, playlistId };
 
@@ -411,6 +436,15 @@ export class PlaylistsService {
           data: { order: i },
         });
       }
+
+      // Touch the parent Playlist row so the device content `version` stays
+      // monotonic on reorder (contentVersion reads playlist.updatedAt). Kept
+      // inside the transaction with the item writes so the version and the new
+      // order commit atomically.
+      await tx.playlist.updateMany({
+        where: { id: playlistId, organizationId },
+        data: { updatedAt: new Date() },
+      });
     });
 
     // Return updated playlist
