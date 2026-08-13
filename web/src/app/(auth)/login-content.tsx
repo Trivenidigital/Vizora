@@ -175,7 +175,7 @@ export default function LoginContent() {
           </div>
           <p className="text-[var(--foreground-tertiary)] text-sm">
             Welcome back to your display management platform.{' '}
-            <span className="text-[#00E5A0] font-medium">2,500+ organizations trust Vizora.</span>
+            <span className="text-[var(--primary-ink)] font-medium">2,500+ organizations trust Vizora.</span>
           </p>
         </div>
 
@@ -191,7 +191,7 @@ export default function LoginContent() {
             <div className={`flex items-start gap-3 px-4 py-3 rounded-lg mb-6 ${
               error.toLowerCase().includes('locked')
                 ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
-                : 'bg-[var(--error)]/10 border border-[var(--error)]/30 text-[var(--error)]'
+                : 'bg-[var(--error)]/10 border border-[var(--error)]/30 text-[var(--error-ink)]'
             }`}>
               <svg className="w-5 h-5 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
                 {error.toLowerCase().includes('locked') ? (
@@ -264,7 +264,7 @@ export default function LoginContent() {
                 aria-invalid={!!errors.password}
               />
               {errors.password && (
-                <p className="mt-1 text-xs text-[var(--error)]" role="alert">
+                <p className="mt-1 text-xs text-[var(--error-ink)]" role="alert">
                   {errors.password}
                 </p>
               )}

@@ -30,7 +30,7 @@ const ChartErrorState: React.FC<{ message: string; detail?: string | null }> = (
  role="alert"
  className="h-80 flex flex-col items-center justify-center text-center text-[var(--foreground-secondary)] px-6"
  >
- <Icon name="error" size="lg" className="mb-3 text-[var(--error)]" />
+ <Icon name="error" size="lg" className="mb-3 text-[var(--error-ink)]" />
  <p className="text-sm font-medium text-[var(--foreground)]">{message}</p>
  {detail && (
  <p className="mt-2 text-xs text-[var(--foreground-tertiary)] max-w-md">
@@ -92,9 +92,9 @@ const KPICard: React.FC<KPICardProps> = ({
  <p
  className={`text-sm mt-2 ${
  changeType === 'positive'
- ? 'text-[var(--success)]'
+ ? 'text-[var(--success-ink)]'
  : changeType === 'negative'
- ? 'text-[var(--error)]'
+ ? 'text-[var(--error-ink)]'
  : 'text-[var(--accent-warm)]'
  }`}
  >
@@ -357,7 +357,7 @@ export default function AnalyticsClient() {
  className="bg-[var(--error)]/10 border border-[var(--error)]/30 rounded-lg px-4 py-3 flex flex-col gap-2"
  >
  <div className="flex items-center gap-2">
- <Icon name="error" size="sm" className="text-[var(--error)]" />
+ <Icon name="error" size="sm" className="text-[var(--error-ink)]" />
  <span className="text-sm font-medium text-[var(--foreground)]">
  Analytics data unavailable
  </span>

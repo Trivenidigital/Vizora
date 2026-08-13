@@ -24,7 +24,7 @@ export default function PasswordChecklist({ password }: PasswordChecklistProps) 
           <div
             key={req.label}
             className={`flex items-center gap-2 text-xs transition-colors duration-200 ${
-              met ? 'text-[var(--success)]' : 'text-[var(--foreground-tertiary)]'
+              met ? 'text-[var(--success-ink)]' : 'text-[var(--foreground-tertiary)]'
             }`}
           >
             <span
@@ -45,7 +45,7 @@ export default function PasswordChecklist({ password }: PasswordChecklistProps) 
         );
       })}
       {allMet && (
-        <p className="text-xs text-[var(--success)] font-medium mt-1 md:mt-0 md:ml-1">Strong password</p>
+        <p className="text-xs text-[var(--success-ink)] font-medium mt-1 md:mt-0 md:ml-1">Strong password</p>
       )}
     </div>
   );

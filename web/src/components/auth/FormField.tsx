@@ -102,7 +102,7 @@ export default function FormField({
           aria-describedby={error ? `${id}-error` : undefined}
         />
         {isValid && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--success)]">
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--success-ink)]">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M3 8L6.5 11.5L13 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -110,7 +110,7 @@ export default function FormField({
         )}
       </div>
       {error && (
-        <p id={`${id}-error`} className="mt-1 text-xs text-[var(--error)]" role="alert">
+        <p id={`${id}-error`} className="mt-1 text-xs text-[var(--error-ink)]" role="alert">
           {error}
         </p>
       )}

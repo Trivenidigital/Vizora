@@ -50,7 +50,7 @@ export default function MfaChallengeForm({
       </p>
 
       {error && (
-        <div className="flex items-start gap-3 px-4 py-3 rounded-lg mb-6 bg-[var(--error)]/10 border border-[var(--error)]/30 text-[var(--error)]">
+        <div className="flex items-start gap-3 px-4 py-3 rounded-lg mb-6 bg-[var(--error)]/10 border border-[var(--error)]/30 text-[var(--error-ink)]">
           <p className="text-sm">{error}</p>
         </div>
       )}
