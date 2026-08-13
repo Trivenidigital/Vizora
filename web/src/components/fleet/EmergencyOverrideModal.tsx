@@ -150,7 +150,7 @@ export default function EmergencyOverrideModal({ isOpen, onClose, organizationId
                 key={option.value}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition ${
                   targetType === option.value
-                    ? 'border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)]'
+                    ? 'border-[var(--primary-ink)] bg-[var(--primary)]/10 text-[var(--primary-ink)]'
                     : 'border-[var(--border)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
                 }`}
               >
@@ -206,7 +206,10 @@ export default function EmergencyOverrideModal({ isOpen, onClose, organizationId
                 onClick={() => setDuration(opt.value)}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition ${
                   duration === opt.value
-                    ? 'bg-[var(--primary)] text-white'
+                    // Dark ink on the neon fill, matching ViewToggle and
+                    // .eh-filter-pill-active. White on #00E5A0 is 1.65:1 — it
+                    // failed in BOTH themes, not just light.
+                    ? 'bg-[var(--primary)] text-[#061A21]'
                     : 'bg-[var(--background)] text-[var(--foreground-secondary)] border border-[var(--border)] hover:bg-[var(--surface-hover)]'
                 }`}
               >

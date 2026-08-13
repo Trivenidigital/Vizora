@@ -397,15 +397,15 @@ export default function RegisterContent() {
                   setAgreeTerms(e.target.checked);
                   if (errors.agreeTerms) setErrors((prev) => ({ ...prev, agreeTerms: '' }));
                 }}
-                className="w-4 h-4 mt-0.5 rounded border-[var(--border)] bg-[var(--background)] text-[var(--primary)] focus:ring-[var(--primary)] focus:ring-2 accent-[#00E5A0] cursor-pointer"
+                className="w-4 h-4 mt-0.5 rounded border-[var(--border)] bg-[var(--background)] text-[var(--primary-ink)] focus:ring-[var(--primary-ink)] focus:ring-2 accent-[#00E5A0] cursor-pointer"
               />
               <label htmlFor="agreeTerms" className="text-xs text-[var(--foreground-tertiary)] cursor-pointer select-none leading-relaxed">
                 I agree to the{' '}
-                <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-[var(--primary)] hover:underline">
+                <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-[var(--primary-ink)] hover:underline">
                   Terms of Service
                 </a>{' '}
                 and{' '}
-                <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-[var(--primary)] hover:underline">
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-[var(--primary-ink)] hover:underline">
                   Privacy Policy
                 </a>
               </label>
@@ -475,7 +475,7 @@ export default function RegisterContent() {
 
           <p className="text-center mt-4 lg:mt-3 text-sm text-[var(--foreground-secondary)]">
             Already have an account?{' '}
-            <Link href="/login" className="text-[var(--primary)] font-medium hover:underline">
+            <Link href="/login" className="text-[var(--primary-ink)] font-medium hover:underline">
               Log in
             </Link>
           </p>

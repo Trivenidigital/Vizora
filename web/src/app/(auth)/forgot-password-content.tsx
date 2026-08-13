@@ -193,12 +193,12 @@ export default function ForgotPasswordContent() {
               </div>
 
               <div className="mt-4 lg:mt-3 text-center space-y-3 auth-field-enter auth-field-enter-4">
-                <Link href="/login" className="text-sm text-[var(--foreground-secondary)] hover:text-[var(--primary)] transition-colors">
+                <Link href="/login" className="text-sm text-[var(--foreground-secondary)] hover:text-[var(--primary-ink)] transition-colors">
                   &larr; Back to Login
                 </Link>
                 <p className="text-sm text-[var(--foreground-tertiary)]">
                   Don&apos;t have an account?{' '}
-                  <Link href="/register" className="text-[var(--primary)] font-medium hover:underline">
+                  <Link href="/register" className="text-[var(--primary-ink)] font-medium hover:underline">
                     Sign up free
                   </Link>
                 </p>
@@ -224,13 +224,13 @@ export default function ForgotPasswordContent() {
                 type="button"
                 onClick={handleResend}
                 disabled={resendCooldown > 0 || loading}
-                className="text-sm text-[var(--primary)] font-medium hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
+                className="text-sm text-[var(--primary-ink)] font-medium hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
               >
                 {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Didn't receive it? Resend"}
               </button>
 
               <div className="mt-8">
-                <Link href="/login" className="text-sm text-[var(--foreground-secondary)] hover:text-[var(--primary)] transition-colors">
+                <Link href="/login" className="text-sm text-[var(--foreground-secondary)] hover:text-[var(--primary-ink)] transition-colors">
                   &larr; Back to Login
                 </Link>
               </div>

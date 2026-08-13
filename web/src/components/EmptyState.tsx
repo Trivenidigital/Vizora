@@ -44,7 +44,7 @@ export default function EmptyState({
   return (
     <div className="eh-empty-state eh-dash-card py-16 px-6 animate-[fadeIn_0.3s_ease-out]">
       <div className="w-14 h-14 bg-[rgba(0,229,160,0.08)] rounded-2xl flex items-center justify-center mb-5">
-        <Icon name={icon} size="2xl" className="text-[var(--primary)]" />
+        <Icon name={icon} size="2xl" className="text-[var(--primary-ink)]" />
       </div>
       <h3 className="eh-dash-subtitle text-lg mb-2">{title}</h3>
       <p className="text-sm text-[var(--foreground-secondary)] text-center max-w-sm mb-6">{description}</p>

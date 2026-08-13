@@ -316,7 +316,7 @@ export default function HelpPage() {
                       <Icon
                         name={category.icon}
                         size="md"
-                        className="text-[var(--primary)]"
+                        className="text-[var(--primary-ink)]"
                       />
                     </div>
                     <div className="text-left">

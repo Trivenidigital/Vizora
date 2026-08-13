@@ -134,7 +134,7 @@ export default function ResetPasswordContent() {
           {/* Loading state */}
           {pageState === 'loading' && (
             <div className="flex flex-col items-center justify-center py-16">
-              <svg className="animate-spin h-8 w-8 text-[var(--primary)] mb-4" viewBox="0 0 24 24" fill="none">
+              <svg className="animate-spin h-8 w-8 text-[var(--primary-ink)] mb-4" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
@@ -165,7 +165,7 @@ export default function ResetPasswordContent() {
                 Request a New Reset Link
               </Link>
               <div className="mt-6">
-                <Link href="/login" className="text-sm text-[var(--foreground-secondary)] hover:text-[var(--primary)] transition-colors">
+                <Link href="/login" className="text-sm text-[var(--foreground-secondary)] hover:text-[var(--primary-ink)] transition-colors">
                   &larr; Back to Login
                 </Link>
               </div>
@@ -310,7 +310,7 @@ export default function ResetPasswordContent() {
               </div>
 
               <div className="mt-4 lg:mt-3 text-center auth-field-enter auth-field-enter-5">
-                <Link href="/login" className="text-sm text-[var(--foreground-secondary)] hover:text-[var(--primary)] transition-colors">
+                <Link href="/login" className="text-sm text-[var(--foreground-secondary)] hover:text-[var(--primary-ink)] transition-colors">
                   &larr; Back to Login
                 </Link>
               </div>

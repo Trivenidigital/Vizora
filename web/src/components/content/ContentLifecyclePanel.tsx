@@ -309,7 +309,7 @@ export default function ContentLifecyclePanel({
             type="button"
             onClick={() => void loadVersions()}
             disabled={versionsLoading}
-            className="text-xs text-[var(--primary)] hover:underline disabled:opacity-50"
+            className="text-xs text-[var(--primary-ink)] hover:underline disabled:opacity-50"
           >
             Refresh
           </button>

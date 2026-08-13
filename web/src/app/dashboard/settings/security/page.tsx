@@ -95,7 +95,7 @@ export default function SecuritySettingsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <Link href="/dashboard/settings" className="text-sm text-[var(--foreground-tertiary)] hover:text-[var(--primary)]">
+        <Link href="/dashboard/settings" className="text-sm text-[var(--foreground-tertiary)] hover:text-[var(--primary-ink)]">
           ← Back to settings
         </Link>
         <h2 className="eh-dash-title font-sora text-2xl text-[var(--foreground)] mt-2">Security</h2>

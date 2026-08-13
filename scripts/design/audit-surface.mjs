@@ -104,13 +104,26 @@ const SCAN = ({ vw, isMobile }) => {
     const l1 = lum(a), l2 = lum(b);
     return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
   };
-  // Composite a possibly-translucent foreground over an opaque backdrop.
-  const over = (fg, bg) => ({
-    r: fg.r * fg.a + bg.r * (1 - fg.a),
-    g: fg.g * fg.a + bg.g * (1 - fg.a),
-    b: fg.b * fg.a + bg.b * (1 - fg.a),
-    a: 1,
-  });
+  /**
+   * Porter-Duff "source over", carrying a real result alpha.
+   *
+   * Returning a hardcoded `a: 1` would be correct only when the backdrop is
+   * already opaque. `effectiveBg` walks outward through possibly-translucent
+   * layers and stops once the accumulated alpha is opaque — with a fixed 1 it
+   * would stop after the FIRST translucent layer and report a colour composited
+   * against nothing, silently mis-measuring contrast on any tinted overlay
+   * (`bg-[var(--primary)]/10`, the sidebar active wash, modal scrims).
+   */
+  const over = (fg, bg) => {
+    const a = fg.a + bg.a * (1 - fg.a);
+    if (a === 0) return { r: 0, g: 0, b: 0, a: 0 };
+    return {
+      r: (fg.r * fg.a + bg.r * bg.a * (1 - fg.a)) / a,
+      g: (fg.g * fg.a + bg.g * bg.a * (1 - fg.a)) / a,
+      b: (fg.b * fg.a + bg.b * bg.a * (1 - fg.a)) / a,
+      a,
+    };
+  };
 
   const label = (el) => {
     const cls = typeof el.className === 'string' ? el.className : (el.className?.baseVal ?? '');
@@ -137,7 +150,11 @@ const SCAN = ({ vw, isMobile }) => {
       }
       node = node.parentElement;
     }
-    return { color: acc && acc.a >= 0.999 ? acc : { r: 255, g: 255, b: 255, a: 1 }, indeterminate: false };
+    // Ran out of ancestors while still translucent: whatever we accumulated is
+    // really sitting on the canvas, so composite it over white rather than
+    // discarding it and assuming plain white.
+    const canvas = { r: 255, g: 255, b: 255, a: 1 };
+    return { color: acc ? over(acc, canvas) : canvas, indeterminate: false };
   };
 
   const clipped = [];
@@ -236,7 +253,42 @@ const SCAN = ({ vw, isMobile }) => {
     }
   }
 
+  /* --- focus indicator ---
+   *
+   * Focus rings are not text, so the contrast pass above never sees them, and a
+   * ring bound to a FILL token can silently fall to 1.4:1 while every text run
+   * on the page still passes. WCAG 2.1 SC 1.4.11 wants >= 3:1 for non-text UI.
+   *
+   * `getPropertyValue` returns the *declared* value (`var(--primary-ink)`), so
+   * resolve it by letting the engine compute it on a throwaway element.
+   */
+  const focusRing = (() => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--focus-ring-color)';
+    probe.style.position = 'absolute';
+    probe.style.opacity = '0';
+    document.body.appendChild(probe);
+    const resolved = parse(getComputedStyle(probe).color);
+    probe.remove();
+    if (!resolved) return null;
+
+    const surfaces = [
+      ['body', parse(getComputedStyle(document.body).backgroundColor)],
+      ['card', (() => {
+        const card = document.querySelector('.eh-dash-card, [class*="surface"]');
+        return card ? parse(getComputedStyle(card).backgroundColor) : null;
+      })()],
+    ];
+    const worst = surfaces
+      .filter(([, c]) => c && c.a > 0)
+      .map(([where, c]) => ({ where, ratio: Math.round(ratio(resolved, c) * 100) / 100 }))
+      .sort((a, b) => a.ratio - b.ratio)[0];
+    if (!worst) return null;
+    return { color: getComputedStyle(document.documentElement).getPropertyValue('--focus-ring-color').trim(), ...worst, passes: worst.ratio >= 3 };
+  })();
+
   return {
+    focusRing,
     docScrollWidth: document.documentElement.scrollWidth,
     docClientWidth: document.documentElement.clientWidth,
     clipped: clipped.slice(0, 30),
@@ -340,6 +392,7 @@ for (const theme of THEMES) {
 
         report.push({ route, theme, viewport: vw, screenshot: file, consoleErrors, ...scan });
         const flags = [
+          scan.focusRing && !scan.focusRing.passes ? `focus-ring ${scan.focusRing.ratio}:1` : '',
           scan.clipped.length ? `${scan.clipped.length} clipped` : '',
           scan.contrast.length ? `${scan.contrast.length} contrast` : '',
           scan.touch.length ? `${scan.touch.length} touch` : '',

@@ -90,8 +90,8 @@ export default function FormField({
             error
               ? 'border-[var(--error)] focus:ring-[var(--error)]'
               : isValid
-                ? 'border-[var(--success)] focus:ring-[var(--primary)]'
-                : 'border-[var(--border)] focus:ring-[var(--primary)] hover:border-[var(--border-dark)]'
+                ? 'border-[var(--success)] focus:ring-[var(--primary-ink)]'
+                : 'border-[var(--border)] focus:ring-[var(--primary-ink)] hover:border-[var(--border-dark)]'
           }`}
           placeholder={placeholder}
           autoComplete={autoComplete}

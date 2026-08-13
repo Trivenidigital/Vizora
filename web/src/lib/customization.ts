@@ -135,8 +135,19 @@ export function readableInk(color: string, background: string, minRatio = 4.5): 
   if (!base || !bg) return color;
   if (contrastRatio(color, background) >= minRatio) return color;
 
-  // Blend toward whichever endpoint moves away from the background.
-  const target = relativeLuminance(bg) > 0.5 ? { r: 0, g: 0, b: 0 } : { r: 255, g: 255, b: 255 };
+  /*
+   * Blend toward whichever endpoint actually contrasts better, measured.
+   *
+   * The obvious test — `relativeLuminance(bg) > 0.5 ? black : white` — is
+   * wrong: the crossover where black stops beating white is at L ≈ 0.179, not
+   * 0.5. For any mid-tone background in [0.179, 0.5] that test picks white when
+   * black is strictly better, and since the loop below returns the endpoint if
+   * nothing clears the threshold, it would hand back the WORSE of the two.
+   */
+  const BLACK = { r: 0, g: 0, b: 0 };
+  const WHITE = { r: 255, g: 255, b: 255 };
+  const target =
+    contrastRatio('#000000', background) >= contrastRatio('#ffffff', background) ? BLACK : WHITE;
   for (let t = 0.05; t <= 1.0001; t += 0.05) {
     const candidate = toHex({
       r: base.r + (target.r - base.r) * t,

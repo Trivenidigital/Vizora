@@ -61,4 +61,18 @@ describe('readableInk', () => {
   it('returns the input unchanged when given a malformed colour', () => {
     expect(readableInk('not-a-colour', WHITE)).toBe('not-a-colour');
   });
+
+  it('picks the better endpoint on a mid-tone background', () => {
+    /*
+     * #808080 has relative luminance ~0.216. Choosing the blend direction with
+     * `luminance > 0.5 ? black : white` sends it toward WHITE, whose best
+     * possible ratio here is 3.95:1 — so the function could never reach AA and
+     * would return that failing colour anyway. Black reaches 5.32:1.
+     * Because the crossover is at L ~= 0.179, every background has at least one
+     * endpoint that clears 4.5, so this must always succeed.
+     */
+    const mid = '#808080';
+    expect(ratio('#FFFFFF', mid)).toBeLessThan(4.5); // the trap: white cannot get there
+    expect(ratio(readableInk('#00E5A0', mid), mid)).toBeGreaterThanOrEqual(4.5);
+  });
 });
