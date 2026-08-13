@@ -22,6 +22,7 @@ import {
   formatFingerprint,
   readPackagedOrigins,
   evaluatePackagedOrigins,
+  evaluateOriginsBaseline,
 } from './verify-display-apk.mjs';
 
 // Real fingerprints from the 2026-08-10 Gate B investigation.
@@ -79,12 +80,17 @@ test('formatFingerprint round-trips through normalizeFingerprint', () => {
   assert.equal(normalizeFingerprint(formatFingerprint(APK_1_3_10)), APK_1_3_10);
 });
 
-// ─── Compiled backend origins (vizora-tv#18) ─────────────────────────────────
+// ─── Compiled default origins (vizora-tv#18) ─────────────────────────────────
 //
-// The endpoint check is the only assertion in the gate that is not blind to what
-// the binary talks to. An APK aimed at the wrong environment has a valid package
-// id, a correct version, the right certificate and a perfectly good hash — so if
-// this check is wrong, nothing else catches it.
+// Scope: these check BUILD PROVENANCE — which origins were compiled into the
+// artifact as its defaults — not where a running device ends up pointed. The
+// client layers URL params, stored Preferences and the guarded update_config path
+// over DEFAULT_CONFIG at runtime. Do not let these tests be read as covering that.
+//
+// Within that scope this is the only assertion in the gate that is not blind to
+// the compiled origins. An APK built against the wrong environment has a valid
+// package id, a correct version, the right certificate and a perfectly good hash —
+// so if this check is wrong, nothing else catches it.
 //
 // These tests therefore include a NEGATIVE artifact-level case: a real zip is
 // built on disk with a deliberately mis-pointed origins marker and pushed through
@@ -251,4 +257,90 @@ test('the marker is read whether terser emitted single or double quotes', () => 
       assert.deepEqual(readPackagedOrigins(apk).origins, PINNED_ORIGINS, `quote style ${quote} should parse`);
     });
   }
+});
+
+// ─── Partial pins and partial markers must fail closed ───────────────────────
+//
+// The first draft of evaluatePackagedOrigins decided "a pin exists" with .some()
+// and then compared only the keys that happened to be present. A releaseOrigins
+// block carrying just `api` therefore PASSED on `api` alone while `realtime` and
+// `dashboard` dropped silently out of the assertion — a check reporting green
+// while covering a third of what it claims. These pin that shut.
+
+test('NEGATIVE: a pin missing realtime is rejected, not silently narrowed', () => {
+  const partial = { api: PINNED_ORIGINS.api, dashboard: PINNED_ORIGINS.dashboard };
+  const verdict = evaluatePackagedOrigins(partial, PINNED_ORIGINS, null, true);
+  assert.equal(verdict.pass, false, 'a partial pin must not pass on the keys it does contain');
+  assert.match(verdict.detail, /INCOMPLETE PIN/);
+  assert.match(verdict.detail, /realtime/);
+});
+
+test('NEGATIVE: a pin missing dashboard is rejected', () => {
+  const partial = { api: PINNED_ORIGINS.api, realtime: PINNED_ORIGINS.realtime };
+  const verdict = evaluatePackagedOrigins(partial, PINNED_ORIGINS, null, true);
+  assert.equal(verdict.pass, false);
+  assert.match(verdict.detail, /INCOMPLETE PIN/);
+  assert.match(verdict.detail, /dashboard/);
+});
+
+test('NEGATIVE: an empty-string pinned value counts as missing', () => {
+  const verdict = evaluatePackagedOrigins({ ...PINNED_ORIGINS, realtime: '' }, PINNED_ORIGINS, null, true);
+  assert.equal(verdict.pass, false);
+  assert.match(verdict.detail, /INCOMPLETE PIN/);
+});
+
+test('NEGATIVE: a partial pin fails even outside publishing', () => {
+  const partial = { api: PINNED_ORIGINS.api };
+  const verdict = evaluatePackagedOrigins(partial, PINNED_ORIGINS, null, false);
+  assert.equal(verdict.pass, false, 'malformed pin data is not an absent pin — it never SKIPs');
+  assert.notEqual(verdict.skipped, true);
+});
+
+test('NEGATIVE: a partial pin whose present key MISMATCHES also fails', () => {
+  const partial = { api: 'https://api.vizora.io' };
+  const verdict = evaluatePackagedOrigins(partial, PINNED_ORIGINS, null, true);
+  assert.equal(verdict.pass, false);
+});
+
+test('NEGATIVE: an artifact marker missing one origin is rejected', () => {
+  const incomplete = { api: PINNED_ORIGINS.api, realtime: PINNED_ORIGINS.realtime };
+  withApk([{ name: 'assets/public/assets/index-abc.js', body: bundleWith(incomplete) }], apk => {
+    const read = readPackagedOrigins(apk);
+    assert.deepEqual(read.origins, incomplete, 'the truncated marker is still readable');
+
+    const verdict = evaluatePackagedOrigins(PINNED_ORIGINS, read.origins, read.problem, true);
+    assert.equal(verdict.pass, false, 'a marker missing dashboard must not pass on the other two');
+    assert.match(verdict.detail, /INCOMPLETE MARKER/);
+    assert.match(verdict.detail, /dashboard/);
+  });
+});
+
+test('a complete pin against a complete marker still passes', () => {
+  const verdict = evaluatePackagedOrigins(PINNED_ORIGINS, PINNED_ORIGINS, null, true);
+  assert.equal(verdict.pass, true);
+});
+
+// ─── Release-over-release origins baseline ───────────────────────────────────
+
+test('origins baseline: absent baseline is SKIP, never a silent pass', () => {
+  const verdict = evaluateOriginsBaseline(null, PINNED_ORIGINS);
+  assert.equal(verdict.skipped, true);
+  assert.match(verdict.detail, /SKIPPED/);
+});
+
+test('origins baseline: a partial baseline is treated as absent, not as a pass', () => {
+  const verdict = evaluateOriginsBaseline({ api: PINNED_ORIGINS.api }, PINNED_ORIGINS);
+  assert.equal(verdict.skipped, true);
+});
+
+test('origins baseline: unchanged origins pass', () => {
+  assert.equal(evaluateOriginsBaseline(PINNED_ORIGINS, PINNED_ORIGINS).pass, true);
+});
+
+test('NEGATIVE: origins baseline catches a silent environment move between releases', () => {
+  const moved = { ...PINNED_ORIGINS, api: 'https://api.vizora.io' };
+  const verdict = evaluateOriginsBaseline(PINNED_ORIGINS, moved);
+  assert.equal(verdict.pass, false);
+  assert.match(verdict.detail, /CHANGED since the published release/);
+  assert.match(verdict.detail, /api\.vizora\.io/);
 });

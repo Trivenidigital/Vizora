@@ -94,10 +94,12 @@ fi
 # signature verification cannot run. keytool alone reads the v1 block only and
 # would miss a v2/v3 block signed with a different key.
 #
-# --require-pinned-origins does the same for the backend the APK talks to. Every
-# other check is endpoint-blind: a build aimed at the wrong environment has a
-# valid package id, a correct version, the right certificate and a good hash.
-say "Verifying APK identity, signing key, backend origins and integrity"
+# --require-pinned-origins does the same for the DEFAULT origins the APK was
+# compiled with (build provenance — runtime config can still be overridden on the
+# device). Every other check is origin-blind: a build made against the wrong
+# environment has a valid package id, a correct version, the right certificate and
+# a good hash.
+say "Verifying APK identity, signing key, compiled origins and integrity"
 node "$REPO_ROOT/scripts/release/verify-display-apk.mjs" \
   --apk "$APK" \
   --against "$RELEASE_JSON" \
@@ -224,5 +226,8 @@ cat <<EOF
 
   Remaining manual step: move the verified 'candidate' block in
   deploy/tv/release.json to 'published', commit, and open a PR. That block is
-  the baseline the NEXT release's signing certificate is compared against.
+  the baseline the NEXT release is compared against — its signing certificate,
+  its versionCode, and its compiledOrigins. Carry compiledOrigins across with
+  the rest: leaving it null keeps the origins continuity check permanently
+  SKIPPED, which looks like coverage without being any.
 EOF

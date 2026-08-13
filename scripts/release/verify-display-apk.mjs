@@ -37,6 +37,14 @@ import { pathToFileURL } from 'node:url';
 
 const DEFAULT_PACKAGE = 'com.vizora.display';
 
+/**
+ * The three compiled-in backend origins every release must pin and record.
+ *
+ * Named once so "all three are asserted" cannot drift into "whichever the data
+ * happened to contain" — the failure mode this list exists to prevent.
+ */
+const ORIGIN_KEYS = ['api', 'realtime', 'dashboard'];
+
 // ─── Binary AndroidManifest.xml (AXML) parsing ───────────────────────────────
 // Format reference: AOSP frameworks/base/libs/androidfw/include/androidfw/ResourceTypes.h
 
@@ -176,12 +184,19 @@ function listEntries(apkPath) {
 }
 
 /**
- * Read the backend origins the bundle was COMPILED with, out of the packaged APK.
+ * Read the DEFAULT backend origins the bundle was COMPILED with, out of the APK.
  *
- * This is the check that makes the endpoint a property of the artifact instead of
- * a property of the build machine. Every other assertion here — package id,
- * version, certificate, hash — is indifferent to what the binary talks to, which
- * is how a mis-pointed APK could previously have passed the entire gate.
+ * Scope, stated precisely: this proves build provenance — which origins were
+ * compiled into the artifact as its defaults — and nothing more. It is NOT proof
+ * of where a running device ends up pointed. The client seeds `DEFAULT_CONFIG`
+ * from these values and then applies URL parameters and stored Preferences over
+ * them, and the guarded `update_config` path can move a paired device to another
+ * host in the same registrable domain. Effective runtime destination is a separate
+ * question with its own controls; do not let this check be read as covering it.
+ *
+ * What it does close is the original hole: every other assertion here — package
+ * id, version, certificate, hash — is indifferent to which origins were compiled
+ * in, which is how an APK built against the wrong environment passed the gate.
  *
  * Reads the `__VIZORA_RELEASE_ORIGINS__` marker that vizora-tv stamps into the
  * bundle at build time. Deliberately NOT a scan for bare URLs: `api` and
@@ -283,19 +298,44 @@ export function readPackagedOrigins(apkPath, deps = {}) {
  * @param required true when publishing (--require-pinned-origins)
  */
 export function evaluatePackagedOrigins(pinned, actual, problem, required) {
-  const name = 'compiled backend origins match the pinned expectation';
-  const keys = ['api', 'realtime', 'dashboard'];
-  const hasPin = pinned && keys.some(k => pinned[k]);
+  const name = 'compiled default origins match the pinned expectation';
+  const keys = ORIGIN_KEYS;
 
-  if (!hasPin) {
+  const isFilled = (obj, k) => typeof obj?.[k] === 'string' && obj[k].length > 0;
+  const pinnedKeys = keys.filter(k => isFilled(pinned, k));
+
+  // A PARTIAL pin is malformed data, not an absent one, and it fails closed in
+  // every mode — including outside publishing, exactly like a malformed cert pin.
+  //
+  // This is the shape of the bug that shipped in the first draft of this function:
+  // "a pin exists" was decided with .some(), then only the keys that happened to be
+  // present were compared. A releaseOrigins block carrying just `api` therefore
+  // passed on `api` alone while `realtime` and `dashboard` silently dropped out of
+  // the assertion — the check reporting PASS while covering one third of what it
+  // claims. Requiring all three up front is what makes "all three are asserted" a
+  // property of the code rather than of the data it happens to be handed.
+  if (pinnedKeys.length > 0 && pinnedKeys.length < keys.length) {
+    const missing = keys.filter(k => !isFilled(pinned, k));
+    return {
+      name,
+      pass: false,
+      detail:
+        `INCOMPLETE PIN — releaseOrigins must pin all of ${keys.join(', ')}; ` +
+        `missing or empty: ${missing.join(', ')}.\n        ` +
+        `A partial pin drops the unpinned origins from the comparison entirely, so a ` +
+        `mis-pointed one would pass unnoticed. Fix the pin rather than publishing against it.`,
+    };
+  }
+
+  if (pinnedKeys.length === 0) {
     if (required) {
       return {
         name,
         pass: false,
         detail:
           'NO ORIGINS PINNED — releaseOrigins is missing from release.json. Publishing without ' +
-          'a pinned expectation is how an APK aimed at the wrong backend reaches customers: every ' +
-          'other check here passes regardless of what the binary talks to.',
+          'a pinned expectation is how an APK compiled against the wrong backend reaches ' +
+          'customers: every other check here passes regardless of which origins it was built with.',
       };
     }
     return {
@@ -310,23 +350,81 @@ export function evaluatePackagedOrigins(pinned, actual, problem, required) {
     return { name, pass: false, detail: `could not read the compiled origins: ${problem}` };
   }
 
+  // The artifact must carry all three too. A marker missing a key is as unverifiable
+  // as a marker missing entirely, and must not pass on the strength of the others.
+  const absent = keys.filter(k => !isFilled(actual, k));
+  if (absent.length) {
+    return {
+      name,
+      pass: false,
+      detail:
+        `INCOMPLETE MARKER — the APK records no value for: ${absent.join(', ')}. ` +
+        `All of ${keys.join(', ')} must be present to verify the build.`,
+    };
+  }
+
   const mismatches = keys
-    .filter(k => pinned[k])
     .filter(k => actual[k] !== pinned[k])
-    .map(k => `${k}: apk has ${actual[k] ?? '(absent)'}, pin expects ${pinned[k]}`);
+    .map(k => `${k}: apk compiled with ${actual[k]}, pin expects ${pinned[k]}`);
 
   if (mismatches.length) {
     return {
       name,
       pass: false,
       detail:
-        `MISMATCH — this APK talks to a different backend than the pin allows.\n        ` +
+        `MISMATCH — this APK was compiled against different origins than the pin allows.\n        ` +
         mismatches.join('\n        ') +
-        `\n        Do not publish it: customers installing this build would reach the wrong environment.`,
+        `\n        Do not publish it: installs would default to the wrong environment.`,
     };
   }
 
-  return { name, pass: true, detail: keys.filter(k => pinned[k]).map(k => `${k}=${actual[k]}`).join('  ') };
+  return { name, pass: true, detail: keys.map(k => `${k}=${actual[k]}`).join('  ') };
+}
+
+/**
+ * Compare the artifact's compiled origins against the previously PUBLISHED
+ * artifact's, so a change of backend is a deliberate, visible act rather than
+ * something that slips through between releases — the same role
+ * `signingCertSha256` plays for the key.
+ *
+ * Absent baseline is an explicit SKIP, never a silent pass: releases predating the
+ * origins marker have nothing to compare against, and that must not read as a
+ * continuity check that ran and succeeded.
+ */
+export function evaluateOriginsBaseline(baselineOrigins, actual) {
+  const name = 'compiled default origins match the previously published release';
+  const keys = ORIGIN_KEYS;
+  const isFilled = (obj, k) => typeof obj?.[k] === 'string' && obj[k].length > 0;
+
+  if (!baselineOrigins || !keys.every(k => isFilled(baselineOrigins, k))) {
+    return {
+      name,
+      pass: true,
+      skipped: true,
+      detail:
+        'SKIPPED — the published baseline records no compiled origins (it predates the ' +
+        'origins marker). This artifact\'s origins become the baseline once promoted to published.',
+    };
+  }
+
+  if (!actual) {
+    return { name, pass: false, detail: 'could not read the compiled origins from this APK' };
+  }
+
+  const changed = keys.filter(k => actual[k] !== baselineOrigins[k]);
+  if (changed.length) {
+    return {
+      name,
+      pass: false,
+      detail:
+        `CHANGED since the published release:\n        ` +
+        changed.map(k => `${k}: published ${baselineOrigins[k]} -> this build ${actual[k]}`).join('\n        ') +
+        `\n        If the environment move is intended, update releaseOrigins and the published ` +
+        `baseline deliberately. If it is not, this build is pointed somewhere it should not be.`,
+    };
+  }
+
+  return { name, pass: true, detail: 'unchanged from the published release' };
 }
 
 /** Extract a single entry from the APK (a zip) using the bundled `unzip`. */
@@ -717,12 +815,15 @@ async function main() {
   // APK must match it.
   checks.push(evaluatePinnedCert(pinnedCert, cert.sha256, Boolean(args['require-pinned-cert'])));
 
-  // 3d. The backend this APK actually talks to.
+  // 3d. The default origins this APK was COMPILED with.
   //
   // Read from the packaged bundle, not from the build config, because the config
-  // only says what we intended. Every check above is endpoint-blind — a build
-  // aimed at the wrong environment has a valid package id, a correct version, the
+  // only says what we intended. Every check above is origin-blind — a build made
+  // against the wrong environment has a valid package id, a correct version, the
   // right certificate and a perfectly good hash. This is the one that catches it.
+  //
+  // Build provenance only: the client layers URL params, stored Preferences and the
+  // guarded update_config path over these defaults at runtime.
   const packagedOrigins = readPackagedOrigins(apkPath);
   checks.push(
     evaluatePackagedOrigins(
@@ -732,6 +833,13 @@ async function main() {
       Boolean(args['require-pinned-origins']),
     ),
   );
+
+  // 3e. Release-over-release continuity for the origins, mirroring what
+  // signingCertSha256 does for the key: `published.compiledOrigins` is the baseline,
+  // so moving environments has to be a deliberate edit rather than a silent drift.
+  if (baseline) {
+    checks.push(evaluateOriginsBaseline(baseline.compiledOrigins, packagedOrigins.origins));
+  }
 
   // 4. certificate matches the previously accepted release + versionCode increases
   if (baselineAbsent) {
