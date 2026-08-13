@@ -1,51 +1,53 @@
 /**
  * Every `experimental` key in next.config.js must exist in the INSTALLED Next.
  *
- * An unrecognised key is silently inert: Next warns once at startup and ignores
- * it, so the config keeps asserting a behaviour that nothing implements. That is
- * how `experimental.turbopackUseSystemTlsCerts` survived — it was added in a
- * large unrelated commit (713784f0) with no stated rationale and never existed
- * in any Next this repo has installed.
+ * An unrecognised key is silently inert: Next's schema is a zod `strictObject`,
+ * so it logs "Unrecognized key(s)" once at startup and drops the value. The
+ * config keeps asserting a behaviour that nothing implements. That is how
+ * `experimental.turbopackUseSystemTlsCerts` survived — added in a large
+ * unrelated commit (713784f0) with no stated rationale, and never present in
+ * any Next this repo has installed.
  *
- * The check is against the installed package rather than a hardcoded list, so a
- * Next upgrade that renames or drops a key fails here instead of going quiet.
+ * ─── Two things this file gets right on purpose ─────────────────────────────
  *
- * next.config.js composes Nx plugins at module scope, so it is read as text
- * rather than required — the test must not depend on a full Next/Nx load.
+ * 1. The authority is Next's EXPORTED `experimentalSchema`, not a grep of the
+ *    schema source. Grepping matched any key defined anywhere in that file,
+ *    including ~30 keys that are valid only at TOP level — so putting
+ *    `turbopack: {}` (a real key, but not an experimental one) under
+ *    `experimental` would have passed while Next ignored it. "Key graduated
+ *    out of experimental" is the single most likely future instance of this
+ *    exact bug.
+ *
+ * 2. The parser FAILS CLOSED. next.config.js composes Nx plugins at module
+ *    scope, so it is read as text rather than required; a text parser that
+ *    quietly mis-parses would make the check vacuous instead of loud. Anything
+ *    it cannot represent exactly — a spread, a computed key, a quoted key, a
+ *    shorthand key — throws rather than being omitted from the key set.
  */
 
 const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
 
-/**
- * Top-level keys of the `experimental` object literal, ignoring nested ones.
- *
- * Single pass that tracks string and comment state, so a `//` inside a URL or a
- * `{` inside a comment cannot shift the brace depth. An earlier version keyed
- * off the preceding character and silently returned ZERO keys once a comment
- * was added above the first key — a parser that finds nothing would make the
- * check below vacuously pass, which is why the parser has its own test.
- */
-function experimentalKeys(source) {
-  const start = source.indexOf('experimental:');
-  if (start === -1) return [];
-  const open = source.indexOf('{', start);
-  if (open === -1) return [];
+const { experimentalSchema } = require('next/dist/server/config-schema');
 
-  const keys = [];
+/** Locate the single `experimental: {` block, ignoring depth-0 noise. */
+function experimentalBody(source) {
+  const anchors = [...source.matchAll(/^[ \t]*experimental:[ \t]*\{/gm)];
+  if (anchors.length !== 1) {
+    throw new Error(`expected exactly one experimental block, found ${anchors.length}`);
+  }
+  const open = source.indexOf('{', anchors[0].index);
+
   let depth = 0;
-  let expectKey = false; // true at a position where a key may begin
-
   for (let i = open; i < source.length; i++) {
     const ch = source[i];
-    const next2 = source.slice(i, i + 2);
-
-    if (next2 === '//') {
+    const pair = source.slice(i, i + 2);
+    if (pair === '//') {
       i = source.indexOf('\n', i);
       if (i === -1) break;
       continue;
     }
-    if (next2 === '/*') {
+    if (pair === '/*') {
       const end = source.indexOf('*/', i + 2);
       if (end === -1) break;
       i = end + 1;
@@ -58,60 +60,118 @@ function experimentalKeys(source) {
       }
       continue;
     }
-
-    if (ch === '{') {
-      depth++;
-      expectKey = depth === 1;
-      continue;
-    }
-    if (ch === '}') {
+    if (ch === '{') depth++;
+    else if (ch === '}') {
       depth--;
-      if (depth === 0) break;
+      if (depth === 0) return source.slice(open + 1, i);
+    }
+  }
+  throw new Error('unterminated experimental block');
+}
+
+/** Top-level keys of the experimental object. Throws on anything ambiguous. */
+function experimentalKeys(source) {
+  const body = experimentalBody(source);
+  const keys = [];
+  let depth = 0;
+  let expectKey = true;
+
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    const pair = body.slice(i, i + 2);
+
+    if (pair === '//') {
+      i = body.indexOf('\n', i);
+      if (i === -1) break;
       continue;
     }
-    if (ch === ',') {
-      expectKey = depth === 1;
+    if (pair === '/*') {
+      const end = body.indexOf('*/', i + 2);
+      if (end === -1) break;
+      i = end + 1;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') {
+      if (depth === 0 && expectKey) {
+        throw new Error(`quoted key at top level of experimental: ${body.slice(i, i + 40)}`);
+      }
+      for (i++; i < body.length; i++) {
+        if (body[i] === '\\') i++;
+        else if (body[i] === ch) break;
+      }
+      continue;
+    }
+    if (ch === '{' || ch === '[' || ch === '(') {
+      if (depth === 0 && expectKey && ch === '[') {
+        throw new Error(`computed key at top level of experimental: ${body.slice(i, i + 40)}`);
+      }
+      depth++;
+      continue;
+    }
+    if (ch === '}' || ch === ']' || ch === ')') {
+      depth--;
+      continue;
+    }
+    if (depth === 0 && ch === ',') {
+      expectKey = true;
       continue;
     }
     if (/\s/.test(ch)) continue;
+    if (depth !== 0) continue;
 
-    if (depth === 1 && expectKey) {
-      const m = /^([A-Za-z_$][\w$]*)\s*:/.exec(source.slice(i));
-      if (m) {
-        keys.push(m[1]);
-        i += m[0].length - 1;
+    if (expectKey) {
+      if (body.startsWith('...', i)) {
+        throw new Error(`spread at top level of experimental: ${body.slice(i, i + 40)}`);
       }
+      const m = /^([A-Za-z_$][\w$]*)\s*:/.exec(body.slice(i));
+      if (!m) {
+        throw new Error(`unparsable entry in experimental: ${body.slice(i, i + 40)}`);
+      }
+      keys.push(m[1]);
+      i += m[0].length - 1;
       expectKey = false;
-      continue;
     }
-    expectKey = false;
   }
   return keys;
 }
 
 describe('next.config experimental keys', () => {
   const configSource = readFileSync(join(__dirname, 'next.config.js'), 'utf8');
-  const schemaSource = readFileSync(
-    require.resolve('next/dist/server/config-schema.js'),
-    'utf8',
-  );
+  const known = new Set(Object.keys(experimentalSchema.shape ?? experimentalSchema));
 
-  it('parses only top-level experimental keys, not nested ones', () => {
-    // Guards the parser itself: serverActions.allowedOrigins must not be
-    // mistaken for an experimental key, or the check below means nothing.
+  it('reads the real experimental keys, not the outer config object', () => {
+    // Guards the parser itself. An earlier version anchored on a bare
+    // indexOf('experimental:'), which could latch onto a comment and then walk
+    // the OUTER config object — returning `typescript`, `images`, `webpack`…
+    // all of which are real Next keys, so the check passed while inspecting
+    // entirely the wrong object.
     const keys = experimentalKeys(configSource);
-    expect(keys).toContain('serverActions');
-    expect(keys).not.toContain('allowedOrigins');
+    assertDeep(keys, ['serverActions']);
+  });
+
+  it.each([
+    ['spread', '    ...(cond ? { turbopackUseSystemTlsCerts: true } : {}),\n'],
+    ['quoted key', "    'turbopackUseSystemTlsCerts': true,\n"],
+    ['computed key', '    [dyn]: true,\n'],
+    ['shorthand key', '    someValue,\n'],
+  ])('fails closed on a %s rather than silently ignoring it', (_label, injected) => {
+    // Each of these previously produced a key set that simply omitted the
+    // entry — a silent PASS while an unrecognised key sat in the config.
+    const mutated = configSource.replace('    serverActions: {', injected + '    serverActions: {');
+    expect(() => experimentalKeys(mutated)).toThrow();
   });
 
   it('every experimental key is recognised by the installed Next', () => {
     const keys = experimentalKeys(configSource);
     expect(keys.length).toBeGreaterThan(0);
+    expect(keys.filter(k => !known.has(k))).toEqual([]);
+  });
 
-    const unknown = keys.filter(
-      k => !new RegExp(`["']${k}["']|[^A-Za-z0-9_$]${k}\\s*:`).test(schemaSource),
-    );
-    expect(unknown).toEqual([]);
+  it('rejects a real Next key that is NOT an experimental one', () => {
+    // `turbopack` is a genuine top-level Next option. Under `experimental` it
+    // is ignored. The previous grep-the-schema-source check passed this.
+    expect(known.has('turbopack')).toBe(false);
+    expect(known.has('turbopackMinify')).toBe(true);
   });
 
   it('turbopackUseSystemTlsCerts is gone and does not come back', () => {
@@ -119,6 +179,10 @@ describe('next.config experimental keys', () => {
     // NODE_EXTRA_CA_CERTS env var — deliberately NOT set here, because nothing
     // demonstrated a TLS problem this was solving.
     expect(configSource).not.toMatch(/turbopackUseSystemTlsCerts/);
-    expect(schemaSource).not.toMatch(/turbopackUseSystemTlsCerts/);
+    expect(known.has('turbopackUseSystemTlsCerts')).toBe(false);
   });
 });
+
+function assertDeep(actual, expected) {
+  expect(actual).toEqual(expected);
+}

@@ -8,9 +8,9 @@
  *      setting, and that module is not installed on prod. Declaring it made
  *      every app assert a log bound that did not exist.
  *
- *   2. Every app writes both streams into ./logs/. `lib/log-retention.ts`
- *      bounds log size by scanning exactly that one directory, so an app
- *      logging anywhere else would grow without any bound at all.
+ *   2. Every app writes both streams into ./logs/. The db-maintainer ops
+ *      agent handles log size by scanning exactly that one directory, so an
+ *      app logging anywhere else would grow without any bound at all.
  */
 
 import assert from 'node:assert/strict';
@@ -31,8 +31,8 @@ test('no app declares max_size — PM2 has no such option, so it is inert', () =
 });
 
 test('every app writes both log streams into ./logs/', () => {
-  // log-retention scans this one directory. An app logging elsewhere is
-  // unbounded, and its evidence is invisible to the retention report.
+  // db-maintainer scans this one directory. An app logging elsewhere is
+  // unbounded, and its evidence is invisible to its report.
   const offenders: string[] = [];
   for (const app of apps) {
     for (const key of ['out_file', 'error_file'] as const) {

@@ -45,7 +45,8 @@ module.exports = {
       // setting, and that module is not installed (/root/.pm2/modules is empty,
       // module_conf.json is {}), nor is there an /etc/logrotate.d entry for
       // pm2. Declaring it made the config assert a log bound that did not
-      // exist. Size is bounded by scripts/ops/lib/log-retention.ts instead.
+      // exist. Log handling lives in the db-maintainer ops agent
+      // (scripts/ops/db-maintainer.ts), not in PM2 config.
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       error_file: './logs/middleware-error.log',
       out_file: './logs/middleware-out.log',
