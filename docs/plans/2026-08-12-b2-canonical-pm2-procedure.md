@@ -165,9 +165,12 @@ call.
   would be a deploy wrapper script that refuses to run without `--env
   production`; that is a code change, deliberately out of scope here.
 - **The web build inputs.** `NEXT_PUBLIC_*` are baked at build time and are not
-  a PM2 concern. B1 explicitly deferred intent-checking to a build manifest that
-  B2 was expected to establish — **this document does not establish it.** It
-  remains open, and B1's build-time dimension stays excluded until it exists.
+  a PM2 concern. B1 deferred intent-checking to a build manifest that this
+  document did not establish. **RESOLVED 2026-08-13 by B2c:** the record now
+  exists at `deploy/web-build-inputs.json`, covering all five consumed
+  variables and enforced in CI by `scripts/ops/web-build-inputs.test.ts`.
+  B1's build-time dimension stays excluded from the *runtime* detector — it
+  cannot be observed from a running process — but it is no longer unchecked.
 - **Operator attribution.** The 2026-08-12 restart was performed by an
   unidentified second agent session. That is tracked separately; no procedure
   document prevents an uncoordinated actor.

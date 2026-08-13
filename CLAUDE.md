@@ -144,7 +144,9 @@ MFA_ENCRYPTION_KEY      # AES-256-GCM key (min 32 chars) for TOTP-secret encrypt
 INTERNAL_API_SECRET     # Required in prod — service-to-service auth (middleware ↔ realtime)
 BCRYPT_ROUNDS           # Password hashing rounds (10-15, default 12)
 GOOGLE_CLIENT_ID        # Optional — Google OAuth client ID
-NEXT_PUBLIC_GOOGLE_CLIENT_ID  # Same value, exposed to frontend for GSI button (rebuild web on change)
+NEXT_PUBLIC_GOOGLE_CLIENT_ID  # Same value, for the GSI button. REBUILD REQUIRED — it is a
+                              #   build input, not a runtime one. See the NEXT_PUBLIC_* section
+                              #   below and deploy/web-build-inputs.json (currently unset)
 NEXT_SERVER_ACTIONS_ENCRYPTION_KEY  # Stable Next.js Server-Action key — KEEP CONSTANT across deploys
 ```
 
@@ -167,10 +169,32 @@ local organization and test data set.
 
 ### Web frontend (NEXT_PUBLIC_*)
 
+> **`deploy/web-build-inputs.json` is the authoritative record** for these — where
+> each is consumed, whether it is a CI build input or intentionally unset, its
+> production value, and its per-consumer default. `scripts/ops/web-build-inputs.test.ts`
+> fails CI when a newly consumed variable is missing from it, when an entry has no
+> consumer, or when a declared CI input is not actually supplied to the build.
+
+**`NEXT_PUBLIC_*` is not "client = build-time, server = runtime".** Set at build it is
+constant-folded into a literal in BOTH bundles; unset at build it stays a
+`process.env` lookup, which reads live env on the server but is `undefined`
+**permanently** in the browser. So one of these cannot be introduced later by editing
+prod `.env` and reloading PM2 — that changes the server and silently cannot change the
+browser. `ecosystem.config.js` re-injects `NEXT_PUBLIC_GOOGLE_CLIENT_ID` at PM2 start
+on that mistaken assumption; it is harmless only because the prod value is empty.
+
 ```
-NEXT_PUBLIC_API_URL     # Backend API URL for web frontend
-NEXT_PUBLIC_SOCKET_URL  # Realtime gateway URL for web frontend
-BACKEND_URL             # Server-side API URL (used by next.config proxy)
+NEXT_PUBLIC_API_URL            # CI build input — https://vizora.cloud. Also joins the
+                               #   trusted-origin set gating device-content token append
+NEXT_PUBLIC_SOCKET_URL         # CI build input — https://vizora.cloud. Required in a
+                               #   production build (next.config.security.js throws)
+NEXT_PUBLIC_SENTRY_DSN         # intentionally unset — Sentry is a stub (@sentry/nextjs
+                               #   is not a dependency; initSentry() has no call site)
+NEXT_PUBLIC_SCHEDULES_ENABLED  # intentionally unset — feature off; enabling it is a
+                               #   BUILD input, not a .env change
+NEXT_PUBLIC_GOOGLE_CLIENT_ID   # intentionally unset — enabling GSI requires a CI build
+                               #   input; setting it in prod .env is a silent no-op
+BACKEND_URL                    # Server-side API URL (used by next.config proxy)
 ```
 
 ### Display client

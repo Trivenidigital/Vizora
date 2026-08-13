@@ -258,21 +258,32 @@ export const DRIFT_CLASS_TO_SEVERITY: Record<DriftClass, Severity> = {
 };
 
 /**
- * Build-time `NEXT_PUBLIC_*` intent checking is OUT OF SCOPE for v1 (ruling
- * constraint 5). `.env` is provably not the intended source — the documented
- * build overrides it — and no authoritative record of intended build inputs
- * exists yet. B2's build manifest becomes that record.
+ * Build-time `NEXT_PUBLIC_*` intent is not checkable from a running process,
+ * so it stays out of scope here (ruling constraint 5). `.env` is provably not
+ * the intended source — the documented build overrides it.
+ *
+ * That record now EXISTS: `deploy/web-build-inputs.json` (B2c), enforced by
+ * `scripts/ops/web-build-inputs.test.ts` in CI. This exclusion therefore no
+ * longer means "nobody is checking"; it means "checked at build time, not
+ * here". The variable list is the full consumed set, not just the two with
+ * values, so this line does not under-report its own blind spot.
  *
  * Reported on every run rather than left silent: silence reads as
  * "checked and fine".
  */
 export const BUILD_TIME_EXCLUSION = {
-  variables: ['NEXT_PUBLIC_API_URL', 'NEXT_PUBLIC_SOCKET_URL'],
+  variables: [
+    'NEXT_PUBLIC_API_URL',
+    'NEXT_PUBLIC_SOCKET_URL',
+    'NEXT_PUBLIC_SENTRY_DSN',
+    'NEXT_PUBLIC_SCHEDULES_ENABLED',
+    'NEXT_PUBLIC_GOOGLE_CLIENT_ID',
+  ],
   reason:
     'Build-time values are baked into .next and cannot be observed from a ' +
     'running process. .env is NOT the intended source (the documented build ' +
-    'overrides it), and no authoritative build-input record exists yet — ' +
-    'deferred to B2, which establishes the build manifest.',
+    'overrides it). Build-input intent is recorded in ' +
+    'deploy/web-build-inputs.json (B2) and enforced in CI, not here.',
 } as const;
 
 /** Values safe to compare and print verbatim (design §4). */

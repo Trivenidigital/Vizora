@@ -107,8 +107,13 @@ module.exports = {
         PORT: 3001,
         // NEXT_PUBLIC_* vars must be available at SSR runtime (not just
         // build time). The client ID is public (embedded in the browser
-        // anyway), so it's safe to reference here. Load from root .env
-        // or web/.env.local at PM2 startup time.
+        // anyway), so it's safe to reference here. Reads web/.env.local ONLY
+        // (not the root .env) at PM2 startup time.
+        //
+        // NOTE: this reaches the SSR process only. GoogleSignInButton is a
+        // client component, so the BROWSER reads an empty process shim and
+        // sees undefined regardless. Enabling GSI requires a CI build input —
+        // see deploy/web-build-inputs.json.
         ...(() => {
           try {
             const fs = require('fs');

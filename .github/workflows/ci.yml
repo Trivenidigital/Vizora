@@ -276,6 +276,13 @@ jobs:
       # was no retained build to restore from. It also gives B2c a machine-
       # readable record of what the deployed client was built from, instead of
       # reverse-engineering intended values out of minified chunks.
+      # Provenance for EVERY NEXT_PUBLIC_* the app consumes, not just the ones
+      # with values. The three listed as intentionally unset are read in the
+      # browser, where an unset variable is `undefined` permanently — recording
+      # them here is what makes "this artifact cannot do Google Sign-In"
+      # readable from the artifact instead of inferred from its absence.
+      # deploy/web-build-inputs.json is the source of truth; the mapping is
+      # enforced by scripts/ops/web-build-inputs.test.ts.
       - name: Write web build metadata
         run: |
           cat > web/.next/build-metadata.env <<META
@@ -288,6 +295,7 @@ jobs:
           NEXT_PUBLIC_API_URL=https://vizora.cloud
           NEXT_PUBLIC_SOCKET_URL=https://vizora.cloud
           BACKEND_URL=https://vizora.cloud
+          buildInputsIntentionallyUnset=NEXT_PUBLIC_SENTRY_DSN,NEXT_PUBLIC_SCHEDULES_ENABLED,NEXT_PUBLIC_GOOGLE_CLIENT_ID
           META
           echo "--- build-metadata.env ---"
           cat web/.next/build-metadata.env
