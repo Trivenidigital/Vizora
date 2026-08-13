@@ -118,6 +118,20 @@ export function checkManifest(
     }
   }
 
+  // The reverse direction. Without it, adding a variable to the CI build env
+  // while forgetting the manifest produced ZERO findings — the manifest would
+  // quietly stop being the complete record it claims to be.
+  for (const name of buildStep) {
+    if (!declared.has(name)) {
+      findings.push({
+        variable: name,
+        problem:
+          'supplied to the CI web build but absent from ' +
+          'deploy/web-build-inputs.json — the manifest is not the full record',
+      });
+    }
+  }
+
   for (const entry of manifest.variables) {
     if (!consumed.includes(entry.name)) {
       findings.push({
