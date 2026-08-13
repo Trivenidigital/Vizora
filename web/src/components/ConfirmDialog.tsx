@@ -1,7 +1,8 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useCallback, useId, useRef, useState } from 'react';
 import { Icon } from '@/theme/icons';
+import { useDialog } from '@/lib/hooks/useDialog';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -27,6 +28,30 @@ export default function ConfirmDialog({
   const [isConfirming, setIsConfirming] = useState(false);
   const titleId = useId();
   const messageId = useId();
+  const cancelButtonRef = useRef<HTMLButtonElement>(null);
+
+  /**
+   * Ignore Escape while the action is in flight, matching the backdrop, which
+   * already refuses to close mid-confirm. Dismissing then would leave the
+   * caller's promise running with its dialog gone.
+   */
+  const handleDismiss = useCallback(() => {
+    if (!isConfirming) onClose();
+  }, [isConfirming, onClose]);
+
+  /*
+   * This dialog declared role="dialog" aria-modal="true" while providing none
+   * of it — no Escape, no scroll lock, no focus management — so the page behind
+   * it stayed scrollable and tabbable even though assistive tech had been told
+   * it was inert. Initial focus goes to CANCEL, not the confirm button: this is
+   * most often a destructive prompt, and the safe option should be the one
+   * under Enter.
+   */
+  const containerRef = useDialog({
+    isOpen,
+    onClose: handleDismiss,
+    initialFocusRef: cancelButtonRef,
+  });
 
   if (!isOpen) return null;
 
@@ -71,6 +96,8 @@ export default function ConfirmDialog({
 
         {/* Dialog */}
         <div
+          ref={containerRef}
+          tabIndex={-1}
           role="dialog"
           aria-modal="true"
           aria-labelledby={titleId}
@@ -93,6 +120,7 @@ export default function ConfirmDialog({
 
           <div className="bg-[var(--background)] px-6 py-4 flex justify-end gap-3 rounded-b-lg">
             <button
+              ref={cancelButtonRef}
               onClick={onClose}
               disabled={isConfirming}
               className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-md hover:bg-[var(--surface-hover)] transition"
