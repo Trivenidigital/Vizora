@@ -28,7 +28,8 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
   const router = useRouter();
 
   // Use controlled or uncontrolled mode
-  const open = controlledOpen !== undefined ? controlledOpen : isOpen;
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : isOpen;
 
   useEffect(() => {
     if (controlledOpen !== undefined) {
@@ -36,12 +37,44 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
     }
   }, [controlledOpen]);
 
+  /**
+   * The single way this component may change its own visibility.
+   *
+   * Every dismissal path used to call `setIsOpen(false)` directly. Under a
+   * controlled parent — which is how the app mounts it
+   * (CommandPaletteWrapper passes `open`) — `open` resolves to the prop, so
+   * those writes landed on state nothing reads. Escape did nothing, the
+   * backdrop did nothing, and running a command navigated but left the palette
+   * covering the page it navigated to. Only ⌘K closed it, because the WRAPPER
+   * owns that shortcut.
+   *
+   * So: notify the parent when controlled, and keep local state authoritative
+   * only when it actually is.
+   */
+  const setOpen = useCallback(
+    (next: boolean) => {
+      if (isControlled) onOpenChange?.(next);
+      else setIsOpen(next);
+    },
+    [isControlled, onOpenChange],
+  );
+
   // Handle keyboard shortcut (Cmd+K or Ctrl+K)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      /**
+       * Only own ⌘K when nobody else does.
+       *
+       * CommandPaletteWrapper registers its own window-level ⌘K handler. If
+       * this one also toggled while controlled, BOTH would fire for a single
+       * keypress — this one setting the parent to `!open`, the wrapper's
+       * functional `prev => !prev` then flipping that result straight back —
+       * and the palette would never open at all. Naively routing this through
+       * setOpen() is exactly how fixing the dismiss bug breaks the open path.
+       */
+      if (!isControlled && (e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        setIsOpen(!open);
+        setOpen(!open);
         setSearch('');
         setSelectedIndex(0);
       }
@@ -51,7 +84,8 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
 
       switch (e.key) {
         case 'Escape':
-          setIsOpen(false);
+          e.preventDefault();
+          setOpen(false);
           break;
         case 'ArrowDown':
           e.preventDefault();
@@ -65,7 +99,7 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
           e.preventDefault();
           if (filteredCommands[selectedIndex]) {
             filteredCommands[selectedIndex].onExecute();
-            setIsOpen(false);
+            setOpen(false);
             setSearch('');
           }
           break;
@@ -74,7 +108,7 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, search, selectedIndex]);
+  }, [open, search, selectedIndex, setOpen, isControlled]);
 
   // Filter commands by search
   const filteredCommands = commands.filter(cmd => {
@@ -114,7 +148,7 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
         <div
           className="fixed inset-0 bg-black/50 z-40"
           onClick={() => {
-            setIsOpen(false);
+            setOpen(false);
             setSearch('');
           }}
         />
@@ -167,7 +201,7 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
                           key={cmd.id}
                           onClick={() => {
                             cmd.onExecute();
-                            setIsOpen(false);
+                            setOpen(false);
                             setSearch('');
                           }}
                           className={`w-full px-4 py-3 text-left flex items-center gap-3 transition-colors ${
