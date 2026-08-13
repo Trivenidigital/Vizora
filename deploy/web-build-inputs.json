@@ -1,0 +1,68 @@
+{
+  "$schema": "./web-build-inputs.md",
+  "$comment": [
+    "Authoritative record of every NEXT_PUBLIC_* the web app consumes, and how each one",
+    "reaches production. Enforced by scripts/ops/web-build-inputs.test.ts, which fails CI",
+    "when a consumed variable is missing here, when an entry here has no consumer, and when",
+    "a client-consumed variable is not supplied to the CI web build.",
+    "",
+    "WHY THIS EXISTS: NEXT_PUBLIC_* is NOT simply 'client = build-time, server = runtime'.",
+    "The real rule, verified against the built artifact, is: SET AT BUILD => folded into a",
+    "literal everywhere; UNSET AT BUILD => left as a process.env lookup. On the server that",
+    "lookup reads the live process env, so it appears to work. In the BROWSER the same lookup",
+    "resolves against an empty process shim and is undefined forever. Setting such a variable",
+    "in prod .env and reloading PM2 therefore changes the server and cannot change the",
+    "browser -- silently.",
+    "",
+    "ecosystem.config.js re-injects NEXT_PUBLIC_GOOGLE_CLIENT_ID into the web process at PM2",
+    "start for exactly that reason, and it cannot work for a client component. It is harmless",
+    "today only because the value is empty on prod."
+  ],
+  "variables": [
+    {
+      "name": "NEXT_PUBLIC_API_URL",
+      "consumedInClientBundle": true,
+      "consumedOnServer": true,
+      "buildInput": "ci",
+      "productionValue": "https://vizora.cloud",
+      "defaultIfAbsent": "http://localhost:3000/api/v1",
+      "why": "Client display components derive an API origin from it; server-side api client and next.config images.remotePatterns also read it. next.config.security.js rejects a loopback origin in a production build."
+    },
+    {
+      "name": "NEXT_PUBLIC_SOCKET_URL",
+      "consumedInClientBundle": true,
+      "consumedOnServer": true,
+      "buildInput": "ci",
+      "productionValue": "https://vizora.cloud",
+      "defaultIfAbsent": "http://localhost:3002 in development; empty string in production, which useSocket relies on for SAME-ORIGIN connection",
+      "why": "Feeds the browser socket connection and the CSP connect-src. next.config.security.js THROWS when it is unset in a production build, so the same-origin empty-string path is unreachable in a real prod build -- but useSocket still implements it, and that behaviour must be preserved if the interlock ever changes."
+    },
+    {
+      "name": "NEXT_PUBLIC_SENTRY_DSN",
+      "consumedInClientBundle": true,
+      "consumedOnServer": true,
+      "buildInput": "intentionally-unset",
+      "productionValue": null,
+      "defaultIfAbsent": "every sentry helper no-ops via `if (!dsn) return`",
+      "why": "Sentry is a stub: @sentry/nextjs is not a dependency of web/package.json and initSentry() has no call site. Supplying a DSN would not start reporting. Setting this must be part of actually wiring Sentry, not a config change on its own."
+    },
+    {
+      "name": "NEXT_PUBLIC_SCHEDULES_ENABLED",
+      "consumedInClientBundle": true,
+      "consumedOnServer": true,
+      "buildInput": "intentionally-unset",
+      "productionValue": null,
+      "defaultIfAbsent": "false -- the read is a strict `=== 'true'`, so absent/empty/'1'/'TRUE' are all false",
+      "why": "The schedules feature is off. Prod .env carries NEXT_PUBLIC_SCHEDULES_ENABLED=false, which matches the default, so server and client agree today. Turning it on is a BUILD input: setting it only in prod .env would enable the server-rendered page while every client nav guard stayed false."
+    },
+    {
+      "name": "NEXT_PUBLIC_GOOGLE_CLIENT_ID",
+      "consumedInClientBundle": true,
+      "consumedOnServer": false,
+      "buildInput": "intentionally-unset",
+      "productionValue": null,
+      "defaultIfAbsent": "GoogleSignInButton renders nothing -- it gates on `if (!mounted || !GOOGLE_CLIENT_ID) return`",
+      "why": "Google Sign-In is not configured: prod .env has NEXT_PUBLIC_GOOGLE_CLIENT_ID= (empty). ENABLING IT REQUIRES A CI BUILD INPUT. Setting it in prod .env and reloading PM2 -- which ecosystem.config.js is written to support -- injects it into the SSR process only; the browser bundle reads an empty process shim and the button stays hidden with no error anywhere."
+    }
+  ]
+}
