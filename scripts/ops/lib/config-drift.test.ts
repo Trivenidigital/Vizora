@@ -74,6 +74,10 @@ function prodEnv(over: Partial<EnvMap> = {}): EnvMap {
     NODE_ENV: 'production',
     DATABASE_URL: pgUrl(),
     REDIS_URL: redisUrl(),
+    // Mirrors prod, verified 2026-08-13: .env carries BOTH, and REDIS_URL's
+    // password must equal REDIS_PASSWORD (docker-compose's --requirepass) or
+    // every client is rejected with NOAUTH.
+    REDIS_PASSWORD: REDIS_PW,
     API_BASE_URL: 'https://vizora.cloud',
     CORS_ORIGIN: 'https://vizora.cloud',
     APP_URL: 'https://vizora.cloud',

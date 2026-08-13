@@ -44,7 +44,6 @@
  * Nothing here repairs anything — `issuesFixed` is always 0 by design.
  */
 
-import { createHash, timingSafeEqual } from 'node:crypto';
 import { parse as parseDotenv } from 'dotenv';
 
 import { validateEnv } from '../../../middleware/src/modules/config/env.validation.js';
@@ -65,7 +64,7 @@ export type DriftClass = 'CRITICAL' | 'HIGH' | 'WARNING';
  * The only thing a secret comparison may emit. Never a value, never a
  * derivation of one.
  */
-export type SecretVerdict = 'MATCH' | 'DRIFT' | 'BOTH_ABSENT' | 'ONE_ABSENT';
+export type { SecretVerdict } from './secret-compare.js';
 
 export type BudgetVerdict = 'SAFE' | 'UNSAFE' | 'UNKNOWN';
 
@@ -529,25 +528,15 @@ export function buildMaxConnectionsCandidates(
 }
 
 // ─── Secret comparison (ruling constraint 3) ────────────────────────────────
+//
+// Implementation moved to `secret-compare.ts` so low-level modules (e.g.
+// `redis-config.ts`) can compare secrets without importing this module's
+// Zod/middleware dependency chain. Re-exported so this module's public surface
+// is unchanged.
+export { compareSecretValues } from './secret-compare.js';
+import { compareSecretValues } from './secret-compare.js';
+import { checkRedisConsistency, isRedisBroken } from './redis-config.js';
 
-/**
- * Compare two secrets in memory and return ONLY a state token.
- *
- * Both operands are hashed to fixed-length digests so the comparison is
- * constant-time and length-independent; the digests are internal and are never
- * returned, logged, persisted or transmitted. Nothing derived from either value
- * escapes this function.
- */
-export function compareSecretValues(a: string | undefined, b: string | undefined): SecretVerdict {
-  const aSet = a !== undefined && a !== null;
-  const bSet = b !== undefined && b !== null;
-  if (!aSet && !bSet) return 'BOTH_ABSENT';
-  if (aSet !== bSet) return 'ONE_ABSENT';
-
-  const da = createHash('sha256').update(a as string, 'utf8').digest();
-  const db = createHash('sha256').update(b as string, 'utf8').digest();
-  return timingSafeEqual(da, db) ? 'MATCH' : 'DRIFT';
-}
 
 // ─── Fresh-start validation (design §1) ─────────────────────────────────────
 
@@ -732,6 +721,70 @@ export interface DriftAnalysis {
   evaluated: string[];
 }
 
+/**
+ * B4 — do the Redis SERVER and its CLIENTS agree on the password?
+ *
+ * `REDIS_URL` is the only thing application code reads; `REDIS_PASSWORD` is
+ * read only by docker-compose, where it becomes the server's `--requirepass`.
+ * Nothing in either file references the other, so rotating one and not the
+ * other breaks Redis for every service with no warning anywhere.
+ *
+ * Emitted ONCE rather than per service. On prod middleware/.env and
+ * realtime/.env are both SYMLINKS to the same file and no ecosystem block
+ * carries REDIS_*, so this is a property of the deployment rather than of a
+ * service; web loads no dotenv file at all and self-excludes. Three identical
+ * findings for one root cause would be noise and would dedup to three
+ * separate incidents.
+ *
+ * Checked against the ZERO-STATE config — the question is whether a restart
+ * would come up able to talk to Redis.
+ */
+function detectRedisRepresentationFindings(observations: ServiceObservation[]): DriftFinding[] {
+  const obs = observations.find(o => o.dotenvVars !== null && Object.keys(o.pm2Env).length > 0);
+  if (!obs) return [];
+
+  const zeroState = computeZeroState(obs);
+  const result = checkRedisConsistency(zeroState.REDIS_URL, zeroState.REDIS_PASSWORD);
+
+  // An unparseable REDIS_URL is its own failure with its own remediation, and
+  // it is INVISIBLE to every other check: `new URL` accepts a bare `%`, so
+  // middleware's Zod `z.string().url()` passes and no zero-state-would-fail
+  // fires — while ioredis throws URIError at client construction and every
+  // realtime crash-loops (its Redis client is constructed in the provider
+  // constructor with no catch). MIDDLEWARE DOES NOT: it catches and explicitly
+  // does not rethrow, so it boots Redis-degraded and silent. Either way,
+  // staying silent HERE is the silent-failure shape.
+  // (A merely ABSENT REDIS_URL is not reported: the services fall back to
+  // redis://localhost:6379 by design, and realtime's own presence validator
+  // already covers requiring it.)
+  if (result.verdict === 'URL_UNAVAILABLE') {
+    if (!zeroState.REDIS_URL) return [];
+    return [{
+      driftClass: 'HIGH',
+      type: 'redis-url-unparseable',
+      service: obs.service,
+      targetId: 'global:REDIS_URL parse',
+      message: result.detail,
+      remediation:
+        'Check REDIS_URL for characters that need percent-encoding (a bare %, /, # or ? ' +
+        'in the password). It may still satisfy a URL validator while failing at client ' +
+        'construction. ' + NO_REPAIR,
+    }];
+  }
+
+  if (!isRedisBroken(result)) return [];
+
+  return [{
+    driftClass: 'CRITICAL',
+    type: 'redis-representation-drift',
+    service: obs.service,
+    targetId: 'global:REDIS representation',
+    message: `Redis server and client configuration would disagree after a rebuild — ${result.detail}`,
+    remediation: NO_REPAIR,
+  }];
+}
+
+
 /** Backwards-compatible wrapper — most callers only need the findings. */
 export function detectDrift(
   observations: ServiceObservation[],
@@ -822,6 +875,7 @@ export function analyzeDrift(
     findings.push(...detectPoolDrift(obs, runtime, zeroState));
   }
 
+  findings.push(...detectRedisRepresentationFindings(observations));
   findings.push(...detectBudgetFindings(observations, opts.maxConnections, unobservable));
 
   // `global` only when every observed service was fully evaluated.

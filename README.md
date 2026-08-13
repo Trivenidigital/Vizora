@@ -94,10 +94,10 @@ Configure the following required variables:
 DATABASE_URL=postgresql://vizora:vizora@localhost:5432/vizora
 JWT_SECRET=your-secure-secret-min-32-chars
 DEVICE_JWT_SECRET=your-device-secret-min-32-chars
-REDIS_URL=redis://localhost:6379
+REDIS_URL=redis://:<REDIS_PASSWORD>@localhost:6379
 
 # realtime/.env
-REDIS_URL=redis://localhost:6379
+REDIS_URL=redis://:<REDIS_PASSWORD>@localhost:6379
 DEVICE_JWT_SECRET=your-device-secret-min-32-chars
 
 # web/.env
