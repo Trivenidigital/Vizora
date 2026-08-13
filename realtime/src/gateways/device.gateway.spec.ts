@@ -1001,6 +1001,142 @@ describe('DeviceGateway', () => {
       (gateway as any).deviceSockets.set('device-1', 'socket-1');
     });
 
+    // T2 heartbeat-reconcile. The precedent for this block is pending-decisions.md:379-383:
+    // this exact signal was once wired on both ends with green tests and was ALWAYS
+    // undefined at runtime. So these assert the ack FIELD the client actually reads
+    // (response.data.reconcileContent), and each positive is paired with the negative that
+    // proves the control fires rather than the assertion merely passing.
+    describe('content reconcile signal', () => {
+      const stamp = new Date('2026-01-01T00:00:00Z');
+      const VERSION = stamp.toISOString();
+
+      // Server truth = one playlist stamped VERSION, via the shared resolver.
+      const serverHasContent = () => {
+        mockDatabaseService.display.findFirst.mockResolvedValue({ timezone: 'UTC', isDisabled: false, currentPlaylistId: 'p-1' });
+        mockDatabaseService.schedule.findMany.mockResolvedValue([]);
+        mockDatabaseService.playlist.findFirst.mockResolvedValue({
+          id: 'p-1', name: 'Current', updatedAt: stamp,
+          items: [{ contentId: 'c-1', order: 0, duration: 10, updatedAt: stamp, content: { id: 'c-1', name: 'i', type: 'image', url: '', updatedAt: stamp } }],
+        });
+      };
+
+      const beat = async (contentVersion: unknown) => {
+        const client = createMockSocket();
+        const result = await gateway.handleHeartbeat(client as any, { contentVersion } as any);
+        return result;
+      };
+
+      beforeEach(() => {
+        // Each test starts with both throttles clear so behaviour is the subject, not timing.
+        (gateway as any).reconcileResolvedAt.clear();
+        (gateway as any).reconcileSignalledAt.clear();
+        mockRedisService.get.mockResolvedValue(null);
+      });
+
+      it('DRIFT via the cheap path: reported != last version sent → reconcileContent true', async () => {
+        mockRedisService.get.mockResolvedValue(VERSION); // last sent
+        const result = await beat('2025-06-01T00:00:00.000Z'); // device is behind
+        expect(result.data).toHaveProperty('reconcileContent', true);
+      });
+
+      it('NO drift: reported == last version sent → false (and flipping the version makes it appear)', async () => {
+        mockRedisService.get.mockResolvedValue(VERSION);
+        serverHasContent(); // cache AND truth agree with the device — the only real no-drift state
+        expect((await beat(VERSION)).data).toHaveProperty('reconcileContent', false);
+
+        // Same setup, only the reported version changes → the control fires.
+        (gateway as any).reconcileSignalledAt.clear();
+        expect((await beat('2025-06-01T00:00:00.000Z')).data).toHaveProperty('reconcileContent', true);
+      });
+
+      it('DRIFT the cache CANNOT see: cache agrees with the device, resolver disagrees → true', async () => {
+        // This is the case a cache-only compare answers "no drift" forever: the authoritative
+        // version moved with no send to record it. Real sources: template-refresh regenerates
+        // content every minute and emits nothing; schedule windows open with no push at all.
+        mockRedisService.get.mockResolvedValue('2025-06-01T00:00:00.000Z'); // stale, agrees with device
+        serverHasContent(); // truth has moved on to VERSION
+        const result = await beat('2025-06-01T00:00:00.000Z');
+        expect(result.data).toHaveProperty('reconcileContent', true);
+      });
+
+      it('no cache entry and the device matches server truth → false (no false positive)', async () => {
+        serverHasContent();
+        const result = await beat(VERSION);
+        expect(result.data).toHaveProperty('reconcileContent', false);
+      });
+
+      it('EMPTY reported version + server HAS content → true (documented: a fresh device is drifted)', async () => {
+        // Every shipped device sends '' until it applies versioned content, so this is the
+        // fleet-wide first-contact case. '' means "showing nothing authoritative", which is
+        // real drift when the server has content — this is how a device still running
+        // pre-versioned content gets caught up.
+        serverHasContent();
+        const result = await beat('');
+        expect(result.data).toHaveProperty('reconcileContent', true);
+      });
+
+      it('EMPTY reported version + server has NO content → false (both agree on nothing)', async () => {
+        mockDatabaseService.display.findFirst.mockResolvedValue({ timezone: 'UTC', isDisabled: false, currentPlaylistId: null });
+        mockDatabaseService.schedule.findMany.mockResolvedValue([]);
+        const result = await beat('');
+        expect(result.data).toHaveProperty('reconcileContent', false);
+      });
+
+      it('a device that reports no version at all does not participate', async () => {
+        serverHasContent();
+        const client = createMockSocket();
+        const result = await gateway.handleHeartbeat(client as any, {} as any);
+        expect(result.data).toHaveProperty('reconcileContent', false);
+      });
+
+      it('the resolver THROWING never breaks the heartbeat that carries the signal', async () => {
+        mockDatabaseService.display.findFirst.mockRejectedValue(new Error('db down'));
+        const result = await beat('anything');
+        expect(result.success).toBe(true);
+        expect(result.data).toHaveProperty('nextHeartbeatIn', 15000);
+        expect(result.data).toHaveProperty('reconcileContent', false);
+        expect(mockRedisService.setDeviceStatus).toHaveBeenCalled(); // the heartbeat still did its job
+      });
+
+      it('Redis THROWING never breaks the heartbeat either', async () => {
+        mockRedisService.get.mockRejectedValue(new Error('redis down'));
+        const result = await beat('anything');
+        expect(result.success).toBe(true);
+        expect(result.data).toHaveProperty('reconcileContent', false);
+      });
+
+      it('signals at most once per cooldown, so a device that cannot converge is not stormed', async () => {
+        mockRedisService.get.mockResolvedValue(VERSION);
+        expect((await beat('stale')).data).toHaveProperty('reconcileContent', true);
+        // The device pulls, fails safe, and reports the same stale version on the next beat.
+        expect((await beat('stale')).data).toHaveProperty('reconcileContent', false);
+        expect((await beat('stale')).data).toHaveProperty('reconcileContent', false);
+      });
+
+      it('the resolve throttle bounds DB cost without making a no-drift answer sticky', async () => {
+        serverHasContent();
+        await beat(VERSION); // resolves once
+        await beat(VERSION); // throttled — must NOT resolve again
+        await beat(VERSION);
+        expect(mockDatabaseService.display.findFirst).toHaveBeenCalledTimes(1);
+
+        // Once the throttle window passes, it re-resolves and reports the drift that
+        // appeared in the meantime — the answer is bounded in cost, never cached as final.
+        (gateway as any).reconcileResolvedAt.set('device-1', Date.now() - 61_000);
+        const result = await beat('2025-06-01T00:00:00.000Z');
+        expect(mockDatabaseService.display.findFirst).toHaveBeenCalledTimes(2);
+        expect(result.data).toHaveProperty('reconcileContent', true);
+      });
+
+      it('leaves the rest of the ack contract intact (commands stays, shape unchanged)', async () => {
+        mockRedisService.get.mockResolvedValue(VERSION);
+        const result = await beat(VERSION);
+        expect(result.success).toBe(true);
+        expect(result.data).toHaveProperty('commands', []);
+        expect(result.data).toHaveProperty('nextHeartbeatIn', 15000);
+      });
+    });
+
     it('should process heartbeat and return success', async () => {
       const client = createMockSocket();
       const data = {
