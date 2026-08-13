@@ -109,8 +109,12 @@ describe('Modal', () => {
     it('has aria-labelledby pointing to title', () => {
       render(<Modal {...defaultProps} />);
       const dialog = screen.getByRole('dialog');
-      expect(dialog).toHaveAttribute('aria-labelledby', 'modal-title');
-      expect(screen.getByText('Test Modal')).toHaveAttribute('id', 'modal-title');
+      // Assert the RELATIONSHIP, not a literal id. The id used to be the
+      // hardcoded string "modal-title", which is invalid the moment two modals
+      // are mounted at once — it is now generated per instance with useId().
+      const labelledBy = dialog.getAttribute('aria-labelledby');
+      expect(labelledBy).toBeTruthy();
+      expect(screen.getByText('Test Modal')).toHaveAttribute('id', labelledBy!);
     });
 
     it('close button has aria-label', () => {

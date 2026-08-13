@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useId, useRef } from 'react';
+import { useDialog } from '@/lib/hooks/useDialog';
 
 interface ModalProps {
   isOpen: boolean;
@@ -12,28 +13,12 @@ interface ModalProps {
 
 export default function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  // Unique per instance: a hardcoded id collides if two modals ever mount together.
+  const titleId = useId();
 
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-
-      // Handle ESC key
-      const handleEscape = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') {
-          onClose();
-        }
-      };
-      document.addEventListener('keydown', handleEscape);
-
-      return () => {
-        document.body.style.overflow = 'unset';
-        document.removeEventListener('keydown', handleEscape);
-      };
-    } else {
-      document.body.style.overflow = 'unset';
-      return undefined;
-    }
-  }, [isOpen, onClose]);
+  // Escape, scroll lock, focus-in, focus trap and focus restore. `closeButtonRef`
+  // was already wired to the close button but nothing ever focused it.
+  const containerRef = useDialog({ isOpen, onClose, initialFocusRef: closeButtonRef });
 
   if (!isOpen) return null;
 
@@ -46,10 +31,12 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
 
   return (
     <div
+      ref={containerRef}
+      tabIndex={-1}
       className="fixed inset-0 z-50 overflow-y-auto"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="modal-title"
+      aria-labelledby={titleId}
     >
       <div className="flex min-h-screen items-center justify-center p-4">
         {/* Backdrop */}
@@ -65,7 +52,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
         >
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)]">
-            <h3 id="modal-title" className="eh-dash-title text-lg">{title}</h3>
+            <h3 id={titleId} className="eh-dash-title text-lg">{title}</h3>
             <button
               ref={closeButtonRef}
               onClick={onClose}
