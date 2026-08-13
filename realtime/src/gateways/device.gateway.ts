@@ -539,6 +539,7 @@ export class DeviceGateway
   private async requeuePendingPlaylistIfCurrent(
     deviceId: string,
     playlist: Playlist,
+    version: string,
     replayVersion: number,
     status: PendingPlaylistDeliveryStatus = 'requeued',
   ): Promise<PendingPlaylistDeliveryStatus> {
@@ -546,7 +547,7 @@ export class DeviceGateway
       return 'skipped';
     }
 
-    await this.redisService.setPendingPlaylist(deviceId, redactDevicePlaylist(playlist));
+    await this.redisService.setPendingPlaylist(deviceId, redactDevicePlaylist(playlist), version);
     return status;
   }
 
@@ -1228,14 +1229,14 @@ export class DeviceGateway
     };
 
     try {
+      // The cache only decides whether to look SOONER; it can no longer signal on its own.
+      // A cache mismatch used to be enough, and that is what made the unassign loop below
+      // possible from a path that never consulted the resolver.
       const lastSent = await this.redisService.get(this.contentVersionKey(deviceId));
-      if (lastSent != null && lastSent !== reportedVersion) {
-        return signal('missed a send');
-      }
+      const cacheSuspectsDrift = lastSent != null && lastSent !== reportedVersion;
 
       const lastResolved = this.reconcileResolvedAt.get(deviceId) ?? 0;
-      if (now - lastResolved < RECONCILE_RESOLVE_INTERVAL_MS) return false;
-      this.reconcileResolvedAt.set(deviceId, now);
+      if (!cacheSuspectsDrift && now - lastResolved < RECONCILE_RESOLVE_INTERVAL_MS) return false;
 
       const effective = await resolveEffectiveContent(
         this.databaseService,
@@ -1243,8 +1244,28 @@ export class DeviceGateway
         organizationId,
         new Date(),
       );
+      // Stamped only after a SUCCESSFUL resolve: a throwing resolve used to burn the whole
+      // window, so a transient database blip delayed drift detection by an extra 60s.
+      this.reconcileResolvedAt.set(deviceId, now);
+
+      // Nothing to converge TO. The device cannot act on "show nothing": its version-wins
+      // gate refuses a null playlist (effective-content.ts:224, mirrored in the shipped
+      // player at vizora-tv/src/utils.ts:53) because that is the never-black guarantee. So
+      // it would keep reporting its old version, be told to reconcile again, pull, refuse
+      // again — one resolve + signal + HTTP pull per device per cooldown window, forever,
+      // ending only when content is reassigned. Unassigning a playlist is a normal
+      // dashboard operation, so this was reachable in ordinary use.
+      //
+      // Signalling a device that provably cannot converge is pure cost. Its screen keeps
+      // the last-known-good content either way — that part is by design, and unchanged.
+      if (!effective.playlist) return false;
+
       if (effective.version !== reportedVersion) {
-        return signal(`authoritative version drift (device '${reportedVersion}')`);
+        return signal(
+          cacheSuspectsDrift
+            ? `missed a send (device '${reportedVersion}')`
+            : `authoritative version drift (device '${reportedVersion}')`,
+        );
       }
       return false;
     } catch (error: unknown) {
@@ -2015,16 +2036,18 @@ export class DeviceGateway
     }
 
     const replayVersion = this.pendingPlaylistReplayVersions.get(deviceId) ?? 0;
-    const pendingPlaylist = await this.redisService.getPendingPlaylist(deviceId);
-    if (!pendingPlaylist) return 'none';
-    const safePendingPlaylist = redactDevicePlaylist(pendingPlaylist);
+    const pending = await this.redisService.getPendingPlaylist(deviceId);
+    if (!pending) return 'none';
+    const safePendingPlaylist = redactDevicePlaylist(pending.playlist);
+    // Carried with the record rather than recomputed from it — see setPendingPlaylist.
+    const pendingVersion = pending.version;
 
     this.logger.log(`Delivering pending playlist to device ${deviceId} (queued while offline)`);
 
     // Re-queue if the active client changed or disconnected after the atomic Redis consume.
     if (!this.isActiveDeviceSocket(client, deviceId) || !client.connected) {
       this.logger.warn(`Device ${deviceId} disconnected before pending playlist delivery - re-queuing`);
-      return this.requeuePendingPlaylistIfCurrent(deviceId, safePendingPlaylist, replayVersion, 'deferred');
+      return this.requeuePendingPlaylistIfCurrent(deviceId, safePendingPlaylist, pendingVersion, replayVersion, 'deferred');
     }
 
     // Fetch display metadata for config (qrOverlay etc.)
@@ -2040,7 +2063,7 @@ export class DeviceGateway
 
     if (!this.isActiveDeviceSocket(client, deviceId) || !client.connected) {
       this.logger.warn(`Device ${deviceId} disconnected before pending playlist delivery - re-queuing`);
-      return this.requeuePendingPlaylistIfCurrent(deviceId, safePendingPlaylist, replayVersion, 'deferred');
+      return this.requeuePendingPlaylistIfCurrent(deviceId, safePendingPlaylist, pendingVersion, replayVersion, 'deferred');
     }
 
     const configMetadata = (displayForConfig?.metadata as Record<string, any>) || {};
@@ -2056,15 +2079,14 @@ export class DeviceGateway
       return 'skipped';
     }
 
-    // Carry a `version` so the device applies this through the same version-wins gate
-    // as the other two channels instead of the legacy signature fallback. Computed with
-    // the SHARED contentVersion, so a queued snapshot and a freshly resolved payload of
-    // the same content produce the same stamp. This queue is a best-effort optimisation:
-    // its correctness is backstopped by sendInitialState resolving authoritative truth
-    // on this same connect.
+    // The version the resolver produced when this content was queued, carried through the
+    // record. It must be the resolver's own string: the device compares versions with `>`,
+    // and a stamp re-derived from the serialized playlist is missing playlist.updatedAt —
+    // which PD-7 deliberately makes the newest value — so it would always look older than
+    // truth and provoke a reconcile on every replay.
     const result = await this.emitWithDeliveryAck(client, 'playlist:update', {
       playlist: safePendingPlaylist,
-      version: contentVersion(safePendingPlaylist as never, null),
+      version: pendingVersion,
       timestamp: new Date().toISOString(),
     });
 
@@ -2075,10 +2097,14 @@ export class DeviceGateway
 
     if (!this.isActiveDeviceSocket(client, deviceId) || !client.connected) {
       this.logger.warn(`Device ${deviceId} changed sockets during pending playlist delivery - re-queuing`);
-      return this.requeuePendingPlaylistIfCurrent(deviceId, safePendingPlaylist, replayVersion, 'deferred');
+      return this.requeuePendingPlaylistIfCurrent(deviceId, safePendingPlaylist, pendingVersion, replayVersion, 'deferred');
     }
 
     if (result.delivered) {
+      // This path returns before sendInitialState runs, so without this the cache would
+      // still hold whatever was sent BEFORE the device went offline — disagreeing with
+      // what the device is now holding.
+      await this.recordSentContentVersion(deviceId, pendingVersion);
       this.logger.log(
         result.legacy
           ? `Pending playlist delivered to legacy device ${deviceId} (best-effort)`
@@ -2086,7 +2112,7 @@ export class DeviceGateway
       );
     } else {
       this.logger.warn(`Pending playlist ${result.reason || 'delivery failure'} for device ${deviceId} - re-queuing`);
-      return this.requeuePendingPlaylistIfCurrent(deviceId, safePendingPlaylist, replayVersion);
+      return this.requeuePendingPlaylistIfCurrent(deviceId, safePendingPlaylist, pendingVersion, replayVersion);
     }
     return 'delivered';
   }
@@ -2229,7 +2255,7 @@ export class DeviceGateway
 
     if (sockets.length === 0) {
       this.logger.warn(`pushPlaylist: no sockets in room ${roomName} for device ${deviceId} — queuing for reconnect`);
-      await this.redisService.setPendingPlaylist(deviceId, resolvedPlaylist);
+      await this.redisService.setPendingPlaylist(deviceId, resolvedPlaylist, resolvedVersion);
       this.resetHeartbeatReplayBackoff(deviceId);
       return { delivered: false, reason: 'no_sockets' };
     }
@@ -2259,7 +2285,7 @@ export class DeviceGateway
 
     if (!anyAcknowledged) {
       this.logger.warn(`pushPlaylist: all sockets timed out for device ${deviceId} — queuing for reconnect`);
-      await this.redisService.setPendingPlaylist(deviceId, resolvedPlaylist);
+      await this.redisService.setPendingPlaylist(deviceId, resolvedPlaylist, resolvedVersion);
       this.resetHeartbeatReplayBackoff(deviceId);
       return { delivered: false, reason: failureReason };
     }
