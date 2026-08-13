@@ -230,3 +230,61 @@ test('naming a KNOWN-DEFAULT credential is not a leak', () => {
   assert.match(report, /MINIO_SECRET_KEY/);
   assert.match(report, /minioadmin/);
 });
+
+// ─── Soundness of the positive verdict ───────────────────────────────────────
+
+test('realtime never reports a bare OK — its .env cannot satisfy its presence check', () => {
+  // realtime/src/main.ts has no dotenv import and its process.exit(1) presence
+  // check reads process.env at line 13, BEFORE NestFactory.create at line 23.
+  // Reporting OK from a merged dotenv would be a false green on a BLOCKING gate.
+  const assertions = assertCanRestart([
+    {
+      service: 'realtime',
+      ecosystemEnvProduction: { NODE_ENV: 'production', PORT: '3002' },
+      dotenvVars: {
+        DATABASE_URL: 'postgresql://vizora:pw@localhost:5432/vizora',
+        REDIS_URL: 'redis://:pw@localhost:6379',
+        JWT_SECRET: 'j'.repeat(48),
+        DEVICE_JWT_SECRET: 'd'.repeat(48),
+        INTERNAL_API_SECRET: 'i'.repeat(48),
+        CORS_ORIGIN: 'https://vizora.cloud',
+      },
+    },
+  ]);
+
+  assert.deepEqual(assertions[0]?.failures, [], 'nothing it CAN check should fail here');
+  assert.equal(assertions[0]?.unprovable.length, 1, 'the presence dimension is unprovable');
+
+  const report = renderStartupAssertions(assertions);
+  assert.match(report, /PARTIAL realtime/);
+  assert.doesNotMatch(report, /OK\s+realtime/);
+  assert.doesNotMatch(report, /REFUSING/, 'unprovable is not a refusal — prod boots via PM2 injection');
+});
+
+test('middleware still reports a real OK — dotenv/config is its first import', () => {
+  const report = renderStartupAssertions(assertCanRestart([healthyMiddleware()]));
+  assert.match(report, /OK\s+middleware/);
+  assert.doesNotMatch(report, /PARTIAL middleware/);
+});
+
+test('a service with failures is never rendered as PARTIAL or SKIPPED', () => {
+  // Ordering guard: rendering must not swallow stated reasons behind a
+  // secondary status. An earlier revision printed SKIPPED with failures
+  // present, producing "REFUSING to proceed" with nothing stated.
+  const broken = healthyMiddleware();
+  delete broken.dotenvVars!.JWT_SECRET;
+  const report = renderStartupAssertions(assertCanRestart([broken]));
+  assert.match(report, /BLOCKED middleware/);
+  assert.doesNotMatch(report, /SKIPPED middleware/);
+  assert.doesNotMatch(report, /PARTIAL middleware/);
+});
+
+test('a fresh start that is not production is a FAILURE, not a quiet OK', () => {
+  // NODE_ENV != production skips the presence check AND the Zod superRefine, so
+  // an empty failures list would mean "almost nothing ran". That is the
+  // 2026-08-12 incident shape.
+  const dev = healthyMiddleware();
+  dev.ecosystemEnvProduction.NODE_ENV = 'development';
+  const failures = assertCanRestart([dev])[0]!.failures;
+  assert.ok(failures.some(f => /not production/.test(f)), failures.join(' | '));
+});

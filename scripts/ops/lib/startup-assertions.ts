@@ -50,10 +50,35 @@ export interface PersistedServiceConfig {
   dotenvVars: EnvMap | null;
 }
 
+/**
+ * realtime's presence check cannot be satisfied by its dotenv file.
+ *
+ * `realtime/src/main.ts` has NO dotenv import at all, and its
+ * `process.exit(1)` presence check for DATABASE_URL / REDIS_URL /
+ * DEVICE_JWT_SECRET / JWT_SECRET / INTERNAL_API_SECRET runs at line 13 —
+ * BEFORE `NestFactory.create(AppModule)` at line 23, which is where
+ * ConfigModule would load one. So only the process environment can satisfy it.
+ *
+ * B1's zero-state model merges `<cwd>/.env` in, which is right for middleware
+ * (`import 'dotenv/config'` is the first line of its main.ts) and optimistic
+ * for realtime. B1 is a detector, so optimism there is a reportable inaccuracy.
+ * Here it would become a POSITIVE VERDICT on a blocking gate — "OK realtime,
+ * persisted config would boot" for a config that exits 1.
+ *
+ * So this dimension is reported as UNPROVABLE rather than passed. It is
+ * deliberately not a refusal: on prod today those five variables do reach the
+ * process (PM2 injects them), so refusing would block every deploy over a
+ * modelling limit rather than a real defect. Saying "not proven" is the honest
+ * verdict; claiming OK is not.
+ */
+const PRESENCE_NOT_SATISFIABLE_FROM_DOTENV = new Set<ServiceName>(['realtime']);
+
 export interface StartupAssertion {
   service: ServiceName;
   /** Human-readable reasons a fresh start would fail. Empty means it would boot. */
   failures: string[];
+  /** Dimensions this gate cannot prove from persisted config alone. */
+  unprovable: string[];
   /**
    * False when NO validator applies to this service, so an empty `failures`
    * proves nothing. `web` is the case today: it has no required production
@@ -91,11 +116,39 @@ export function freshStartEnv(config: PersistedServiceConfig): EnvMap {
  * `failures` array would boot.
  */
 export function assertCanRestart(configs: PersistedServiceConfig[]): StartupAssertion[] {
-  return configs.map(config => ({
-    service: config.service,
-    failures: validateFreshStart(config.service, freshStartEnv(config)),
-    checked: SERVICES_WITH_VALIDATORS.has(config.service),
-  }));
+  return configs.map(config => {
+    const env = freshStartEnv(config);
+    const failures = validateFreshStart(config.service, env);
+
+    // A fresh start that is not production skips the presence check AND the
+    // Zod superRefine, so an empty `failures` would mean "almost nothing ran",
+    // not "would boot". That is the 2026-08-12 incident shape exactly —
+    // services up in development mode with both validators bypassed — so it is
+    // a failure in its own right rather than a quiet OK.
+    if (SERVICES_WITH_VALIDATORS.has(config.service) && env.NODE_ENV !== 'production') {
+      failures.push(
+        `fresh start would set NODE_ENV=${env.NODE_ENV ?? '(unset)'}, not production — ` +
+        'both boot validators would be skipped and the service would come up in ' +
+        'development mode',
+      );
+    }
+
+    const unprovable: string[] = [];
+    if (PRESENCE_NOT_SATISFIABLE_FROM_DOTENV.has(config.service)) {
+      unprovable.push(
+        'required-variable presence: realtime reads process.env directly before ' +
+        'Nest loads any dotenv file, so its .env cannot satisfy that check and ' +
+        'this gate cannot prove it from persisted config',
+      );
+    }
+
+    return {
+      service: config.service,
+      failures,
+      unprovable,
+      checked: SERVICES_WITH_VALIDATORS.has(config.service),
+    };
+  });
 }
 
 /**
@@ -141,11 +194,19 @@ export function renderStartupAssertions(
   if (notes.length > 0) lines.push('');
 
   for (const a of assertions) {
-    if (!a.checked) {
+    // Order matters: a service with failures must NEVER render as SKIPPED.
+    // The reverse order swallowed the reasons while `anyServiceWouldFail` still
+    // refused — producing "REFUSING to proceed" with nothing stated.
+    if (a.failures.length === 0 && !a.checked) {
       lines.push(`  SKIPPED ${a.service} — no boot validators exist for this service`);
       continue;
     }
     if (a.failures.length === 0) {
+      if (a.unprovable.length > 0) {
+        lines.push(`  PARTIAL ${a.service} — the checks that ran passed, but:`);
+        for (const u of a.unprovable) lines.push(`            ? ${u}`);
+        continue;
+      }
       lines.push(`  OK      ${a.service} — persisted config would boot`);
       continue;
     }

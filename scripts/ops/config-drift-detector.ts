@@ -62,6 +62,7 @@ import {
   type ServiceName,
   type ServiceObservation,
   readServiceDotenv,
+  serviceCwdFor,
 } from './lib/config-drift.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -292,7 +293,7 @@ function collect(): Collection {
     const online = instancesOfService.filter(p => p.pm2_env?.status === 'online');
 
     const app = apps.find(a => a.name === pm2Name);
-    const serviceCwd = app?.cwd ? resolve(REPO_ROOT, app.cwd) : join(REPO_ROOT, service);
+    const serviceCwd = serviceCwdFor(REPO_ROOT, service, app?.cwd);
 
     // Fresh-start instance count comes from the ecosystem (what a restart would
     // create); the observed PM2 count is the fallback.

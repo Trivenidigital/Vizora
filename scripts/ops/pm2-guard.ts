@@ -63,7 +63,12 @@ import {
   renderStartupAssertions,
   type PersistedServiceConfig,
 } from './lib/startup-assertions.js';
-import { readServiceDotenv, type EnvMap, type ServiceName } from './lib/config-drift.js';
+import {
+  readServiceDotenv,
+  serviceCwdFor,
+  type EnvMap,
+  type ServiceName,
+} from './lib/config-drift.js';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ECOSYSTEM_PATH = join(REPO_ROOT, 'ecosystem.config.js');
@@ -109,7 +114,7 @@ function summarizeApps(apps: EcosystemApp[]): EcosystemAppSummary[] {
 }
 
 /** PM2 app name -> the ServiceName its validators are registered under. */
-const SERVICE_BY_APP: Record<string, ServiceName> = {
+export const SERVICE_BY_APP: Record<string, ServiceName> = {
   'vizora-middleware': 'middleware',
   'vizora-realtime': 'realtime',
   'vizora-web': 'web',
@@ -130,9 +135,11 @@ const SERVICE_BY_APP: Record<string, ServiceName> = {
  * symlink missing this would have reported "would boot" for a service that
  * exits 1 on start — the exact failure the gate exists to prevent.
  */
-function readPersistedConfigs(
+export function readPersistedConfigs(
   names: string[],
   apps: EcosystemApp[],
+  /** Injected so the per-service cwd resolution — the D1 repair — is testable. */
+  repoRoot: string = REPO_ROOT,
 ): { configs: PersistedServiceConfig[]; notes: string[] } {
   const configs: PersistedServiceConfig[] = [];
   const notes: string[] = [];
@@ -145,10 +152,16 @@ function readPersistedConfigs(
       notes.push(`${name}: no validator mapping — NOT asserted`);
       continue;
     }
-    if (configs.some(c => c.service === service)) continue; // cluster: one config
+    // A many-to-one SERVICE_BY_APP would otherwise silently drop a service, so
+    // record it rather than `continue` quietly. (Cluster instances share one
+    // ecosystem entry and one name, so clustering cannot reach this.)
+    if (configs.some(c => c.service === service)) {
+      notes.push(`${name}: maps to ${service}, already asserted — NOT asserted separately`);
+      continue;
+    }
 
     const app = apps.find(a => a.name === name);
-    const serviceCwd = app?.cwd ? resolve(REPO_ROOT, app.cwd) : join(REPO_ROOT, service);
+    const serviceCwd = serviceCwdFor(repoRoot, service, app?.cwd);
     const dotenvVars = readServiceDotenv(serviceCwd);
     notes.push(
       `${service}: dotenv ${join(serviceCwd, '.env')} ${dotenvVars ? 'loaded' : 'NOT FOUND'}`,
@@ -269,4 +282,9 @@ function main(): void {
   }
 }
 
-main();
+// Only run when invoked directly. Without this the module cannot be imported,
+// which is why the D1 repair (per-service cwd resolution) shipped with no test
+// of its own — a source mutation re-introducing the bug passed the whole suite.
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main();
+}
