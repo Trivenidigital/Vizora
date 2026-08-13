@@ -1,8 +1,5 @@
 # Product experience / internal UI redesign wave — 2026-08-13
 
-> Superseded working note: the current UI-wave plan lives in `tasks/ui-wave-todo.md`.
-> This file is the long-lived project tracker and predates it.
-
 Goal: someone moving from `vizora.cloud` into the authenticated app should feel they stayed
 inside the same product. Benchmark = the light "Electric Horizon" marketing homepage.
 
@@ -35,46 +32,57 @@ Baseline on `main` (36 captures, 9 routes × {1440,390} × {dark,light}):
 
 ## PR queue
 
-- [x] **PR1 — brand truth + ink token + shell** (`feat/ui-shell-foundation`)
-      Backend served `#0284c7` as the default brand colour, which the client writes onto
-      `--primary` app-wide → every un-customised tenant ran a sky-blue dashboard. Fixed, plus
-      a new `--primary-ink` token (neon is a FILL, 1.65:1 as text on white), contrast-safe
-      ink derivation for tenant colours, sidebar a11y/targets, and the devices-table scroller
-      (row actions were unreachable at 1440px). Devices clipping 23 → 0; dashboard mobile
-      touch failures 15 → 5.
-- [x] **#309 — dashboard device identity + honest timestamps.** MERGED (`74bfb0fc`).
-      Socket handler replaced the stored entry with a metadata-less payload, erasing every
-      device's nickname/location/lastSeen on the first status event; `lastSeen` then fell back
-      to `new Date()`, so a chronological list was sorted by fabricated timestamps.
-- [x] **#310 — command palette dismissable.** MERGED. `onOpenChange` had zero call sites, so Escape,
-      backdrop and command-selection all wrote to state nothing read. Guarded the duplicate
-      ⌘K listener, which would otherwise double-toggle and stop the palette opening at all.
-- [x] **#308 — brand truth + ink token + shell.** MERGED (cf1a1f1d).
-- [ ] **#311 — dialog focus management** (useDialog: Escape/scroll-lock/focus-trap/restore; 45 call sites unchanged). CI.
-- [ ] **#312 — light substrate re-point** (:root -> Electric Horizon cool grey). CI.
-- [ ] **PR-next — .eh-* light repair (P2).** Re-point the light `:root` block to the Electric
-      Horizon substrate (currently warm cream `#F0ECE8` vs marketing cool grey `#E9EEEF`),
-      and repair the unscoped `.eh-*` utilities for a light substrate. CSS-only; upgrades
-      20–28 files with zero TSX churn.
-- [ ] **PR3 — `.mkt` semantic leak (live bug).** `.mkt` never redeclares
-      `--success/--warning/--error/--info`, so the *dark* values resolve on the light auth
-      pages: validation messages render `#ef4444` at ~2.3:1. Affects all four auth screens.
-- [ ] **PR4 — Dashboard overview.** Includes the confirmed data bug: the socket handler at
-      `DeviceStatusContext.tsx:95` does `{...prev, [id]: data}`, replacing the entry with a
-      payload carrying no `metadata` — so every device loses nickname/location/lastSeen on
-      the first status event ("Unnamed Device", and `lastSeen` falls back to `new Date()`,
-      fabricating a timestamp).
-- [ ] **PR5 — Devices.** Preserve the assigned-vs-delivery-deferred distinction.
-      `.eh-badge-success` carries Online/Offline truth at 2.09:1 on light — highest
-      product-correctness risk in the repo.
-- [ ] **PR6 — Playlists.** Also carries the assigned-vs-deferred distinction.
-- [ ] **PR7 — Content.** `content/page-client.tsx` is 2,771 LOC — must be split before it is
-      restyled, not during.
-- [ ] **PR8 — Schedules** (information architecture first, not styling).
-- [ ] **PR9 — Settings/billing/team** consistency pass.
-- [ ] Global: `<Overlay>` (42 consumers) and `<Banner>` (7 call sites) primitives.
-- [ ] Bounded maintenance: B3 `.env.local` modelling gap; typecheck for `scripts/release/**`
-      (currently excluded in `scripts/tsconfig.json` with a stated reason).
+### Merged — foundation phase (global surfaces every page inherits)
+- #308 brand default `#0284c7` -> Electric Horizon, `--primary-ink`, shell, devices scroller
+- #309 device identity + honest timestamps (socket handler no longer erases metadata)
+- #310 command palette dismissable (`onOpenChange` had zero call sites)
+- #311 dialog focus management (`useDialog`; ~45 call sites unchanged)
+- #312 light substrate -> Electric Horizon cool grey
+- #313 toast contrast + stacking + icon (58 files render ToastContainer)
+- #314 audit recorded  /  #317 restored `tasks/todo.md` after I clobbered it
+- #315 `.eh-*` utilities read tokens instead of hardcoding dark
+- #319 `.mkt` semantic leak + semantic ink variants + `color-scheme: light`
+
+### Merged — Devices correctness floor (functional truth before visuals)
+- #320 stop stating what the backend cannot prove:
+      "Currently Playing" -> "Assigned Playlist"; `unknown` state distinct from `offline`;
+      homepage alt text corrected.
+- #322 one status source per row (badge no longer a second store) + relative Last Seen
+      in `<time dateTime>` with exact timestamp on hover.
+
+### Next — Devices visual redesign
+The correctness floor is in place, so the redesign can proceed without inventing meaning.
+Hard invariant: `assigned != delivered != acknowledged != playing`. Keep the deferred-assignment
+copy at `devices/page-client.tsx` ("Non-online devices will update when they come online") - it is
+correct and server-backed.
+Open design questions the redesign must answer: fleet scannability, bulk-action feedback on
+partial failure, responsive table-to-card at 390px (row actions currently need horizontal scroll),
+empty/filtered-empty/error/partial states, keyboard operability of row actions.
+
+### Then
+Playlists -> Dashboard overview -> Scheduling -> Content/Media -> Analytics -> settings surfaces.
+Then Pool C by semantic family (see "Known traps"), not as a mechanical 1,094-literal replace.
+
+### Confirmed backend follow-ups (NOT UI work, keep separate)
+1. **Cron-detected offline never reaches an open dashboard.** The gateway broadcasts
+   `device:status` to the org room on connect and disconnect (`device.gateway.ts:1401`, `:1777`),
+   so the socket path is covered. The hole is when `handleDisconnect` never fires (realtime crash,
+   half-open socket) and the middleware cron flips Postgres with no push. The internal push surface
+   has `/api/push/playlist`, `/api/push/content`, `/internal/command`, `/internal/device-revoked` -
+   **no status push**. Fix the consuming path; do not paper over it with wording.
+2. **Redis liveness reads are dead** - `RedisService.getDeviceStatus` (0 callers),
+   `HeartbeatService.getDeviceHealth` (0 callers; only a comment at `displays.service.ts:305`).
+   Revive deliberately or delete. Do not wire new reads to them assuming they work.
+
+### Locally observed, NOT classified as defects (need production evidence first)
+- middleware cron `PrismaClientValidationError: lt: new Date("Invalid Date")`, ~1/min locally.
+- `[Socket] join:organization - Not authenticated` on dashboard load locally.
+Reproduce in production before treating either as real; otherwise record as local-env only.
+
+### Deferred, recorded so it is not lost
+- 52 sub-44px touch targets at 390px across the four auth screens.
+- Auth pages show fabricated figures ("2,500+ organizations trust Vizora", and a
+  "24 Screens / 148 Content / 99.9% Uptime" panel) that are hardcoded, not tenant data.
 
 ## Known traps (measured, not assumed)
 

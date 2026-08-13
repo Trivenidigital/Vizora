@@ -78,7 +78,28 @@ Playwright runs sequentially (1 worker) to avoid DB race conditions. Retries: 2 
 
 **WebSocket room architecture**: Realtime gateway uses `device:{deviceId}` and `org:{organizationId}` rooms. Devices join both on connect. Dashboard clients join org rooms for live status updates.
 
-**Dual persistence for device status**: Device online/offline status writes to both Redis (fast reads) and PostgreSQL (persistence/dashboard queries).
+**Device status persistence — Redis is WRITE-ONLY on this path**: online/offline is written to
+both Redis and PostgreSQL, but **every read comes from PostgreSQL**. `RedisService.getDeviceStatus`
+and `HeartbeatService.getDeviceHealth` have **zero callers** (the only mention of the latter is a
+comment in `displays.service.ts:305`). The dashboard reads `GET /api/v1/displays` →
+`DisplaysService.findAll`, a plain Postgres `findMany`; Redis is not consulted. Do not describe
+this as "Redis fast reads" — and do not wire new reads to those methods on the assumption they are
+live. Either revive them deliberately, with a reason, or delete them.
+
+**Device status freshness**: `status` is a *recent observation*, not a live fact. Three different
+signals feed it — a live socket, a heartbeat message, and a DB timestamp comparison. The heartbeat
+Postgres write is throttled to 60s (`HEARTBEAT_DB_REFRESH_INTERVAL_MS`), the offline threshold is
+120s (`packages/database/src/lib/device-constants.ts`), and `detectOfflineDevices` runs on minute
+boundaries. Socket.IO ping/pong (25s + 20s) is the fastest detector at ~45s. So the DB can read
+"online" for ~45s after a hard death, and up to ~180s if `handleDisconnect` never fires. UI must
+present freshness alongside status rather than implying live truth.
+
+**`assigned` != `delivered` != `acknowledged` != `playing`** — a hard invariant. `currentPlaylistId`
+is the operator's assignment, written before any device is contacted. The delivery ack exists on
+only two of four channels, lives in Redis under a TTL, is never persisted and is exposed by no API.
+**No `deliveredAt`/`acknowledgedAt`/`playing` field exists.** Never label an assignment as what a
+screen is showing. An offline device legitimately keeps playing cached content, and a deferred
+assignment is replayed by the gateway on reconnect — so offline is not assignment failure.
 
 **Durable device time-series (ClickHouse)**: ClickHouse is now wired (was provisioned-but-dark). The realtime gateway batches a `device_health_samples` row on every heartbeat via `ClickHouseService` (`realtime/src/services/clickhouse.service.ts`) — buffered, async, fire-and-forget, **fail-open** (a ClickHouse outage never touches the heartbeat path). The middleware reads it (`middleware/src/modules/clickhouse/`) for **real** uptime: `AnalyticsService.getDeviceUptime`/`getUptimeSummary` compute uptime as the fraction of 5-min buckets holding ≥1 sample, and return a clearly-labelled `insufficient_data` (`uptimePercent: null`, `measured: false`) when there is no history or ClickHouse is unreachable — never a fabricated number. A `ClickHouseWatchdogService` @Cron (§12a) alerts via Sentry when displays are active but samples stop arriving. Config is `CLICKHOUSE_*` (see `.env.example`); reads/writes fail-open and never hard-fail boot. Canonical DDL: `docker/clickhouse/init.sql` (app also creates it idempotently on startup).
 
