@@ -99,13 +99,22 @@ fi
 # device). Every other check is origin-blind: a build made against the wrong
 # environment has a valid package id, a correct version, the right certificate and
 # a good hash.
-say "Verifying APK identity, signing key, compiled origins and integrity"
+#
+# --require-candidate-binding ties the release RECORD to these exact bytes: the
+# candidate block must describe this APK (package, version, hash, certificate,
+# compiled origins) and Gate A's approved hash must equal both. Without it the
+# record and the artifact are related only by an operator copying fields
+# correctly, and candidate is what gets promoted to published — so a wrong
+# candidate poisons the NEXT release's baseline, or nulls a field and silently
+# skips the check built on it.
+say "Verifying APK identity, signing key, compiled origins, record binding and integrity"
 node "$REPO_ROOT/scripts/release/verify-display-apk.mjs" \
   --apk "$APK" \
   --against "$RELEASE_JSON" \
   --require-apksigner \
   --require-pinned-cert \
-  --require-pinned-origins
+  --require-pinned-origins \
+  --require-candidate-binding
 
 # ─── Confirm the page matches the artifact ───────────────────────────────────
 say "Confirming installer page matches release.json"

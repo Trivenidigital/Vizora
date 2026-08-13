@@ -520,6 +520,167 @@ export function evaluateOriginsBaseline(baselineOrigins, actual, transition, pin
   };
 }
 
+/**
+ * Bind the `candidate` record in release.json to the APK actually being published.
+ *
+ * Without this the record and the artifact are related only by an operator copying
+ * fields correctly. Everything downstream trusts `candidate`: it is promoted to
+ * `published` after a successful publish and becomes the baseline the NEXT release's
+ * certificate, versionCode and compiled origins are compared against. A candidate
+ * that does not describe the bytes just published therefore poisons the next
+ * release's baseline — or, where a field is null, permanently SKIPs the check that
+ * depends on it, which reads as coverage and is not.
+ *
+ * `compiledOrigins` is three-state rather than merely present/absent: a pre-marker
+ * build must record null and a marker-era build must record all three, and which is
+ * correct is decided by the bytes. Neither an omission nor a stale value can pass as
+ * the other.
+ */
+export function evaluateCandidateBinding(candidate, actual, required) {
+  const name = 'candidate record matches this exact APK';
+
+  if (!candidate) {
+    if (required) {
+      return {
+        name,
+        pass: false,
+        detail:
+          'NO CANDIDATE RECORDED — release.json has no candidate block, so nothing ties the ' +
+          'release record to these bytes. Publishing would promote an unverified record.',
+      };
+    }
+    return { name, pass: true, skipped: true, detail: 'SKIPPED — no candidate block. Publish always requires one.' };
+  }
+
+  const problems = [];
+  const cmp = (field, expected, got, normalise = v => v) => {
+    if (expected === undefined || expected === null || expected === '') {
+      problems.push(`candidate.${field} is missing — it must describe the artifact being published`);
+      return;
+    }
+    if (normalise(expected) !== normalise(got)) {
+      problems.push(`candidate.${field} is ${expected} but the APK has ${got}`);
+    }
+  };
+
+  cmp('package', candidate.package, actual.package);
+  cmp('versionName', candidate.versionName, actual.versionName);
+  cmp('versionCode', candidate.versionCode, actual.versionCode, v => String(v));
+  cmp('apkSha256', candidate.apkSha256, actual.apkSha256, normalizeFingerprint);
+  cmp('signingCertSha256', candidate.signingCertSha256, actual.signingCertSha256, normalizeFingerprint);
+
+  if (Number.isInteger(candidate.apkBytes) && candidate.apkBytes !== actual.apkBytes) {
+    problems.push(`candidate.apkBytes is ${candidate.apkBytes} but the APK is ${actual.apkBytes} bytes`);
+  }
+
+  const isFilled = (obj, k) => typeof obj?.[k] === 'string' && obj[k].length > 0;
+  const co = candidate.compiledOrigins;
+  const apkHasMarker = Boolean(actual.compiledOrigins);
+
+  if (co === undefined) {
+    problems.push('candidate.compiledOrigins is absent — record null for a pre-marker build, or all three origins');
+  } else if (co === null) {
+    if (apkHasMarker) {
+      problems.push(
+        'candidate.compiledOrigins is null but this APK carries an origins marker. Record the three ' +
+          'compiled origins, or the next release inherits a permanently SKIPPED baseline check.',
+      );
+    }
+  } else if (!ORIGIN_KEYS.every(k => isFilled(co, k))) {
+    const missing = ORIGIN_KEYS.filter(k => !isFilled(co, k));
+    problems.push(`candidate.compiledOrigins is incomplete — missing or empty: ${missing.join(', ')}`);
+  } else if (!apkHasMarker) {
+    problems.push('candidate.compiledOrigins records origins but this APK carries no marker to corroborate them');
+  } else {
+    const wrong = ORIGIN_KEYS.filter(k => co[k] !== actual.compiledOrigins[k]);
+    if (wrong.length) {
+      problems.push(
+        'candidate.compiledOrigins disagrees with the APK: ' +
+          wrong.map(k => `${k} recorded ${co[k]}, apk has ${actual.compiledOrigins[k]}`).join('; '),
+      );
+    }
+  }
+
+  if (problems.length) {
+    return {
+      name,
+      pass: false,
+      detail:
+        `CANDIDATE DOES NOT DESCRIBE THIS APK:\n        ` +
+        problems.map(p => `- ${p}`).join('\n        ') +
+        `\n        This record is promoted to published after release and becomes the next release's ` +
+        `baseline. Fix it rather than publishing against it.`,
+    };
+  }
+
+  return {
+    name,
+    pass: true,
+    detail: `${candidate.versionName} (${candidate.versionCode}); sha, cert and origins all match the artifact`,
+  };
+}
+
+/**
+ * Enforce Gate A's exact-artifact binding mechanically.
+ *
+ * The release record has always SAID Gate A binds to one specific SHA-256 and that a
+ * rebuild voids it — but that lived only in prose. The publish script checked
+ * `artifactApprovedBy` was non-null and never compared the approved hash to the APK
+ * in front of it, so an approval for one binary would wave through a different one:
+ * exactly the failure the prose warns about.
+ */
+export function evaluateGateABinding(approval, candidateSha, actualSha, required) {
+  const name = 'Gate A approval is bound to this exact APK';
+  const approved = approval?.artifactApprovedSha256;
+
+  if (!approved) {
+    if (required) {
+      return {
+        name,
+        pass: false,
+        detail:
+          'NO APPROVED HASH RECORDED — approval.artifactApprovedSha256 is missing. Gate A must name the ' +
+          'exact binary it approves; an approver name alone cannot tell this APK from any other.',
+      };
+    }
+    return {
+      name,
+      pass: true,
+      skipped: true,
+      detail: 'SKIPPED — approval.artifactApprovedSha256 not set. Publish always requires it.',
+    };
+  }
+
+  if (!approval?.artifactApprovedBy) {
+    return {
+      name,
+      pass: false,
+      detail: 'approval.artifactApprovedSha256 is set but approval.artifactApprovedBy is empty — nobody approved it',
+    };
+  }
+
+  const a = normalizeFingerprint(approved);
+  const problems = [];
+  if (a !== normalizeFingerprint(actualSha)) {
+    problems.push(
+      `approved ${formatFingerprint(a)} but this APK is ${formatFingerprint(normalizeFingerprint(actualSha))}. ` +
+        `Approval binds to one binary; a rebuild produces different bytes and voids it.`,
+    );
+  }
+  if (candidateSha && a !== normalizeFingerprint(candidateSha)) {
+    problems.push(
+      `approved hash does not match candidate.apkSha256 ${formatFingerprint(normalizeFingerprint(candidateSha))} — ` +
+        `the approval and the release record disagree about which artifact this is`,
+    );
+  }
+
+  if (problems.length) {
+    return { name, pass: false, detail: `GATE A MISMATCH:\n        ` + problems.join('\n        ') };
+  }
+
+  return { name, pass: true, detail: `${formatFingerprint(a)} approved by ${approval.artifactApprovedBy}` };
+}
+
 /** Extract a single entry from the APK (a zip) using the bundled `unzip`. */
 function extractEntry(apkPath, entryName) {
   try {
@@ -778,6 +939,8 @@ async function main() {
   let pinnedCert = '';
   let pinnedOrigins = null;
   let originTransition = null;
+  let candidateRecord = null;
+  let approvalRecord = null;
   if (args.against) {
     const p = resolve(String(args.against));
     if (!existsSync(p)) {
@@ -790,6 +953,8 @@ async function main() {
     pinnedCert = normalizeFingerprint(doc?.signing?.canonicalCertSha256 || '');
     pinnedOrigins = doc?.releaseOrigins || null;
     originTransition = doc?.originTransition || null;
+    candidateRecord = doc?.candidate || null;
+    approvalRecord = doc?.approval || null;
   }
 
   const bytes = readFileSync(apkPath);
@@ -937,6 +1102,41 @@ async function main() {
       evaluateOriginsBaseline(baseline.compiledOrigins, packagedOrigins.origins, originTransition, pinnedOrigins),
     );
   }
+
+  // 3f. The release RECORD must describe these exact bytes.
+  //
+  // candidate is promoted to published after a successful publish and becomes the
+  // next release's baseline, so a candidate that does not match the artifact
+  // poisons that baseline — or, where a field is null, permanently skips the check
+  // built on it. Until now nothing compared the two: the hand-off was a note in the
+  // publish output telling a human to copy fields across correctly.
+  checks.push(
+    evaluateCandidateBinding(
+      candidateRecord,
+      {
+        package: manifest.package,
+        versionName: manifest.versionName,
+        versionCode: manifest.versionCode,
+        apkSha256,
+        apkBytes: bytes.length,
+        signingCertSha256: cert.sha256,
+        compiledOrigins: packagedOrigins.origins,
+      },
+      Boolean(args['require-candidate-binding']),
+    ),
+  );
+
+  // 3g. Gate A's exact-hash binding, mechanically. The record has always said the
+  // approval is bound to one SHA-256 and that a rebuild voids it; that sentence was
+  // never enforced by anything.
+  checks.push(
+    evaluateGateABinding(
+      approvalRecord,
+      candidateRecord?.apkSha256,
+      apkSha256,
+      Boolean(args['require-candidate-binding']),
+    ),
+  );
 
   // 4. certificate matches the previously accepted release + versionCode increases
   if (baselineAbsent) {

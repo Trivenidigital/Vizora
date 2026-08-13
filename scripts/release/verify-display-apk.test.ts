@@ -23,6 +23,8 @@ import {
   readPackagedOrigins,
   evaluatePackagedOrigins,
   evaluateOriginsBaseline,
+  evaluateCandidateBinding,
+  evaluateGateABinding,
 } from './verify-display-apk.mjs';
 
 // Real fingerprints from the 2026-08-10 Gate B investigation.
@@ -420,4 +422,147 @@ test('NEGATIVE: a transition with incomplete from/to is rejected', () => {
   const verdict = evaluateOriginsBaseline(PINNED_ORIGINS, MOVED, { ...GOOD_TRANSITION, to: { api: MOVED.api } }, MOVED);
   assert.equal(verdict.pass, false);
   assert.match(verdict.detail, /does not name all three origins/);
+});
+
+// ─── Candidate ↔ artifact binding, and Gate A's exact-hash binding ───────────
+//
+// `candidate` is promoted to `published` after a successful publish and becomes
+// the baseline the NEXT release is compared against. Nothing used to check it
+// described the bytes being published — the hand-off was a note telling a human
+// to copy fields across. A wrong candidate poisons the next baseline; a null
+// field silently SKIPs the check built on it, which reads as coverage.
+
+const APK_SHA = 'C5C0B72C4B3EB15FA08F63F9001FB3CD6CB0361957E601F682179BE50F856C72';
+const OTHER_SHA = '1D035BDBB48720B9BCE1F0C8ADA8E74436E9D37A03D9A11FF7CEFA6B515F8EF7';
+
+const ARTIFACT = {
+  package: 'com.vizora.display',
+  versionName: '1.3.14',
+  versionCode: 10144,
+  apkSha256: APK_SHA,
+  apkBytes: 1250365,
+  signingCertSha256: LOCAL_KEYSTORE,
+  compiledOrigins: PINNED_ORIGINS,
+};
+
+const GOOD_CANDIDATE = {
+  package: 'com.vizora.display',
+  versionName: '1.3.14',
+  versionCode: 10144,
+  apkSha256: APK_SHA,
+  apkBytes: 1250365,
+  signingCertSha256: LOCAL_KEYSTORE,
+  compiledOrigins: PINNED_ORIGINS,
+};
+
+test('a candidate that describes the APK passes', () => {
+  assert.equal(evaluateCandidateBinding(GOOD_CANDIDATE, ARTIFACT, true).pass, true);
+});
+
+test('NEGATIVE: publishing with no candidate block FAILS CLOSED', () => {
+  const v = evaluateCandidateBinding(null, ARTIFACT, true);
+  assert.equal(v.pass, false);
+  assert.match(v.detail, /NO CANDIDATE RECORDED/);
+});
+
+test('NEGATIVE: a STALE candidate hash is rejected', () => {
+  const v = evaluateCandidateBinding({ ...GOOD_CANDIDATE, apkSha256: OTHER_SHA }, ARTIFACT, true);
+  assert.equal(v.pass, false);
+  assert.match(v.detail, /candidate\.apkSha256/);
+});
+
+test('NEGATIVE: a candidate describing a different version is rejected', () => {
+  const v = evaluateCandidateBinding({ ...GOOD_CANDIDATE, versionCode: 10143 }, ARTIFACT, true);
+  assert.equal(v.pass, false);
+  assert.match(v.detail, /candidate\.versionCode/);
+});
+
+test('NEGATIVE: a candidate with the wrong signing certificate is rejected', () => {
+  const v = evaluateCandidateBinding({ ...GOOD_CANDIDATE, signingCertSha256: APK_1_3_10 }, ARTIFACT, true);
+  assert.equal(v.pass, false);
+  assert.match(v.detail, /candidate\.signingCertSha256/);
+});
+
+test('NEGATIVE: candidate.compiledOrigins null while the APK HAS a marker is rejected', () => {
+  // The exact sequence flagged in review: origins verify fine against the policy
+  // pin, but the record carries null, so promoting it permanently SKIPs the next
+  // release's baseline check.
+  const v = evaluateCandidateBinding({ ...GOOD_CANDIDATE, compiledOrigins: null }, ARTIFACT, true);
+  assert.equal(v.pass, false);
+  assert.match(v.detail, /null but this APK carries an origins marker/);
+});
+
+test('NEGATIVE: candidate.compiledOrigins that disagree with the APK are rejected', () => {
+  const wrong = { ...PINNED_ORIGINS, api: 'https://api.vizora.io' };
+  const v = evaluateCandidateBinding({ ...GOOD_CANDIDATE, compiledOrigins: wrong }, ARTIFACT, true);
+  assert.equal(v.pass, false);
+  assert.match(v.detail, /disagrees with the APK/);
+});
+
+test('NEGATIVE: partial candidate.compiledOrigins are rejected', () => {
+  const partial = { api: PINNED_ORIGINS.api, realtime: PINNED_ORIGINS.realtime };
+  const v = evaluateCandidateBinding({ ...GOOD_CANDIDATE, compiledOrigins: partial }, ARTIFACT, true);
+  assert.equal(v.pass, false);
+  assert.match(v.detail, /incomplete/);
+});
+
+test('NEGATIVE: candidate records origins but the APK has no marker — rejected', () => {
+  const preMarkerApk = { ...ARTIFACT, compiledOrigins: null };
+  const v = evaluateCandidateBinding(GOOD_CANDIDATE, preMarkerApk, true);
+  assert.equal(v.pass, false);
+  assert.match(v.detail, /no marker to corroborate/);
+});
+
+test('a pre-marker artifact with a null candidate origins field is consistent', () => {
+  const preMarkerApk = { ...ARTIFACT, compiledOrigins: null };
+  const v = evaluateCandidateBinding({ ...GOOD_CANDIDATE, compiledOrigins: null }, preMarkerApk, true);
+  assert.equal(v.pass, true);
+});
+
+test('NEGATIVE: an absent candidate.compiledOrigins field is rejected', () => {
+  const { compiledOrigins, ...noField } = GOOD_CANDIDATE;
+  const v = evaluateCandidateBinding(noField, ARTIFACT, true);
+  assert.equal(v.pass, false);
+  assert.match(v.detail, /is absent/);
+});
+
+test('Gate A: an approval bound to this APK passes', () => {
+  const v = evaluateGateABinding(
+    { artifactApprovedSha256: APK_SHA, artifactApprovedBy: 'Srini' }, APK_SHA, APK_SHA, true);
+  assert.equal(v.pass, true);
+});
+
+test('NEGATIVE: publishing with no approved hash FAILS CLOSED', () => {
+  const v = evaluateGateABinding({ artifactApprovedBy: 'Srini' }, APK_SHA, APK_SHA, true);
+  assert.equal(v.pass, false);
+  assert.match(v.detail, /NO APPROVED HASH RECORDED/);
+});
+
+test('NEGATIVE: a STALE Gate A hash (approval for a previous build) is rejected', () => {
+  const v = evaluateGateABinding(
+    { artifactApprovedSha256: OTHER_SHA, artifactApprovedBy: 'Srini' }, OTHER_SHA, APK_SHA, true);
+  assert.equal(v.pass, false);
+  assert.match(v.detail, /GATE A MISMATCH/);
+  assert.match(v.detail, /rebuild produces different bytes/);
+});
+
+test('NEGATIVE: approval and candidate disagreeing about the artifact is rejected', () => {
+  const v = evaluateGateABinding(
+    { artifactApprovedSha256: APK_SHA, artifactApprovedBy: 'Srini' }, OTHER_SHA, APK_SHA, true);
+  assert.equal(v.pass, false);
+  assert.match(v.detail, /does not match candidate\.apkSha256/);
+});
+
+test('NEGATIVE: an approved hash with no named approver is rejected', () => {
+  const v = evaluateGateABinding(
+    { artifactApprovedSha256: APK_SHA, artifactApprovedBy: '' }, APK_SHA, APK_SHA, true);
+  assert.equal(v.pass, false);
+  assert.match(v.detail, /artifactApprovedBy is empty/);
+});
+
+test('Gate A hash comparison ignores colons and case', () => {
+  const v = evaluateGateABinding(
+    { artifactApprovedSha256: formatFingerprint(APK_SHA).toLowerCase(), artifactApprovedBy: 'Srini' },
+    APK_SHA, APK_SHA, true);
+  assert.equal(v.pass, true);
 });
