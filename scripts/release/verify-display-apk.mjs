@@ -391,19 +391,40 @@ export function evaluatePackagedOrigins(pinned, actual, problem, required) {
  * origins marker have nothing to compare against, and that must not read as a
  * continuity check that ran and succeeded.
  */
-export function evaluateOriginsBaseline(baselineOrigins, actual) {
+export function evaluateOriginsBaseline(baselineOrigins, actual, transition, pinned) {
   const name = 'compiled default origins match the previously published release';
   const keys = ORIGIN_KEYS;
   const isFilled = (obj, k) => typeof obj?.[k] === 'string' && obj[k].length > 0;
+  const complete = obj => Boolean(obj) && keys.every(k => isFilled(obj, k));
+  const describe = obj => keys.map(k => `${k}=${obj?.[k] ?? '(absent)'}`).join('  ');
 
-  if (!baselineOrigins || !keys.every(k => isFilled(baselineOrigins, k))) {
+  // ABSENT is special; MALFORMED is not. A null baseline genuinely has nothing to
+  // compare against — 1.3.13 predates the origins marker — and that is the only
+  // case allowed to skip. A non-null baseline missing or emptying a key is bad
+  // data, and letting it skip would rebuild the exact escape hatch just removed
+  // from the policy-pin check: malformed input silently disabling the control.
+  if (baselineOrigins === null || baselineOrigins === undefined) {
     return {
       name,
       pass: true,
       skipped: true,
       detail:
         'SKIPPED — the published baseline records no compiled origins (it predates the ' +
-        'origins marker). This artifact\'s origins become the baseline once promoted to published.',
+        "origins marker). This artifact's origins become the baseline once promoted to published.",
+    };
+  }
+
+  if (!complete(baselineOrigins)) {
+    const missing = keys.filter(k => !isFilled(baselineOrigins, k));
+    return {
+      name,
+      pass: false,
+      detail:
+        `INCOMPLETE BASELINE — published.compiledOrigins is present but missing or empty for: ` +
+        `${missing.join(', ')}.\n        ` +
+        `A partial baseline is corrupt release metadata, not an absent one. Treating it as ` +
+        `absent would let malformed data silently switch this check off. Repair the published ` +
+        `record — do not publish against it.`,
     };
   }
 
@@ -412,19 +433,91 @@ export function evaluateOriginsBaseline(baselineOrigins, actual) {
   }
 
   const changed = keys.filter(k => actual[k] !== baselineOrigins[k]);
-  if (changed.length) {
+  if (changed.length === 0) {
+    return { name, pass: true, detail: 'unchanged from the published release' };
+  }
+
+  // ─── The artifact moves environments ───────────────────────────────────────
+  //
+  // `published` describes the artifact that is CURRENTLY LIVE. Editing it to the
+  // new origins so the gate goes green would falsify the record of what customers
+  // are actually running, to authorise a change that has not happened yet — the
+  // one file whose job is to be true about production. It stays immutable until
+  // the new candidate is genuinely published.
+  //
+  // A deliberate migration is therefore authorised OUT OF BAND, by an explicit
+  // transition that names where it is coming from and going to. That keeps the
+  // approval auditable and self-invalidating: once `from` no longer matches the
+  // live baseline, the transition has been consumed and cannot silently authorise
+  // a second, different move.
+  const detailChanged = changed
+    .map(k => `${k}: published ${baselineOrigins[k]} -> this build ${actual[k]}`)
+    .join('\n        ');
+
+  if (!transition) {
     return {
       name,
       pass: false,
       detail:
-        `CHANGED since the published release:\n        ` +
-        changed.map(k => `${k}: published ${baselineOrigins[k]} -> this build ${actual[k]}`).join('\n        ') +
-        `\n        If the environment move is intended, update releaseOrigins and the published ` +
-        `baseline deliberately. If it is not, this build is pointed somewhere it should not be.`,
+        `UNAUTHORISED ORIGIN CHANGE — this build was compiled against different origins ` +
+        `than the published release:\n        ${detailChanged}\n        ` +
+        `If this move is intended, record an approved originTransition {from, to, approvedBy, ` +
+        `approvedAt} in release.json. Do NOT edit published.compiledOrigins to match: that ` +
+        `record describes what is live right now, and rewriting it to clear a gate would make ` +
+        `it a lie about production.`,
     };
   }
 
-  return { name, pass: true, detail: 'unchanged from the published release' };
+  const problems = [];
+  if (!complete(transition.from)) problems.push('originTransition.from does not name all three origins');
+  else if (keys.some(k => transition.from[k] !== baselineOrigins[k])) {
+    problems.push(
+      `originTransition.from does not match the live published baseline ` +
+        `(transition says ${describe(transition.from)}; published is ${describe(baselineOrigins)}). ` +
+        `A stale transition must not authorise a different move than the one approved.`,
+    );
+  }
+
+  if (!complete(transition.to)) problems.push('originTransition.to does not name all three origins');
+  else {
+    if (keys.some(k => transition.to[k] !== actual[k])) {
+      problems.push(
+        `originTransition.to does not match what this APK was actually compiled with ` +
+          `(transition says ${describe(transition.to)}; apk has ${describe(actual)})`,
+      );
+    }
+    if (!complete(pinned)) {
+      problems.push('releaseOrigins is missing or incomplete, so the transition target cannot be corroborated');
+    } else if (keys.some(k => transition.to[k] !== pinned[k])) {
+      problems.push(
+        `originTransition.to does not match the releaseOrigins policy pin ` +
+          `(transition says ${describe(transition.to)}; pin is ${describe(pinned)})`,
+      );
+    }
+  }
+
+  if (!transition.approvedBy) problems.push('originTransition.approvedBy is empty — a migration needs a named approver');
+  if (!transition.approvedAt) problems.push('originTransition.approvedAt is empty');
+
+  if (problems.length) {
+    return {
+      name,
+      pass: false,
+      detail:
+        `ORIGIN TRANSITION REJECTED — the change is declared but not properly authorised:` +
+        `\n        ${detailChanged}\n        ` +
+        problems.map(p => `- ${p}`).join('\n        '),
+    };
+  }
+
+  return {
+    name,
+    pass: true,
+    detail:
+      `authorised migration by ${transition.approvedBy} on ${transition.approvedAt}:\n        ` +
+      detailChanged +
+      `\n        published.compiledOrigins stays as-is until this build is actually published.`,
+  };
 }
 
 /** Extract a single entry from the APK (a zip) using the bundled `unzip`. */
@@ -684,6 +777,7 @@ async function main() {
   let baselineAbsent = false;
   let pinnedCert = '';
   let pinnedOrigins = null;
+  let originTransition = null;
   if (args.against) {
     const p = resolve(String(args.against));
     if (!existsSync(p)) {
@@ -695,6 +789,7 @@ async function main() {
     if (!baseline) baselineAbsent = true;
     pinnedCert = normalizeFingerprint(doc?.signing?.canonicalCertSha256 || '');
     pinnedOrigins = doc?.releaseOrigins || null;
+    originTransition = doc?.originTransition || null;
   }
 
   const bytes = readFileSync(apkPath);
@@ -838,7 +933,9 @@ async function main() {
   // signingCertSha256 does for the key: `published.compiledOrigins` is the baseline,
   // so moving environments has to be a deliberate edit rather than a silent drift.
   if (baseline) {
-    checks.push(evaluateOriginsBaseline(baseline.compiledOrigins, packagedOrigins.origins));
+    checks.push(
+      evaluateOriginsBaseline(baseline.compiledOrigins, packagedOrigins.origins, originTransition, pinnedOrigins),
+    );
   }
 
   // 4. certificate matches the previously accepted release + versionCode increases

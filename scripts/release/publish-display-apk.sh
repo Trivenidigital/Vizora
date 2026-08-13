@@ -230,4 +230,11 @@ cat <<EOF
   its versionCode, and its compiledOrigins. Carry compiledOrigins across with
   the rest: leaving it null keeps the origins continuity check permanently
   SKIPPED, which looks like coverage without being any.
+
+  This promotion is the ONLY time published.compiledOrigins changes. It records
+  what customers are running, so it is never edited to make a gate pass.
+
+  If this release was an approved environment migration, clear originTransition
+  in the same commit — the move it authorised has now happened, and the block
+  would otherwise sit there pre-authorising a future one.
 EOF

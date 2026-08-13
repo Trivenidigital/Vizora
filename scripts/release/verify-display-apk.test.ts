@@ -322,25 +322,102 @@ test('a complete pin against a complete marker still passes', () => {
 
 // ─── Release-over-release origins baseline ───────────────────────────────────
 
-test('origins baseline: absent baseline is SKIP, never a silent pass', () => {
-  const verdict = evaluateOriginsBaseline(null, PINNED_ORIGINS);
+// ABSENT may skip; MALFORMED may not. Only a genuinely null baseline has nothing
+// to compare against (1.3.13 predates the marker). A non-null baseline missing a
+// key is corrupt metadata, and letting it skip would rebuild the same
+// "malformed input silently disables the check" hatch just removed from the
+// policy pin — one layer down, where it is harder to notice.
+
+test('origins baseline: a null baseline is SKIP, never a silent pass', () => {
+  const verdict = evaluateOriginsBaseline(null, PINNED_ORIGINS, null, PINNED_ORIGINS);
   assert.equal(verdict.skipped, true);
   assert.match(verdict.detail, /SKIPPED/);
 });
 
-test('origins baseline: a partial baseline is treated as absent, not as a pass', () => {
-  const verdict = evaluateOriginsBaseline({ api: PINNED_ORIGINS.api }, PINNED_ORIGINS);
-  assert.equal(verdict.skipped, true);
+test('NEGATIVE: a baseline missing realtime FAILS — it must not degrade to SKIP', () => {
+  const partial = { api: PINNED_ORIGINS.api, dashboard: PINNED_ORIGINS.dashboard };
+  const verdict = evaluateOriginsBaseline(partial, PINNED_ORIGINS, null, PINNED_ORIGINS);
+  assert.equal(verdict.pass, false);
+  assert.notEqual(verdict.skipped, true);
+  assert.match(verdict.detail, /INCOMPLETE BASELINE/);
+  assert.match(verdict.detail, /realtime/);
+});
+
+test('NEGATIVE: a baseline missing dashboard FAILS', () => {
+  const partial = { api: PINNED_ORIGINS.api, realtime: PINNED_ORIGINS.realtime };
+  const verdict = evaluateOriginsBaseline(partial, PINNED_ORIGINS, null, PINNED_ORIGINS);
+  assert.equal(verdict.pass, false);
+  assert.match(verdict.detail, /INCOMPLETE BASELINE/);
+  assert.match(verdict.detail, /dashboard/);
+});
+
+test('NEGATIVE: a baseline with an empty value FAILS', () => {
+  const verdict = evaluateOriginsBaseline({ ...PINNED_ORIGINS, api: '' }, PINNED_ORIGINS, null, PINNED_ORIGINS);
+  assert.equal(verdict.pass, false);
+  assert.match(verdict.detail, /INCOMPLETE BASELINE/);
+});
+
+test('NEGATIVE: an empty-object baseline FAILS rather than skipping', () => {
+  const verdict = evaluateOriginsBaseline({}, PINNED_ORIGINS, null, PINNED_ORIGINS);
+  assert.equal(verdict.pass, false);
+  assert.notEqual(verdict.skipped, true);
 });
 
 test('origins baseline: unchanged origins pass', () => {
-  assert.equal(evaluateOriginsBaseline(PINNED_ORIGINS, PINNED_ORIGINS).pass, true);
+  assert.equal(evaluateOriginsBaseline(PINNED_ORIGINS, PINNED_ORIGINS, null, PINNED_ORIGINS).pass, true);
 });
 
-test('NEGATIVE: origins baseline catches a silent environment move between releases', () => {
-  const moved = { ...PINNED_ORIGINS, api: 'https://api.vizora.io' };
-  const verdict = evaluateOriginsBaseline(PINNED_ORIGINS, moved);
+// ─── Authorised environment migration ────────────────────────────────────────
+//
+// published.compiledOrigins describes what customers are running RIGHT NOW, so a
+// deliberate move is authorised out of band instead of by rewriting that record
+// to clear the gate.
+
+const MOVED = { api: 'https://api.vizora.io', realtime: 'wss://realtime.vizora.io', dashboard: 'https://dashboard.vizora.io' };
+const GOOD_TRANSITION = { from: PINNED_ORIGINS, to: MOVED, approvedBy: 'Srini', approvedAt: '2026-08-13' };
+
+test('NEGATIVE: an unauthorised environment move is rejected', () => {
+  const verdict = evaluateOriginsBaseline(PINNED_ORIGINS, MOVED, null, MOVED);
   assert.equal(verdict.pass, false);
-  assert.match(verdict.detail, /CHANGED since the published release/);
-  assert.match(verdict.detail, /api\.vizora\.io/);
+  assert.match(verdict.detail, /UNAUTHORISED ORIGIN CHANGE/);
+  assert.match(verdict.detail, /Do NOT edit published\.compiledOrigins/);
+});
+
+test('an APPROVED transition permits the move', () => {
+  const verdict = evaluateOriginsBaseline(PINNED_ORIGINS, MOVED, GOOD_TRANSITION, MOVED);
+  assert.equal(verdict.pass, true);
+  assert.match(verdict.detail, /authorised migration by Srini/);
+});
+
+test('NEGATIVE: a stale transition (from != live baseline) is rejected', () => {
+  // The migration already happened; the same block must not wave through another.
+  const stale = { ...GOOD_TRANSITION, from: { api: 'https://old.example.com', realtime: 'wss://old.example.com', dashboard: 'https://old.example.com' } };
+  const verdict = evaluateOriginsBaseline(PINNED_ORIGINS, MOVED, stale, MOVED);
+  assert.equal(verdict.pass, false);
+  assert.match(verdict.detail, /does not match the live published baseline/);
+});
+
+test('NEGATIVE: a transition whose `to` differs from the actual artifact is rejected', () => {
+  const elsewhere = { ...MOVED, api: 'https://sneaky.example.com' };
+  const verdict = evaluateOriginsBaseline(PINNED_ORIGINS, elsewhere, GOOD_TRANSITION, MOVED);
+  assert.equal(verdict.pass, false);
+  assert.match(verdict.detail, /does not match what this APK was actually compiled with/);
+});
+
+test('NEGATIVE: a transition that disagrees with the policy pin is rejected', () => {
+  const verdict = evaluateOriginsBaseline(PINNED_ORIGINS, MOVED, GOOD_TRANSITION, PINNED_ORIGINS);
+  assert.equal(verdict.pass, false);
+  assert.match(verdict.detail, /does not match the releaseOrigins policy pin/);
+});
+
+test('NEGATIVE: an unapproved transition (no approver) is rejected', () => {
+  const verdict = evaluateOriginsBaseline(PINNED_ORIGINS, MOVED, { ...GOOD_TRANSITION, approvedBy: '' }, MOVED);
+  assert.equal(verdict.pass, false);
+  assert.match(verdict.detail, /approvedBy is empty/);
+});
+
+test('NEGATIVE: a transition with incomplete from/to is rejected', () => {
+  const verdict = evaluateOriginsBaseline(PINNED_ORIGINS, MOVED, { ...GOOD_TRANSITION, to: { api: MOVED.api } }, MOVED);
+  assert.equal(verdict.pass, false);
+  assert.match(verdict.detail, /does not name all three origins/);
 });
