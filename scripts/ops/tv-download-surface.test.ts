@@ -71,6 +71,21 @@ function startServer(mode: SurfaceMode): Promise<{ server: Server; baseUrl: stri
       return res.end('<html><body>Vizora Display</body></html>');
     }
 
+    // The web root and its build assets — always healthy in these tests, which
+    // are about the install surface, not about web. health-guardian follows an
+    // asset the served HTML references, so a fake healthy web has to serve one.
+    if (url === '/') {
+      res.writeHead(200, { 'content-type': 'text/html', connection: 'close' });
+      return res.end(
+        '<html><head><script src="/_next/static/chunks/test-chunk.js"></script>' +
+        '</head><body>ok</body></html>',
+      );
+    }
+    if (url.startsWith('/_next/static/')) {
+      res.writeHead(200, { 'content-type': 'application/javascript', connection: 'close' });
+      return res.end('console.log("chunk");');
+    }
+
     // Service health endpoints — always healthy in these tests.
     res.writeHead(200, { 'content-type': 'application/json', connection: 'close' });
     res.end(JSON.stringify({ status: 'ok' }));

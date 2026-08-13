@@ -35,7 +35,7 @@ import {
 } from './lib/state.js';
 import { log, pingHeartbeat } from './lib/alerting.js';
 import { readEcosystemMemoryPolicy } from './lib/ecosystem.js';
-import { planAssetProbe, summarizeAssetProbe, type AssetProbeOutcome } from './lib/web-assets.js';
+import { probeWebAssets, type ProbeFetch } from './lib/web-assets.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -147,7 +147,7 @@ async function checkEndpoint(url: string): Promise<{ ok: boolean; status?: numbe
 }
 
 /**
- * Follow at least one asset the served HTML actually references.
+ * Follow an asset the served HTML actually references.
  *
  * WEB_HEALTH_FALSE_GREEN: on 2026-08-12 an OOM-killed `next build` wiped
  * `.next` while the running next-server kept serving HTML from already-open
@@ -155,49 +155,30 @@ async function checkEndpoint(url: string): Promise<{ ok: boolean; status?: numbe
  * returned 500, and this agent reported web healthy for 5h45m because it only
  * asked the shell. A shell that renders is not a working app.
  *
- * Returns `ok: true` when the HTML references no build assets — that is
- * reported as unverifiable rather than silently passing, because "nothing to
- * check" and "everything checked out" are different states.
+ * FAIL-CLOSED: anything that cannot establish usability — an HTML failure, a
+ * non-2xx asset, or HTML with no verifiable build references — is unhealthy.
+ * Decision logic lives in `lib/web-assets.ts` so it is testable without a
+ * server; this only supplies the timeout-bounded fetch.
  */
-async function probeWebAssets(baseUrl: string): Promise<{ ok: boolean; detail: string }> {
-  let html: string;
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
-    try {
-      const res = await fetch(baseUrl, { method: 'GET', signal: controller.signal });
-      if (!res.ok) return { ok: false, detail: `HTML fetch returned ${res.status}` };
-      html = await res.text();
-    } finally {
-      clearTimeout(timer);
-    }
-  } catch (err) {
-    return { ok: false, detail: `HTML fetch failed: ${err instanceof Error ? err.message : err}` };
-  }
-
-  const plan = planAssetProbe(html);
-  if (plan.unverifiable) {
-    // Not a failure, but must not read as a clean pass.
-    return { ok: true, detail: plan.reason };
-  }
-
-  const outcomes: AssetProbeOutcome[] = [];
-  for (const path of plan.paths) {
-    const url = `${baseUrl.replace(/\/$/, '')}${path}`;
+async function probeWebAssetHealth(baseUrl: string): Promise<{ ok: boolean; detail: string }> {
+  const boundedFetch: ProbeFetch = async (url: string) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
     try {
       const res = await fetch(url, { method: 'GET', signal: controller.signal });
-      outcomes.push({ path, status: res.status, ok: res.status >= 200 && res.status < 400 });
-    } catch (err) {
-      outcomes.push({ path, ok: false, error: err instanceof Error ? err.message : String(err) });
+      // The body MUST be consumed inside the timeout window, for two reasons:
+      // an unread body leaves the socket open and keeps this cron process
+      // alive past its work (the same shape as the pingHeartbeat timer leak in
+      // lib/alerting.ts), and a lazy read after clearTimeout would be unbounded.
+      const body = await res.text();
+      return { ok: res.ok, status: res.status, text: async () => body };
     } finally {
       clearTimeout(timer);
     }
-  }
-
-  return summarizeAssetProbe(outcomes);
+  };
+  return probeWebAssets(baseUrl, boundedFetch);
 }
+
 
 // ─── APK Download Surface Check ──────────────────────────────────────────────
 
@@ -376,7 +357,7 @@ async function main(): Promise<void> {
 
     // The HTML shell answering 200 is necessary but not sufficient for web.
     if (result.ok && svc.probeAssets && svc.assetBaseUrl) {
-      const assets = await probeWebAssets(svc.assetBaseUrl);
+      const assets = await probeWebAssetHealth(svc.assetBaseUrl);
       log(AGENT, `${svc.name}: asset probe — ${assets.detail}`);
       if (!assets.ok) {
         result = { ok: false, status: result.status, error: `referenced assets unhealthy: ${assets.detail}` };

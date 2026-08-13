@@ -14,7 +14,10 @@ import test from 'node:test';
 import {
   extractReferencedAssets,
   planAssetProbe,
+  probeWebAssets,
   summarizeAssetProbe,
+  type ProbeFetch,
+  type ProbeResponse,
 } from './web-assets.js';
 
 /** Shape of the HTML prod actually served during the incident. */
@@ -138,8 +141,94 @@ test('a network error is reported rather than swallowed', () => {
   assert.match(r.detail, /ECONNREFUSED/);
 });
 
-test('probing nothing is not a failure', () => {
-  // Absence of assets is handled by planAssetProbe's unverifiable flag; the
-  // summary must not manufacture a failure from an empty probe set.
-  assert.equal(summarizeAssetProbe([]).ok, true);
+test('probing NOTHING is a failure — no evidence is not evidence of health', () => {
+  // An earlier revision returned ok:true here. Combined with probeWebAssets
+  // returning healthy for unverifiable HTML, the promised fail-closed
+  // behaviour did not exist: the log wording changed, the verdict did not.
+  const r = summarizeAssetProbe([]);
+  assert.equal(r.ok, false);
+  assert.match(r.detail, /unverifiable/);
+});
+
+// ─── probeWebAssets: the health verdict itself ───────────────────────────────
+
+function fakeFetch(routes: Record<string, { status: number; body?: string }>): ProbeFetch {
+  return async (url: string): Promise<ProbeResponse> => {
+    const route = routes[url];
+    if (!route) throw new Error(`ECONNREFUSED ${url}`);
+    return {
+      ok: route.status >= 200 && route.status < 300,
+      status: route.status,
+      text: async () => route.body ?? '',
+    };
+  };
+}
+
+test('INTEGRATION: HTML 200 with no /_next/static references → NOT healthy', () => {
+  // The blocker. Previously this produced "asset probe: could not be verified"
+  // followed by "web: healthy" — the exact false-green shape, one level up.
+  return probeWebAssets(
+    'http://localhost:3001',
+    fakeFetch({ 'http://localhost:3001': { status: 200, body: '<html><body>shell</body></html>' } }),
+  ).then((r) => {
+    assert.equal(r.ok, false, 'inability to prove the app works is not proof it works');
+    assert.match(r.detail, /could not be verified/);
+  });
+});
+
+test('INTEGRATION: the outage shape — HTML 200, referenced assets 500 → NOT healthy', async () => {
+  const r = await probeWebAssets(
+    'http://localhost:3001',
+    fakeFetch({
+      'http://localhost:3001': { status: 200, body: REAL_HTML },
+      'http://localhost:3001/_next/static/chunks/e1a2b3c4.css': { status: 500 },
+      'http://localhost:3001/_next/static/chunks/2mne9w-o6li3-.js': { status: 500 },
+    }),
+  );
+  assert.equal(r.ok, false);
+  assert.match(r.detail, /2\/2 referenced asset\(s\) failed/);
+});
+
+test('INTEGRATION: HTML 200 and referenced assets 200 → healthy', async () => {
+  const r = await probeWebAssets(
+    'http://localhost:3001',
+    fakeFetch({
+      'http://localhost:3001': { status: 200, body: REAL_HTML },
+      'http://localhost:3001/_next/static/chunks/e1a2b3c4.css': { status: 200 },
+      'http://localhost:3001/_next/static/chunks/2mne9w-o6li3-.js': { status: 200 },
+    }),
+  );
+  assert.equal(r.ok, true);
+  assert.match(r.detail, /2\/2 referenced asset\(s\) served/);
+});
+
+test('INTEGRATION: a 3xx asset is NOT counted as healthy', async () => {
+  // The code, comments and PR all said 2xx; the fetch check previously accepted
+  // < 400. fetch follows redirects, so a legitimate redirect already resolves
+  // to its final 2xx — a surviving 3xx here means something is wrong.
+  const r = await probeWebAssets(
+    'http://localhost:3001',
+    fakeFetch({
+      'http://localhost:3001': { status: 200, body: REAL_HTML },
+      'http://localhost:3001/_next/static/chunks/e1a2b3c4.css': { status: 200 },
+      'http://localhost:3001/_next/static/chunks/2mne9w-o6li3-.js': { status: 302 },
+    }),
+  );
+  assert.equal(r.ok, false);
+  assert.match(r.detail, /2mne9w-o6li3-\.js -> 302/);
+});
+
+test('INTEGRATION: an HTML failure is unhealthy without probing assets', async () => {
+  const r = await probeWebAssets(
+    'http://localhost:3001',
+    fakeFetch({ 'http://localhost:3001': { status: 503 } }),
+  );
+  assert.equal(r.ok, false);
+  assert.match(r.detail, /HTML fetch returned 503/);
+});
+
+test('INTEGRATION: an unreachable server is unhealthy, not silently healthy', async () => {
+  const r = await probeWebAssets('http://localhost:3001', fakeFetch({}));
+  assert.equal(r.ok, false);
+  assert.match(r.detail, /HTML fetch failed/);
 });

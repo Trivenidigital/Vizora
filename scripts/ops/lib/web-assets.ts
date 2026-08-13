@@ -97,13 +97,17 @@ export interface AssetProbeOutcome {
  * Any non-2xx is a failure. The incident produced 500s; a 404 would mean the
  * HTML references a file that no longer exists, which is the same class of
  * artifact/serving mismatch and equally user-breaking.
+ *
+ * An EMPTY outcome set is also a failure. Having probed nothing, this function
+ * cannot assert the app is usable, and returning healthy from "no evidence" is
+ * exactly the false-green shape the whole check exists to remove.
  */
 export function summarizeAssetProbe(outcomes: AssetProbeOutcome[]): {
   ok: boolean;
   detail: string;
 } {
   if (outcomes.length === 0) {
-    return { ok: true, detail: 'no assets probed' };
+    return { ok: false, detail: 'no assets probed — asset health unverifiable' };
   }
   const failed = outcomes.filter(o => !o.ok);
   if (failed.length === 0) {
@@ -116,4 +120,69 @@ export function summarizeAssetProbe(outcomes: AssetProbeOutcome[]): {
     ok: false,
     detail: `${failed.length}/${outcomes.length} referenced asset(s) failed: ${detail}`,
   };
+}
+
+// ─── Probe orchestration ────────────────────────────────────────────────────
+
+/** Minimal shape of the response fields the probe reads. */
+export interface ProbeResponse {
+  ok: boolean;
+  status: number;
+  text(): Promise<string>;
+}
+
+export type ProbeFetch = (url: string) => Promise<ProbeResponse>;
+
+/**
+ * Fetch the served HTML, follow the build assets it references, and decide
+ * whether web is genuinely usable.
+ *
+ * ─── Fail-closed, deliberately ──────────────────────────────────────────────
+ *
+ * Every path that cannot ESTABLISH usability returns `ok: false`:
+ *
+ *   HTML fetch fails                → unhealthy
+ *   a referenced asset is not 2xx   → unhealthy
+ *   HTML references no build assets → unhealthy (unverifiable)
+ *
+ * That last case matters. An earlier revision returned healthy with the detail
+ * "could not be verified", which changed the log wording without changing the
+ * verdict — reproducing the false-green behaviour this check exists to remove,
+ * one level up. Inability to prove the app works is not evidence that it works.
+ *
+ * `fetchImpl` is injected so the decision logic is testable without a server.
+ */
+export async function probeWebAssets(
+  baseUrl: string,
+  fetchImpl: ProbeFetch,
+  sampleSize = 2,
+): Promise<{ ok: boolean; detail: string }> {
+  let html: string;
+  try {
+    const res = await fetchImpl(baseUrl);
+    if (!res.ok) return { ok: false, detail: `HTML fetch returned ${res.status}` };
+    html = await res.text();
+  } catch (err) {
+    return { ok: false, detail: `HTML fetch failed: ${err instanceof Error ? err.message : err}` };
+  }
+
+  const plan = planAssetProbe(html, sampleSize);
+  if (plan.unverifiable) {
+    return { ok: false, detail: plan.reason };
+  }
+
+  const origin = baseUrl.replace(/\/$/, '');
+  const outcomes: AssetProbeOutcome[] = [];
+  for (const path of plan.paths) {
+    try {
+      const res = await fetchImpl(`${origin}${path}`);
+      // `res.ok` is 2xx exactly. fetch follows redirects, so a legitimate
+      // redirect already resolves to its final 2xx response.
+      outcomes.push({ path, status: res.status, ok: res.ok });
+    } catch (err) {
+      outcomes.push({ path, ok: false, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  return summarizeAssetProbe(outcomes);
 }
