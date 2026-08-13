@@ -35,6 +35,7 @@ import {
 } from './lib/state.js';
 import { log, pingHeartbeat } from './lib/alerting.js';
 import { readEcosystemMemoryPolicy } from './lib/ecosystem.js';
+import { planAssetProbe, summarizeAssetProbe, type AssetProbeOutcome } from './lib/web-assets.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -80,6 +81,10 @@ interface ServiceDef {
   healthUrl: string;
   pm2Name: string;
   memoryLimitBytes: number | null;
+  /** Follow a reference from the served HTML before declaring this healthy. */
+  probeAssets?: boolean;
+  /** Origin the referenced asset paths are resolved against. */
+  assetBaseUrl?: string;
 }
 
 function getServiceDefs(): ServiceDef[] {
@@ -110,6 +115,9 @@ function getServiceDefs(): ServiceDef[] {
       healthUrl: `${webUrl}/`,
       pm2Name: 'vizora-web',
       memoryLimitBytes: policy.limits['vizora-web'] ?? null,
+      // A 200 on the HTML shell is NOT proof the app works — see probeWebAssets.
+      probeAssets: true,
+      assetBaseUrl: webUrl,
     },
   ];
 }
@@ -136,6 +144,59 @@ async function checkEndpoint(url: string): Promise<{ ok: boolean; status?: numbe
     clearTimeout(timer);
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+/**
+ * Follow at least one asset the served HTML actually references.
+ *
+ * WEB_HEALTH_FALSE_GREEN: on 2026-08-12 an OOM-killed `next build` wiped
+ * `.next` while the running next-server kept serving HTML from already-open
+ * file handles. `/` returned 200 while every `/_next/static/*` it referenced
+ * returned 500, and this agent reported web healthy for 5h45m because it only
+ * asked the shell. A shell that renders is not a working app.
+ *
+ * Returns `ok: true` when the HTML references no build assets — that is
+ * reported as unverifiable rather than silently passing, because "nothing to
+ * check" and "everything checked out" are different states.
+ */
+async function probeWebAssets(baseUrl: string): Promise<{ ok: boolean; detail: string }> {
+  let html: string;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
+    try {
+      const res = await fetch(baseUrl, { method: 'GET', signal: controller.signal });
+      if (!res.ok) return { ok: false, detail: `HTML fetch returned ${res.status}` };
+      html = await res.text();
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch (err) {
+    return { ok: false, detail: `HTML fetch failed: ${err instanceof Error ? err.message : err}` };
+  }
+
+  const plan = planAssetProbe(html);
+  if (plan.unverifiable) {
+    // Not a failure, but must not read as a clean pass.
+    return { ok: true, detail: plan.reason };
+  }
+
+  const outcomes: AssetProbeOutcome[] = [];
+  for (const path of plan.paths) {
+    const url = `${baseUrl.replace(/\/$/, '')}${path}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
+    try {
+      const res = await fetch(url, { method: 'GET', signal: controller.signal });
+      outcomes.push({ path, status: res.status, ok: res.status >= 200 && res.status < 400 });
+    } catch (err) {
+      outcomes.push({ path, ok: false, error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  return summarizeAssetProbe(outcomes);
 }
 
 // ─── APK Download Surface Check ──────────────────────────────────────────────
@@ -311,7 +372,16 @@ async function main(): Promise<void> {
     const existingIncident = priorState.incidents.find(i => i.id === incidentId);
 
     log(AGENT, `Checking ${svc.name}: ${svc.healthUrl}`);
-    const result = await checkEndpoint(svc.healthUrl);
+    let result = await checkEndpoint(svc.healthUrl);
+
+    // The HTML shell answering 200 is necessary but not sufficient for web.
+    if (result.ok && svc.probeAssets && svc.assetBaseUrl) {
+      const assets = await probeWebAssets(svc.assetBaseUrl);
+      log(AGENT, `${svc.name}: asset probe — ${assets.detail}`);
+      if (!assets.ok) {
+        result = { ok: false, status: result.status, error: `referenced assets unhealthy: ${assets.detail}` };
+      }
+    }
 
     if (result.ok) {
       log(AGENT, `${svc.name}: healthy (status ${result.status})`);
