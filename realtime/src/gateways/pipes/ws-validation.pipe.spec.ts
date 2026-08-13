@@ -138,6 +138,52 @@ describe('WsValidationPipe', () => {
       const bogus = { uptime: 10, notAContractField: 'x' };
       await expect(pipe.transform(bogus, hbMeta)).rejects.toThrow(WsException);
     });
+
+    it('ACCEPTS the REAL shipped heartbeat payload, contentVersion included', async () => {
+      // Regression for a live production outage. This block existed and still
+      // missed it: `contentVersion` shipped in the player at v1.3.10 and was
+      // never added here, so forbidNonWhitelisted rejected EVERY heartbeat from
+      // v1.3.10 through v1.3.13. The status refresh and appVersion persistence
+      // never ran and the ack never returned — 0 of 24 production devices had
+      // metadata.appVersion, which only the post-validation path writes.
+      //
+      // Mirrors vizora-tv src/main.ts heartbeatData field for field, so the next
+      // player-side addition fails HERE rather than in the field. Adding a field
+      // to the player without adding it to this DTO is a breaking change.
+      const shipped = {
+        uptime: 3600,
+        appVersion: '1.3.13',
+        contentVersion: 'playlist-abc@7',
+        metrics: { cpuUsage: 0, memoryUsage: 42.5 },
+        currentContent: { contentId: 'c1' },
+        screenState: 'playing',
+        playbackSource: 'live',
+      };
+      const result = await pipe.transform(shipped, hbMeta);
+      expect(result.contentVersion).toBe('playlist-abc@7');
+      expect(result.appVersion).toBe('1.3.13');
+    });
+
+    it('ACCEPTS the empty-string contentVersion a freshly booted device sends', async () => {
+      // The player initialises currentContentVersion to '' and sends it before it
+      // has rendered anything, so the empty string is the FIRST value the server
+      // ever sees. @IsOptional() alone would not have saved us here — '' is
+      // present, not absent — which is precisely why the field had to be
+      // whitelisted rather than merely tolerated.
+      const booting = { uptime: 2, appVersion: '1.3.13', contentVersion: '' };
+      const result = await pipe.transform(booting, hbMeta);
+      expect(result.contentVersion).toBe('');
+    });
+
+    it('rejects an oversized contentVersion (it lands in a JSONB row)', async () => {
+      const huge = { uptime: 10, contentVersion: 'x'.repeat(129) };
+      await expect(pipe.transform(huge, hbMeta)).rejects.toThrow(WsException);
+    });
+
+    it('rejects a non-string contentVersion', async () => {
+      const wrongType = { uptime: 10, contentVersion: 7 };
+      await expect(pipe.transform(wrongType, hbMeta)).rejects.toThrow(WsException);
+    });
   });
 
   describe('non-body params (the prod-breaking gap)', () => {

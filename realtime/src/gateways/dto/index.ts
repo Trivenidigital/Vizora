@@ -97,6 +97,28 @@ export class HeartbeatMessageDto {
   @IsString()
   @MaxLength(32)
   playbackSource?: string;
+
+  // The effective-content version the device currently has rendered, so the
+  // server can detect drift and answer with `reconcileContent`.
+  //
+  // NOT whitelisting this is what the comment above warns about, and it happened:
+  // the player has sent `contentVersion` on EVERY heartbeat since v1.3.10
+  // (vizora-tv src/main.ts, initialised to '' so it is always serialised, never
+  // dropped as undefined), while this DTO never listed it. With
+  // forbidNonWhitelisted the pipe rejected the payload before the handler ran, so
+  // for four releases no heartbeat was processed: the Redis/DB status refresh and
+  // appVersion persistence never executed and the ack never reached the device.
+  //
+  // Proof it was live, not theoretical: 0 of 24 production devices carried
+  // metadata.appVersion, which only the post-validation heartbeat path writes.
+  // Device rows still looked recent because handleConnection writes lastHeartbeat
+  // on CONNECT — which is why this hid for so long.
+  //
+  // Bounded like appVersion: it is device-supplied and reaches a JSONB row.
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  contentVersion?: string;
 }
 
 /**
