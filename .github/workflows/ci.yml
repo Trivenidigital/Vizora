@@ -110,6 +110,15 @@ jobs:
         working-directory: display
         run: pnpm typecheck
 
+      # `pnpm test:ops` runs under tsx, which STRIPS types without checking them,
+      # and neither `lint` (middleware/src + realtime/src) nor the display
+      # typecheck covers scripts/. So a type error in the code PM2 runs against
+      # production could reach main silently — one already did. Runs after the
+      # @vizora/database build above, which the middleware validator that
+      # scripts/ops imports needs in order to resolve.
+      - name: Typecheck ops scripts
+        run: pnpm typecheck:ops
+
       - name: Run ops unit tests
         run: pnpm test:ops
 

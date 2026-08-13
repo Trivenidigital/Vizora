@@ -117,3 +117,29 @@ test('no service limit is duplicated as an independent constant in health-guardi
     'health-guardian must not hardcode a memoryLimitBytes value',
   );
 });
+
+// ─── CI gate coverage ────────────────────────────────────────────────────────
+
+test('CI type-checks the ops scripts', async () => {
+  // pnpm test:ops runs under tsx, which strips types without checking them, and
+  // neither `lint` nor the display typecheck covers scripts/. Removing this CI
+  // step would silently reopen the hole a type error already slipped through.
+  const { readFileSync } = await import('node:fs');
+  const { dirname, join } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+  const workflow = readFileSync(join(repoRoot, '.github', 'workflows', 'ci.yml'), 'utf8');
+  assert.match(workflow, /run: pnpm typecheck:ops/, 'ci.yml must run the ops typecheck');
+
+  const pkg = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
+  assert.ok(pkg.scripts['typecheck:ops'], 'package.json must define typecheck:ops');
+
+  // The step must run AFTER the database build, or the middleware validator that
+  // scripts/ops imports cannot resolve @vizora/database and the check fails for
+  // an environment reason rather than a code one.
+  assert.ok(
+    workflow.indexOf('nx build @vizora/database') < workflow.indexOf('pnpm typecheck:ops'),
+    'typecheck:ops must come after the @vizora/database build',
+  );
+});

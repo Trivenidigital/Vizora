@@ -22,6 +22,7 @@ import {
   buildPsqlCandidates,
   summarize,
   type MaintenanceReport,
+  type VacuumOutcome,
 } from './db-maintenance.js';
 
 const PG_PW = 'PGPW-do-not-leak-4f7a';
@@ -146,8 +147,11 @@ test('total VACUUM failure is CRITICAL and reported once, not per table', () => 
 });
 
 test('a single VACUUM failure is WARNING — autovacuum still covers it', () => {
-  const vacuum = VACUUM_TABLES.map(t => ({ table: t, success: true }));
-  vacuum[0] = { table: vacuum[0].table, success: false, error: 'lock timeout' };
+  // Annotated: without it the element type is inferred as {table, success}
+  // and assigning an `error` below is a type error — invisible under tsx,
+  // which strips types without checking them.
+  const vacuum: VacuumOutcome[] = VACUUM_TABLES.map(t => ({ table: t, success: true }));
+  vacuum[0] = { table: vacuum[0]!.table, success: false, error: 'lock timeout' };
   const incidents = buildMaintenanceIncidents(report({ vacuum }), AT);
   const one = incidents.find(i => i.type === 'vacuum-failed');
   assert.ok(one);

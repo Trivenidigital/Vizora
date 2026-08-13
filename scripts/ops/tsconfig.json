@@ -1,0 +1,37 @@
+{
+  "//": [
+    "Type-checks the autonomous-ops scripts.",
+    "",
+    "WHY THIS EXISTS: nothing type-checked scripts/ at all. CI's `lint` job covers",
+    "middleware/src + realtime/src, and the only `typecheck` job covers `display`.",
+    "`pnpm test:ops` runs under tsx, which STRIPS types without checking them. So a",
+    "type error in production ops code reached main silently — one already did:",
+    "lib/state.ts used `Incident` without importing it.",
+    "",
+    "Scope is scripts/ops deliberately. That is the code PM2 runs against production",
+    "every few minutes, and it type-checks clean today, so the gate costs nothing to",
+    "add. scripts/agents is excluded for now: it needs the generated Prisma client to",
+    "resolve @vizora/database, and carries 4 implicit-any errors. Widening this is a",
+    "separate, tracked job — not a reason to leave the ops path ungated.",
+    "",
+    "Settings mirror what the ops code is actually executed with: ESM, bundler",
+    "resolution (so `./x.js` specifiers resolve to `./x.ts`, as tsx does)."
+  ],
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["**/*.ts"]
+}

@@ -239,7 +239,7 @@ test('a successful release does not increment the failure count', async () => {
   __resetSessionReleaseFailures();
   const { restore } = stubFetch([`${REFRESH_COOKIE}; Path=/`, `${CSRF_COOKIE}; Path=/`], { logoutStatus: 200 });
   try {
-    const token = await login(BASE, 'ops@example.test', 'pw');
+    await login(BASE, 'ops@example.test', 'pw');
     await releaseSessions();
     assert.equal(sessionReleaseFailures(), 0, 'clean release must not count as failure');
   } finally {
