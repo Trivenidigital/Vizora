@@ -577,7 +577,42 @@ describe('DevicesClient', () => {
     await waitFor(() => {
       expect(mockBulkAssignPlaylist).toHaveBeenCalledWith(['d1', 'd2'], 'p1');
     });
-    expect(mockToast.success).toHaveBeenCalledWith('Playlist assigned to 1 device(s)');
+    // d1 is online, d2 is offline — a mixed selection, so the operator is told
+    // the offline one updates later rather than being left to infer it from a
+    // TV that keeps showing its cached playlist.
+    expect(mockToast.success).toHaveBeenCalledWith(
+      'Playlist assigned to 1 device(s). Non-online devices will update when they come online.',
+    );
+  });
+
+  it('omits the deferred-delivery note when every selected device is online', async () => {
+    mockBulkAssignPlaylist.mockResolvedValue({ updated: 2 });
+
+    render(
+      <DevicesClient
+        initialDevices={sampleDevices as any}
+        initialPlaylists={samplePlaylists as any}
+        initialDevicesComplete
+        initialPlaylistsComplete
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Lobby Display')).toBeInTheDocument();
+    });
+
+    // checkboxes[1] = d1 (online), checkboxes[3] = d3 (online) — d2 is offline.
+    const checkboxes = screen.getAllByRole('checkbox');
+    fireEvent.click(checkboxes[1]);
+    fireEvent.click(checkboxes[3]);
+    fireEvent.click(screen.getByText('Assign Playlist'));
+    fireEvent.change(screen.getAllByRole('combobox').at(-1)!, { target: { value: 'p1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Assign' }));
+
+    await waitFor(() => {
+      expect(mockBulkAssignPlaylist).toHaveBeenCalledWith(['d1', 'd3'], 'p1');
+    });
+    expect(mockToast.success).toHaveBeenCalledWith('Playlist assigned to 2 device(s)');
   });
 
   it('reports backend added count after bulk group assignment', async () => {
