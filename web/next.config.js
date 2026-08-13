@@ -30,7 +30,10 @@ const nextConfig = {
   // is the NEXT_SERVER_ACTIONS_ENCRYPTION_KEY env var (read automatically
   // by Next.js at build time) - set it to a stable value in production .env.
   experimental: {
-    turbopackUseSystemTlsCerts: true,
+    // NOTE: every key here must exist in the installed Next's config schema.
+    // `next.config.experimental.test.js` enforces that. An unrecognised key is
+    // silently inert — Next warns once at startup and ignores it — so it reads
+    // like configuration while doing nothing.
     serverActions: {
       allowedOrigins: ['vizora.cloud', 'www.vizora.cloud', 'localhost:3001'],
     },

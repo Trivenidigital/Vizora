@@ -39,8 +39,15 @@ module.exports = {
       // Graceful shutdown — 30s for in-flight requests to complete
       kill_timeout: 30000,
       // Logging
+      //
+      // Deliberately no `max_size`: PM2 6.0.14's app schema
+      // (lib/API/schema.json) has no such option — it is a pm2-logrotate MODULE
+      // setting, and that module is not installed (/root/.pm2/modules is empty,
+      // module_conf.json is {}), nor is there an /etc/logrotate.d entry for
+      // pm2. Declaring it made the config assert a log bound that did not
+      // exist. Log handling lives in the db-maintainer ops agent
+      // (scripts/ops/db-maintainer.ts), not in PM2 config.
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '50M',
       error_file: './logs/middleware-error.log',
       out_file: './logs/middleware-out.log',
       merge_logs: true,
@@ -73,7 +80,6 @@ module.exports = {
       kill_timeout: 15000, // 15 seconds for WebSocket connections to close
       // Logging
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '50M',
       error_file: './logs/realtime-error.log',
       out_file: './logs/realtime-out.log',
       merge_logs: true,
@@ -119,7 +125,6 @@ module.exports = {
       kill_timeout: 30000,
       // Logging
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '50M',
       error_file: './logs/web-error.log',
       out_file: './logs/web-out.log',
       merge_logs: true,
@@ -153,7 +158,6 @@ module.exports = {
         RETENTION_DAYS: '90',
       },
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '10M',
       error_file: './logs/cleanup-impressions-error.log',
       out_file: './logs/cleanup-impressions-out.log',
       merge_logs: true,
@@ -178,7 +182,6 @@ module.exports = {
       },
       // Logging
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '10M',
       error_file: './logs/validator-error.log',
       out_file: './logs/validator-out.log',
       merge_logs: true,
@@ -203,7 +206,6 @@ module.exports = {
       },
       // Logging
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '10M',
       error_file: './logs/ops-health-guardian-error.log',
       out_file: './logs/ops-health-guardian-out.log',
       merge_logs: true,
@@ -228,7 +230,6 @@ module.exports = {
       },
       // Logging
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '10M',
       error_file: './logs/ops-content-lifecycle-error.log',
       out_file: './logs/ops-content-lifecycle-out.log',
       merge_logs: true,
@@ -253,7 +254,6 @@ module.exports = {
       },
       // Logging
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '10M',
       error_file: './logs/ops-fleet-manager-error.log',
       out_file: './logs/ops-fleet-manager-out.log',
       merge_logs: true,
@@ -278,7 +278,6 @@ module.exports = {
       },
       // Logging
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '10M',
       error_file: './logs/ops-schedule-doctor-error.log',
       out_file: './logs/ops-schedule-doctor-out.log',
       merge_logs: true,
@@ -303,7 +302,6 @@ module.exports = {
       },
       // Logging
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '10M',
       error_file: './logs/ops-reporter-error.log',
       out_file: './logs/ops-reporter-out.log',
       merge_logs: true,
@@ -326,7 +324,6 @@ module.exports = {
       },
       // Logging
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '10M',
       error_file: './logs/ops-watchdog-error.log',
       out_file: './logs/ops-watchdog-out.log',
       merge_logs: true,
@@ -351,7 +348,6 @@ module.exports = {
       },
       // Logging
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '10M',
       error_file: './logs/ops-db-maintainer-error.log',
       out_file: './logs/ops-db-maintainer-out.log',
       merge_logs: true,
@@ -383,7 +379,6 @@ module.exports = {
       },
       // Logging
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '10M',
       error_file: './logs/ops-config-drift-detector-error.log',
       out_file: './logs/ops-config-drift-detector-out.log',
       merge_logs: true,
@@ -414,7 +409,6 @@ module.exports = {
         VALIDATOR_BASE_URL: 'http://localhost:3000',
       },
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '10M',
       error_file: './logs/agent-customer-lifecycle-error.log',
       out_file: './logs/agent-customer-lifecycle-out.log',
       merge_logs: true,
@@ -438,7 +432,6 @@ module.exports = {
         VALIDATOR_BASE_URL: 'http://localhost:3000',
       },
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '10M',
       error_file: './logs/agent-support-triage-error.log',
       out_file: './logs/agent-support-triage-out.log',
       merge_logs: true,
@@ -488,7 +481,6 @@ module.exports = {
       watch: false,
       max_memory_restart: '256M',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '10M',
       error_file: './logs/hermes-vizora-customer-lifecycle-error.log',
       out_file: './logs/hermes-vizora-customer-lifecycle-out.log',
       merge_logs: true,
@@ -511,7 +503,6 @@ module.exports = {
       watch: false,
       max_memory_restart: '256M',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '10M',
       error_file: './logs/hermes-vizora-support-triage-error.log',
       out_file: './logs/hermes-vizora-support-triage-out.log',
       merge_logs: true,
@@ -537,7 +528,6 @@ module.exports = {
       watch: false,
       max_memory_restart: '256M',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      max_size: '10M',
       error_file: './logs/hermes-insights-poller-error.log',
       out_file: './logs/hermes-insights-poller-out.log',
       merge_logs: true,
