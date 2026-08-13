@@ -483,10 +483,9 @@ async function sendSlackAlert(current: MonitorState, previous: MonitorState | nu
   }
 
   const prevStatus = previous?.readiness ?? 'unknown';
-  const icon = current.readiness === 'READY' ? ':large_green_circle:' :
-               current.readiness === 'DEGRADED' ? ':large_yellow_circle:' :
-               current.readiness === 'UNHEALTHY' ? ':red_circle:' : ':red_circle:';
-
+  // (No separate `icon`: the header below computes its own emoji inline, which
+  // superseded it. The leftover binding was dead — surfaced by the new
+  // scripts/ops typecheck, which nothing had ever run over this file.)
   const blocks: Record<string, unknown>[] = [
     {
       type: 'header',

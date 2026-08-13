@@ -414,8 +414,13 @@ Available at `http://localhost:3000/api/v1/docs` in development mode only.
 - **Ops scripts**: **154 / 154 tests pass** via `pnpm test:ops` (node:test + tsx) — verified 2026-08-12.
   Note `pnpm test:ops` runs under tsx, which strips types without checking them, and CI's
   `typecheck` job covers only `display` while `lint` covers only `middleware/src` + `realtime/src`.
-  **Nothing type-checks `scripts/`** — a type error there reaches main silently (one had:
-  `lib/state.ts` used `Incident` without importing it). Run `tsc --noEmit` over touched ops files by hand.
+  `scripts/` **is** now type-checked in CI: `pnpm typecheck:ops` (`scripts/tsconfig.json`)
+  runs in the `test` job, after `nx build @vizora/database` — the middleware validator that
+  `scripts/ops` imports needs that package resolvable. Excluded: `**/*.spec.ts` (jest globals),
+  `scripts/release/**`, and `scripts/seed-production.ts` (broken against the current schema —
+  it writes `Plan.monthlyPrice`/`yearlyPrice`, which do not exist).
+  **Locally you must run `prisma generate` + `nx build @vizora/database` first** — `packages/database/dist`
+  is gitignored, so a fresh clone reports module-resolution errors rather than real ones.
 - **Aggregate**: 4517+ unit/integration tests passing, **ZERO failures**.
 - **TypeScript**: middleware `tsc --noEmit` exit 0; realtime + web pass via ts-jest (no separate type-check needed).
 - **Playwright (E2E)**: 24 spec files in `e2e-tests/`. Post-2026-05-09 fix (mass `/api/` → `/api/v1/` + h1 copy regex updates), estimated >90% pass rate. ~26 remaining failures concentrated in 9 specs (heaviest: 16-billing); see `docs/plans/2026-05-09-playwright-results.md`. Critical-path flows verified.

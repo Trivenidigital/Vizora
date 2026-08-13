@@ -117,3 +117,38 @@ test('no service limit is duplicated as an independent constant in health-guardi
     'health-guardian must not hardcode a memoryLimitBytes value',
   );
 });
+
+// ─── CI gate coverage ────────────────────────────────────────────────────────
+
+test('CI type-checks the scripts, after the dependency it needs', async () => {
+  // pnpm test:ops runs under tsx, which strips types without checking them, and
+  // neither `lint` nor the display typecheck covers scripts/. Removing this CI
+  // step would silently reopen the hole a type error already slipped through.
+  const { readFileSync } = await import('node:fs');
+  const { dirname, join } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+  const workflow = readFileSync(join(repoRoot, '.github', 'workflows', 'ci.yml'), 'utf8');
+  assert.match(workflow, /run: pnpm typecheck:ops/, 'ci.yml must run the ops typecheck');
+
+  const pkg = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'));
+  assert.ok(pkg.scripts['typecheck:ops'], 'package.json must define typecheck:ops');
+
+  // The step must run AFTER the database build, or the middleware validator that
+  // scripts/ imports cannot resolve @vizora/database and the check fails for an
+  // environment reason rather than a code one.
+  //
+  // Scoped to the `test:` job and asserting the build EXISTS first. A previous
+  // version compared indexOf over the whole file, which passed vacuously when
+  // the build step was deleted entirely (indexOf returns -1, and -1 < X) and
+  // could not see job boundaries at all.
+  const jobStart = workflow.indexOf('\n  test:');
+  const jobEnd = workflow.indexOf('\n  e2e:');
+  const testJob = workflow.slice(jobStart, jobEnd === -1 ? undefined : jobEnd);
+  const buildAt = testJob.indexOf('nx build @vizora/database');
+  const checkAt = testJob.indexOf('pnpm typecheck:ops');
+  assert.ok(buildAt !== -1, 'the test job must build @vizora/database');
+  assert.ok(checkAt !== -1, 'the typecheck step must live in the test job');
+  assert.ok(buildAt < checkAt, 'typecheck:ops must come after the @vizora/database build');
+});

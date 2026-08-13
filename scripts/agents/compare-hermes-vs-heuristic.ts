@@ -151,6 +151,8 @@ async function main(): Promise<void> {
   let disagreePri = 0;
   let unmatched = 0;
   let scoreDiffSum = 0;
+  let rankDistSum = 0;
+  let rankDistCount = 0;
   let scoreDiffCount = 0;
   const samples: Array<{
     ticket: string;
@@ -197,9 +199,19 @@ async function main(): Promise<void> {
       scoreDiffSum += Math.abs(h.hermes_score - closest.heuristic_score);
       scoreDiffCount++;
     }
+
+    // Rank distance across the DISAGREEMENTS only — the cutover gate asks how
+    // far apart the two systems are when they differ, not how often.
+    if (h.hermes_priority && h.hermes_priority !== closest.heuristic_priority) {
+      rankDistSum += Math.abs(
+        priorityRank(h.hermes_priority) - priorityRank(closest.heuristic_priority),
+      );
+      rankDistCount++;
+    }
   }
 
   const matched = agreePri + disagreePri;
+  const avgRankDistance = rankDistCount > 0 ? rankDistSum / rankDistCount : 0;
   console.log(`\nMatched (Hermes ticket joined to heuristic row): ${matched}`);
   console.log(`Unmatched (heuristic never scored this ticket):  ${unmatched}`);
   console.log(`Priority agreement:                              ${agreePri} (${pct(agreePri, matched)})`);
@@ -223,6 +235,7 @@ async function main(): Promise<void> {
   console.log(`  ≥7 days shadow:               ${heartbeats.length >= 2 ? `${heartbeats.length} heartbeats` : '<2 heartbeats'}`);
   console.log(`  ≥50 tickets scored:           ${hermesScored.length >= 50 ? '✓ MET' : `✗ have ${hermesScored.length}`}`);
   console.log(`  ≥80% priority agreement:      ${matched > 0 && agreePri / matched >= 0.8 ? '✓ MET' : `✗ have ${pct(agreePri, matched)}`}`);
+  console.log(`  Avg disagreement rank-dist ≤1: ${rankDistCount === 0 ? '✓ MET (no disagreements)' : avgRankDistance <= 1.0 ? `✓ MET (${avgRankDistance.toFixed(2)})` : `✗ have ${avgRankDistance.toFixed(2)}`}`);
   console.log(`  Sri sign-off:                 (out of band)`);
 
   // Disconnect even though the script doesn't read the DB anymore — keep
