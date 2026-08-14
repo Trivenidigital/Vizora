@@ -162,3 +162,151 @@ describe('contentVersion — monotonic across all content changes', () => {
     for (const v of versions) expect(v.length).toBeLessThanOrEqual(64);
   });
 });
+
+/**
+ * Vizora#325 — version MONOTONICITY across item removal.
+ *
+ * The invariant: for a given playlist, every semantic change to what a device should
+ * show must yield a version STRICTLY GREATER than the last one issued. The shipped
+ * client refuses a same-playlist payload whose version did not advance, so a version
+ * that stalls or regresses does not merely mis-label the payload — it makes the
+ * CORRECTED payload undeliverable, and the screen keeps rendering archived/expired
+ * content indefinitely.
+ *
+ * Both halves below are load-bearing and neither subsumes the other:
+ *   archive  is a WRITE      -> covered by versioning over the unfiltered item set
+ *   expiry   is WRITE-FREE   -> covered ONLY by stamping expiresAt once crossed
+ */
+describe('Vizora#325 — content version never regresses when an item stops being served', () => {
+  const NOW325 = new Date('2026-03-01T12:00:00Z');
+  const disp = { timezone: 'UTC', isDisabled: false, currentPlaylistId: 'pl-1' };
+
+  // Deliberately explicit about status/expiresAt — production always selects both
+  // (`include: { content: true }`), and these tests are about exactly those fields.
+  const c = (
+    id: string,
+    updatedAt: string,
+    extra: { status?: string; expiresAt?: string | null } = {},
+  ) => ({
+    contentId: id,
+    order: 0,
+    duration: 10,
+    content: {
+      id,
+      updatedAt: new Date(updatedAt),
+      status: extra.status ?? 'active',
+      expiresAt: extra.expiresAt ? new Date(extra.expiresAt) : null,
+    },
+  });
+
+  const playlistWith = (items: any[]) => ({
+    id: 'pl-1',
+    updatedAt: new Date('2026-01-01T00:00:00Z'), // structural floor, deliberately OLD
+    items,
+  });
+
+  const resolveWith = (items: any[], now = NOW325) =>
+    resolveEffectiveContent(
+      mockDb({ display: disp, currentPlaylist: playlistWith(items) }) as any,
+      'disp-1',
+      'org-1',
+      now,
+    );
+
+  it('ARCHIVE of the max-carrying item: it stops being served, and the version RISES', async () => {
+    // B is the newest thing in the playlist, so it carries the version.
+    const before = await resolveWith([c('a', '2026-02-01T00:00:00Z'), c('b', '2026-02-20T00:00:00Z')]);
+    expect(before.playlist!.items!.map((i: any) => i.contentId)).toEqual(['a', 'b']);
+
+    // Archiving is a WRITE: status flips AND updatedAt bumps to the write time.
+    const after = await resolveWith([
+      c('a', '2026-02-01T00:00:00Z'),
+      c('b', '2026-02-25T00:00:00Z', { status: 'archived' }),
+    ]);
+
+    // Served set shrank — the S1-2 filter still works...
+    expect(after.playlist!.items!.map((i: any) => i.contentId)).toEqual(['a']);
+    // ...and the version went FORWARD, so the client will accept the corrected payload.
+    expect(after.version > before.version).toBe(true);
+  });
+
+  it('EXPIRY boundary with NO intervening write: it stops being served, and the version RISES', async () => {
+    // The deterministic case, and the one an unfiltered-max fix alone does NOT solve.
+    // setExpiration wrote updatedAt=T0 and expiresAt=T1 (T1 > T0). Crossing T1 runs no
+    // code anywhere — identical rows, only the clock moved.
+    const items = [
+      c('a', '2026-02-01T00:00:00Z'),
+      c('b', '2026-02-10T00:00:00Z', { expiresAt: '2026-02-15T00:00:00Z' }),
+    ];
+    const beforeBoundary = await resolveWith(items, new Date('2026-02-14T00:00:00Z'));
+    const afterBoundary = await resolveWith(items, new Date('2026-02-16T00:00:00Z'));
+
+    expect(beforeBoundary.playlist!.items!.map((i: any) => i.contentId)).toEqual(['a', 'b']);
+    expect(afterBoundary.playlist!.items!.map((i: any) => i.contentId)).toEqual(['a']);
+    expect(afterBoundary.version > beforeBoundary.version).toBe(true);
+    // The advance comes from the BOUNDARY itself, not from any row changing.
+    expect(afterBoundary.version).toBe(new Date('2026-02-15T00:00:00Z').toISOString());
+  });
+
+  it('a FUTURE expiry is not stamped early — it must not swallow later genuine edits', async () => {
+    // If expiresAt were pushed unconditionally the version would jump ahead of real
+    // time, and every real edit before that date would then fail to raise it.
+    const res = await resolveWith(
+      [c('a', '2026-02-01T00:00:00Z', { expiresAt: '2027-01-01T00:00:00Z' })],
+      NOW325,
+    );
+    expect(res.version).toBe(new Date('2026-02-01T00:00:00Z').toISOString());
+
+    const afterEdit = await resolveWith(
+      [c('a', '2026-02-05T00:00:00Z', { expiresAt: '2027-01-01T00:00:00Z' })],
+      NOW325,
+    );
+    expect(afterEdit.version > res.version).toBe(true);
+  });
+
+  it('BULK archive of every remaining item still raises the version', async () => {
+    const before = await resolveWith([c('a', '2026-02-01T00:00:00Z'), c('b', '2026-02-02T00:00:00Z')]);
+    const after = await resolveWith([
+      c('a', '2026-02-26T00:00:00Z', { status: 'archived' }),
+      c('b', '2026-02-27T00:00:00Z', { status: 'archived' }),
+    ]);
+    expect(after.playlist!.items).toEqual([]); // nothing served
+    expect(after.version > before.version).toBe(true); // but the device is TOLD
+  });
+
+  it('NEGATIVE CONTROL: versioning over only the SERVED items reproduces the bug', async () => {
+    // This is what the code did before, and what a naive "just filter later" fix would
+    // still do. It must FAIL the two cases above — otherwise those tests prove nothing
+    // about WHICH set is being versioned.
+    const served = (items: any[], now: Date) =>
+      items.filter((i) => {
+        if (i.content.status !== 'active') return false;
+        return !i.content.expiresAt || new Date(i.content.expiresAt).getTime() > now.getTime();
+      });
+    const oldVersion = (items: any[], now: Date) =>
+      contentVersion(playlistWith(served(items, now)) as unknown as EffectivePlaylist, null, { now });
+
+    // Archive: version goes BACKWARDS (b's newer stamp disappears along with b).
+    const archBefore = [c('a', '2026-02-01T00:00:00Z'), c('b', '2026-02-20T00:00:00Z')];
+    const archAfter = [c('a', '2026-02-01T00:00:00Z'), c('b', '2026-02-25T00:00:00Z', { status: 'archived' })];
+    expect(oldVersion(archAfter, NOW325) < oldVersion(archBefore, NOW325)).toBe(true);
+
+    // Write-free expiry: the version REGRESSES to a's stamp, so the client cannot be told.
+    const expItems = [
+      c('a', '2026-02-01T00:00:00Z'),
+      c('b', '2026-02-10T00:00:00Z', { expiresAt: '2026-02-15T00:00:00Z' }),
+    ];
+    const preBoundary = oldVersion(expItems, new Date('2026-02-14T00:00:00Z'));
+    const postBoundary = oldVersion(expItems, new Date('2026-02-16T00:00:00Z'));
+    expect(postBoundary < preBoundary).toBe(true);
+  });
+
+  it('a different-playlist reassignment is still applied regardless of its timestamp', async () => {
+    // The reason a blanket server-side "lower version => do not signal" guard was NOT
+    // added: an older playlist is a legitimate destination, and the client applies a
+    // different playlist unconditionally. Nothing here may break that.
+    const older = { playlistId: 'pl-2', version: '2026-01-01T00:00:00.000Z' };
+    const newer = { playlistId: 'pl-1', version: '2026-02-20T00:00:00.000Z' };
+    expect(shouldApplyContent(older, newer)).toBe(true);
+  });
+});

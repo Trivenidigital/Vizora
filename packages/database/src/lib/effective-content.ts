@@ -24,8 +24,18 @@ export interface EffectivePlaylistItem {
   contentId: string;
   order: number;
   duration?: number | null;
-  updatedAt?: Date | string | null;
-  content?: { id: string; updatedAt?: Date | string | null; [k: string]: unknown } | null;
+  // NOTE: PlaylistItem has NO `updatedAt` column (schema.prisma model PlaylistItem).
+  // A field was declared here once and read by contentVersion(), which made it look
+  // like items carried their own version floor. They never did — it was always
+  // undefined. Removed rather than left as a comment, because a phantom floor is
+  // exactly what let the version-regression this file now guards survive review.
+  content?: {
+    id: string;
+    updatedAt?: Date | string | null;
+    status?: string | null;
+    expiresAt?: Date | string | null;
+    [k: string]: unknown;
+  } | null;
   [k: string]: unknown;
 }
 
@@ -45,20 +55,71 @@ export interface EffectiveContent {
   version: string;
 }
 
-// S1-2 filter: never serve expired/archived content. `content` is a required
-// relation, so filtering the `items` include drops stale items, never the playlist.
-const activeContentItemsInclude = (now: Date) => ({
+// Fetch EVERY linked item, then decide deliverability in code (see splitDeliverable).
+//
+// This used to filter inside the Prisma include, which was correct for what gets
+// DELIVERED and wrong for what gets VERSIONED: contentVersion() only ever saw the
+// surviving rows, so dropping the item that carried the max `updatedAt` moved the
+// version BACKWARDS. The client gates a same-playlist update on `incoming > current`
+// (vizora-tv src/utils.ts), so it then refused the corrected payload and kept
+// rendering archived/expired content indefinitely, while heartbeat reconcile —
+// which compares with `!==` — signalled drift once a minute forever. (Vizora#325)
+//
+// The filter still exists; it just moved to where it cannot corrupt the version.
+const allContentItemsInclude = {
   items: {
-    where: {
-      content: {
-        status: 'active',
-        OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
-      },
-    },
     include: { content: true },
     orderBy: { order: 'asc' as const },
   },
-});
+};
+
+/**
+ * S1-2: never SERVE expired/archived content. Deliverability only — not versioning.
+ *
+ * Fails OPEN on an absent field, deliberately. Production always has both values —
+ * the include is `content: true`, which selects every scalar — so absence means a
+ * caller projected fewer fields, not that the content is unservable. Excluding on a
+ * field we were never given would blank a screen to protect against a state we cannot
+ * actually observe, and blanking is the worse failure in this system.
+ */
+function isDeliverable(item: EffectivePlaylistItem, now: Date): boolean {
+  const content = item.content;
+  if (!content) return false;
+  if (content.status != null && content.status !== 'active') return false;
+  const expiresAt = content.expiresAt;
+  if (expiresAt == null) return true;
+  const t = new Date(expiresAt).getTime();
+  return Number.isNaN(t) ? true : t > now.getTime();
+}
+
+/**
+ * Narrow `playlist.items` to the deliverable set and hand back the COMPLETE set for
+ * versioning. Returns the full list separately rather than stashing it on the playlist,
+ * so it cannot leak into a serialized device payload.
+ */
+function splitDeliverable(playlist: EffectivePlaylist, now: Date): EffectivePlaylistItem[] {
+  const all = playlist.items ?? [];
+  playlist.items = all.filter((item) => isDeliverable(item, now));
+  return all;
+}
+
+/** Version stamps a single content row contributes: its edit, and its crossed expiry. */
+function contentStamps(
+  content: { updatedAt?: Date | string | null; expiresAt?: Date | string | null } | null | undefined,
+  now: Date,
+): number[] {
+  const out: number[] = [];
+  if (!content) return out;
+  if (content.updatedAt != null) {
+    const t = new Date(content.updatedAt).getTime();
+    if (!Number.isNaN(t)) out.push(t);
+  }
+  if (content.expiresAt != null) {
+    const t = new Date(content.expiresAt).getTime();
+    if (!Number.isNaN(t) && t <= now.getTime()) out.push(t);
+  }
+  return out;
+}
 
 const empty: EffectiveContent = { playlist: null, source: 'none', scheduleId: null, version: '' };
 
@@ -93,7 +154,7 @@ export async function resolveEffectiveContent(
       ],
     },
     orderBy: { priority: 'desc' },
-    include: { playlist: { include: activeContentItemsInclude(now) } },
+    include: { playlist: { include: allContentItemsInclude } },
   });
 
   const active = candidates.find((s) =>
@@ -105,12 +166,15 @@ export async function resolveEffectiveContent(
   );
   if (active?.playlist) {
     const playlist = active.playlist as unknown as EffectivePlaylist;
-    await resolveLayoutZones(db, playlist, organizationId, now);
+    // Split BEFORE zone resolution so zones resolve only for delivered items, and
+    // version over the COMPLETE set so a filtered-out item cannot lower the version.
+    const allItems = splitDeliverable(playlist, now);
+    const zoneStamps = await resolveLayoutZones(db, playlist, organizationId, now);
     return {
       playlist,
       source: 'schedule',
       scheduleId: active.id,
-      version: contentVersion(playlist, active.updatedAt),
+      version: contentVersion(playlist, active.updatedAt, { versionItems: allItems, now, extraStamps: zoneStamps }),
     };
   }
 
@@ -118,16 +182,17 @@ export async function resolveEffectiveContent(
   if (display.currentPlaylistId) {
     const found = await db.playlist.findFirst({
       where: { id: display.currentPlaylistId, organizationId },
-      include: activeContentItemsInclude(now),
+      include: allContentItemsInclude,
     });
     if (found) {
       const playlist = found as unknown as EffectivePlaylist;
-      await resolveLayoutZones(db, playlist, organizationId, now);
+      const allItems = splitDeliverable(playlist, now);
+      const zoneStamps = await resolveLayoutZones(db, playlist, organizationId, now);
       return {
         playlist,
         source: 'currentPlaylist',
         scheduleId: null,
-        version: contentVersion(playlist, null),
+        version: contentVersion(playlist, null, { versionItems: allItems, now, extraStamps: zoneStamps }),
       };
     }
   }
@@ -147,7 +212,13 @@ export async function resolveLayoutZones(
   playlist: EffectivePlaylist | null,
   organizationId: string,
   now: Date,
-): Promise<void> {
+): Promise<number[]> {
+  // Version stamps from content that is resolved here but NOT delivered — zone items
+  // that are archived/expired, and a dropped zone content. Returned to the caller
+  // rather than attached to the payload: nothing hidden is written onto `zone`, so a
+  // filtered-out item cannot reappear in serialized metadata on the wire.
+  const stamps: number[] = [];
+
   for (const item of playlist?.items ?? []) {
     const content = item.content as Record<string, unknown> | null | undefined;
     if (!content || content.type !== 'layout') continue;
@@ -155,28 +226,76 @@ export async function resolveLayoutZones(
     const zones = Array.isArray(metadata?.zones) ? (metadata!.zones as Record<string, unknown>[]) : [];
     for (const zone of zones) {
       if (typeof zone.playlistId === 'string') {
-        zone.resolvedPlaylist = await db.playlist.findFirst({
+        const zonePlaylist = (await db.playlist.findFirst({
           where: { id: zone.playlistId, organizationId },
-          include: activeContentItemsInclude(now),
-        });
+          include: allContentItemsInclude,
+        })) as unknown as EffectivePlaylist | null;
+        if (zonePlaylist) {
+          // Same split as the top level, for the same two reasons: S1-2 says never
+          // SERVE archived/expired content, and #325 says a filtered-out item must
+          // still raise the version. The include is unfiltered now, so without this
+          // the zone would put archived content on the wire.
+          const allZoneItems = splitDeliverable(zonePlaylist, now);
+          for (const zoneItem of allZoneItems) stamps.push(...contentStamps(zoneItem.content, now));
+        }
+        zone.resolvedPlaylist = zonePlaylist;
       }
       if (typeof zone.contentId === 'string') {
-        zone.resolvedContent = await db.content.findFirst({
+        const zoneContent = await db.content.findFirst({
           where: { id: zone.contentId, organizationId },
         });
+        // A directly-pinned zone content was NEVER status/expiry checked — the filter
+        // only ever applied to playlist items, so an archived or expired content
+        // pinned straight into a zone has always been servable. Same invariant, same
+        // customer-visible failure (dead content on glass), so it is closed here
+        // rather than left as a known second door. Its stamps still count toward the
+        // version, so dropping it advances rather than stalls the payload.
+        stamps.push(...contentStamps(zoneContent as never, now));
+        const servable =
+          zoneContent && isDeliverable({ contentId: '', order: 0, content: zoneContent as never }, now);
+        zone.resolvedContent = servable ? zoneContent : null;
       }
     }
   }
+
+  return stamps;
 }
 
-/** Max `updatedAt` (ISO) across the playlist, its items + their content, and the
- *  owning schedule. Any content edit, structural change, or reassignment raises it. */
+/**
+ * Max `updatedAt` (ISO) across the playlist, its items + their content, and the owning
+ * schedule. Any content edit, structural change, or reassignment raises it.
+ *
+ * MONOTONICITY IS THE CONTRACT (Vizora#325): for a given playlist, every semantic
+ * change to what a device should show must yield a version STRICTLY GREATER than the
+ * last one issued. The shipped client refuses a same-playlist payload whose version did
+ * not advance (vizora-tv src/utils.ts), so a version that stalls or regresses does not
+ * merely mis-label the payload — it makes the CORRECTED payload undeliverable.
+ *
+ * Two things are required to hold that, and neither covers the other's case:
+ *
+ *  - `opts.versionItems` — the COMPLETE linked item set, including items filtered out
+ *    of delivery. Covers archive/status changes, which are WRITES: the write bumps
+ *    `content.updatedAt`, so while the stamp is still visible the max rises.
+ *
+ *  - `opts.now` + the expiry-boundary stamp below. Covers time-based expiry, which is
+ *    NOT a write: at `expiresAt` the item stops being deliverable with nothing running
+ *    anywhere. Retaining its `updatedAt` is useless here — that stamp is identical on
+ *    both sides of the boundary, so the payload would change while the version stood
+ *    still. Stamping `expiresAt` itself, once crossed, is what advances it:
+ *    `setExpiration` writes `updatedAt = now` alongside a future `expiresAt`, so the
+ *    boundary is strictly later than the write that scheduled it.
+ */
 export function contentVersion(
   playlist: EffectivePlaylist | null,
   scheduleUpdatedAt: Date | string | null,
+  opts?: { versionItems?: EffectivePlaylistItem[]; now?: Date; extraStamps?: number[] },
 ): string {
   if (!playlist) return '';
-  const stamps: number[] = [];
+  // `extraStamps` carries the version contribution of content resolved for layout
+  // ZONES that is not delivered — an archived/expired zone item, or a dropped zone
+  // content. It arrives as a plain number list from resolveLayoutZones rather than
+  // being hung off the payload, so hidden versioning context cannot leak onto the wire.
+  const stamps: number[] = [...(opts?.extraStamps ?? [])];
   const push = (v: Date | string | null | undefined) => {
     if (v == null) return;
     const t = new Date(v).getTime();
@@ -184,9 +303,20 @@ export function contentVersion(
   };
   push(playlist.updatedAt);
   push(scheduleUpdatedAt);
-  for (const item of playlist.items ?? []) {
-    push(item.updatedAt);
+  // Default to the playlist's own items so existing callers that hand over a plain
+  // playlist (e.g. the realtime push fallback) keep working unchanged.
+  const versionItems = opts?.versionItems ?? playlist.items ?? [];
+  const nowMs = opts?.now ? opts.now.getTime() : Date.now();
+  for (const item of versionItems) {
     push(item.content?.updatedAt);
+    // The write-free transition. Only ONCE CROSSED — stamping a future expiry would
+    // push the version ahead of real time and then swallow every genuine edit made
+    // before that date.
+    const expiresAt = item.content?.expiresAt;
+    if (expiresAt != null) {
+      const expMs = new Date(expiresAt).getTime();
+      if (!Number.isNaN(expMs) && expMs <= nowMs) stamps.push(expMs);
+    }
     // PD-9 — descend into layout zones so a single-zone content edit (a DIFFERENT
     // content row that doesn't bump the layout's own updatedAt) still raises the
     // version, propagating the zone edit. Both channels compute this identically.

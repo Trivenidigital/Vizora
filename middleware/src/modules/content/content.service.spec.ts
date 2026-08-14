@@ -81,6 +81,13 @@ describe('ContentService', () => {
         deleteMany: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
       },
+      // The real transaction client exposes `playlist`; the paths that structurally
+      // remove PlaylistItem rows bump the parent playlists' updatedAt inside the same
+      // transaction to keep the device content version monotonic (Vizora#325).
+      playlist: {
+        updateMany: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
       tag: {
         count: jest.fn(),
         findMany: jest.fn(),
@@ -1928,6 +1935,19 @@ describe('ContentService', () => {
 
       expect(result.processed).toBe(1);
       expect(result.playlistsRefreshed).toBe(2);
+
+      // Vizora#325 — the expiry worker REMOVES PlaylistItem rows, so the resolver can
+      // no longer see that content's updatedAt at all (absent, not filtered). Without
+      // bumping the parent playlists the effective version can fall below what the
+      // device already holds, and the shipped client then refuses the corrected
+      // payload. Asserted on the DE-DUPED set, in the same transaction as the removal.
+      expect(mockDatabaseService.playlist.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: { in: ['pl-a', 'pl-b'] } },
+          data: expect.objectContaining({ updatedAt: expect.any(Date) }),
+        }),
+      );
+
       expect(mockEventEmitter.emit).toHaveBeenCalledWith('playlist.updated', {
         entityId: 'pl-a',
         organizationId: 'org-123',
