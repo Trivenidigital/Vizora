@@ -25,6 +25,9 @@ import {
   evaluateOriginsBaseline,
   evaluateCandidateBinding,
   evaluateGateABinding,
+  computeVerdict,
+  exitCodeForVerdict,
+  RELEASE_BINDING_CHECKS,
 } from './verify-display-apk.mjs';
 
 // Real fingerprints from the 2026-08-10 Gate B investigation.
@@ -653,4 +656,86 @@ test('NEGATIVE: a wrong integer candidate.versionCode still fails on value', () 
 
 test('a correct integer candidate.versionCode passes', () => {
   assert.equal(evaluateCandidateBinding(GOOD_CANDIDATE, ARTIFACT, true).pass, true);
+});
+
+// ─── Vizora#318 — a run that skipped its bindings must not print "PASS" ──────────
+//
+// The defect: every release-binding check SKIPS when its flag/record is absent, and a
+// skip carries `pass: true`, so `checks.every(c => c.pass)` was true and the weakest
+// possible invocation printed the same VERDICT as a fully bound one. The difference
+// was visible only in SKIP lines above the verdict — exactly where a hurried reader
+// does not look.
+//
+// "No binding check ran" and "every binding check passed" are completely different
+// statements about an artifact. They must not share a word.
+
+const pass = (name: string) => ({ name, pass: true, detail: '' });
+const fail = (name: string) => ({ name, pass: false, detail: '' });
+const skip = (name: string) => ({ name, pass: true, skipped: true, detail: '' });
+
+const BINDING = RELEASE_BINDING_CHECKS;
+
+test('computeVerdict: fully bound run with nothing wrong is PASS', () => {
+  const checks = [pass('package id'), ...BINDING.map(pass)];
+  assert.equal(computeVerdict(checks), 'PASS');
+  assert.equal(exitCodeForVerdict('PASS'), 0);
+});
+
+test('computeVerdict: a skipped RELEASE-BINDING check downgrades PASS to PASS_WITH_SKIPS', () => {
+  for (const bindingName of BINDING) {
+    const checks = [
+      pass('package id'),
+      ...BINDING.map(n => (n === bindingName ? skip(n) : pass(n))),
+    ];
+    assert.equal(
+      computeVerdict(checks),
+      'PASS_WITH_SKIPS',
+      `skipping "${bindingName}" must not read as a full pass`,
+    );
+  }
+  assert.equal(exitCodeForVerdict('PASS_WITH_SKIPS'), 3);
+});
+
+test('computeVerdict: the DEFAULT invocation shape (all four skipped) is PASS_WITH_SKIPS', () => {
+  // This is precisely what `--apk <path>` with no other flags produces, and precisely
+  // what used to print VERDICT: PASS.
+  const checks = [pass('package id'), pass('apksigner verifies the APK'), ...BINDING.map(skip)];
+  assert.equal(computeVerdict(checks), 'PASS_WITH_SKIPS');
+});
+
+test('computeVerdict: a skipped NON-binding check is still a full PASS', () => {
+  // Legitimate skips exist — e.g. the release-over-release origins baseline on a first
+  // publish. Those must not be conflated with an unbound artifact, or the new verdict
+  // becomes noise and gets ignored.
+  const checks = [
+    pass('package id'),
+    skip('compiled default origins match the previously published release'),
+    ...BINDING.map(pass),
+  ];
+  assert.equal(computeVerdict(checks), 'PASS');
+});
+
+test('computeVerdict: FAIL outranks a binding skip', () => {
+  const checks = [fail('package id'), ...BINDING.map(skip)];
+  assert.equal(computeVerdict(checks), 'FAIL');
+  assert.equal(exitCodeForVerdict('FAIL'), 1);
+});
+
+test('computeVerdict: exit codes are distinct, so callers can tell the three apart', () => {
+  const codes = ['PASS', 'FAIL', 'PASS_WITH_SKIPS'].map(exitCodeForVerdict);
+  assert.equal(new Set(codes).size, 3, 'each verdict needs its own exit code');
+  assert.equal(exitCodeForVerdict('PASS'), 0, 'only a fully bound run may exit 0');
+  assert.notEqual(exitCodeForVerdict('PASS_WITH_SKIPS'), 0, 'an unbound run must not exit 0');
+});
+
+test('RELEASE_BINDING_CHECKS names the four checks that tie artifact to record', () => {
+  // Pinned by name because these strings are the join between the check sites and the
+  // verdict rule. Rename a check without updating this list and the verdict silently
+  // stops noticing that it was skipped — the original bug, reintroduced quietly.
+  assert.deepEqual([...BINDING].sort(), [
+    'Gate A approval is bound to this exact APK',
+    'candidate record matches this exact APK',
+    'certificate matches the pinned canonical signing identity',
+    'compiled default origins match the pinned expectation',
+  ]);
 });
