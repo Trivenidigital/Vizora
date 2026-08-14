@@ -129,3 +129,38 @@ token for no user-visible gain, and would churn files the wave never needed to t
 - `feat/design-explorations` — never merge, never deploy.
 - Widgets — operator has deprioritised.
 - TV/APK work is owned by another session.
+
+## API keys — ENFORCE (operator ruling, 2026-08-14), but not by attaching the guard
+
+vizora.cloud advertises API access on the Pro plan, so retiring the capability would contradict
+what customers are sold. The management surface is complete: create / list / revoke, 8 scopes,
+copy-once secret, `lastUsedAt`. `ApiKeyGuard` validates `x-api-key`, resolves the org and scopes,
+and updates last-used.
+
+**Do NOT simply add `@UseGuards(ApiKeyGuard)` to endpoints.** The guard is not merely unused, it
+is incompatible with how this app scopes tenants, and enforcing it naively is a cross-tenant risk
+rather than a no-op:
+
+- Controllers read the org from `request.user.organizationId`, via `@CurrentUser()`.
+- `ApiKeyGuard` sets `request.organizationId` — a field **nothing** in the request path reads
+  (the `pairing.service`/`support.service` hits on that name are unrelated locals).
+- So a guarded endpoint would see `@CurrentUser()` undefined and either crash or run an
+  UNSCOPED query.
+
+Minimum correct shape:
+
+1. `ApiKeyGuard` populates `request.user` with a synthetic principal carrying `organizationId`,
+   `authType: 'api-key'`, `isSuperAdmin: false` and NO role — so every existing org-scoped query
+   works unchanged, and `RolesGuard` (which reads `user.role`) plus `SuperAdminGuard` deny by
+   default rather than by accident.
+2. A `@RequireScopes()` decorator checked against `request.apiKeyScopes`, so the 8 advertised
+   scopes actually gate something. They currently gate nothing.
+3. A composite JWT-or-API-key guard, because browser clients must keep working on the same routes.
+4. Applied to a DELIBERATELY CHOSEN read surface first — the documented `GET /api/v1/content` —
+   not swept across existing endpoints.
+5. Cross-tenant tests are mandatory: a key from org A must not read org B, and a key must not
+   reach any `@Roles`-gated or super-admin route.
+
+Treat this as a new externally-reachable auth surface: rate limiting, audit, and the tenant tests
+are part of the change, not follow-ups.
+
