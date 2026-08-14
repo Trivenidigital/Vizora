@@ -214,8 +214,31 @@ export class AlertRulesService {
     ruleId: string,
     deviceId: string,
     now: Date,
+    options?: { windowMs?: number; episodeStartedAt?: Date | null },
   ): Promise<boolean> {
-    const threshold = new Date(now.getTime() - DEDUP_WINDOW_MS);
+    /**
+     * The claim is EPISODE-AWARE, which matters for the periodic path.
+     *
+     * A pure "older than the window" test suppresses a genuinely new outage.
+     * Device drops, alerts, recovers, drops again two hours later: with a 24h
+     * reminder window the second outage stays silent for the rest of the day,
+     * and the transition path cannot rescue it because any threshold above the
+     * ~180s transition window only ever fires here.
+     *
+     * `episodeStartedAt` is the device's lastHeartbeat — the last moment we
+     * heard from it, i.e. the start of the current silence. A fire recorded
+     * BEFORE that marker belongs to a previous outage and must not suppress
+     * this one. A fire recorded after it is this outage's first alert, and only
+     * the reminder window may release it.
+     *
+     * Both conditions are `lastFiredAt < X`, so they collapse to a single
+     * comparison against the later of the two thresholds — keeping this one
+     * atomic updateMany, and keeping the unique index as the only serialiser.
+     */
+    const windowMs = options?.windowMs ?? DEDUP_WINDOW_MS;
+    const windowThreshold = now.getTime() - windowMs;
+    const episodeThreshold = options?.episodeStartedAt?.getTime() ?? Number.NEGATIVE_INFINITY;
+    const threshold = new Date(Math.max(windowThreshold, episodeThreshold));
 
     const updated = await this.db.alertRuleFire.updateMany({
       where: { alertRuleId: ruleId, deviceId, lastFiredAt: { lt: threshold } },
