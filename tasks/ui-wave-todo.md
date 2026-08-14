@@ -129,3 +129,68 @@ token for no user-visible gain, and would churn files the wave never needed to t
 - `feat/design-explorations` — never merge, never deploy.
 - Widgets — operator has deprioritised.
 - TV/APK work is owned by another session.
+
+## API keys — ENFORCE (operator ruling, 2026-08-14), but not by attaching the guard
+
+vizora.cloud advertises API access on the Pro plan, so retiring the capability would contradict
+what customers are sold. The management surface is complete: create / list / revoke, 8 scopes,
+copy-once secret, `lastUsedAt`. `ApiKeyGuard` validates `x-api-key`, resolves the org and scopes,
+and updates last-used.
+
+**Do NOT simply add `@UseGuards(ApiKeyGuard)` to endpoints.** The guard is not merely unused, it
+is incompatible with how this app scopes tenants, and enforcing it naively is a cross-tenant risk
+rather than a no-op:
+
+- Controllers read the org from `request.user.organizationId`, via `@CurrentUser()`.
+- `ApiKeyGuard` sets `request.organizationId` — a field **nothing** in the request path reads
+  (the `pairing.service`/`support.service` hits on that name are unrelated locals).
+- So a guarded endpoint would see `@CurrentUser()` undefined and either crash or run an
+  UNSCOPED query.
+
+**HEADLINE REQUIREMENT (operator):** do not enable API-key authentication until the API-key
+principal is proven tenant-safe through the same `request.user` contract existing controllers
+consume, and the cross-tenant negative tests FAIL when that binding is removed. Everything else —
+scope decorators, composite guard, docs — comes after it.
+
+Minimum correct shape:
+
+1. `ApiKeyGuard` populates `request.user` as an EXPLICIT API-key principal, not an imitation JWT
+   user — the distinction matters, because anything shaped like a user invites code to treat it
+   as one:
+
+   ```
+   request.user = {
+     organizationId,
+     authType: 'api-key',
+     apiKeyId,
+     apiKeyScopes,
+     isSuperAdmin: false,
+     role: undefined,
+   }
+   ```
+
+   Every existing org-scoped query then works unchanged, while `RolesGuard` (which matches on
+   `user.role`) and `SuperAdminGuard` deny by DEFAULT rather than by accident.
+2. A `@RequireScopes()` decorator checked against `request.apiKeyScopes`, so the 8 advertised
+   scopes actually gate something. They currently gate nothing.
+3. A composite JWT-or-API-key guard, because browser clients must keep working on the same routes.
+4. Applied to a DELIBERATELY CHOSEN read surface first — the documented `GET /api/v1/content` —
+   not swept across existing endpoints.
+5. Proof obligations for that session — all of them, and the cross-tenant ones must fail when the
+   principal binding is removed:
+
+   ```
+   valid key, own tenant         -> allowed
+   valid key, other tenant       -> impossible to read
+   revoked / expired key         -> denied
+   missing required scope        -> denied
+   matching required scope       -> allowed
+   API key on role-admin route   -> denied by default
+   API key on super-admin route  -> denied
+   JWT browser request           -> unchanged
+   JWT + API key together        -> exactly one authenticated principal
+   ```
+
+Treat this as a new externally-reachable auth surface: rate limiting, audit, and the tenant tests
+are part of the change, not follow-ups.
+

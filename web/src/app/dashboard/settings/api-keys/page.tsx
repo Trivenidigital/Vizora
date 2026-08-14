@@ -318,7 +318,7 @@ export default function ApiKeysPage() {
  header with each request:
  </p>
  <pre className="bg-[#061A21] text-[#F0ECE8] p-4 rounded-lg overflow-x-auto">
-{`curl -X GET "https://api.vizora.io/content" \\
+{`curl -X GET "https://vizora.cloud/api/v1/content" \\
  -H "X-API-Key: vz_live_your_api_key_here"`}
  </pre>
  </div>
