@@ -20,6 +20,18 @@ export type Channel = (typeof CHANNELS)[number];
 export const DEDUP_WINDOW_MS = 15 * 60 * 1000;
 
 /**
+ * Reminder cadence for an outage that is STILL ongoing, used only by the
+ * periodic re-evaluation path.
+ *
+ * The transition path keeps DEDUP_WINDOW_MS: it fires once as a device drops
+ * and 15 minutes is a sane suppressor for event churn. Re-using 15 minutes for
+ * a device that stays offline would turn a multi-day outage into a 15-minute
+ * alarm clock, which is why docs/plans/2026-08-02-persistent-offline-monitoring.md
+ * proposed 24h. This is that value.
+ */
+export const PERSISTENT_OFFLINE_REMINDER_MS = 24 * 60 * 60 * 1000;
+
+/**
  * Floor for `minOfflineSec`. The stale-heartbeat cron in
  * `displays.service.ts` only emits `device.offline` once a device's
  * `lastHeartbeat` is >2 min stale, so any `minOfflineSec` below 120s would

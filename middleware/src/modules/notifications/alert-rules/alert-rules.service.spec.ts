@@ -229,6 +229,94 @@ describe('AlertRulesService', () => {
     const deviceB = 'device-B';
     const now = new Date('2026-05-19T10:00:00Z');
 
+    /**
+     * The periodic (persistent-offline) path claims once per OUTAGE EPISODE and
+     * then at most once per 24h while that same silence continues.
+     *
+     * The threshold it compares against is the LATER of "24h ago" and the
+     * episode marker (the device's lastHeartbeat). Both conditions are
+     * `lastFiredAt < X`, so they collapse into one comparison — which is what
+     * keeps this a single atomic updateMany, with the unique index still the
+     * only serialiser between PM2 instances.
+     */
+    describe('periodic path (episode-aware)', () => {
+      const REMINDER_MS = 24 * 60 * 60 * 1000;
+      const uniqueViolation = () =>
+        Object.assign(new Error('Unique constraint'), { code: 'P2002' });
+
+      const claimThreshold = () =>
+        (db.alertRuleFire.updateMany.mock.calls[0][0] as any).where.lastFiredAt.lt as Date;
+
+      it('a fire from a PREVIOUS outage does not suppress a new one', async () => {
+        // Device alerted, recovered (heartbeat at 09:00), dropped again. The
+        // old fire predates this episode, so the new outage must be claimable
+        // even though the 24h reminder window has not elapsed.
+        db.alertRuleFire.updateMany.mockResolvedValue({ count: 1 });
+        const episodeStartedAt = new Date('2026-05-19T09:00:00Z');
+
+        const claimed = await service.tryClaimDedupWindow(ruleId, deviceA, now, {
+          windowMs: REMINDER_MS,
+          episodeStartedAt,
+        });
+
+        expect(claimed).toBe(true);
+        // The episode marker is later than "24h ago", so it governs.
+        expect(claimThreshold().getTime()).toBe(episodeStartedAt.getTime());
+      });
+
+      it('within the same outage, only the 24h reminder can release a second alert', async () => {
+        // No recovery: the marker is older than 24h ago, so the reminder
+        // window governs and a fresh fire stays suppressed.
+        db.alertRuleFire.updateMany.mockResolvedValue({ count: 0 });
+        db.alertRuleFire.create.mockRejectedValue(uniqueViolation());
+        const episodeStartedAt = new Date('2026-05-10T00:00:00Z');
+
+        const claimed = await service.tryClaimDedupWindow(ruleId, deviceA, now, {
+          windowMs: REMINDER_MS,
+          episodeStartedAt,
+        });
+
+        expect(claimed).toBe(false);
+        expect(claimThreshold().getTime()).toBe(now.getTime() - REMINDER_MS);
+      });
+
+      it('a device that never sent a heartbeat falls back to the reminder window', async () => {
+        db.alertRuleFire.updateMany.mockResolvedValue({ count: 1 });
+
+        await service.tryClaimDedupWindow(ruleId, deviceB, now, {
+          windowMs: REMINDER_MS,
+          episodeStartedAt: null,
+        });
+
+        expect(claimThreshold().getTime()).toBe(now.getTime() - REMINDER_MS);
+      });
+
+      it('two workers racing the same eligibility → exactly one claims', async () => {
+        // Whatever the path, the loser is the one whose updateMany misses AND
+        // whose create hits the unique index. That is the whole cluster-safety
+        // story, and it is unchanged by the episode logic.
+        db.alertRuleFire.updateMany.mockResolvedValue({ count: 0 });
+        db.alertRuleFire.create
+          .mockResolvedValueOnce({ id: 'fire-1' })
+          .mockRejectedValueOnce(uniqueViolation());
+
+        const [a, b] = await Promise.all([
+          service.tryClaimDedupWindow(ruleId, deviceA, now, { windowMs: REMINDER_MS, episodeStartedAt: null }),
+          service.tryClaimDedupWindow(ruleId, deviceA, now, { windowMs: REMINDER_MS, episodeStartedAt: null }),
+        ]);
+
+        expect([a, b].filter(Boolean)).toHaveLength(1);
+      });
+
+      it('the transition path is unchanged — still the 15-minute suppressor', async () => {
+        db.alertRuleFire.updateMany.mockResolvedValue({ count: 1 });
+
+        await service.tryClaimDedupWindow(ruleId, deviceA, now);
+
+        expect(claimThreshold().getTime()).toBe(now.getTime() - 15 * 60 * 1000);
+      });
+    });
+
     it('updateMany count=1 (existing stale row claimed) → returns true', async () => {
       db.alertRuleFire.updateMany.mockResolvedValue({ count: 1 });
 

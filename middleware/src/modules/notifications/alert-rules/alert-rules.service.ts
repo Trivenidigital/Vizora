@@ -214,8 +214,43 @@ export class AlertRulesService {
     ruleId: string,
     deviceId: string,
     now: Date,
+    options?: { windowMs?: number; episodeStartedAt?: Date | null },
   ): Promise<boolean> {
-    const threshold = new Date(now.getTime() - DEDUP_WINDOW_MS);
+    /**
+     * The claim is EPISODE-AWARE, which matters for the periodic path.
+     *
+     * A pure "older than the window" test suppresses a genuinely new outage.
+     * Device drops, alerts, recovers, drops again two hours later: with a 24h
+     * reminder window the second outage stays silent for the rest of the day,
+     * and the transition path cannot rescue it because any threshold above the
+     * ~180s transition window only ever fires here.
+     *
+     * `episodeStartedAt` is the device's lastHeartbeat — the last moment we
+     * heard from it, i.e. the start of the current silence. A fire recorded
+     * BEFORE that marker belongs to a previous outage and must not suppress
+     * this one. A fire recorded after it is this outage's first alert, and only
+     * the reminder window may release it.
+     *
+     * Both conditions are `lastFiredAt < X`, so they collapse to a single
+     * comparison against the later of the two thresholds — keeping this one
+     * atomic updateMany, and keeping the unique index as the only serialiser.
+     */
+    const windowMs = options?.windowMs ?? DEDUP_WINDOW_MS;
+    const windowThreshold = now.getTime() - windowMs;
+
+    /**
+     * A null `episodeStartedAt` is a deliberate semantic EXCEPTION, not an
+     * omission: a device that has never sent a heartbeat has no episode to
+     * mark, so there is nothing to compare a prior fire against. Those devices
+     * fall back to pure window-based dedup.
+     *
+     * NEGATIVE_INFINITY is how that is expressed — it can never win the max(),
+     * so the window governs alone. The evaluator treats the same devices as
+     * infinitely offline, so every threshold passes and the reminder cadence is
+     * the only thing bounding them.
+     */
+    const episodeThreshold = options?.episodeStartedAt?.getTime() ?? Number.NEGATIVE_INFINITY;
+    const threshold = new Date(Math.max(windowThreshold, episodeThreshold));
 
     const updated = await this.db.alertRuleFire.updateMany({
       where: { alertRuleId: ruleId, deviceId, lastFiredAt: { lt: threshold } },

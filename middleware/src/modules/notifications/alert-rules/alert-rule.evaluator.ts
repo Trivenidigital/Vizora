@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { OnEvent } from '@nestjs/event-emitter';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { firstValueFrom } from 'rxjs';
 import { DatabaseService } from '../../database/database.service';
 import { MailService } from '../../mail/mail.service';
@@ -11,6 +12,7 @@ import {
   SLACK_WEBHOOK_REGEX,
   TriggerEvent,
   escapeSlackText,
+  PERSISTENT_OFFLINE_REMINDER_MS,
 } from './alert-rule.types';
 
 interface DeviceOfflinePayload {
@@ -70,7 +72,58 @@ export class AlertRuleEvaluator {
     }
   }
 
-  private async evaluate(payload: DeviceOfflinePayload): Promise<void> {
+  /**
+   * Periodic re-evaluation of devices that are STILL offline.
+   *
+   * `device.offline` is emitted once, on the online->offline transition, and
+   * the emitting cron only fires it ~120-180s after the last heartbeat. So a
+   * rule configured above that window could never fire, while the UI rendered
+   * it Active — "Alert after 600 seconds offline" was dead configuration.
+   * minOfflineSec is a DURATION gate (docs/plans/2026-08-02-persistent-offline-monitoring.md
+   * designs a persistent emitter reusing this same field; the original O7 design's
+   * acceptance case is minOfflineSec=300), so the evaluator, not the field, was
+   * the defective side.
+   *
+   * This re-runs the SAME evaluate() so both paths share minOfflineSec
+   * semantics, scope matching and dispatch. It is additive: the transition path
+   * is untouched and still gives fast first evaluation.
+   *
+   * Cluster safety is the CAS, not this cron: both PM2 instances run it, and
+   * exactly one wins the claim per (rule, device, window).
+   */
+  @Cron(CronExpression.EVERY_5_MINUTES)
+  async reevaluatePersistentOffline(): Promise<void> {
+    try {
+      const offlineDevices = await this.db.display.findMany({
+        where: { status: 'offline', isDisabled: false },
+        select: { id: true, organizationId: true },
+      });
+      if (offlineDevices.length === 0) return;
+
+      for (const device of offlineDevices) {
+        // Same swallow-per-device discipline as the @OnEvent handler: one bad
+        // device must not abort the sweep or surface as an unhandled rejection.
+        try {
+          await this.evaluate(
+            { deviceId: device.id, organizationId: device.organizationId },
+            true,
+          );
+        } catch (err) {
+          this.logger.error(
+            `Persistent-offline re-evaluation failed for device ${device.id}`,
+            err instanceof Error ? err.stack : String(err),
+          );
+        }
+      }
+    } catch (err) {
+      this.logger.error(
+        'Persistent-offline re-evaluation sweep failed',
+        err instanceof Error ? err.stack : String(err),
+      );
+    }
+  }
+
+  private async evaluate(payload: DeviceOfflinePayload, periodic = false): Promise<void> {
     const device = await this.db.display.findUnique({
       where: { id: payload.deviceId },
       include: {
@@ -105,11 +158,17 @@ export class AlertRuleEvaluator {
       // Atomic CAS — only the instance whose upsert affects 1 row dispatches.
       // Per-(rule, device) dedup: a rule matching N devices alerts for EACH
       // device, not just the first to go offline in the window.
-      const claimed = await this.alertRulesService.tryClaimDedupWindow(
-        rule.id,
-        device.id,
-        now,
-      );
+      // The transition path keeps the 15-minute suppressor. The periodic path
+      // claims once per outage EPISODE (keyed on lastHeartbeat) and then at
+      // most once per 24h while that same silence continues.
+      // Called with the transition path's exact original arity when not
+      // periodic, so that contract stays pinned by its existing spec.
+      const claimed = periodic
+        ? await this.alertRulesService.tryClaimDedupWindow(rule.id, device.id, now, {
+            windowMs: PERSISTENT_OFFLINE_REMINDER_MS,
+            episodeStartedAt: device.lastHeartbeat,
+          })
+        : await this.alertRulesService.tryClaimDedupWindow(rule.id, device.id, now);
       if (!claimed) continue;
 
       await this.dispatchAll(rule, payload);
