@@ -147,19 +147,49 @@ rather than a no-op:
 - So a guarded endpoint would see `@CurrentUser()` undefined and either crash or run an
   UNSCOPED query.
 
+**HEADLINE REQUIREMENT (operator):** do not enable API-key authentication until the API-key
+principal is proven tenant-safe through the same `request.user` contract existing controllers
+consume, and the cross-tenant negative tests FAIL when that binding is removed. Everything else —
+scope decorators, composite guard, docs — comes after it.
+
 Minimum correct shape:
 
-1. `ApiKeyGuard` populates `request.user` with a synthetic principal carrying `organizationId`,
-   `authType: 'api-key'`, `isSuperAdmin: false` and NO role — so every existing org-scoped query
-   works unchanged, and `RolesGuard` (which reads `user.role`) plus `SuperAdminGuard` deny by
-   default rather than by accident.
+1. `ApiKeyGuard` populates `request.user` as an EXPLICIT API-key principal, not an imitation JWT
+   user — the distinction matters, because anything shaped like a user invites code to treat it
+   as one:
+
+   ```
+   request.user = {
+     organizationId,
+     authType: 'api-key',
+     apiKeyId,
+     apiKeyScopes,
+     isSuperAdmin: false,
+     role: undefined,
+   }
+   ```
+
+   Every existing org-scoped query then works unchanged, while `RolesGuard` (which matches on
+   `user.role`) and `SuperAdminGuard` deny by DEFAULT rather than by accident.
 2. A `@RequireScopes()` decorator checked against `request.apiKeyScopes`, so the 8 advertised
    scopes actually gate something. They currently gate nothing.
 3. A composite JWT-or-API-key guard, because browser clients must keep working on the same routes.
 4. Applied to a DELIBERATELY CHOSEN read surface first — the documented `GET /api/v1/content` —
    not swept across existing endpoints.
-5. Cross-tenant tests are mandatory: a key from org A must not read org B, and a key must not
-   reach any `@Roles`-gated or super-admin route.
+5. Proof obligations for that session — all of them, and the cross-tenant ones must fail when the
+   principal binding is removed:
+
+   ```
+   valid key, own tenant         -> allowed
+   valid key, other tenant       -> impossible to read
+   revoked / expired key         -> denied
+   missing required scope        -> denied
+   matching required scope       -> allowed
+   API key on role-admin route   -> denied by default
+   API key on super-admin route  -> denied
+   JWT browser request           -> unchanged
+   JWT + API key together        -> exactly one authenticated principal
+   ```
 
 Treat this as a new externally-reachable auth surface: rate limiting, audit, and the tenant tests
 are part of the change, not follow-ups.
