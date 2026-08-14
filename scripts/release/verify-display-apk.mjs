@@ -867,6 +867,47 @@ function runApksigner(binary, apkPath) {
 }
 
 /** Fingerprints compare case-insensitively and ignore colon separators. */
+/**
+ * The RELEASE-BINDING checks — the ones that tie this artifact to the recorded release:
+ * its pinned signing identity, its pinned origins, its candidate record, and its Gate A
+ * approval.
+ *
+ * Each SKIPS when its flag or record is absent, and a skip carries `pass: true`, so
+ * before Vizora#318 the weakest possible invocation printed the same `VERDICT: PASS` as
+ * a fully bound one — the difference visible only in SKIP lines above the verdict,
+ * which is exactly where a hurried reader does not look.
+ *
+ * Publishing passes every `--require-*` flag, so none of these can skip there. A skip
+ * therefore always means "nobody asked for the binding", never "the binding failed".
+ */
+export const RELEASE_BINDING_CHECKS = Object.freeze([
+  'certificate matches the pinned canonical signing identity',
+  'compiled default origins match the pinned expectation',
+  'candidate record matches this exact APK',
+  'Gate A approval is bound to this exact APK',
+]);
+
+/**
+ * THREE outcomes, not two:
+ *   FAIL            something was checked and was wrong
+ *   PASS_WITH_SKIPS nothing was wrong, but the artifact was never BOUND to the record
+ *   PASS            fully bound, nothing wrong
+ *
+ * The middle one exists because "no binding check ran" and "every binding check
+ * passed" are completely different statements about an artifact, and they used to
+ * print the same word.
+ */
+export function computeVerdict(checks, bindingNames = RELEASE_BINDING_CHECKS) {
+  if (!checks.every(c => c.pass)) return 'FAIL';
+  const binding = new Set(bindingNames);
+  return checks.some(c => c.skipped && binding.has(c.name)) ? 'PASS_WITH_SKIPS' : 'PASS';
+}
+
+/** Exit code per verdict. Distinct, so a caller cannot mistake incomplete for bound. */
+export function exitCodeForVerdict(verdict) {
+  return verdict === 'PASS' ? 0 : verdict === 'FAIL' ? 1 : 3;
+}
+
 export function normalizeFingerprint(fp) {
   return String(fp).replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
 }
@@ -1279,7 +1320,7 @@ async function main() {
       : { binary: null, verified: null, required: requireApksigner },
     published,
     checks,
-    verdict: checks.every(c => c.pass) ? 'PASS' : 'FAIL',
+    verdict: computeVerdict(checks),
   };
 
   if (args.json) {
@@ -1324,10 +1365,30 @@ async function main() {
     }
     console.log('');
     console.log(`  VERDICT: ${report.verdict}`);
+    if (report.verdict === 'PASS_WITH_SKIPS') {
+      const bindingSet = new Set(RELEASE_BINDING_CHECKS);
+      const missed = checks.filter(c => c.skipped && bindingSet.has(c.name)).map(c => c.name);
+      console.log('');
+      console.log('  INCOMPLETE — the artifact was NOT bound to the release record. These');
+      console.log('  release-binding checks did not run:');
+      for (const m of missed) console.log(`    - ${m}`);
+      console.log('');
+      console.log('  This is NOT publish-equivalent verification. Re-run with:');
+      console.log('    --against deploy/tv/release.json --require-apksigner \\');
+      console.log('    --require-pinned-cert --require-pinned-origins --require-candidate-binding');
+    }
     console.log('');
   }
 
-  process.exit(report.verdict === 'PASS' ? 0 : 1);
+  // Distinct machine-readable outcomes, so a caller cannot mistake an incomplete run
+  // for a bound one:
+  //   0 = PASS             fully bound
+  //   1 = FAIL             a check failed
+  //   3 = PASS_WITH_SKIPS  nothing failed, but the artifact was never bound
+  // publish-display-apk.sh passes every --require-* flag, so it gets 0 or 1 and is
+  // unaffected. A `verify && publish` chain now stops on an unbound run instead of
+  // proceeding on a green-looking headline.
+  process.exit(exitCodeForVerdict(report.verdict));
 }
 
 // Only run the CLI when executed directly — importing this module (for tests)
