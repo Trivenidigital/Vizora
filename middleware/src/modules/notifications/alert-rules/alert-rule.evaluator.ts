@@ -22,6 +22,21 @@ interface DeviceOfflinePayload {
 }
 
 /**
+ * What a CALLER of evaluate() must supply. The transition path forwards the
+ * emitter's full payload; the periodic sweep knows only identity, because it
+ * selects `{ id, organizationId }` and never loads a name. `deviceName` is
+ * therefore optional at this boundary and evaluate() is the single place
+ * responsible for resolving it — see resolveDeviceName.
+ *
+ * This used to be typed as the full DeviceOfflinePayload, and the periodic
+ * sweep passed an object without `deviceName`. That is a compile error
+ * (TS2345) but nothing in CI typechecks middleware/src, so it reached
+ * production and every persistent-offline alert read "undefined is offline".
+ */
+type DeviceOfflineTrigger = Omit<DeviceOfflinePayload, 'deviceName'> &
+  Partial<Pick<DeviceOfflinePayload, 'deviceName'>>;
+
+/**
  * O7 — Rule-driven evaluator for `device.offline` events.
  *
  * Replaces the hard-coded `handleDeviceOffline` handler that previously
@@ -123,9 +138,28 @@ export class AlertRuleEvaluator {
     }
   }
 
-  private async evaluate(payload: DeviceOfflinePayload, periodic = false): Promise<void> {
+  /**
+   * Canonical display name, matching what the transition path's emitter uses
+   * (`displays.service.ts:329`). Derived from the row evaluate() already
+   * fetched, so a caller that cannot supply a name still produces a
+   * customer-legible alert instead of "undefined is offline".
+   *
+   * Precedence is caller-first so the transition path stays byte-identical to
+   * the behaviour its existing spec pins; the periodic sweep never supplies a
+   * name, so it always lands on the derived value.
+   */
+  private static resolveDeviceName(
+    trigger: DeviceOfflineTrigger,
+    device: { nickname?: string | null; deviceIdentifier?: string | null },
+  ): string {
+    return (
+      trigger.deviceName ?? device.nickname ?? device.deviceIdentifier ?? 'Unknown device'
+    );
+  }
+
+  private async evaluate(trigger: DeviceOfflineTrigger, periodic = false): Promise<void> {
     const device = await this.db.display.findUnique({
-      where: { id: payload.deviceId },
+      where: { id: trigger.deviceId },
       include: {
         tags: { select: { tagId: true } },
         groups: { select: { displayGroupId: true } },
@@ -133,10 +167,18 @@ export class AlertRuleEvaluator {
     });
     if (!device) {
       this.logger.warn(
-        `device.offline event for unknown device ${payload.deviceId} — skipping all rules`,
+        `device.offline event for unknown device ${trigger.deviceId} — skipping all rules`,
       );
       return;
     }
+
+    // Resolved only once the row exists, so every dispatch channel below sees
+    // the same customer-legible name regardless of which path triggered us.
+    const payload: DeviceOfflinePayload = {
+      deviceId: trigger.deviceId,
+      organizationId: trigger.organizationId,
+      deviceName: AlertRuleEvaluator.resolveDeviceName(trigger, device),
+    };
 
     const rules = await this.alertRulesService.findActiveForEvent(
       payload.organizationId,
