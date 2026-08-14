@@ -280,3 +280,40 @@ Three corrections were needed this session, all the same shape — a conclusion 
 - Corollary worth its own line: **check the direction of an assertion, not just its
   presence.** `expect 200` and `expect 401` are both "a check on that route"; only one of
   them notices a guard disappearing.
+
+### The place a feature is *entered* is part of the feature
+- **Vizora#331 / #336.** The persistent-offline sweep shipped dispatching `undefined is
+  offline` to production. 18 notifications, 11 of them to real customer orgs.
+- The sweep selects `{ id, organizationId }` and passed exactly that to `evaluate()`,
+  whose parameter required `deviceName`. `tsc` reports it as TS2345 — the compiler was
+  never wrong, it was never asked. CI typechecks the display client and `scripts/`, not
+  `middleware/src` or `realtime/src`, the two services PM2 actually runs (#337).
+- The feature had 24 passing tests. **Every one of them entered through the *other*
+  entry point** — `handleDeviceOffline`, whose caller supplies a name. The new cron
+  method `reevaluatePersistentOffline()` had zero tests. The bug lived precisely in the
+  gap between "the logic is well tested" and "the way the logic is reached is tested".
+- The test-shaped tell: a spec whose every `it()` calls the same helper, when the
+  production code has two callers. Adding a feature by adding a *caller* to well-tested
+  logic feels safe and is the exact shape that skips coverage — the diff looks like
+  plumbing, so it attracts no tests.
+- **Rule:** when a change adds a new way to *reach* existing logic, the new entry point
+  is the thing under test — not the logic it reaches. Drive the real entry point, and
+  mutation-check it: restoring the shipped bug had to turn the new tests red while all
+  26 pre-existing tests stayed green. That second half is what proved the old path was
+  genuinely untouched rather than merely still passing.
+
+### Match the prediction oracle to the production predicate, or it will "find" phantoms
+- Same workstream. Pre-deploy I predicted 23 alerts from
+  `lastHeartbeat < now() - minOfflineSec`. The sweep produced 18, and for a while that
+  5-alert shortfall looked like a suppression defect worth chasing.
+- It was my oracle. The sweep also filters `{ status: 'offline', isDisabled: false }`;
+  my SQL omitted `isDisabled`, and all 5 missing pairs were disabled devices that
+  *correctly* must not alert. The implementation was right and the prediction was wrong.
+- This is §9c (post-hoc attribution) pointed at a verification artifact instead of at
+  production: I attributed a gap to a mechanism without checking that my model of the
+  mechanism matched its code.
+- **Rule:** a hand-written prediction query is a re-implementation of the production
+  predicate, and re-implementations drift. Read the predicate out of the source and
+  transcribe every clause, or you will spend the investigation proving your own SQL
+  wrong. Cheap insurance: pin the predicate with a test that asserts the literal
+  `where` the production code passes, so a future divergence fails loudly.
