@@ -62,6 +62,34 @@ regression check that the release was not disturbed.
 | `grep -c activeContentItemsInclude packages/database/dist/lib/effective-content.js` | expected **4** before |
 | `grep -c allContentItemsInclude .../effective-content.js` | expected **0** before |
 | `/tv` version + public APK sha256 + byte size | the identity that must NOT change |
+| **`bash scripts/deploy-verify.sh > /tmp/deploy-verify.pre.txt 2>&1 \|\| true`** | **the before/after discriminator — see below** |
+
+### Why the deploy-verify baseline is not optional (Vizora#333)
+
+On the 2026-08-14 rollout this step did not exist, and `deploy-verify.sh` came back
+with 4 failures afterwards. Deciding whether they were regressions took source
+archaeology — comparing the script's blob SHA across both commits and diffing the
+modules behind each failing route — to establish they were stale oracle expectations
+that had been failing all along.
+
+An operator at 2am will not do that. They will either roll back a good deploy or wave
+through a real regression. Capture the baseline, and diff it afterwards:
+
+```sh
+# pre-deploy
+bash scripts/deploy-verify.sh > /tmp/deploy-verify.pre.txt 2>&1 || true
+# post-deploy
+bash scripts/deploy-verify.sh > /tmp/deploy-verify.post.txt 2>&1 || true
+diff /tmp/deploy-verify.pre.txt /tmp/deploy-verify.post.txt
+```
+
+**A check that failed before AND after is not a rollout failure. A check that newly
+fails is.** Direct discrimination, no archaeology.
+
+Run it from the repo, not a copy: the readiness parser is resolved relative to the
+script's own directory (`$SCRIPT_DIR/ops/readiness-status-parser.mjs`), so a copy run
+from `/tmp` reports a spurious `parser_missing` FAILURE that is about the copy, not the
+deployment. That exact false alarm was hit while fixing this.
 
 ---
 

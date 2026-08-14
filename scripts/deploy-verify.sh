@@ -56,6 +56,9 @@ fi
 pass()    { echo -e "  ${GREEN}PASS${NC}  $1"; }
 fail()    { echo -e "  ${RED}FAIL${NC}  $1"; ERRORS=$((ERRORS+1)); }
 warn()    { echo -e "  ${YELLOW}WARN${NC}  $1"; WARNINGS=$((WARNINGS+1)); }
+# INFO is neither pass nor problem: a fact worth printing that this script cannot
+# assert. Counts toward nothing, so it never inflates or masks a verdict.
+info()    { echo -e "  INFO  $1"; }
 check()   { TOTAL=$((TOTAL+1)); }
 
 echo "========================================="
@@ -99,9 +102,14 @@ echo ""
 # ---------------------------------------------------------------------------
 echo "--- Protected API Routes (expect 401) ---"
 
+# Every entry MUST be a route that actually exists. Vizora#333: "templates" and
+# "devices" were asserted here for months and neither is a registered controller —
+# so this section reported two permanent FAILs that were oracle defects, not outages.
+# A gate that is always red is a gate nobody reads.
+#
+# The real device self-service surface is rooted at devices/me (see devices/me/content
+# below), not a /devices collection.
 PROTECTED_ROUTES=(
-  "templates"
-  "devices"
   "playlists"
   "content"
   "content/widgets"
@@ -111,6 +119,9 @@ PROTECTED_ROUTES=(
   "schedules"
   "display-groups"
   "folders"
+  # The device path the TV client actually calls. 401 anonymous proves the route is
+  # registered AND its guard is live — the two things that broke for four releases.
+  "devices/me/content"
 )
 
 for ROUTE in "${PROTECTED_ROUTES[@]}"; do
@@ -134,15 +145,26 @@ echo ""
 # ---------------------------------------------------------------------------
 # 3. Public API routes
 # ---------------------------------------------------------------------------
-echo "--- Public API Routes ---"
+# Vizora#333: these two were asserted as PUBLIC (expect 200) and are not. Both
+# controllers are guarded — template-library by RolesGuard, billing by
+# JwtAuthGuard+RolesGuard — so an anonymous 401 is the CORRECT contract, and the old
+# expectation produced two permanent false FAILs.
+#
+# Asserting 401 is also the more useful assertion: a guarded route drifting to 200 is
+# the security-relevant regression worth catching, and "expect 200" could never see it.
+echo "--- Guarded API Routes (expect 401 anonymous) ---"
 
 check
 STATUS=$(http_status "$BASE_URL/api/v1/template-library")
-if [[ "$STATUS" == "200" ]]; then pass "GET /api/v1/template-library -> $STATUS"; else fail "GET /api/v1/template-library -> $STATUS (expected 200)"; fi
+if [[ "$STATUS" == "401" ]]; then pass "GET /api/v1/template-library -> 401 (guard live)"
+elif [[ "$STATUS" == "200" ]]; then fail "GET /api/v1/template-library -> 200 (GUARD MISSING — RolesGuard not applied)"
+else fail "GET /api/v1/template-library -> $STATUS (expected 401)"; fi
 
 check
 STATUS=$(http_status "$BASE_URL/api/v1/billing/plans")
-if [[ "$STATUS" == "200" ]]; then pass "GET /api/v1/billing/plans -> $STATUS"; else fail "GET /api/v1/billing/plans -> $STATUS (expected 200)"; fi
+if [[ "$STATUS" == "401" ]]; then pass "GET /api/v1/billing/plans -> 401 (guard live)"
+elif [[ "$STATUS" == "200" ]]; then fail "GET /api/v1/billing/plans -> 200 (GUARD MISSING — JwtAuthGuard not applied)"
+else fail "GET /api/v1/billing/plans -> $STATUS (expected 401)"; fi
 
 echo ""
 
@@ -162,6 +184,11 @@ if echo "$TEMPLATE_BODY" | grep -q '"total"'; then
   else
     fail "Templates seeded: 0 (run seed script)"
   fi
+elif echo "$TEMPLATE_BODY" | grep -q '"statusCode":401'; then
+  # Expected: template-library is guarded (Vizora#333). The seed count cannot be read
+  # anonymously, so this is a genuine capability gap, not a deployment problem. Said
+  # explicitly rather than left as a permanent WARN that trains readers to ignore WARNs.
+  info "Template count not checkable anonymously (route is guarded) — needs an authenticated probe"
 else
   warn "Could not verify template count from response"
 fi

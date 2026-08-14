@@ -250,3 +250,33 @@ Three corrections were needed this session, all the same shape — a conclusion 
   record (`1250557`) until the timestamps were checked — they were 1.3.13, recorded before the
   publish. **Compare observations to the record only after aligning them in time.**
 
+### A verifier's happy path being green says nothing about what it verifies
+- Sharper form of the rule above, from three failures in one workstream that all had the
+  same shape — **the instrument was wrong, the product was fine** — and none of which a
+  passing run could have surfaced.
+- **Nested-content mutation miss.** A 9-row mutation table on the content resolver was
+  fully green, so the fix looked proven. It perturbed only the *top-level* playlist. The
+  same change had broken layout-**zone** delivery one nesting level down, leaking
+  archived content onto the wire. A mutation harness proves only the semantic depth it
+  actually perturbs; if a change touches recursive resolution, the mutation plan has to
+  walk the same nesting.
+- **Vizora#318.** `verify-display-apk.mjs` printed `VERDICT: PASS` and exit 0 when every
+  release-binding check had SKIPPED, because a skip carried `pass: true`. "No binding
+  check ran" and "every binding check passed" are completely different claims about an
+  artifact and shared one word. Now `PASS_WITH_SKIPS` with its own exit code.
+- **Vizora#333.** `deploy-verify.sh` asserted two routes that were never registered, and
+  asserted two *guarded* routes were public. Worse than noise: `expect 200` on a guarded
+  route would have gone **green precisely when the guard was removed** — the oracle was
+  inverted relative to the risk it should have caught. Now asserts 401 and fails loudly
+  on 200 with "GUARD MISSING".
+- Both fixes were accepted only after a control at the layer they claim to cover: for
+  #318, reverting the verdict rule makes the new tests fail (`actual: 'PASS'`,
+  `expected: 'PASS_WITH_SKIPS'`); for #333, a stub answering 200 to everything makes the
+  guard assertions fail by name.
+- **Rule:** a verifier is not accepted because its happy path is green. Its *claimed
+  meaning* must be demonstrated with a negative control **at the same layer it claims to
+  verify** — break the specific thing it says it detects, and watch the verdict change.
+  A green run only tells you the tool ran.
+- Corollary worth its own line: **check the direction of an assertion, not just its
+  presence.** `expect 200` and `expect 401` are both "a check on that route"; only one of
+  them notices a guard disappearing.
