@@ -232,3 +232,21 @@ Three corrections were needed this session, all the same shape — a conclusion 
   indistinguishable from "still running". Two PRs sat green unnoticed. `gh --jq` has jq embedded.
 - **Rule:** a measurement that disagrees with the code is as likely to be the instrument as the
   subject. And silence from a monitor is not evidence of nothing happening.
+
+### A production check must state its observation point
+
+- Verifying whether APK 1.3.15 had reached prod, `curl -sI https://vizora.cloud/...` from the
+  Windows workstation returned **nothing** — no headers, no error, exit 0. Read naively that is
+  "the download surface is down". Run from the VPS's own self-curl the same URL returned
+  `200`, `Content-Length: 1250557` and a SHA-256 matching the release record exactly.
+- The asymmetry is already recorded in this project's memory ("local curl to vizora.cloud can 000
+  while prod is fine"), which is the only reason it was not mistaken for an outage.
+- **Rule:** local workstation, public edge, loopback, container and VPS self-curl are **not
+  interchangeable**. State which one produced the observation, and never convert a failed local
+  probe into a production claim. The same discipline applies in reverse: a green check from
+  inside the box does not prove the public edge is serving — health-guardian probing the public
+  edge to decide whether to restart Next.js is the mirror-image mistake, still open as a finding.
+- Related: the byte counts in the ops captures (`1250365`) looked like drift against the release
+  record (`1250557`) until the timestamps were checked — they were 1.3.13, recorded before the
+  publish. **Compare observations to the record only after aligning them in time.**
+
