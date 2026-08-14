@@ -26,7 +26,9 @@ describe('AlertRuleEvaluator', () => {
 
   beforeEach(() => {
     db = {
-      display: { findUnique: jest.fn() },
+      // findMany is the periodic sweep's device selector; findUnique is the
+      // per-device re-read both paths share.
+      display: { findUnique: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
       notification: { create: jest.fn() },
       // Default: the recipient user exists in the rule's org. Override
       // per-test for cross-tenant guard checks.
@@ -429,5 +431,109 @@ describe('AlertRuleEvaluator', () => {
     expect(notifications.create).not.toHaveBeenCalled();
     expect(mail.sendDeviceOfflineAlertEmail).not.toHaveBeenCalled();
     expect(http.post).not.toHaveBeenCalled();
+  });
+
+  // ---------------------------------------------------------------------------
+  // Periodic sweep (reevaluatePersistentOffline)
+  //
+  // WHY THESE EXIST. Every test above enters through handleDeviceOffline, the
+  // TRANSITION path, whose caller hands in a deviceName. The periodic sweep is
+  // a second, independent entry point that selects only `{ id, organizationId }`
+  // — it had no test at all, and it shipped dispatching `undefined is offline`
+  // to production for every persistent-offline alert. These drive the cron
+  // method itself, not evaluate(), so the payload the sweep actually constructs
+  // is the thing under test.
+  // ---------------------------------------------------------------------------
+  describe('reevaluatePersistentOffline (periodic path)', () => {
+    // Arrange a sweep that finds exactly one still-offline device and has one
+    // active in_app rule whose dedup claim succeeds.
+    const armSweep = (deviceOverrides: Partial<any> = {}) => {
+      db.display.findMany.mockResolvedValue([{ id: deviceId, organizationId: orgId }]);
+      db.display.findUnique.mockResolvedValue(makeDevice(deviceOverrides));
+      alertRulesService.findActiveForEvent.mockResolvedValue([makeRule()]);
+      alertRulesService.tryClaimDedupWindow.mockResolvedValue(true);
+    };
+
+    it('dispatches the device NICKNAME, not "undefined" (the shipped regression)', async () => {
+      armSweep({ nickname: 'Lobby Screen', deviceIdentifier: 'AA-BB-CC' });
+
+      await evaluator.reevaluatePersistentOffline();
+
+      expect(notifications.create).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Lobby Screen is offline' }),
+      );
+      // Pin the failure mode itself: no dispatched message may contain the
+      // string "undefined", whatever else changes about the wording.
+      for (const [arg] of notifications.create.mock.calls) {
+        expect((arg as { message: string }).message).not.toContain('undefined');
+      }
+    });
+
+    it('falls back to deviceIdentifier when the device has no nickname', async () => {
+      armSweep({ nickname: null, deviceIdentifier: 'AA-BB-CC' });
+
+      await evaluator.reevaluatePersistentOffline();
+
+      expect(notifications.create).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'AA-BB-CC is offline' }),
+      );
+    });
+
+    it('never emits "undefined" even when the row has neither name field', async () => {
+      armSweep({ nickname: null, deviceIdentifier: null });
+
+      await evaluator.reevaluatePersistentOffline();
+
+      expect(notifications.create).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Unknown device is offline' }),
+      );
+    });
+
+    it('sweeps only enabled devices whose status is offline', async () => {
+      armSweep({ nickname: 'Lobby Screen' });
+
+      await evaluator.reevaluatePersistentOffline();
+
+      // This predicate is why a disabled-but-silent device produces no alert.
+      // Production reconciliation depends on it: 23 heartbeat-stale pairs,
+      // 5 of them isDisabled, 18 alerts.
+      expect(db.display.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { status: 'offline', isDisabled: false },
+        }),
+      );
+    });
+
+    it('claims per outage EPISODE, keyed on lastHeartbeat, with the 24h reminder window', async () => {
+      const lastHeartbeat = new Date(Date.now() - 10 * 60 * 1000);
+      armSweep({ nickname: 'Lobby Screen', lastHeartbeat });
+
+      await evaluator.reevaluatePersistentOffline();
+
+      expect(alertRulesService.tryClaimDedupWindow).toHaveBeenCalledWith(
+        'rule-1',
+        deviceId,
+        expect.any(Date),
+        expect.objectContaining({ episodeStartedAt: lastHeartbeat }),
+      );
+    });
+
+    it('one failing device does not abort the sweep', async () => {
+      db.display.findMany.mockResolvedValue([
+        { id: 'device-bad', organizationId: orgId },
+        { id: deviceId, organizationId: orgId },
+      ]);
+      db.display.findUnique
+        .mockRejectedValueOnce(new Error('DB down'))
+        .mockResolvedValue(makeDevice({ nickname: 'Lobby Screen' }));
+      alertRulesService.findActiveForEvent.mockResolvedValue([makeRule()]);
+      alertRulesService.tryClaimDedupWindow.mockResolvedValue(true);
+
+      await evaluator.reevaluatePersistentOffline();
+
+      expect(notifications.create).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Lobby Screen is offline' }),
+      );
+    });
   });
 });
