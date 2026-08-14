@@ -28,6 +28,7 @@ import {
   recordAgentRun,
   addRemediation,
   makeIncidentId,
+  resolveNotReraised,
 } from './lib/state.js';
 import { log } from './lib/alerting.js';
 
@@ -432,18 +433,13 @@ async function main(): Promise<void> {
   // If a display was previously offline but is now back, resolve the incident
   const currentIncidentIds = new Set(incidents.map(i => i.id));
 
-  for (const existing of priorState.incidents) {
-    if (existing.agent !== AGENT) continue;
-    if (existing.status !== 'open') continue;
-    if (currentIncidentIds.has(existing.id)) continue;
-
-    // This incident was not re-raised — the issue is resolved
-    log(AGENT, `Resolving stale incident: ${existing.id}`);
-    incidents.push({
-      ...existing,
-      status: 'resolved',
-      resolvedAt: new Date().toISOString(),
-    });
+  for (const resolved of resolveNotReraised(priorState.incidents, AGENT, currentIncidentIds)) {
+    // Not re-raised this run — the issue is gone. This must sweep `escalated`
+    // as well as `open`: display_offline_persistent is RAISED as escalated, so
+    // an `open`-only guard could never clear the very incident this agent
+    // escalates, and systemStatus stayed CRITICAL after the screen came back.
+    log(AGENT, `Resolving stale incident: ${resolved.id}`);
+    incidents.push(resolved);
     issuesFixed++;
   }
 
