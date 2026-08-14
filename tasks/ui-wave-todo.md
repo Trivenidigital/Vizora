@@ -241,3 +241,27 @@ Before choosing any queued item:
 `tasks/lessons.md` is routinely contended, because every session appends to it. Read current
 origin/main, expect concurrent edits, and rebase — never force-push over another session's entry.
 
+### When fresh evidence contradicts the interpretation, stop — do not defend the theory
+
+Sunk implementation effort is not evidence. The moment new evidence contradicts the model the
+current work rests on, stop that path, update the model, and re-rank — before writing more code
+on top of it.
+
+Worked example, 2026-08-14 (alert rules). The reading was "minOfflineSec is transition-only, so
+clamp configuration to the reachable ~180s", supported by a backlog entry recording that
+transition alerting is not outage coverage. An investigation then found the opposite: the
+persistent-offline design reuses the SAME field as a duration gate, the original O7 design's
+acceptance case is minOfflineSec=300, a Grafana "Device Offline > 5 minutes" rule had been
+retired on the grounds that this evaluator owned it, and the improvement backlog already
+classified the behaviour as a correctness defect prescribing periodic re-evaluation.
+
+The earlier evidence was real but said duration coverage was DEFERRED — not that duration
+semantics were wrong. Two different claims, collapsed into one.
+
+Had the first reading been defended, the shipped result would have been an upper-bound clamp that
+FORMALISED the bug as a spec — and worse, there was no honest number to clamp to, because the
+reachable ceiling is a function of cron scheduling health rather than a constant.
+
+The tell to watch for: an argument that leans on work already done, or on a conclusion already
+announced, rather than on the evidence in front of you.
+
