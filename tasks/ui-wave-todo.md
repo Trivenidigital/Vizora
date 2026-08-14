@@ -194,3 +194,74 @@ Minimum correct shape:
 Treat this as a new externally-reachable auth surface: rate limiting, audit, and the tenant tests
 are part of the change, not follow-ups.
 
+## Queue corrections (carry forward — these overturn earlier estimates)
+
+### Ops-agent clearing path is M, not S
+
+`resolveNotReraised()` (lib/state.ts, shipped in #327) solves the shared resolution MECHANISM, so
+the item looks like a small repeat of the fleet-manager fix. It is not. Each of schedule-doctor,
+content-lifecycle and db-maintainer must independently prove its checks COMPLETED before it
+resolves anything, and completion semantics differ per agent — which is why this cannot be one
+sweep applied three times.
+
+```
+checks completed successfully
+  -> incidents not re-raised may resolve
+
+fetch / query / check incomplete or failed
+  -> existing incidents remain OPEN
+```
+
+The helper treats "not re-raised" as "resolved". So an agent that early-returns on a failed fetch
+with an empty incident list would mark EVERY outstanding incident resolved — turning a
+degraded run into a false all-clear. That is a worse defect than the one being fixed, and it is
+the same shape as this repo's recorded lesson that "'Nothing to do' must still be a recorded run".
+
+Never read an empty finding list from a failed or incomplete run as "everything recovered".
+
+### Check changed files, not conceptual adjacency, before deferring to an open PR
+
+Concurrent sessions make "this sounds related" an unreliable blocking signal in both directions.
+Worked example, 2026-08-14: PR #334 ("verification hardening") sounds like it owns health-check
+work, so health-guardian looked blocked. Its actual changed-file set was
+`scripts/deploy-verify.sh`, `scripts/release/verify-display-apk.{mjs,test.ts}`,
+`docs/runbooks/coordinated-full-main-rollout.md` and `tasks/lessons.md` — so
+`scripts/ops/health-guardian.ts` was NOT blocked, while `scripts/release/**` typecheck coverage
+(which sounds unrelated) WAS.
+
+Before choosing any queued item:
+
+```
+1. list currently open PRs
+2. list their ACTUAL changed files
+3. compare those paths against the candidate
+4. defer only on real file or runtime-surface overlap
+```
+
+`tasks/lessons.md` is routinely contended, because every session appends to it. Read current
+origin/main, expect concurrent edits, and rebase — never force-push over another session's entry.
+
+### When fresh evidence contradicts the interpretation, stop — do not defend the theory
+
+Sunk implementation effort is not evidence. The moment new evidence contradicts the model the
+current work rests on, stop that path, update the model, and re-rank — before writing more code
+on top of it.
+
+Worked example, 2026-08-14 (alert rules). The reading was "minOfflineSec is transition-only, so
+clamp configuration to the reachable ~180s", supported by a backlog entry recording that
+transition alerting is not outage coverage. An investigation then found the opposite: the
+persistent-offline design reuses the SAME field as a duration gate, the original O7 design's
+acceptance case is minOfflineSec=300, a Grafana "Device Offline > 5 minutes" rule had been
+retired on the grounds that this evaluator owned it, and the improvement backlog already
+classified the behaviour as a correctness defect prescribing periodic re-evaluation.
+
+The earlier evidence was real but said duration coverage was DEFERRED — not that duration
+semantics were wrong. Two different claims, collapsed into one.
+
+Had the first reading been defended, the shipped result would have been an upper-bound clamp that
+FORMALISED the bug as a spec — and worse, there was no honest number to clamp to, because the
+reachable ceiling is a function of cron scheduling health rather than a constant.
+
+The tell to watch for: an argument that leans on work already done, or on a conclusion already
+announced, rather than on the evidence in front of you.
+
