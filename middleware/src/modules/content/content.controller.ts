@@ -44,6 +44,7 @@ import {
 } from './dto/approval.dto';
 import { ReviewContentDto } from './dto/review-content.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { ApiKeyRoute } from '../auth/decorators/api-key-route.decorator';
 import { getOwnedMinioObjectKey, MINIO_URL_PREFIX } from '../storage/minio-object-key';
 import { SkipEnvelope } from '../common/interceptors/response-envelope.interceptor';
 import { SkipOutputSanitize } from '../common/interceptors/sanitize.interceptor';
@@ -373,7 +374,17 @@ export class ContentController {
     }
   }
 
+  /**
+   * The FIRST and only route enabled for API-key authentication.
+   *
+   * Read-only and org-scoped: `organizationId` comes from the principal and is
+   * spread straight into the Prisma where-clause, so it is the entire tenant
+   * boundary here — reads are passed through by the tenant guard, which also
+   * defaults to non-blocking. Do not copy @AllowApiKey onto further routes
+   * until this contract has been observed working in production.
+   */
   @Get()
+  @ApiKeyRoute('read:content')
   findAll(
     @CurrentUser('organizationId') organizationId: string,
     @Query() query: ContentQueryDto,
