@@ -363,6 +363,34 @@ export function isActiveIncident(incident: Pick<Incident, 'status'>): boolean {
 }
 
 /**
+ * Resolve an agent's prior incidents that it did NOT re-raise this run.
+ *
+ * The sweep must key off `isActiveIncident`, i.e. "not already resolved" — the
+ * same predicate `determineSystemStatus` uses. fleet-manager previously swept
+ * only `status === 'open'` while raising `display_offline_persistent` as
+ * `'escalated'`, so that incident was born in a state its own resolver skipped:
+ * a display offline for over an hour pinned systemStatus at CRITICAL forever,
+ * and no later run could clear it even once the screen came back. The two
+ * halves contradicted each other — this file already documents that escalated
+ * incidents stay active "until an agent records a resolved copy", and nothing
+ * recorded one.
+ *
+ * Scoped to one agent deliberately: an agent may only resolve what it raised.
+ */
+export function resolveNotReraised(
+  priorIncidents: Incident[],
+  agent: string,
+  currentIncidentIds: Set<string>,
+  now: string = new Date().toISOString(),
+): Incident[] {
+  return priorIncidents
+    .filter((i) => i.agent === agent)
+    .filter(isActiveIncident)
+    .filter((i) => !currentIncidentIds.has(i.id))
+    .map((i) => ({ ...i, status: 'resolved' as const, resolvedAt: now }));
+}
+
+/**
  * Determine overall system status based on active incidents:
  * - CRITICAL: any active incident with severity 'critical'
  * - DEGRADED: any active incident with severity 'warning'
