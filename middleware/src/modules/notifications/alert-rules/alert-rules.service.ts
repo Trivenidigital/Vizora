@@ -237,6 +237,18 @@ export class AlertRulesService {
      */
     const windowMs = options?.windowMs ?? DEDUP_WINDOW_MS;
     const windowThreshold = now.getTime() - windowMs;
+
+    /**
+     * A null `episodeStartedAt` is a deliberate semantic EXCEPTION, not an
+     * omission: a device that has never sent a heartbeat has no episode to
+     * mark, so there is nothing to compare a prior fire against. Those devices
+     * fall back to pure window-based dedup.
+     *
+     * NEGATIVE_INFINITY is how that is expressed — it can never win the max(),
+     * so the window governs alone. The evaluator treats the same devices as
+     * infinitely offline, so every threshold passes and the reminder cadence is
+     * the only thing bounding them.
+     */
     const episodeThreshold = options?.episodeStartedAt?.getTime() ?? Number.NEGATIVE_INFINITY;
     const threshold = new Date(Math.max(windowThreshold, episodeThreshold));
 
