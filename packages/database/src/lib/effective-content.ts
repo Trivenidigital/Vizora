@@ -103,6 +103,24 @@ function splitDeliverable(playlist: EffectivePlaylist, now: Date): EffectivePlay
   return all;
 }
 
+/** Version stamps a single content row contributes: its edit, and its crossed expiry. */
+function contentStamps(
+  content: { updatedAt?: Date | string | null; expiresAt?: Date | string | null } | null | undefined,
+  now: Date,
+): number[] {
+  const out: number[] = [];
+  if (!content) return out;
+  if (content.updatedAt != null) {
+    const t = new Date(content.updatedAt).getTime();
+    if (!Number.isNaN(t)) out.push(t);
+  }
+  if (content.expiresAt != null) {
+    const t = new Date(content.expiresAt).getTime();
+    if (!Number.isNaN(t) && t <= now.getTime()) out.push(t);
+  }
+  return out;
+}
+
 const empty: EffectiveContent = { playlist: null, source: 'none', scheduleId: null, version: '' };
 
 export async function resolveEffectiveContent(
@@ -151,12 +169,12 @@ export async function resolveEffectiveContent(
     // Split BEFORE zone resolution so zones resolve only for delivered items, and
     // version over the COMPLETE set so a filtered-out item cannot lower the version.
     const allItems = splitDeliverable(playlist, now);
-    await resolveLayoutZones(db, playlist, organizationId, now);
+    const zoneStamps = await resolveLayoutZones(db, playlist, organizationId, now);
     return {
       playlist,
       source: 'schedule',
       scheduleId: active.id,
-      version: contentVersion(playlist, active.updatedAt, { versionItems: allItems, now }),
+      version: contentVersion(playlist, active.updatedAt, { versionItems: allItems, now, extraStamps: zoneStamps }),
     };
   }
 
@@ -169,12 +187,12 @@ export async function resolveEffectiveContent(
     if (found) {
       const playlist = found as unknown as EffectivePlaylist;
       const allItems = splitDeliverable(playlist, now);
-      await resolveLayoutZones(db, playlist, organizationId, now);
+      const zoneStamps = await resolveLayoutZones(db, playlist, organizationId, now);
       return {
         playlist,
         source: 'currentPlaylist',
         scheduleId: null,
-        version: contentVersion(playlist, null, { versionItems: allItems, now }),
+        version: contentVersion(playlist, null, { versionItems: allItems, now, extraStamps: zoneStamps }),
       };
     }
   }
@@ -194,7 +212,13 @@ export async function resolveLayoutZones(
   playlist: EffectivePlaylist | null,
   organizationId: string,
   now: Date,
-): Promise<void> {
+): Promise<number[]> {
+  // Version stamps from content that is resolved here but NOT delivered — zone items
+  // that are archived/expired, and a dropped zone content. Returned to the caller
+  // rather than attached to the payload: nothing hidden is written onto `zone`, so a
+  // filtered-out item cannot reappear in serialized metadata on the wire.
+  const stamps: number[] = [];
+
   for (const item of playlist?.items ?? []) {
     const content = item.content as Record<string, unknown> | null | undefined;
     if (!content || content.type !== 'layout') continue;
@@ -202,18 +226,39 @@ export async function resolveLayoutZones(
     const zones = Array.isArray(metadata?.zones) ? (metadata!.zones as Record<string, unknown>[]) : [];
     for (const zone of zones) {
       if (typeof zone.playlistId === 'string') {
-        zone.resolvedPlaylist = await db.playlist.findFirst({
+        const zonePlaylist = (await db.playlist.findFirst({
           where: { id: zone.playlistId, organizationId },
           include: allContentItemsInclude,
-        });
+        })) as unknown as EffectivePlaylist | null;
+        if (zonePlaylist) {
+          // Same split as the top level, for the same two reasons: S1-2 says never
+          // SERVE archived/expired content, and #325 says a filtered-out item must
+          // still raise the version. The include is unfiltered now, so without this
+          // the zone would put archived content on the wire.
+          const allZoneItems = splitDeliverable(zonePlaylist, now);
+          for (const zoneItem of allZoneItems) stamps.push(...contentStamps(zoneItem.content, now));
+        }
+        zone.resolvedPlaylist = zonePlaylist;
       }
       if (typeof zone.contentId === 'string') {
-        zone.resolvedContent = await db.content.findFirst({
+        const zoneContent = await db.content.findFirst({
           where: { id: zone.contentId, organizationId },
         });
+        // A directly-pinned zone content was NEVER status/expiry checked — the filter
+        // only ever applied to playlist items, so an archived or expired content
+        // pinned straight into a zone has always been servable. Same invariant, same
+        // customer-visible failure (dead content on glass), so it is closed here
+        // rather than left as a known second door. Its stamps still count toward the
+        // version, so dropping it advances rather than stalls the payload.
+        stamps.push(...contentStamps(zoneContent as never, now));
+        const servable =
+          zoneContent && isDeliverable({ contentId: '', order: 0, content: zoneContent as never }, now);
+        zone.resolvedContent = servable ? zoneContent : null;
       }
     }
   }
+
+  return stamps;
 }
 
 /**
@@ -243,10 +288,14 @@ export async function resolveLayoutZones(
 export function contentVersion(
   playlist: EffectivePlaylist | null,
   scheduleUpdatedAt: Date | string | null,
-  opts?: { versionItems?: EffectivePlaylistItem[]; now?: Date },
+  opts?: { versionItems?: EffectivePlaylistItem[]; now?: Date; extraStamps?: number[] },
 ): string {
   if (!playlist) return '';
-  const stamps: number[] = [];
+  // `extraStamps` carries the version contribution of content resolved for layout
+  // ZONES that is not delivered — an archived/expired zone item, or a dropped zone
+  // content. It arrives as a plain number list from resolveLayoutZones rather than
+  // being hung off the payload, so hidden versioning context cannot leak onto the wire.
+  const stamps: number[] = [...(opts?.extraStamps ?? [])];
   const push = (v: Date | string | null | undefined) => {
     if (v == null) return;
     const t = new Date(v).getTime();
