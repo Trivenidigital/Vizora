@@ -315,12 +315,25 @@ export default function DevicesClient({
  });
  };
 
+ /**
+  * Select-all is PAGE-scoped, matching the header checkbox and the content
+  * page's precedent (content/page-client.tsx prunes selection to the visible
+  * ids on every load). Selection previously survived pagination while the
+  * checkbox and bulk bar described only the visible page, so "Delete 10
+  * selected" could be armed against rows the operator could not see.
+  */
  const toggleSelectAll = () => {
- if (selectedDeviceIds.size === displayDevices.length) {
- setSelectedDeviceIds(new Set());
+ const visibleIds = displayDevices.map(d => d.id);
+ const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedDeviceIds.has(id));
+ setSelectedDeviceIds(prev => {
+ const next = new Set(prev);
+ if (allVisibleSelected) {
+ visibleIds.forEach(id => next.delete(id));
  } else {
- setSelectedDeviceIds(new Set(displayDevices.map(d => d.id)));
+ visibleIds.forEach(id => next.add(id));
  }
+ return next;
+ });
  };
 
  const handleBulkDelete = async () => {
@@ -436,6 +449,29 @@ export default function DevicesClient({
  const startIndex = (currentPage - 1) * itemsPerPage;
  const endIndex = startIndex + itemsPerPage;
  const displayDevices = filteredAndSortedDevices.slice(startIndex, endIndex);
+
+ /**
+  * Selection may only ever contain rows the operator can currently see.
+  *
+  * Every destructive bulk action sends Array.from(selectedDeviceIds), so any id
+  * that survives a change to the visible set becomes an invisible target. This
+  * prunes on page change, search, filter, sort, page-size change and refetch -
+  * every path that alters what is on screen - by keying off the visible ids
+  * themselves rather than trying to enumerate the events.
+  *
+  * `displayDevices` is a fresh slice each render, so the effect keys off a
+  * stable signature; returning `prev` unchanged when nothing was pruned keeps
+  * it from looping.
+  */
+ const visibleIdsKey = displayDevices.map(d => d.id).join(',');
+ useEffect(() => {
+ setSelectedDeviceIds(prev => {
+ if (prev.size === 0) return prev;
+ const visible = new Set(visibleIdsKey ? visibleIdsKey.split(',') : []);
+ const next = new Set(Array.from(prev).filter(id => visible.has(id)));
+ return next.size === prev.size ? prev : next;
+ });
+ }, [visibleIdsKey]);
 
  useEffect(() => {
  setCurrentPage(1);
@@ -574,8 +610,10 @@ export default function DevicesClient({
  {debouncedSearch && (
  <div className="bg-info-50 dark:bg-info-900 border border-info-200 dark:border-info-700 rounded-lg p-3 mb-4">
  <p className="text-sm text-info-800 dark:text-info-200">
- {displayDevices.length}{' '}
- {displayDevices.length === 1 ? 'result' : 'results'} found
+ {/* The filtered total, not the page slice - this sat directly above
+     "Showing 1 to 10 of 25 devices" and disagreed with it. */}
+ {totalItems}{' '}
+ {totalItems === 1 ? 'result' : 'results'} found
  </p>
  </div>
  )}
@@ -604,7 +642,7 @@ export default function DevicesClient({
  <tr>
  {canSelectDevices && (
  <th className="px-4 py-3 text-left">
- <input type="checkbox" checked={selectedDeviceIds.size === displayDevices.length && displayDevices.length > 0} onChange={toggleSelectAll} className="rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]" />
+ <input type="checkbox" aria-label="Select all devices on this page" checked={displayDevices.length > 0 && displayDevices.every(d => selectedDeviceIds.has(d.id))} onChange={toggleSelectAll} className="rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]" />
  </th>
  )}
  <th className="eh-th cursor-pointer hover:bg-[var(--surface-hover)] select-none" onClick={() => handleSort('nickname')}>Device{getSortIcon('nickname')}</th>

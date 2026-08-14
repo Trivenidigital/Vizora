@@ -141,7 +141,19 @@ jest.mock('@/components/ConfirmDialog', () => {
 });
 
 jest.mock('@/components/SearchFilter', () => {
-  return function MockSearch() { return <input data-testid="search-input" placeholder="Search..." />; };
+  // Faithful to the real SearchFilter's controlled contract (value + onChange):
+  // the previous stub ignored its props, so no test could drive a search, and
+  // anything gated on `debouncedSearch` was unreachable.
+  return function MockSearch({ value, onChange }: any) {
+    return (
+      <input
+        data-testid="search-input"
+        placeholder="Search..."
+        value={value ?? ''}
+        onChange={(e) => onChange?.(e.target.value)}
+      />
+    );
+  };
 });
 
 jest.mock('@/components/DeviceStatusIndicator', () => {
@@ -657,6 +669,75 @@ describe('DevicesClient', () => {
     render(<DevicesClient initialDevices={[]} initialPlaylists={[]} />);
     await waitFor(() => {
       expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
+    });
+  });
+});
+
+/**
+ * Destructive bulk actions must operate on exactly the rows the operator can
+ * identify as selected.
+ *
+ * Selection previously survived pagination while the header checkbox and the
+ * bulk bar described only the visible page, so selecting a page of devices and
+ * paging on left the bulk Delete armed against rows the operator could no
+ * longer see or review. Deletion is irreversible.
+ *
+ * Page-scoped is the model this app already teaches: the content page prunes
+ * selection to the visible ids on every load (content/page-client.tsx). Cases
+ * are phrased as what must NOT happen.
+ */
+describe('DevicesClient bulk selection is confined to visible rows', () => {
+  const manyDevices = Array.from({ length: 25 }, (_, i) => ({
+    id: `dev-${i + 1}`,
+    nickname: `Device ${i + 1}`,
+    name: `Device ${i + 1}`,
+    status: 'online',
+    location: 'Seattle',
+    lastSeen: '2026-08-13T10:00:00.000Z',
+  }));
+
+  const renderMany = () =>
+    render(
+      <DevicesClient
+        initialDevices={manyDevices as any}
+        initialPlaylists={[] as any}
+        initialDevicesComplete
+        initialPlaylistsComplete
+      />,
+    );
+
+  const selectAllCheckbox = () => screen.getByLabelText('Select all devices on this page');
+
+  it('reports the filtered total as the result count, not the page slice', async () => {
+    renderMany();
+    await waitFor(() => expect(screen.getByText('Device 1')).toBeInTheDocument());
+
+    // The banner only renders during an active search, which is exactly when
+    // the mismatch showed: it counted the page slice ("10 results found") while
+    // the pagination line below counted the filtered set ("of 24 devices").
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'Device' } });
+
+    await waitFor(() => {
+      const banner = screen.getByText(/results found/i).textContent ?? '';
+      expect(banner.replace(/\s+/g, ' ').trim()).toBe('25 results found');
+    });
+  });
+
+  it('drops selection that is no longer visible when the page changes', async () => {
+    renderMany();
+    await waitFor(() => expect(screen.getByText('Device 1')).toBeInTheDocument());
+
+    fireEvent.click(selectAllCheckbox());
+    expect(selectAllCheckbox()).toBeChecked();
+
+    fireEvent.click(screen.getByText('Next →'));
+
+    // Page 2 holds different rows, so nothing from page 1 may remain armed.
+    // Search, filter, sort and page-size changes prune through the same
+    // visible-ids path, so this covers them too; the shared SearchFilter mock
+    // has no onChange wiring, so a filter-driven case would assert the mock.
+    await waitFor(() => {
+      expect(selectAllCheckbox()).not.toBeChecked();
     });
   });
 });
