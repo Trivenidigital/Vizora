@@ -138,11 +138,24 @@ export class BillingService implements OnModuleInit {
 
     const subscriptionId = org.stripeSubscriptionId || org.razorpaySubscriptionId;
     if (subscriptionId && org.paymentProvider) {
-      const provider = this.getProvider(org.paymentProvider);
-      const subscription = await provider.getSubscription(subscriptionId);
-      if (subscription) {
-        currentPeriodEnd = subscription.currentPeriodEnd.toISOString();
-        cancelAtPeriodEnd = subscription.cancelAtPeriodEnd;
+      // Degrade rather than fail. The provider throws before its own error
+      // handling when it is not configured (`ensureConfigured()`), and a 503
+      // here blanks the whole billing page — which then renders the org's
+      // plan from no data at all. Falling back to a null period end is the
+      // same shape both providers already return on an API failure, so the
+      // customer still sees their true tier from the database.
+      try {
+        const provider = this.getProvider(org.paymentProvider);
+        const subscription = await provider.getSubscription(subscriptionId);
+        if (subscription) {
+          currentPeriodEnd = subscription.currentPeriodEnd.toISOString();
+          cancelAtPeriodEnd = subscription.cancelAtPeriodEnd;
+        }
+      } catch (error) {
+        this.logger.warn(
+          `Unable to read subscription ${subscriptionId} from ${org.paymentProvider} for org ${organizationId}; ` +
+            `returning database tier with no period end: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
 
@@ -171,9 +184,13 @@ export class BillingService implements OnModuleInit {
       select: { subscriptionTier: true, country: true },
     });
 
-    const effectiveCountry = country || org?.country || 'US';
+    if (!org) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    const effectiveCountry = country || org.country || 'US';
     const currency = effectiveCountry === 'IN' ? 'inr' : 'usd';
-    const currentTier = org?.subscriptionTier || 'free';
+    const currentTier = org.subscriptionTier;
 
     return Object.values(PLAN_TIERS).map((plan) => {
       const priceData = plan.prices[currency];

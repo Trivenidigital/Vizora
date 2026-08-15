@@ -267,6 +267,23 @@ describe('BillingService', () => {
       expect(result.currentPeriodEnd).toBeNull();
       expect(result.cancelAtPeriodEnd).toBe(false);
     });
+
+    it('should degrade to a null currentPeriodEnd when the provider read throws', async () => {
+      // The provider throws out of `ensureConfigured()` before its own error
+      // handling. Failing the endpoint blanks the billing page, which then
+      // renders the org's plan from no data at all — return the DB tier instead.
+      mockDatabaseService.organization.findUnique.mockResolvedValue(mockOrganization);
+      mockStripeProvider.getSubscription.mockRejectedValue(
+        new ServiceUnavailableException('Stripe is not configured'),
+      );
+
+      const result = await service.getSubscriptionStatus('org-123');
+
+      expect(result.subscriptionTier).toBe('basic');
+      expect(result.subscriptionStatus).toBe('active');
+      expect(result.currentPeriodEnd).toBeNull();
+      expect(result.cancelAtPeriodEnd).toBe(false);
+    });
   });
 
   describe('getPlans', () => {
@@ -330,6 +347,16 @@ describe('BillingService', () => {
 
       const basicPlan = result.find((p) => p.id === 'basic');
       expect(basicPlan?.isCurrent).toBe(false);
+    });
+
+    it('should throw NotFoundException for non-existent organization', async () => {
+      // Never fabricate a tier for an org we could not read — the old
+      // `org?.subscriptionTier || 'free'` marked Free as the current plan.
+      mockDatabaseService.organization.findUnique.mockResolvedValue(null);
+
+      await expect(service.getPlans('non-existent', 'US', 'monthly')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
