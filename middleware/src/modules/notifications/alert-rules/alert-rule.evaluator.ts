@@ -106,6 +106,11 @@ export class AlertRuleEvaluator {
    * Cluster safety is the CAS, not this cron: both PM2 instances run it, and
    * exactly one wins the claim per (rule, device, window).
    */
+  // Deliberately NOT leader-locked: as the paragraph above states, cluster safety
+  // here is the CAS dedup claim per (rule, device, window) — both instances run,
+  // exactly one wins the claim, one email goes out. A leader lock would duplicate
+  // a guarantee the CAS already provides, and being fail-open it could not
+  // replace it anyway.
   @Cron(CronExpression.EVERY_5_MINUTES)
   async reevaluatePersistentOffline(): Promise<void> {
     try {

@@ -138,6 +138,38 @@ emitter, asserted by test. Gated by `PERSISTENT_OFFLINE_RECONCILE_ENABLED`. **Be
 writes or notifications, read the activation gate in its docblock** — the cron fires in both PM2
 cluster instances. See `docs/plans/2026-08-02-persistent-offline-monitoring.md`.
 
+**Cluster crons — `@Cron` fires in BOTH PM2 instances; locking is per-cron and asymmetric**:
+middleware runs 2 instances in cluster mode and `@nestjs/schedule` fires every `@Cron` in EVERY
+one (proven in prod: `AlertRulesService` logged twice at 18:00 and 19:00, once per worker PID).
+`CronLeaderService.runExclusive(name, fn)` (`common/services/cron-leader.service.ts`, provided +
+exported by the `@Global` `CommonModule`) takes a per-cron Redis `SET NX EX` lock so one instance
+runs per tick. **Do NOT wrap every cron** — the decision is per-cron and both directions are
+enforced by a source-scan test (`common/services/cluster-cron-policy.spec.ts`).
+
+- **Leader-locked (6)**: `billing-lifecycle.handleTrialLifecycle` (trial reminder email has no
+  dedup at all — the only customer-visible double-fire), `template-refresh.processTemplateRefresh`
+  (doubles outbound calls to customer data sources + OpenWeather quota every minute, and races on
+  the `metadata` blob), `data-retention.runRetentionPolicy`, `analytics.cleanupOldImpressions`,
+  `clickhouse-watchdog.checkDeviceHealthFreshness` (duplicate Sentry alerts), and
+  `validation-monitor.handleHourlyValidation` (cost only — ~400 redundant queries/hour).
+- **Deliberately NOT locked** because something else already dedupes: `detectOfflineDevices` +
+  `resetStalePairingDevices` (idempotent `updateMany`; the duplicate `device.offline` is absorbed
+  by `AlertRulesService.tryClaimDedupWindow`), `handleGracePeriodExpiry` (the status-guarded CAS in
+  `EntitlementService.advanceRung` gates every side effect — **that guard is load-bearing for
+  cluster mode**), `checkLadderFreshness` (duplicate log line only), `healMissingDefaultRules`
+  (P2002 on the unique index), `alert-rule.evaluator` (CAS dedup).
+- **MUST run in every instance — never lock these**: `continuous-health-monitor.runHealthCheck`
+  (per-worker in-memory probe state that only that worker's `/health` serves) and
+  `persistent-offline.reconciler.reconcile` (in-process Prometheus gauge; each worker serves its
+  own `/internal/metrics`, so locking freezes the loser's gauge at a stale value forever).
+- **Fail-open semantics**: if Redis is unavailable the body RUNS anyway — a skipped cron is worse
+  than a rare double-fire — and every fail-open logs at WARN with a per-cron counter (§12b). So the
+  lock is a de-duplicator, not a guarantee: **customer-visible paths still need their own
+  idempotency underneath it** (this is why `expireTrials` also does a status-guarded `updateMany`).
+  It is a FAN-OUT lock, not mutual exclusion over time: it does not prevent overlapping runs of a
+  slow cron, and a leader that dies mid-run loses that run until the next window — 24h for a daily
+  cron (backlog: completed-marker key).
+
 **Content system**: Supports image/video/url/html types. Template rendering via Handlebars. File validation with magic number verification to prevent MIME spoofing. Expiration system with automatic replacement content.
 
 **Marketing `.mkt` scope (and its pending supersession)**: `globals.css` defines a `.mkt`

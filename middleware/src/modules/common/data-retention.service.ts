@@ -1,12 +1,16 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { DatabaseService } from '../database/database.service';
+import { CronLeaderService } from './services/cron-leader.service';
 
 @Injectable()
 export class DataRetentionService {
   private readonly logger = new Logger(DataRetentionService.name);
 
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly cronLeader: CronLeaderService,
+  ) {}
 
   /**
    * Daily data retention policy — runs at 3 AM (after analytics cleanup at 2 AM).
@@ -21,9 +25,21 @@ export class DataRetentionService {
    *
    * Note: Content impressions are already cleaned up by AnalyticsService at 2 AM.
    * Note: Redis device commands have a 5-minute TTL and self-expire.
+   *
+   * LEADER-LOCKED. The deletes are individually idempotent (a second pass just
+   * deletes zero rows), but running six unbounded `deleteMany` sweeps twice
+   * concurrently doubles the lock and WAL pressure of the heaviest scheduled DB
+   * job in the app, against tables the API is also serving.
    */
   @Cron('0 3 * * *')
   async runRetentionPolicy() {
+    await this.cronLeader.runExclusive('common-data-retention', () =>
+      this.purgeExpiredRecords(),
+    );
+  }
+
+  /** The actual purge. Split out so the cron entry point can leader-lock it. */
+  private async purgeExpiredRecords(): Promise<void> {
     this.logger.log('Starting daily data retention cleanup...');
 
     const now = new Date();

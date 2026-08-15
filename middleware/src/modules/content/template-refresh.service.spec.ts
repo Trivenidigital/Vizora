@@ -60,6 +60,9 @@ describe('TemplateRefreshService', () => {
     service = new TemplateRefreshService(
       mockDb as DatabaseService,
       mockTemplateRendering,
+      // Pass-through leader lock — see cron-leader.service.spec.ts for the
+      // election itself and cluster-cron-policy.spec.ts for the wiring assertion.
+      { runExclusive: (_n: string, fn: () => Promise<void>) => fn() } as any,
     );
   });
 

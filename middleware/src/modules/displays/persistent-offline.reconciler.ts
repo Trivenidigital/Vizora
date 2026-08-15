@@ -89,6 +89,17 @@ export class PersistentOfflineReconciler {
    * which throws inside `app.listen()` and crash-looped middleware in
    * production once already (incident #247). Do not "tidy" this into the enum.
    */
+  /**
+   * MUST run in EVERY instance — do NOT leader-lock this one.
+   *
+   * The output is an in-process Prometheus gauge, and each PM2 worker serves its
+   * OWN `/internal/metrics`. Under a leader lock the loser never sets its gauge,
+   * so half of all scrapes would read a value frozen at whatever it held when the
+   * lock was introduced — a permanently stale number that looks like real data.
+   * The cron is a pure read plus a gauge set: running it in both instances costs
+   * one extra query per 15 minutes and is the only way both scrape targets stay
+   * truthful.
+   */
   @Cron('*/15 * * * *')
   async reconcile(): Promise<void> {
     if (!this.enabled) return;

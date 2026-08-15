@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { DataRetentionService } from './data-retention.service';
 import { DatabaseService } from '../database/database.service';
+import { CronLeaderService } from './services/cron-leader.service';
 
 describe('DataRetentionService', () => {
   let service: DataRetentionService;
@@ -23,6 +24,12 @@ describe('DataRetentionService', () => {
             mcpAuditLog: { deleteMany: mockDeleteMany },
             adminAuditLog: { deleteMany: mockDeleteMany },
           },
+        },
+        // Pass-through leader lock — see cron-leader.service.spec.ts for the
+        // election itself and cluster-cron-policy.spec.ts for the wiring assertion.
+        {
+          provide: CronLeaderService,
+          useValue: { runExclusive: (_n: string, fn: () => Promise<void>) => fn() },
         },
       ],
     }).compile();

@@ -4,6 +4,7 @@ import { Test } from '@nestjs/testing';
 import { ClickHouseWatchdogService } from './clickhouse-watchdog.service';
 import { DatabaseService } from '../database/database.service';
 import { ClickHouseService } from './clickhouse.service';
+import { CronLeaderService } from '../common/services/cron-leader.service';
 
 /**
  * Regression guard for the 2026-07-11 prod boot failure.
@@ -41,6 +42,13 @@ describe('ClickHouseWatchdogService — @Cron bootstrap (regression guard)', () 
         {
           provide: ClickHouseService,
           useValue: { isEnabled: false, getLatestSampleTime: jest.fn() },
+        },
+        // The service gained this dep when its cron was leader-locked. Providing
+        // it here keeps this guard testing what it is named for (cron expression
+        // validity at bootstrap) rather than failing on DI resolution.
+        {
+          provide: CronLeaderService,
+          useValue: { runExclusive: jest.fn(async (_n: string, fn: () => Promise<void>) => fn()) },
         },
       ],
     }).compile();

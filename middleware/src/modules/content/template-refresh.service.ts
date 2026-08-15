@@ -4,6 +4,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { DatabaseService } from '../database/database.service';
 import { TemplateRenderingService } from './template-rendering.service';
 import { TemplateMetadata } from './content.service';
+import { CronLeaderService } from '../common/services/cron-leader.service';
 
 /**
  * Service for handling scheduled template data refreshes
@@ -15,13 +16,33 @@ export class TemplateRefreshService {
   constructor(
     private readonly db: DatabaseService,
     private readonly templateRendering: TemplateRenderingService,
+    private readonly cronLeader: CronLeaderService,
   ) {}
 
   /**
-   * Cron job that runs every minute to check for templates that need refreshing
+   * Cron job that runs every minute to check for templates that need refreshing.
+   *
+   * LEADER-LOCKED. Two harms compound under a cluster double-fire, both every
+   * minute: (1) every refresh re-fetches the customer's configured data source,
+   * so outbound calls to their API — and our OpenWeather quota — were doubling;
+   * (2) `refreshTemplate` rewrites the whole `metadata` JSON blob, so two workers
+   * racing on one template is last-writer-wins on fields neither of them meant to
+   * touch. The lock keeps the per-tick fan-out at one.
+   *
+   * Returns what THIS instance did, so a skipped (non-leader) tick reports zeros
+   * rather than lying about the leader's work.
    */
   @Cron(CronExpression.EVERY_MINUTE)
   async processTemplateRefresh(): Promise<{ processed: number; errors: number }> {
+    let outcome = { processed: 0, errors: 0 };
+    await this.cronLeader.runExclusive('content-template-refresh', async () => {
+      outcome = await this.refreshDueTemplates();
+    });
+    return outcome;
+  }
+
+  /** The actual refresh sweep. Split out so the cron entry point can leader-lock it. */
+  private async refreshDueTemplates(): Promise<{ processed: number; errors: number }> {
     const now = new Date();
     let processed = 0;
     let errors = 0;

@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { DEVICE_OFFLINE_THRESHOLD_MS } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
 import { ClickHouseService } from './clickhouse.service';
+import { CronLeaderService } from '../common/services/cron-leader.service';
 
 /**
  * §12a freshness watchdog for the device-health time-series.
@@ -29,6 +30,7 @@ export class ClickHouseWatchdogService {
   constructor(
     private readonly db: DatabaseService,
     private readonly clickhouse: ClickHouseService,
+    private readonly cronLeader: CronLeaderService,
   ) {}
 
   // Every 15 minutes (second 0). NB: do NOT use `CronExpression.EVERY_15_MINUTES`
@@ -37,8 +39,20 @@ export class ClickHouseWatchdogService {
   // undefined expression to the cron parser and crash the whole app at
   // `app.listen()` (a TypeError that unit tests, which call this method
   // directly, never exercise). An explicit expression is unambiguous and safe.
+  //
+  // LEADER-LOCKED. This is an alert emitter: during a real ingestion stall both
+  // cluster instances would independently detect it and fire the Sentry alert,
+  // so the operator gets every ops alert twice for as long as the stall lasts.
+  // Duplicate alerting is how alerting gets muted.
   @Cron('0 */15 * * * *')
   async checkDeviceHealthFreshness(): Promise<void> {
+    await this.cronLeader.runExclusive('clickhouse-health-freshness', () =>
+      this.runFreshnessCheck(),
+    );
+  }
+
+  /** The actual freshness probe. Split out so the cron entry point can leader-lock it. */
+  private async runFreshnessCheck(): Promise<void> {
     try {
       if (!this.clickhouse.isEnabled) return;
 

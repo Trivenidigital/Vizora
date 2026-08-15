@@ -189,6 +189,16 @@ export class EntitlementService {
 
       // Guard the write on the CURRENT status so two concurrent runs (or a retry)
       // can't double-advance — only the first flip wins.
+      //
+      // LOAD-BEARING FOR CLUSTER MODE. This is the ONLY thing making the daily
+      // ladder cron safe against PM2 running two middleware instances, each of
+      // which fires every @Cron: `handleGracePeriodExpiry` is deliberately NOT
+      // leader-locked precisely because this CAS makes locking redundant. Every
+      // downstream side effect — the suspend notifier, the dunning email, the
+      // advanced counter — is gated on `res.count === 0 → continue` below. If a
+      // future rung transition writes state BEFORE this guard, or bypasses it,
+      // that safety disappears silently and customers get duplicate dunning mail.
+      // Add a leader lock to the cron in the same change.
       const res = await this.db.organization.updateMany({
         where: { id: org.id, subscriptionStatus: fromStatus },
         data: { subscriptionStatus: toStatus, ...extraData },

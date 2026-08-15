@@ -343,6 +343,12 @@ export class AlertRulesService {
    * lookup + one INSERT (or a no-op P2002 if the rule appeared in
    * the meantime).
    */
+  // Deliberately NOT leader-locked: the heal is self-deduplicating. Both cluster
+  // instances select the same orgs and both attempt the seed, but the INSERT is
+  // guarded by the unique (organizationId, name) index and the loser's P2002 is
+  // caught and treated as success — which is exactly the "the rule appeared in
+  // the meantime" case described above. A concurrent instance is just one more
+  // way for that to happen.
   @Cron(CronExpression.EVERY_HOUR)
   async healMissingDefaultRules(): Promise<void> {
     // R10 alert-rules scout: page through orgs in batches instead of
