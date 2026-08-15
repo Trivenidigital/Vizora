@@ -18,6 +18,14 @@ test.describe('Comprehensive Integration Tests - Phases 6-7', () => {
     await authenticatedPage.goto('/dashboard/schedules');
     await authenticatedPage.waitForLoadState('networkidle');
 
+    // See the gate note in 06-schedules.spec.ts — SCHEDULES_ENABLED ships off.
+    const gated = await authenticatedPage
+      .locator('text=/Scheduling is temporarily unavailable/i')
+      .first()
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
+    test.skip(gated, 'SCHEDULES_ENABLED is off — schedules route is gated out of this build');
+
     await expect(authenticatedPage.locator('h2').filter({ hasText: 'Schedules' })).toBeVisible();
 
     // Navigate to devices
@@ -60,9 +68,13 @@ test.describe('Comprehensive Integration Tests - Phases 6-7', () => {
       await authenticatedPage.keyboard.press('Enter');
       await authenticatedPage.waitForTimeout(1000);
 
-      // Should navigate successfully
-      const heading = authenticatedPage.locator('h2').first();
-      expect(await heading.isVisible({ timeout: 3000 }).catch(() => false) || true).toBeTruthy();
+      // Executing a palette command must land on a rendered page.
+      await expect(authenticatedPage.locator('h2').first()).toBeVisible({ timeout: 5000 });
+    } else {
+      test.info().annotations.push({
+        type: 'skipped-branch',
+        description: 'command palette did not open on Meta/Control+K — palette navigation not exercised',
+      });
     }
   });
 
@@ -85,11 +97,13 @@ test.describe('Comprehensive Integration Tests - Phases 6-7', () => {
       await searchInput.fill('test');
       await authenticatedPage.waitForTimeout(500);
 
-      // Both filters should be applied
-      const content = authenticatedPage.locator('[class*="card"], [role="listitem"]');
-      const count = await content.count();
-
-      expect(count).toBeGreaterThanOrEqual(0);
+      // The library must stay rendered with both filters applied.
+      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Content' })).toBeVisible();
+    } else {
+      test.info().annotations.push({
+        type: 'skipped-branch',
+        description: 'no search input on the content page — combined tag+search filter not exercised',
+      });
     }
   });
 
@@ -233,9 +247,13 @@ test.describe('Comprehensive Integration Tests - Phases 6-7', () => {
 
       const unfilteredCount = await content.count();
 
-      // Counts should be available
-      expect(filteredCount).toBeGreaterThanOrEqual(0);
-      expect(unfilteredCount).toBeGreaterThanOrEqual(0);
+      // Removing a filter can never show fewer items than the filtered view.
+      expect(unfilteredCount).toBeGreaterThanOrEqual(filteredCount);
+    } else {
+      test.info().annotations.push({
+        type: 'skipped-branch',
+        description: 'no tag checkbox on the content page — tag filtering not exercised',
+      });
     }
   });
 
@@ -284,9 +302,8 @@ test.describe('Comprehensive Integration Tests - Phases 6-7', () => {
         await groupCheckbox.check({ force: true });
         await authenticatedPage.waitForTimeout(500);
 
-        // Both filters applied
-        const results = authenticatedPage.locator('[role="row"], [class*="device"]');
-        expect(await results.count()).toBeGreaterThanOrEqual(0);
+        // The devices page must stay rendered with both filters applied.
+        await expect(authenticatedPage.locator('h2').filter({ hasText: 'Devices' })).toBeVisible();
       }
     }
   });
@@ -356,9 +373,9 @@ test.describe('Comprehensive Integration Tests - Phases 6-7', () => {
       await authenticatedPage.goto(page);
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Each page should load successfully
-      const heading = authenticatedPage.locator('h2').first();
-      expect(await heading.isVisible({ timeout: 5000 }).catch(() => false) || true).toBeTruthy();
+      // Each page must render a heading. (h1 or h2: the gated schedules route
+      // renders its notice as an h1 — see the SCHEDULES_ENABLED note in 06.)
+      await expect(authenticatedPage.locator('h1, h2').first(), `${page} must render a heading`).toBeVisible({ timeout: 5000 });
     }
   });
 
@@ -392,9 +409,8 @@ test.describe('Comprehensive Integration Tests - Phases 6-7', () => {
       await authenticatedPage.reload();
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Page should load successfully after reload
-      const heading = authenticatedPage.locator('h2').first();
-      expect(await heading.isVisible({ timeout: 5000 }).catch(() => false) || true).toBeTruthy();
+      // Page must still render after a reload.
+      await expect(authenticatedPage.locator('h1, h2').first(), `${page} must render a heading after reload`).toBeVisible({ timeout: 5000 });
     }
   });
 
@@ -417,9 +433,8 @@ test.describe('Comprehensive Integration Tests - Phases 6-7', () => {
       await authenticatedPage.setViewportSize({ width: 1280, height: 720 });
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Page should be functional
-      const heading = authenticatedPage.locator('h2').first();
-      expect(await heading.isVisible({ timeout: 3000 }).catch(() => false) || true).toBeTruthy();
+      // Page must survive the resize round-trip.
+      await expect(authenticatedPage.locator('h1, h2').first(), `${page} must render a heading after resize`).toBeVisible({ timeout: 5000 });
     }
   });
 
@@ -432,9 +447,9 @@ test.describe('Comprehensive Integration Tests - Phases 6-7', () => {
       await authenticatedPage.waitForTimeout(300);
     }
 
-    // Final page should load properly
-    const finalHeading = authenticatedPage.locator('h2').first();
-    await expect(finalHeading).toBeVisible({ timeout: 5000 }).catch(() => {});
+    // Final page should load properly (h1 or h2 — see the heading note above).
+    const finalHeading = authenticatedPage.locator('h1, h2').first();
+    await expect(finalHeading).toBeVisible({ timeout: 5000 });
   });
 
   test('should work without JavaScript errors across features (DOMAIN)', async ({ authenticatedPage }) => {
@@ -454,13 +469,13 @@ test.describe('Comprehensive Integration Tests - Phases 6-7', () => {
       await authenticatedPage.waitForLoadState('networkidle');
     }
 
-    // Should have minimal errors (some 3rd party errors expected)
+    // A TypeError/ReferenceError on a dashboard page is a real bug, not noise.
     const criticalErrors = errors.filter(e =>
       e.includes('TypeError') ||
       e.includes('ReferenceError') ||
       e.includes('Cannot read property')
     );
 
-    expect(criticalErrors.length).toBeLessThanOrEqual(5);
+    expect(criticalErrors, `dashboard pages emitted JS errors:\n${criticalErrors.join('\n')}`).toHaveLength(0);
   });
 });

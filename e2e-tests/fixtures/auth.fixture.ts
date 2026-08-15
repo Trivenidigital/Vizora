@@ -1,4 +1,40 @@
-import { test as base, Page } from '@playwright/test';
+import { test as base, APIResponse, Page } from '@playwright/test';
+
+/**
+ * Unwrap the global ResponseEnvelopeInterceptor. Every REST endpoint these specs
+ * call returns `{ success, data, meta }`, so reading `body.<field>` directly
+ * yields undefined and turns the assertions that follow into no-ops.
+ */
+export async function readData<T = any>(res: APIResponse): Promise<T> {
+  const body = await res.json();
+  return body && typeof body === 'object' && 'data' in body ? (body as any).data : body;
+}
+
+/**
+ * POST to the API with both credentials the middleware requires.
+ *
+ * The bearer token alone is not enough: CsrfMiddleware enforces a double-submit
+ * pair (`vizora_csrf_token` cookie + `X-CSRF-Token` header). Sending only the
+ * bearer returns 403 "Invalid CSRF token", which used to push every API-seeded
+ * spec down its "if the API fails, just check the page loads" fallback branch.
+ */
+export async function apiPost(
+  page: Page,
+  token: string,
+  url: string,
+  data: Record<string, unknown>,
+): Promise<APIResponse> {
+  const cookies = await page.context().cookies();
+  const csrf = cookies.find((c) => c.name === 'vizora_csrf_token')?.value ?? '';
+
+  return page.request.post(url, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'X-CSRF-Token': csrf,
+    },
+    data,
+  });
+}
 
 export type AuthenticatedPage = {
   authenticatedPage: Page;
@@ -62,9 +98,12 @@ export const test = base.extend<AuthenticatedPage>({
     // Navigate to a page to establish context
     await page.goto('/');
 
-    // Also set in localStorage for client-side JS (optional, for compatibility)
+    // Also set in localStorage for client-side JS (optional, for compatibility).
+    // The cookie-consent bar is dismissed up front: it slides up 1s after load and
+    // sits above the page, intercepting pointer events on modal confirm buttons.
     await page.evaluate((authToken) => {
       localStorage.setItem('authToken', authToken);
+      localStorage.setItem('vizora_cookie_consent', 'all');
     }, token);
 
     await use(page);

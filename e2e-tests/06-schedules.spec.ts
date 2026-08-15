@@ -14,6 +14,33 @@ import { test, expect } from './fixtures/auth.fixture';
 
 test.describe('Phase 6.0: Complete Schedules Implementation', () => {
 
+  /**
+   * `/dashboard/schedules` is gated behind SCHEDULES_ENABLED (build-time flag, ships
+   * off — see web/src/app/dashboard/schedules/page.tsx, the "interim C-7 mitigation").
+   * With the gate closed the route renders an "unavailable" notice instead of the CRUD
+   * UI, so every assertion below is moot. Skip visibly rather than leave the gate
+   * permanently red for a deliberate product state — an always-red gate is unreadable.
+   * These tests run again, unchanged, the moment the flag is built on.
+   */
+  test.beforeEach(async ({ authenticatedPage }) => {
+    await authenticatedPage.goto('/dashboard/schedules');
+    await authenticatedPage.waitForLoadState('networkidle');
+
+    const gated = await authenticatedPage
+      .locator('text=/Scheduling is temporarily unavailable/i')
+      .first()
+      .isVisible({ timeout: 5000 })
+      .catch(() => false);
+
+    if (gated) {
+      test.info().annotations.push({
+        type: 'skipped-branch',
+        description: 'SCHEDULES_ENABLED is off — schedules CRUD UI is gated out of this build',
+      });
+    }
+    test.skip(gated, 'SCHEDULES_ENABLED is off — schedules CRUD UI is gated out of this build');
+  });
+
   // ============= LOAD & NAVIGATION TESTS =============
 
   test('should load schedules page successfully', async ({ authenticatedPage }) => {
@@ -43,8 +70,13 @@ test.describe('Phase 6.0: Complete Schedules Implementation', () => {
     const searchInput = authenticatedPage.locator('input[placeholder*="Search"], input[type="search"]').first();
     const hasSearch = await searchInput.isVisible({ timeout: 3000 }).catch(() => false);
 
-    // Search is optional - page should at least be functional
-    expect(hasSearch || true).toBeTruthy();
+    if (!hasSearch) {
+      test.info().annotations.push({
+        type: 'skipped-branch',
+        description: 'no search input on the schedules page — search not exercised',
+      });
+    }
+    await expect(authenticatedPage.locator('h2').filter({ hasText: 'Schedules' })).toBeVisible();
   });
 
   // ============= CREATE SCHEDULE TESTS =============
@@ -74,11 +106,9 @@ test.describe('Phase 6.0: Complete Schedules Implementation', () => {
 
     // Try to submit empty form
     const submitButton = authenticatedPage.locator('button').filter({ hasText: /create|save|submit/i }).locator('..').locator('button').last();
-    if (await submitButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      const isDisabled = await submitButton.isDisabled();
-      // Submit should be disabled or show validation error
-      expect(isDisabled || true).toBeTruthy(); // Soft assertion for UI consistency
-    }
+    await expect(submitButton).toBeVisible({ timeout: 5000 });
+    // An empty schedule form must not be submittable.
+    await expect(submitButton).toBeDisabled();
   });
 
   test('should validate schedule name (MUTATION)', async ({ authenticatedPage }) => {
@@ -191,9 +221,9 @@ test.describe('Phase 6.0: Complete Schedules Implementation', () => {
     // Look for day-related elements (buttons or other selectable elements)
     const dayButtons = authenticatedPage.locator('button, [role="checkbox"], [role="option"]').filter({ hasText: /Mon|Tue|Wed|Thu|Fri|Sat|Sun|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday/i });
 
+    // A schedule needs a day-of-week selector; the modal must offer one.
     const count = await dayButtons.count().catch(() => 0);
-    // At least some day selection mechanism should exist, or modal is functional
-    expect(count >= 0).toBeTruthy();
+    expect(count, 'schedule modal must offer day selection').toBeGreaterThan(0);
   });
 
   test('should toggle day selection (MUTATION)', async ({ authenticatedPage }) => {
@@ -210,8 +240,13 @@ test.describe('Phase 6.0: Complete Schedules Implementation', () => {
       await dayButtons.click();
       const afterClickClass = await dayButtons.getAttribute('class');
 
-      // Class should change to indicate selection
-      expect(initialClass !== afterClickClass || true).toBeTruthy();
+      // Clicking a day must visibly change its selection state.
+      expect(afterClickClass).not.toEqual(initialClass);
+    } else {
+      test.info().annotations.push({
+        type: 'skipped-branch',
+        description: 'no "Monday" day button rendered — day toggle not exercised',
+      });
     }
   });
 
@@ -452,15 +487,17 @@ test.describe('Phase 6.0: Complete Schedules Implementation', () => {
       await searchInput.fill('Morning');
       await authenticatedPage.waitForTimeout(500);
 
-      // Results should be filtered
-      const results = authenticatedPage.locator('text=/Schedule|schedule/i');
-      const visibleCount = await results.count();
-
-      expect(visibleCount).toBeGreaterThanOrEqual(0);
-
       // Clear search
       await searchInput.clear();
       await authenticatedPage.waitForTimeout(300);
+
+      // The page must survive a filter round-trip.
+      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Schedules' })).toBeVisible();
+    } else {
+      test.info().annotations.push({
+        type: 'skipped-branch',
+        description: 'no search input rendered — schedule search filter not exercised',
+      });
     }
   });
 
@@ -528,12 +565,12 @@ test.describe('Phase 6.0: Complete Schedules Implementation', () => {
     const schedulesList = authenticatedPage.locator('[role="listitem"], .schedule-card').first();
 
     if (await emptyState.isVisible({ timeout: 2000 }).catch(() => false)) {
-      // Empty state should have CTA
+      // An empty state is only useful with a way out of it.
       const cta = authenticatedPage.locator('button').filter({ hasText: /create|new|add/i });
-      expect(await cta.count()).toBeGreaterThanOrEqual(0);
-    } else if (await schedulesList.isVisible({ timeout: 2000 }).catch(() => false)) {
-      // List is populated
-      expect(true).toBeTruthy();
+      expect(await cta.count(), 'empty state must offer a create CTA').toBeGreaterThan(0);
+    } else {
+      // Otherwise the list itself must be rendered.
+      await expect(schedulesList).toBeVisible({ timeout: 5000 });
     }
   });
 
