@@ -325,6 +325,28 @@ export class BillingService implements OnModuleInit {
       },
     });
 
+    // Persist the Razorpay subscription IDENTIFIER as soon as we have it (B3-P1).
+    // `RazorpayProvider.createCheckoutSession` creates a real Razorpay
+    // Subscription and returns its id as `sessionId` — nothing else ever wrote
+    // that id, so `razorpaySubscriptionId` stayed null forever and both
+    // `updateSubscription` and `cancelSubscription` 400'd with
+    // "No active subscription found" for every paying Razorpay customer.
+    //
+    // IDENTIFIER ONLY. No tier, no status, no quota: at this instant the
+    // subscription is in Razorpay state `created` and NOTHING has been paid.
+    // Entitlement is granted by the subscription.activated / subscription.charged
+    // webhooks via applyTierFromPlan — the single tier-write site.
+    //
+    // Stripe keeps its existing ordering (stripeSubscriptionId is written by
+    // checkout.session.completed) because a Stripe Checkout Session id is NOT a
+    // subscription id; there is no subscription to record yet.
+    if (providerType === 'razorpay' && result.sessionId) {
+      await this.db.organization.update({
+        where: { id: organizationId },
+        data: { razorpaySubscriptionId: result.sessionId },
+      });
+    }
+
     return {
       checkoutUrl: result.url,
       sessionId: result.sessionId,
@@ -826,6 +848,40 @@ export class BillingService implements OnModuleInit {
   }
 
   /**
+   * Recover a Razorpay subscription id that never reached the database (B3-P1).
+   *
+   * `createCheckoutSession` writes it, but that write can be lost — the request
+   * crashes between the Razorpay call and our update, or the subscription was
+   * created out-of-band (Razorpay dashboard, a support-issued link). Every
+   * `subscription.*` webhook carries the subscription entity, so the id is
+   * recoverable from the first lifecycle event the org receives.
+   *
+   * IDENTIFIER ONLY — never tier, status or quota. Writes only on a real change
+   * so a steady-state webhook does not touch the row.
+   */
+  private async reconcileRazorpaySubscriptionId(
+    provider: string,
+    org: { id: string; razorpaySubscriptionId: string | null },
+    data: WebhookData,
+  ): Promise<void> {
+    if (provider !== 'razorpay') return;
+    const subscription = data.subscription;
+    const subscriptionId =
+      subscription && typeof subscription === 'object' ? subscription.id : undefined;
+    if (typeof subscriptionId !== 'string' || !subscriptionId) return;
+    if (org.razorpaySubscriptionId === subscriptionId) return;
+
+    await this.db.organization.update({
+      where: { id: org.id },
+      data: { razorpaySubscriptionId: subscriptionId },
+    });
+    this.logger.log(
+      `Reconciled razorpaySubscriptionId for org ${org.id}: ` +
+        `${org.razorpaySubscriptionId ?? 'null'} → ${subscriptionId}`,
+    );
+  }
+
+  /**
    * Handle subscription updated webhook
    */
   private async handleSubscriptionUpdated(provider: string, data: WebhookData): Promise<void> {
@@ -852,6 +908,8 @@ export class BillingService implements OnModuleInit {
       this.logger.warn(`Organization not found for customer: ${customerId}`);
       return;
     }
+
+    await this.reconcileRazorpaySubscriptionId(provider, org, data);
 
     // Map status. A missing/unmapped status returns null → leave the org's
     // last-known subscriptionStatus untouched (fail-closed) rather than flip
