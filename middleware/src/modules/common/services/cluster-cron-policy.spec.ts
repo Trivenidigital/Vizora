@@ -26,6 +26,44 @@ function readModuleSource(relPath: string): string {
   return src;
 }
 
+/**
+ * Source slice for ONE cron: from its `@Cron(<expr>)` decorator to the next
+ * `@Cron` (or EOF).
+ *
+ * Whole-file assertions are useless where a file holds several crons with
+ * different dispositions. `billing-lifecycle.service.ts` is the case that
+ * matters: it is in LEADER_LOCKED for handleTrialLifecycle, so a whole-file
+ * `toContain('runExclusive')` passes trivially and ADDING a lock to
+ * handleGracePeriodExpiry — which would make a money-path cron newly dependent
+ * on Redis being up, the exact thing this PR argues against — would fail no
+ * test at all.
+ */
+function cronSlice(src: string, cronExpr: string): string {
+  const marker = `@Cron(${cronExpr})`;
+  const markerIdx = src.indexOf(marker);
+  expect(markerIdx).toBeGreaterThanOrEqual(0);
+
+  const lines = src.slice(0, markerIdx).split('\n');
+  // Walk back over the contiguous comment/blank block directly above the
+  // decorator — that is where the "Deliberately NOT leader-locked" rationale
+  // lives, and it belongs to this cron.
+  let firstLine = lines.length - 1;
+  while (firstLine > 0) {
+    const candidate = lines[firstLine - 1].trim();
+    const isComment =
+      candidate.startsWith('//') ||
+      candidate.startsWith('*') ||
+      candidate.startsWith('/*') ||
+      candidate === '';
+    if (!isComment) break;
+    firstLine -= 1;
+  }
+
+  const start = lines.slice(0, firstLine).join('\n').length;
+  const next = src.indexOf('@Cron(', markerIdx + marker.length);
+  return src.slice(start, next === -1 ? undefined : next);
+}
+
 describe('cluster cron policy', () => {
   // ---------------------------------------------------------------------
   // MUST be leader-locked.
@@ -125,6 +163,52 @@ describe('cluster cron policy', () => {
     it('carries a comment explaining why, so the reason survives the next refactor', () => {
       const src = readModuleSource(file);
       expect(src).toContain('do NOT leader-lock');
+    });
+  });
+
+  // ---------------------------------------------------------------------
+  // Method-scoped: the money-path crons that share a file with a LOCKED cron.
+  // ---------------------------------------------------------------------
+  describe('billing-lifecycle: only the trial cron is locked', () => {
+    const FILE = 'billing/billing-lifecycle.service.ts';
+
+    it("handleTrialLifecycle IS locked (it is the file's only locked cron)", () => {
+      const slice = cronSlice(readModuleSource(FILE), "'0 8 * * *'");
+      expect(slice).toContain("runExclusive('billing-trial-lifecycle'");
+    });
+
+    it('handleGracePeriodExpiry is NOT locked — the ladder CAS already dedupes it', () => {
+      // Locking it would give a money-path cron a new dependency on Redis being
+      // up, buying nothing advanceRung's status-guarded updateMany does not
+      // already guarantee.
+      const slice = cronSlice(readModuleSource(FILE), "'0 9 * * *'");
+      expect(slice).not.toContain('runExclusive');
+      expect(slice).toContain('Deliberately NOT leader-locked');
+      expect(slice).toContain('advanceRung');
+    });
+
+    it('checkLadderFreshness is NOT locked — a duplicate log line is the whole harm', () => {
+      // A watchdog that goes silent because its lock backend is down is strictly
+      // worse than one that shouts twice.
+      const slice = cronSlice(readModuleSource(FILE), 'CronExpression.EVERY_HOUR');
+      expect(slice).not.toContain('runExclusive');
+      expect(slice).toContain('Deliberately NOT leader-locked');
+    });
+  });
+
+  describe('displays: neither cron is locked', () => {
+    const FILE = 'displays/displays.service.ts';
+
+    it('detectOfflineDevices is NOT locked — tryClaimDedupWindow absorbs the duplicate event', () => {
+      const slice = cronSlice(readModuleSource(FILE), 'CronExpression.EVERY_MINUTE');
+      expect(slice).not.toContain('runExclusive');
+      expect(slice).toContain('tryClaimDedupWindow');
+    });
+
+    it('resetStalePairingDevices is NOT locked — idempotent updateMany, no event', () => {
+      const slice = cronSlice(readModuleSource(FILE), 'CronExpression.EVERY_HOUR');
+      expect(slice).not.toContain('runExclusive');
+      expect(slice).toContain('Deliberately NOT leader-locked');
     });
   });
 

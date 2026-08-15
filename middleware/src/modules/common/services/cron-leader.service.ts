@@ -2,6 +2,15 @@ import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '../../redis/redis.service';
 
 /**
+ * Hard ceiling on the leader-lock SET. Deliberately small: acquiring the lock is
+ * a single round-trip to a local Redis, so anything approaching a second means
+ * Redis is not healthy, and the correct move is to stop waiting and fail open.
+ * Must stay well under the shortest cron period (60s) — a timeout that exceeded
+ * it would let ticks overlap.
+ */
+const LOCK_COMMAND_TIMEOUT_MS = 2000;
+
+/**
  * Cluster-safe cron leader election.
  *
  * PM2 runs the middleware in cluster mode (multiple instances) and
@@ -34,7 +43,8 @@ import { RedisService } from '../../redis/redis.service';
  *    EVERY_MINUTE's 60s) so the next tick can re-acquire; PM2 cluster instances
  *    share the host clock, so both fire within milliseconds and 50s easily
  *    covers that race.
- *  - FAIL-OPEN: if Redis is unavailable (or the SET errors) the body runs
+ *  - FAIL-OPEN: if Redis is unavailable, the SET errors, OR the SET does not
+ *    answer within `LOCK_COMMAND_TIMEOUT_MS`, the body runs
  *    anyway. A *skipped* cron — above all the entitlement ladder, where a missed
  *    day delays every dunning escalation — is worse than a rare double-fire, and
  *    the money-path crons (B3 ladder) are additionally idempotent by construction
@@ -104,9 +114,10 @@ export class CronLeaderService {
     // object still exists and this fast path never fires. The command would then
     // enter ioredis's offline queue and reject only after maxRetriesPerRequest:20
     // against the capped backoff in redis.service.ts, i.e. ~42s of dead wait per
-    // wrapped cron per tick. isAvailable() reads the connection state, so an
-    // outage short-circuits here in microseconds. The try/catch below still
-    // covers the race where the connection drops between this check and the SET.
+    // wrapped cron per tick.
+    //
+    // isAvailable() only covers outages ioredis has ALREADY OBSERVED, so it is
+    // necessary but NOT sufficient — see the timeout below.
     const client = this.redis.getClient();
     if (!client || !this.redis.isAvailable()) {
       this.failOpen(name, 'Redis unavailable');
@@ -116,7 +127,22 @@ export class CronLeaderService {
 
     let acquired: 'OK' | null;
     try {
-      acquired = await client.set(`cron:leader:${name}`, this.token(), 'EX', ttlSeconds, 'NX');
+      // Bound the SET. isAvailable() is a snapshot of what ioredis has NOTICED;
+      // several real shapes leave it TRUE while the command never completes:
+      //   (a) reconnected but the server is still -LOADING a large RDB/AOF,
+      //   (b) a TCP blackhole, where no error fires until the kernel retransmit
+      //       timeout (~15 min) — the socket looks fine the entire time,
+      //   (c) the server blocked on a BGSAVE fork stall.
+      // The catch below only catches a REJECTION, not a HANG, so without this
+      // race the cron body would be DELAYED — which is precisely the
+      // "skipped cron is worse than a double-fire" outcome this class exists to
+      // avoid, and becomes a genuinely LOST run if PM2 reloads during the hang
+      // (K18). For an EVERY_MINUTE cron a multi-minute hang also piles up
+      // invocations that all release together on recovery.
+      acquired = await this.raceWithTimeout(
+        client.set(`cron:leader:${name}`, this.token(), 'EX', ttlSeconds, 'NX'),
+        LOCK_COMMAND_TIMEOUT_MS,
+      );
     } catch (err) {
       this.failOpen(
         name,
@@ -141,5 +167,35 @@ export class CronLeaderService {
   /** Identifies the winning instance in the lock value (debug/forensics only). */
   private token(): string {
     return `${process.env.NODE_APP_INSTANCE ?? '0'}:${process.pid}`;
+  }
+
+  /**
+   * Resolve with `promise`, or reject once `ms` elapses.
+   *
+   * The timer is ALWAYS cleared — an un-cleared timer would keep the event loop
+   * alive for its duration on every single tick of every wrapped cron, which
+   * Jest's `detectOpenHandles` would (correctly) flag. The losing side of the
+   * race is left to settle on its own: the SET may still land afterwards, which
+   * is harmless — worst case the lock key gets set by an instance that has
+   * already decided to fail open, and it expires on its normal TTL.
+   */
+  private raceWithTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(
+        () =>
+          reject(
+            new Error(
+              `SET timed out after ${ms}ms — Redis is reachable but not responding ` +
+                `(LOADING, blackholed socket, or a blocked server)`,
+            ),
+          ),
+        ms,
+      );
+    });
+
+    return Promise.race([promise, timeout]).finally(() => {
+      if (timer) clearTimeout(timer);
+    }) as Promise<T>;
   }
 }

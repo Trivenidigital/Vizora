@@ -88,8 +88,7 @@ export class PersistentOfflineReconciler {
    * That enum member does not exist; referencing it yields `@Cron(undefined)`,
    * which throws inside `app.listen()` and crash-looped middleware in
    * production once already (incident #247). Do not "tidy" this into the enum.
-   */
-  /**
+   *
    * MUST run in EVERY instance — do NOT leader-lock this one.
    *
    * The output is an in-process Prometheus gauge, and each PM2 worker serves its

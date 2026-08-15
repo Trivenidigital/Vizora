@@ -120,6 +120,72 @@ describe('CronLeaderService', () => {
     });
   });
 
+  // F1 — isAvailable() only reflects outages ioredis has ALREADY OBSERVED. In a
+  // -LOADING replay, a TCP blackhole (no error until the ~15min kernel
+  // retransmit timeout) or a BGSAVE fork stall it stays TRUE while the SET never
+  // answers. A try/catch catches a rejection, not a hang, so without a timeout
+  // the cron body is DELAYED — the exact "skipped is worse than double-firing"
+  // outcome the fail-open design exists to prevent.
+  describe('F1: Redis reachable but not responding (the hang shapes)', () => {
+    it('still runs the body when the SET hangs, without waiting for it', async () => {
+      // Never settles — models the blackhole/LOADING/fork-stall shapes.
+      mockClient.set.mockImplementation(() => new Promise(() => undefined));
+      jest.spyOn(service['logger'], 'warn').mockImplementation(() => undefined);
+      const fn = jest.fn().mockResolvedValue(undefined);
+
+      const startedAt = Date.now();
+      await service.runExclusive('job-a', fn);
+      const elapsed = Date.now() - startedAt;
+
+      expect(fn).toHaveBeenCalledTimes(1);
+      // Bounded by the 2s ceiling, nowhere near ioredis's ~42s or the kernel's
+      // ~15min. Generous upper bound to stay stable on a loaded CI box.
+      expect(elapsed).toBeLessThan(5000);
+    });
+
+    it('reports the hang as a fail-open WARN with the counter (§12b)', async () => {
+      mockClient.set.mockImplementation(() => new Promise(() => undefined));
+      const warn = jest.spyOn(service['logger'], 'warn').mockImplementation(() => undefined);
+
+      await service.runExclusive('job-a', jest.fn().mockResolvedValue(undefined));
+
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(warn.mock.calls[0][0]).toContain('FAIL-OPEN');
+      expect(warn.mock.calls[0][0]).toContain('timed out');
+      expect(service.getFailOpenCount('job-a')).toBe(1);
+    });
+
+    it('a slow-but-answering SET is still honoured (the timeout is not a hair trigger)', async () => {
+      // 50ms is slow for a local round-trip but well inside the ceiling — this
+      // must NOT fail open, or a briefly-loaded Redis would silently disable
+      // the lock across the fleet.
+      mockClient.set.mockImplementation(
+        () => new Promise((resolve) => setTimeout(() => resolve(null), 50)),
+      );
+      const warn = jest.spyOn(service['logger'], 'warn').mockImplementation(() => undefined);
+      const fn = jest.fn().mockResolvedValue(undefined);
+
+      await service.runExclusive('job-a', fn);
+
+      // SET returned null → another instance holds it → body must NOT run.
+      expect(fn).not.toHaveBeenCalled();
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('does not leave a pending timer behind when the SET answers promptly', async () => {
+      // An un-cleared timer would hold the event loop open on every tick of
+      // every wrapped cron (and trip Jest's detectOpenHandles).
+      mockClient.set.mockResolvedValue('OK');
+      jest.spyOn(service['logger'], 'log').mockImplementation(() => undefined);
+      const before = process.getActiveResourcesInfo?.().filter((r) => r === 'Timeout').length ?? 0;
+
+      await service.runExclusive('job-a', jest.fn().mockResolvedValue(undefined));
+
+      const after = process.getActiveResourcesInfo?.().filter((r) => r === 'Timeout').length ?? 0;
+      expect(after).toBeLessThanOrEqual(before);
+    });
+  });
+
   it('fail-open: runs the body and WARNs when the SET NX call throws', async () => {
     // The race D1's pre-check cannot cover: connection drops between
     // isAvailable() and the SET.

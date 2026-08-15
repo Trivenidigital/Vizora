@@ -663,6 +663,12 @@ export class ContentService {
    * every device plus a duplicate `content.expired` emit, every hour. The
    * mid-run-loss tradeoff is accepted here because the cron is hourly, so a lost
    * run costs at most an hour of expiry latency (see K18 in backlog.md).
+   *
+   * Returns what THIS instance did. A skipped (non-leader) tick reports
+   * `{processed: 0, playlistsRefreshed: 0}`, which is INDISTINGUISHABLE from
+   * "this instance was the leader and nothing was due" — so do not treat a zero
+   * as evidence that no content expired anywhere. Any caller that needs
+   * "did the sweep happen" must ask the leader-lock logs, not this value.
    */
   @Cron(CronExpression.EVERY_HOUR)
   async checkExpiredContent() {
