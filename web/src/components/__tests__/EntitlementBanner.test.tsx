@@ -57,10 +57,80 @@ describe('EntitlementBanner (B3 ladder)', () => {
     expect(screen.queryByLabelText('Dismiss')).toBeNull();
   });
 
-  it('renders nothing if the endpoint errors (no crash)', async () => {
-    mockGetEntitlementBanner.mockRejectedValue(new Error('nope'));
-    const { container } = render(<EntitlementBanner />);
-    await waitFor(() => expect(mockGetEntitlementBanner).toHaveBeenCalled());
-    expect(container.querySelector('[role="alert"]')).toBeNull();
+  // B5 — a failed read must degrade visibly. Silence here is indistinguishable
+  // from a healthy account, and the orgs whose read fails are exactly the orgs
+  // the ladder exists to warn (#350 semantic model).
+  describe('degraded read', () => {
+    it('shows an explicit unknown-state notice instead of nothing when the read fails', async () => {
+      mockGetEntitlementBanner.mockRejectedValue(new Error('nope'));
+      render(<EntitlementBanner />);
+
+      await screen.findByText(/Couldn’t check your subscription status/i);
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+
+    it('never fabricates a benign or ladder state from a failed read', async () => {
+      mockGetEntitlementBanner.mockRejectedValue(new Error('nope'));
+      render(<EntitlementBanner />);
+      await screen.findByText(/Couldn’t check your subscription status/i);
+
+      // No fabricated tier/OK state, and none of the three ladder rungs.
+      expect(screen.queryByText(/Payment past due/i)).toBeNull();
+      expect(screen.queryByText(/Publishing paused/i)).toBeNull();
+      expect(screen.queryByText(/Your screens are paused/i)).toBeNull();
+      expect(screen.queryByText(/\bfree\b/i)).toBeNull();
+      expect(screen.queryByText(/up to date|all good|active/i)).toBeNull();
+      // The ladder CTA asserts a payment is due — it must not appear here.
+      expect(screen.queryByText('Update Payment')).toBeNull();
+      expect(screen.queryByText('Update Billing')).toBeNull();
+    });
+
+    it('surfaces the captured error message (a boolean-only state loops retries blind)', async () => {
+      mockGetEntitlementBanner.mockRejectedValue(new Error('Network request failed'));
+      render(<EntitlementBanner />);
+
+      await screen.findByText(/Network request failed/i);
+    });
+
+    it('falls back to a generic message when the rejection carries none', async () => {
+      mockGetEntitlementBanner.mockRejectedValue('boom');
+      render(<EntitlementBanner />);
+
+      await screen.findByText(/The subscription status request failed/i);
+    });
+
+    it('retry re-fetches and replaces the degraded notice with the real state', async () => {
+      mockGetEntitlementBanner.mockRejectedValueOnce(new Error('nope'));
+      render(<EntitlementBanner />);
+      await screen.findByText(/Couldn’t check your subscription status/i);
+
+      mockGetEntitlementBanner.mockResolvedValueOnce(
+        banner({ status: 'suspended', publishLocked: true }),
+      );
+      fireEvent.click(screen.getByText('Retry'));
+
+      await screen.findByText(/Your screens are paused/i);
+      expect(screen.queryByText(/Couldn’t check your subscription status/i)).toBeNull();
+      expect(mockGetEntitlementBanner).toHaveBeenCalledTimes(2);
+    });
+
+    it('a failed retry keeps the degraded notice up rather than blanking the bar', async () => {
+      mockGetEntitlementBanner.mockRejectedValue(new Error('still down'));
+      render(<EntitlementBanner />);
+      await screen.findByText(/Couldn’t check your subscription status/i);
+
+      fireEvent.click(screen.getByText('Retry'));
+
+      await waitFor(() => expect(mockGetEntitlementBanner).toHaveBeenCalledTimes(2));
+      expect(screen.getByText(/Couldn’t check your subscription status/i)).toBeInTheDocument();
+    });
+
+    it('is NOT dismissible — it may be masking a rung, and dismissal is silence again', async () => {
+      mockGetEntitlementBanner.mockRejectedValue(new Error('nope'));
+      render(<EntitlementBanner />);
+      await screen.findByText(/Couldn’t check your subscription status/i);
+
+      expect(screen.queryByLabelText('Dismiss')).toBeNull();
+    });
   });
 });
