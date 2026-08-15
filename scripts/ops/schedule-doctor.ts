@@ -12,27 +12,61 @@
  *   3. Empty playlist schedules — active schedule pointing to an empty playlist
  *   4. Coverage gaps — displays with no playlist and no active schedule
  *
+ * Incident clearing: a run that saw the WHOLE tenant resolves any prior
+ * incident of this agent's it did not re-raise. `empty_playlist_schedule` and
+ * `coverage_gap` are raised with no auto-fix, so before this existed they could
+ * never leave `open` — an operator who assigned the missing playlist watched
+ * the incident sit there pinning ops-state at DEGRADED forever. A run that did
+ * NOT see the whole tenant resolves nothing and says so via `scan-truncated`.
+ *
  * Exit codes:
  *   0 — all schedules healthy
  *   1 — issues found (some may have been auto-fixed)
  *   2 — fatal error (agent could not complete)
+ *
+ * The exit code is computed from DETECTION only — resolving stale incidents can
+ * never turn a run with an open finding green.
  */
 
 import 'dotenv/config';
 import type { Incident, AgentResult, RemediationAction } from './lib/types.js';
-import { login, releaseSessions, OpsApiClient } from './lib/api-client.js';
+import { login, releaseSessions, OpsApiClient, MAX_ENTITIES } from './lib/api-client.js';
 import {
   readOpsState,
   writeOpsState,
   recordAgentRun,
   addRemediation,
   makeIncidentId,
+  resolveNotReraisedForTypes,
 } from './lib/state.js';
 import { log, sendInlineAlert } from './lib/alerting.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const AGENT = 'schedule-doctor';
+
+/**
+ * Every incident type this agent can raise — i.e. what a COMPLETE sweep is
+ * entitled to resolve.
+ *
+ * ONE set, not a per-type table, because the four checks are not independently
+ * degradable. They read three lists fetched by a single all-or-nothing
+ * `Promise.all`: either all three arrive and all four checks run over the full
+ * data, or the fetch throws and the run early-returns having done nothing. So
+ * there is exactly one completeness question — did this run see the whole
+ * tenant — and per-type keys would be ceremony over a single boolean.
+ *
+ * `scan-truncated` is in the set on purpose. It is raised when the sweep could
+ * NOT see everything, so a later complete sweep must be able to clear it;
+ * leaving it out would recreate the never-clearing incident this change fixes.
+ */
+const RESOLVABLE_TYPES: ReadonlySet<string> = new Set([
+  'past_end_schedule',
+  'orphan_schedule',
+  'empty_playlist_schedule',
+  'coverage_gap',
+  'scan-truncated',
+]);
 
 // ─── Domain Types ────────────────────────────────────────────────────────────
 
@@ -110,6 +144,16 @@ async function main(): Promise<void> {
     return;
   }
 
+  // Completeness of the sweep. `getAll` stops at MAX_ENTITIES, so a list that
+  // comes back at the cap may be missing entities this run never examined —
+  // and an entity never examined cannot be evidence that its incident cleared.
+  // Measured on the RAW lists, before the disabled-display filter below, which
+  // only ever shortens them.
+  const scanComplete =
+    schedules.length < MAX_ENTITIES &&
+    displays.length < MAX_ENTITIES &&
+    playlists.length < MAX_ENTITIES;
+
   // Same rule as fleet-manager: an operator-disabled display must not raise
   // incidents. #259 filtered fleet-manager only, so schedule-doctor kept
   // re-raising coverage_gap for a disabled fixture — caught by the natural
@@ -135,6 +179,39 @@ async function main(): Promise<void> {
   const displayIds = new Set(displays.map(d => d.id));
   const playlistMap = new Map(playlists.map(p => [p.id, p]));
   const now = new Date();
+
+  // ─── Check 0: Scan Completeness ────────────────────────────────────────────
+
+  // Truncation is announced, never silent. Skipping resolution quietly would
+  // put a legitimately-large tenant into a permanent no-resolution regime —
+  // incidents accumulating forever with no signal saying why — which is the
+  // same shape of invisible failure this whole change exists to remove.
+  if (!scanComplete) {
+    issuesFound++;
+    log(
+      AGENT,
+      `Entity scan hit the ${MAX_ENTITIES}-item page-walk cap ` +
+      `(schedules=${schedules.length}, displays=${displays.length}, playlists=${playlists.length}) — ` +
+      'no incident will be resolved this run',
+    );
+    incidents.push({
+      id: makeIncidentId(AGENT, 'scan-truncated', 'entity-lists'),
+      agent: AGENT,
+      type: 'scan-truncated',
+      severity: 'warning',
+      target: 'schedules',
+      targetId: 'entity-lists',
+      detected: new Date().toISOString(),
+      message:
+        `Schedule audit could not see the whole tenant: one or more entity lists reached the ` +
+        `${MAX_ENTITIES}-item page-walk cap (schedules=${schedules.length}, displays=${displays.length}, ` +
+        `playlists=${playlists.length}). Findings are still valid, but no prior incident can be cleared ` +
+        'from a partial scan.',
+      remediation: `Raise the getAll page-walk cap in scripts/ops/lib/api-client.ts, or scope this agent's queries.`,
+      status: 'open',
+      attempts: 0,
+    });
+  }
 
   // ─── Check 1: Past-end Schedules ───────────────────────────────────────────
 
@@ -329,6 +406,12 @@ async function main(): Promise<void> {
 
   const durationMs = Date.now() - startTime;
 
+  // Pin the exit code to what DETECTION found, before resolutions inflate
+  // `issuesFixed`. A run that clears five stale incidents while still holding
+  // one open coverage_gap is a failing run; letting resolutions count toward
+  // the fixed tally would turn it green.
+  const detectionExitCode = issuesFound > 0 && issuesFixed < issuesFound ? 1 : 0;
+
   const result: AgentResult = {
     agent: AGENT,
     timestamp: new Date().toISOString(),
@@ -339,9 +422,34 @@ async function main(): Promise<void> {
     incidents,
   };
 
-  // Brief locked read→merge→write with no I/O in between.
+  // Brief locked read→merge→write with no I/O in between. The resolution sweep
+  // below is pure computation over `state.incidents` — no network, no
+  // subprocess — so it is safe to hold the lock across it, and it has to be
+  // here because the prior incidents are only readable under the lock. This
+  // agent consults no prior incidents during detection, so nothing else needs
+  // a snapshot read.
   const state = readOpsState();
   try {
+    // A partial scan resolves NOTHING: an entity the sweep never examined is
+    // not evidence that its incident cleared. The complementary partial-run
+    // case — a failed fetch — early-returns above without writing state or
+    // stamping lastRun at all, so ops-watchdog's 45-minute SLA sees the gap.
+    if (scanComplete) {
+      const currentIncidentIds = new Set(incidents.map(i => i.id));
+      const resolved = resolveNotReraisedForTypes(
+        state.incidents,
+        AGENT,
+        currentIncidentIds,
+        RESOLVABLE_TYPES,
+      );
+      for (const r of resolved) {
+        log(AGENT, `Resolving stale incident: ${r.id}`);
+        incidents.push(r);
+      }
+      issuesFixed += resolved.length;
+      result.issuesFixed = issuesFixed;
+    }
+
     recordAgentRun(state, result);
 
     for (const r of remediations) {
@@ -355,11 +463,7 @@ async function main(): Promise<void> {
 
   log(AGENT, `Cycle complete in ${durationMs}ms — found: ${issuesFound}, fixed: ${issuesFixed}, escalated: ${issuesEscalated}`);
 
-  if (issuesFound > 0 && issuesFixed < issuesFound) {
-    process.exitCode = 1;
-  } else {
-    process.exitCode = 0;
-  }
+  process.exitCode = detectionExitCode;
 }
 
 // ─── Entry Point ─────────────────────────────────────────────────────────────
