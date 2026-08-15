@@ -325,6 +325,7 @@ all historical alerts), and exact length (leaks meaningfully for short secrets).
 > DB / Redis / MinIO             INCLUDED
 > production URLs / CORS         INCLUDED
 > pool parameters / budget       INCLUDED
+> ops-agent credentials          INCLUDED — added 2026-08-15, see below
 > NEXT_PUBLIC build-time intent  EXCLUDED — awaiting B2 build manifest
 > ```
 >
@@ -508,6 +509,60 @@ being incidental.
 
 4. **Scope of services.** middleware, realtime, web are in scope. The 7 ops agents
    and the Hermes runtime also read `.env` — out of scope for v1, worth noting.
+
+   **PARTIALLY SUPERSEDED 2026-08-15.** The ops agents' *credentials* are now in
+   scope as one separate small control — `analyzeOpsAgentCredentialDrift` in
+   `lib/config-drift.ts`, wired in `runDetection`, incident scope `ops-agents`.
+   Trigger: prod's `/opt/vizora/app/.env` held a VALIDATOR_EMAIL/VALIDATOR_PASSWORD
+   pair that 401s while the running agents authenticated fine on a different,
+   working pair carried in PM2's stored env — `import 'dotenv/config'` never
+   overwrites an already-set variable, so the PM2 values shadowed the file. Same
+   config-shadow class as realtime's `PORT`, on a surface the three-service scope
+   could not see; a cold start would have FATAL'd all four credentialed agents
+   (fleet-manager, schedule-doctor, content-lifecycle, ops-reporter) at once.
+
+   The control samples ONE credentialed agent — the first of `ops-fleet-manager`,
+   `ops-schedule-doctor`, `ops-content-lifecycle`, `ops-reporter` whose `pm2_env`
+   is readable and agrees across both `pm2 jlist` samples. These are cron apps,
+   usually `stopped`, and `pm2_env` is readable without a live pid; requiring both
+   samples to agree keeps a read that lands inside a respawn from surfacing as a
+   credential incident. Sampling is not pinned to one hardcoded entry, because a
+   deleted or renamed app would then emit an `unobservable` finding every hour
+   forever.
+
+   Both sides are modelled the same way the service views are:
+
+   ```text
+   runtime  PM2 stored env  over  .env at the running agent's pm_cwd
+   restart  ecosystem env_production  over  .env at the ecosystem-derived cwd
+   ```
+
+   `pm_cwd` is load-bearing: the ops agents load `.env` relative to their cwd, so
+   the file the RUNNING agent read is the one `pm_cwd` points at. Using the
+   ecosystem-derived cwd for both sides would report MATCH against a file the
+   running process never opened. A disagreement between the two cwds is itself a
+   finding — the running agents and a restart are reading different files.
+
+   Modelling the restart side as `.env` ALONE would have been the other half of
+   the same mistake: `computeZeroState` includes `env_production` for every
+   service, and an operator who fixed the drift by adding credentials to the ops
+   app's `env_production` block could never clear the finding.
+
+   `analyzeOpsAgentCredentialDrift` receives ONLY the four credential variables
+   (`projectOpsCredentialKeys`), never a full environment snapshot. Email and
+   password are BOTH treated as secrets; only MATCH/DRIFT verdict tokens reach a
+   finding. Anything unobservable — no readable PM2 entry, an unreadable or
+   unparseable `.env` — is reported as `info`-severity `ops-credentials-unobservable`
+   rather than resolved into a credential verdict, and does NOT mark the scope
+   evaluated, so it can never clear a prior finding.
+
+   Blast radius, per agent rather than rounded up: fleet-manager, schedule-doctor
+   and content-lifecycle exit FATAL with no credentials; `ops-reporter` warns and
+   skips only its dashboard update (`ops-reporter.ts:289`), leaving
+   `/dashboard/ops` stale.
+
+   The rest of the ops-agent config surface, and the Hermes runtime, remain out of
+   scope.
 
 5. **Build-artifact grep brittleness.** §5's approach depends on the origin
    appearing as a literal in the bundle. Minification currently preserves it;
