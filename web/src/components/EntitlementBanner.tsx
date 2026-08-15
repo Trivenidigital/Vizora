@@ -53,8 +53,19 @@ export default function EntitlementBanner() {
     load();
   }, [load]);
 
-  // Degraded read — state UNKNOWN. Neutral tone, and it asserts nothing about
-  // the account beyond the fact that we could not check it.
+  // Self-heal on network restore. `ApiClient.request` retries only AbortError
+  // (timeouts) and replays once through /auth/refresh on a 401 — a dropped
+  // connection rejects with a plain `TypeError: Failed to fetch` and reaches us
+  // un-retried. Since the notice is not dismissible, without this it would sit
+  // over a healthy org's dashboard for the whole session unless they hit Retry.
+  useEffect(() => {
+    const onOnline = () => load();
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, [load]);
+
+  // Degraded — state UNKNOWN. Neutral tone, and it asserts nothing about the
+  // account beyond the fact that we could not check it.
   //
   // NOT dismissible, for the same reason publish_locked isn't: this state may be
   // masking a rung, so it is load-bearing. Dismissing it would restore exactly
@@ -62,18 +73,10 @@ export default function EntitlementBanner() {
   // notice, so a dismissal would also throw away the only recovery route.
   if (loadError) {
     return (
-      <BannerShell
-        tone="slate"
-        message={
-          <>
-            <strong>Couldn&rsquo;t check your subscription status.</strong>
-            <span className="hidden sm:inline">
-              {' '}Any billing warning that applies to your account is missing from this bar until
-              it loads. ({loadError})
-            </span>
-          </>
-        }
-        actions={<RetryButton onClick={load} loading={loading} />}
+      <DegradedNotice
+        detail={`Any billing warning that applies to your account is missing from this bar until it loads. (${loadError})`}
+        onRetry={load}
+        loading={loading}
       />
     );
   }
@@ -81,6 +84,21 @@ export default function EntitlementBanner() {
   if (!data) return null;
 
   const { status, daysUntilNextRung } = data;
+
+  // The SERVER's own degraded sentinel: getBannerState returns status 'unknown'
+  // when it cannot read the org row, i.e. "I could not determine this". Rendering
+  // nothing for it is the same silent failure as swallowing the fetch error, one
+  // layer back — so it gets the same degraded notice, worded for a server-side
+  // determination failure rather than a transport one.
+  if (status === 'unknown') {
+    return (
+      <DegradedNotice
+        detail="We couldn’t determine your account’s billing state, so any warning that applies to it is missing from this bar."
+        onRetry={load}
+        loading={loading}
+      />
+    );
+  }
   const days = daysUntilNextRung ?? 0;
   const dayLabel = days === 1 ? 'day' : 'days';
 
@@ -156,6 +174,34 @@ function PayLink({ label = 'Update Payment' }: { label?: string }) {
     >
       {label}
     </Link>
+  );
+}
+
+/**
+ * The one degraded/unknown rendering, shared by both ways the state can be
+ * unknown: the read failed in transit, or the server told us it could not
+ * determine it. Neither may render as silence or as a benign state.
+ */
+function DegradedNotice({
+  detail,
+  onRetry,
+  loading,
+}: {
+  detail: string;
+  onRetry: () => void;
+  loading: boolean;
+}) {
+  return (
+    <BannerShell
+      tone="slate"
+      message={
+        <>
+          <strong>Couldn&rsquo;t check your subscription status.</strong>
+          <span className="hidden sm:inline">{' '}{detail}</span>
+        </>
+      }
+      actions={<RetryButton onClick={onRetry} loading={loading} />}
+    />
   );
 }
 
