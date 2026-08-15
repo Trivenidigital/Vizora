@@ -25,7 +25,7 @@
  */
 
 import { decomposePostgresUrl } from './pg-url.js';
-import { makeIncidentId } from './state.js';
+import { makeIncidentId, resolveNotReraisedForTypes } from './state.js';
 import type { Incident, Severity } from './types.js';
 
 export const AGENT = 'db-maintainer';
@@ -186,7 +186,20 @@ export interface MaintenanceReport {
   vacuum: VacuumOutcome[];
   prune: { ok: boolean; deleted: number | null; error?: string };
   redis: { available: boolean; reason?: string };
-  backup: { attempted: boolean; ok: boolean; error?: string };
+  backup: {
+    attempted: boolean;
+    ok: boolean;
+    error?: string;
+    /**
+     * Whether a backup target is configured at all (`BACKUP_S3_BUCKET` set).
+     *
+     * Distinct from `attempted`: a bucket that is set but MALFORMED is
+     * configured AND attempted AND failed. Only an unset bucket means the
+     * operator asked for no backups — and that is the one case where a stale
+     * `backup-failed` incident may be swept as no-longer-applicable.
+     */
+    configured: boolean;
+  };
 }
 
 /**
@@ -300,8 +313,112 @@ export function buildMaintenanceIncidents(
   return incidents;
 }
 
+// ─── Clearing ───────────────────────────────────────────────────────────────
+
+/** Every incident type `buildMaintenanceIncidents` and the agent can raise. */
+const MAINTENANCE_INCIDENT_TYPES = [
+  'vacuum-table-missing',
+  'vacuum-all-failed',
+  'vacuum-failed',
+  'alert-fire-prune-failed',
+  'redis-unobservable',
+  'backup-failed',
+  'log-retention-failed',
+] as const;
+
+/** What this run was actually able to observe. */
+export interface MaintenanceCoverage {
+  /**
+   * `findMissingTables().checked` — whether the table-existence query ran.
+   */
+  tableCheckRan: boolean;
+  /**
+   * Whether a backup target is configured (`BACKUP_S3_BUCKET` set), regardless
+   * of whether the backup then succeeded.
+   */
+  backupConfigured: boolean;
+}
+
 /**
- * Counts for `AgentResult`. `issuesFixed` is 0 — this agent repairs nothing.
+ * Resolve prior db-maintainer incidents that this run did not re-raise.
+ *
+ * A BLANKET sweep is right here, unlike the other two agents: every task is
+ * driven from one `report` object built in a single pass, and
+ * `buildMaintenanceIncidents` recomputes the entire incident set from that
+ * run's outcomes. Partial-run safety is structural rather than flag-based —
+ * any throw lands in the agent's catch BEFORE `recordAgentRun`, so a fatal run
+ * writes no state at all and cannot falsely resolve anything.
+ *
+ * "Every task runs every run" is NOT true of the backup, which is why the
+ * carve-outs below exist. `runBackup` returns early when no bucket is
+ * configured, so a `backup-failed` incident can go un-re-raised for two
+ * completely different reasons.
+ *
+ * ─── Carve-out 1: vacuum-table-missing ──────────────────────────────────────
+ *
+ * When `findMissingTables` could not run — psql unreachable — it returns
+ * `{ missing: [], checked: false }`, and `vacuumAnalyze` then marks nothing as
+ * missing. An empty `missing` list from a check that never executed is not
+ * evidence a table exists, so the incident must survive. Without this, the
+ * single most durable configuration defect this agent exists to surface would
+ * be cleared by the very failure mode that hides it.
+ *
+ * ─── Carve-out 2: backup-failed ─────────────────────────────────────────────
+ *
+ * RULING, recorded here rather than only in review: a `backup-failed` incident
+ * IS resolved when the backup target has since been UNCONFIGURED. The check no
+ * longer runs, so nothing will ever observe it recovering, and leaving it open
+ * pins ops-state at CRITICAL forever over a check the operator switched off —
+ * the same reasoning health-guardian applies when its edge watch is disabled by
+ * configuration. The resolved incident's message is REWRITTEN to name that
+ * cause, so the audit trail says "closed because the target went away" and
+ * never implies a backup succeeded.
+ *
+ * A MALFORMED bucket is emphatically not this case: it is configured, attempted
+ * and failed, and `runBackup` reports it as such so the incident is re-raised
+ * normally.
+ *
+ * Pure and I/O-free by design: this module's charter is testable failure
+ * semantics without touching PostgreSQL.
+ *
+ * @param prior       Incidents already in ops-state.
+ * @param detectedIds Incident ids raised by THIS run.
+ * @param coverage    What this run could actually observe.
+ */
+export function resolveClearedMaintenanceIncidents(
+  prior: Incident[],
+  detectedIds: Set<string>,
+  coverage: MaintenanceCoverage,
+  now: string,
+): Incident[] {
+  const covered = new Set<string>(MAINTENANCE_INCIDENT_TYPES);
+  if (!coverage.tableCheckRan) covered.delete('vacuum-table-missing');
+
+  return resolveNotReraisedForTypes(prior, AGENT, detectedIds, covered, now).map(incident =>
+    incident.type === 'backup-failed' && !coverage.backupConfigured
+      ? {
+          ...incident,
+          message:
+            `${incident.message} — backup target no longer configured ` +
+            '(BACKUP_S3_BUCKET is unset); closing stale incident. This does NOT mean a backup succeeded.',
+        }
+      : incident,
+  );
+}
+
+/**
+ * Counts for `AgentResult`, computed from the DETECTED incident set.
+ *
+ * `issuesFixed` is 0 — this agent repairs nothing, and that stays correct: the
+ * caller overwrites `AgentResult.issuesFixed` with its count of RESOLVED stale
+ * incidents (ops-watchdog / fleet-manager precedent), which is a different
+ * quantity from repairs and is deliberately not computed here.
+ *
+ * Callers must run this BEFORE resolving stale incidents. `exitCode` is derived
+ * from the incidents passed in, so feeding it the post-resolution set would let
+ * a run that cleared five stale findings exit 0 while a VACUUM it just watched
+ * fail sits open. Detected-set-only is what makes that impossible by
+ * construction rather than by a guard someone can forget.
  *
  * ─── Exit-code rule ─────────────────────────────────────────────────────────
  *
