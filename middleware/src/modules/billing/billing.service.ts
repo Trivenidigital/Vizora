@@ -552,13 +552,24 @@ export class BillingService implements OnModuleInit {
       // when Stripe actually ends the subscription at period end.
     } else {
       // Razorpay: provider.cancelSubscription(id, false) maps to the SDK's
-      // cancel_at_cycle_end=false, which cancels the subscription IMMEDIATELY —
-      // there is no period-end grace to honor. Finalize locally to match the
-      // provider rather than fake a grace it won't keep. (Existing behavior.)
+      // cancel_at_cycle_end=false, which cancels the subscription IMMEDIATELY
+      // (razorpay.provider.ts:152) — there is no period-end grace to honor.
+      // Finalize locally to match the provider rather than fake a grace it
+      // won't keep.
+      //
+      // Writes the SAME entitlement fields as the immediate branch above and as
+      // handleSubscriptionCanceled (B3-P5). Before B3 this wrote status only,
+      // which was invisible because subscriptionTier was never raised off 'free'
+      // for Razorpay in the first place. Now that the purchase path grants a
+      // real tier, leaving it here would keep a cancelled customer on a paid
+      // tier and quota until the subscription.cancelled webhook happened to
+      // arrive — or forever if it did not.
       await this.db.organization.update({
         where: { id: organizationId },
         data: {
           subscriptionStatus: 'canceled',
+          subscriptionTier: 'free',
+          screenQuota: getScreenQuotaForTier('free'),
         },
       });
     }

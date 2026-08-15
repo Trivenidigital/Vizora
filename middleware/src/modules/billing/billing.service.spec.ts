@@ -623,9 +623,12 @@ describe('BillingService', () => {
       await service.cancelSubscription('org-123', false);
 
       expect(mockRazorpayProvider.cancelSubscription).toHaveBeenCalledWith('sub_razorpay123', false);
+      // Same entitlement fields as the immediate branch and the webhook (B3-P5):
+      // the provider has already cancelled, so leaving a paid tier + quota
+      // behind would keep entitlement the customer no longer pays for.
       expect(mockDatabaseService.organization.update).toHaveBeenCalledWith({
         where: { id: 'org-123' },
-        data: { subscriptionStatus: 'canceled' },
+        data: { subscriptionStatus: 'canceled', subscriptionTier: 'free', screenQuota: 5 },
       });
     });
 
