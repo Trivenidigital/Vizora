@@ -367,7 +367,16 @@ describe('billing webhook routing (B3)', () => {
         data: stripeSubscription('price_pro_m', 'incomplete_expired'),
         createdAt: NEWER,
       },
-      expected: { ...FREE_TIER_FIELDS, subscriptionStatus: 'canceled', billingEventAt: NEWER },
+      expected: {
+        ...FREE_TIER_FIELDS,
+        subscriptionStatus: 'canceled',
+        // HIGH-3: a DEAD subscription also clears the stored id, matching
+        // handleSubscriptionCanceled. Holding a dead id makes every event for a
+        // replacement subscription look foreign, forever.
+        stripeSubscriptionId: null,
+        razorpaySubscriptionId: null,
+        billingEventAt: NEWER,
+      },
     },
     {
       name: 'A-F2 Stripe updated(canceled) after deleted does NOT re-grant the paid tier',
@@ -384,6 +393,8 @@ describe('billing webhook routing (B3)', () => {
       expected: {
         ...FREE_TIER_FIELDS,
         subscriptionStatus: 'canceled',
+        stripeSubscriptionId: null,
+        razorpaySubscriptionId: null,
         billingEventAt: APPLIED_MARK,
       },
     },
@@ -396,7 +407,15 @@ describe('billing webhook routing (B3)', () => {
         data: rzpSubscription('plan_pro_m', 'completed'),
         createdAt: NEWER,
       },
-      expected: { ...FREE_TIER_FIELDS, subscriptionStatus: 'canceled', billingEventAt: NEWER },
+      expected: {
+        ...FREE_TIER_FIELDS,
+        subscriptionStatus: 'canceled',
+        // The subscription is genuinely over — clear the id so a replacement
+        // subscription's events are not all rejected as foreign (HIGH-3).
+        stripeSubscriptionId: null,
+        razorpaySubscriptionId: null,
+        billingEventAt: NEWER,
+      },
     },
     // --- unknown plan / unknown status ---------------------------------------
     {
@@ -423,12 +442,64 @@ describe('billing webhook routing (B3)', () => {
       expected: null,
     },
     {
-      name: 'Stripe `paused` is unmapped → writes NOTHING (fail closed, not a guess)',
+      name: 'MED `paused` collapses entitlement — billing has stopped, so entitlement stops',
+      provider: 'stripe',
+      org: stripeOrg({ subscriptionTier: 'pro', screenQuota: 100 }),
+      event: {
+        type: 'customer.subscription.updated',
+        data: stripeSubscription('price_pro_m', 'paused'),
+        createdAt: NEWER,
+      },
+      // Leaving `paused` unmapped made the event a total no-op while the
+      // customer had stopped being charged: pro tier, quota, storage and API
+      // access all retained for free. NOTE the absence of the id-null fields —
+      // a paused subscription is resumable, so it must stay cancellable.
+      expected: {
+        ...FREE_TIER_FIELDS,
+        subscriptionStatus: 'canceled',
+        billingEventAt: NEWER,
+      },
+    },
+    {
+      name: 'MED Razorpay `paused` likewise collapses but KEEPS the subscription id',
+      provider: 'razorpay',
+      org: { subscriptionTier: 'pro', screenQuota: 100 },
+      event: {
+        type: 'subscription.paused',
+        data: rzpSubscription('plan_pro_m', 'paused'),
+        createdAt: NEWER,
+      },
+      expected: {
+        ...FREE_TIER_FIELDS,
+        subscriptionStatus: 'canceled',
+        billingEventAt: NEWER,
+      },
+    },
+    {
+      name: 'MED `resumed` restores the tier from plan_id, closing the pause loop',
+      provider: 'razorpay',
+      org: { subscriptionTier: 'free', screenQuota: 5, subscriptionStatus: 'canceled' },
+      event: {
+        type: 'subscription.resumed',
+        // Never map the EVENT NAME to a status — subscription.resumed carries
+        // status "active" on the entity, and that is what is read.
+        data: rzpSubscription('plan_pro_m', 'active'),
+        createdAt: NEWER,
+      },
+      expected: {
+        subscriptionStatus: 'active',
+        ...PRO_TIER_FIELDS,
+        trialEndsAt: null,
+        billingEventAt: NEWER,
+      },
+    },
+    {
+      name: 'a genuinely unrecognized status still writes NOTHING (fail closed)',
       provider: 'stripe',
       org: stripeOrg(),
       event: {
         type: 'customer.subscription.updated',
-        data: stripeSubscription('price_pro_m', 'paused'),
+        data: stripeSubscription('price_pro_m', 'some_status_stripe_added_later'),
         createdAt: NEWER,
       },
       expected: null,
@@ -660,6 +731,123 @@ describe('billing webhook routing (B3)', () => {
       id: 'org-rzp',
       OR: [{ billingEventAt: null }, { billingEventAt: { lte: NEWER } }],
     });
+  });
+
+  it('HIGH-2 the ladder does NOT run when a newer event already won the CAS', async () => {
+    // Simulates the interleaving: payment.failed(T1) and payment.captured(T2>T1)
+    // race across two cluster instances. Capture wins the compare-and-set, so
+    // failure's claim returns count 0 and beginPastDue must never be called.
+    // The first shape called the ladder and stamped afterwards, so the org
+    // flipped to past_due with a fresh clock AFTER being paid — and nothing
+    // later rescued it, because applyTierFromPlan leaves status to the ladder.
+    db.organization.findFirst.mockResolvedValue(razorpayOrg());
+    db.organization.updateMany.mockResolvedValue({ count: 0 });
+
+    await deliver('razorpay', {
+      type: 'payment.failed',
+      data: { payment: { id: 'pay_race', customer_id: 'cust_rzp', amount: 100 } },
+      createdAt: NEWER,
+    });
+
+    expect(entitlement.beginPastDue).not.toHaveBeenCalled();
+  });
+
+  it('HIGH-2 the ladder DOES run when this event wins the CAS', async () => {
+    db.organization.findFirst.mockResolvedValue(razorpayOrg());
+
+    await deliver('razorpay', {
+      type: 'payment.failed',
+      data: { payment: { id: 'pay_win', customer_id: 'cust_rzp', amount: 100 } },
+      createdAt: NEWER,
+    });
+
+    expect(entitlement.beginPastDue).toHaveBeenCalledWith('org-rzp');
+  });
+
+  it('MED-2 an unmapped status escalates instead of only warning', async () => {
+    const warnSpy = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => undefined);
+    db.organization.findFirst.mockResolvedValue(razorpayOrg());
+
+    await deliver('razorpay', {
+      type: 'subscription.updated',
+      data: rzpSubscription('plan_pro_m', 'some_new_razorpay_status'),
+      createdAt: NEWER,
+    });
+
+    // Unknown PLAN ids already reported to Sentry; leaving unknown STATUSES at
+    // warn-only would let a provider adding a status freeze entitlement silently.
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('some_new_razorpay_status'),
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('MED-6 a TERMINAL event does not get its dead subscription id adopted', async () => {
+    db.organization.findFirst.mockResolvedValue(razorpayOrg({ razorpaySubscriptionId: null }));
+
+    await deliver('razorpay', {
+      type: 'subscription.completed',
+      data: rzpSubscription('plan_pro_m', 'completed'),
+      createdAt: NEWER,
+    });
+
+    // Adopting it would leave the org holding the id of a subscription that is
+    // already over, after which every event for a replacement looks foreign.
+    expect(db.organization.update).not.toHaveBeenCalled();
+  });
+
+  it('MED-6 a STALE event does not get its subscription id adopted either', async () => {
+    db.organization.findFirst.mockResolvedValue(razorpayOrg({ razorpaySubscriptionId: null }));
+
+    await deliver('razorpay', {
+      type: 'subscription.activated',
+      data: rzpSubscription('plan_pro_m', 'active'),
+      createdAt: OLDER,
+    });
+
+    expect(db.organization.update).not.toHaveBeenCalled();
+  });
+
+  it('MED-3 the unknown-plan write is still ORDERED, it just does not move the mark', async () => {
+    db.organization.findFirst.mockResolvedValue(razorpayOrg());
+
+    await deliver('razorpay', {
+      type: 'subscription.activated',
+      data: rzpSubscription('plan_nobody_configured', 'active'),
+      createdAt: NEWER,
+    });
+
+    // Dropping eventAt to skip the stamp also dropped the WHERE predicate,
+    // making the status write unconditional and able to clobber a newer one.
+    expect(whereClause()).toEqual({
+      id: 'org-rzp',
+      OR: [{ billingEventAt: null }, { billingEventAt: { lte: NEWER } }],
+    });
+    expect(writeSet()).not.toHaveProperty('billingEventAt');
+  });
+
+  it('LOW-2 a capture on a FOREIGN subscription records the row but does not recover', async () => {
+    db.organization.findFirst.mockResolvedValue(
+      razorpayOrg({ subscriptionStatus: 'suspended', razorpaySubscriptionId: 'sub_live' }),
+    );
+
+    await deliver('razorpay', {
+      type: 'payment.captured',
+      data: {
+        payment: {
+          id: 'pay_foreign',
+          customer_id: 'cust_rzp',
+          amount: 100,
+          currency: 'INR',
+          subscription_id: 'sub_abandoned',
+        },
+      },
+      createdAt: NEWER,
+    });
+
+    expect(db.billingTransaction.upsert).toHaveBeenCalled();
+    // Paying off a dead shell must not clear a real dunning episode.
+    expect(entitlement.recover).not.toHaveBeenCalled();
   });
 
   it('duplicate delivery of the same event writes nothing (Redis claim)', async () => {

@@ -3,6 +3,7 @@ import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
 import { MailService } from '../mail/mail.service';
 import { TenantEntitlementNotifier } from './tenant-entitlement.notifier';
+import { tierEntitlementFields } from './constants/plans';
 
 /**
  * B3 — entitlement degrade ladder (design: docs/design/entitlement-state-machine.md v2).
@@ -150,14 +151,26 @@ export class EntitlementService {
       'past_due',
     );
 
-    // Rung 3: suspended → canceled (downgrade to free; free still serves)
+    // Rung 3: suspended → canceled (downgrade to free; free still serves).
+    //
+    // This is the HIGHEST-VOLUME route to the free tier — silent non-payment,
+    // not an explicit cancellation — so it must write the SAME entitlement set
+    // every other downgrade path writes. It used to hardcode
+    // `{ subscriptionTier: 'free', screenQuota: 5 }`: no `storageQuotaBytes`, so
+    // an ex-Pro org kept a 100GB storage quota forever (StorageQuotaService
+    // enforces the stored value verbatim), and a duplicated quota literal that
+    // silently diverges the day free's quota changes (A-F3).
+    //
+    // `billingEventAt` is stamped too: the ladder is an entitlement transition,
+    // and without the mark a late-delivered older webhook could sail past the
+    // billing ordering guard and undo it (B-M2).
     advanced += await this.advanceRung(
       'suspended',
       'canceled',
       LADDER.DAYS_TO_CANCEL,
       now,
       null,
-      { subscriptionTier: 'free', screenQuota: 5 },
+      { ...tierEntitlementFields('free'), billingEventAt: now },
     );
 
     await this.writeHeartbeat(now);

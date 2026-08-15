@@ -25,12 +25,12 @@ import {
 import {
   PLAN_TIERS,
   BILLING_INTERVALS,
-  getScreenQuotaForTier,
   getStripePriceId,
   getRazorpayPlanId,
   razorpayPlanIdToTier,
   stripePriceIdToTier,
   getBillingPlanIdConflicts,
+  tierEntitlementFields,
   type ResolvedPlan,
 } from './constants/plans';
 import { MailService } from '../mail/mail.service';
@@ -318,7 +318,7 @@ export class BillingService implements OnModuleInit {
       throw new BadRequestException('No billing email found for organization');
     }
 
-    // B-H2: never start a SECOND Razorpay subscription while a live one exists.
+    // B-H2: never start a SECOND subscription while a live one exists.
     // `createCheckoutSession` creates a real Razorpay Subscription and P1 stores
     // its id, unconditionally overwriting whatever was there. A double-click, a
     // back-button re-submit or a second purchase attempt therefore replaced the
@@ -334,16 +334,26 @@ export class BillingService implements OnModuleInit {
     // is actually paid emits subscription.activated, and
     // reconcileRazorpaySubscriptionId adopts that id.
     //
-    // NOTE: `getSubscription` swallows provider errors and returns null, so an
-    // unreachable Razorpay reads as "no live subscription" and the checkout is
+    // NOTE: `getSubscription` catches and returns null for API errors, so an
+    // unreachable provider reads as "no live subscription" and the checkout is
     // allowed. That window is narrow (the create call goes to the same API and
     // would fail too) and favours availability over a hard block.
-    if (providerType === 'razorpay' && org.razorpaySubscriptionId) {
-      const existing = await provider.getSubscription(org.razorpaySubscriptionId);
-      if (existing && existing.status === 'active') {
+    //
+    // The first cut applied this to RAZORPAY ONLY, which combined badly with the
+    // A-F5 gate below: a past_due STRIPE customer was refused a plan change with
+    // "Complete checkout first", and checkout then happily created a SECOND
+    // Stripe subscription while the original kept billing and dunning. Both
+    // providers are guarded, and `past_due`/`unpaid` count as LIVE — a
+    // subscription in dunning is still the customer's subscription.
+    const existingSubscriptionId =
+      providerType === 'stripe' ? org.stripeSubscriptionId : org.razorpaySubscriptionId;
+    if (existingSubscriptionId) {
+      const existing = await provider.getSubscription(existingSubscriptionId);
+      if (existing && BillingService.LIVE_PROVIDER_STATUSES.includes(existing.status)) {
         throw new BadRequestException(
-          'This organization already has an active subscription. ' +
-            'Change the plan on the existing subscription instead of starting a new one.',
+          'This organization already has a subscription with this payment provider. ' +
+            'Change the plan on the existing subscription instead of starting a new one; ' +
+            'if payment is failing, update the payment method on that subscription.',
         );
       }
     }
@@ -459,19 +469,34 @@ export class BillingService implements OnModuleInit {
         throw new BadRequestException('Invalid plan for subscription change');
       }
 
-      // A-F5: require a subscription the customer is genuinely PAYING for
-      // before any local tier write. Until B3-P1 this endpoint was unreachable
-      // for Razorpay (razorpaySubscriptionId was always null, so the guard
-      // above 400'd) — persisting the id removed that accidental gate, and an
-      // org that has paid NOTHING (a `created` shell from an abandoned
-      // checkout) could otherwise call this and be granted a paid tier locally.
-      // The provider's own status is the only trustworthy signal here.
+      // A-F5: require a LIVE subscription before touching anything. Until B3-P1
+      // this endpoint was unreachable for Razorpay (razorpaySubscriptionId was
+      // always null, so the guard above 400'd) — persisting the id removed that
+      // accidental gate, and an org that has paid NOTHING (a `created` shell
+      // from an abandoned checkout) could otherwise call this and be granted a
+      // paid tier locally. The provider's own status is the only trustworthy
+      // signal here.
+      //
+      // `past_due`/`unpaid` ARE allowed to change plan. Refusing them was wrong
+      // twice over: it is the same state `SubscriptionActiveGuard` grants full
+      // dashboard write access to, and downgrading to a cheaper plan is exactly
+      // what a customer in dunning is most likely to want. The error text also
+      // must never say "complete checkout" — that sent them to create a second,
+      // parallel subscription.
       const liveSub = await provider.getSubscription(subscriptionId);
-      if (!liveSub || liveSub.status !== 'active') {
+      if (!liveSub || !BillingService.LIVE_PROVIDER_STATUSES.includes(liveSub.status)) {
         throw new BadRequestException(
-          'No active subscription to change. Complete checkout first.',
+          'No live subscription to change. If your subscription has ended, start a new one; ' +
+            'if it was never completed, finish the original checkout rather than starting another.',
         );
       }
+
+      // Entitlement still requires PAYMENT. The provider-side plan change goes
+      // through for a dunning subscriber, but the local paid-tier write is
+      // deferred to the money path (`handlePaymentSucceeded` → `recover()` and
+      // the subsequent lifecycle event), so nobody is granted a higher tier on
+      // the strength of a subscription that is not currently being paid.
+      const grantsTierLocally = liveSub.status === 'active';
 
       // Resolve the new price ID, preserving the subscriber's CURRENT billing
       // interval. A yearly subscriber changing plans must stay yearly —
@@ -518,16 +543,25 @@ export class BillingService implements OnModuleInit {
       // in-flight OLDER webhook would sail past the ordering guard and revert
       // the upgrade the customer just paid for.
       const newTier = dto.planId;
+      if (!grantsTierLocally) {
+        this.logger.log(
+          `Provider plan change applied for org ${organizationId} → ${newTier}, but the ` +
+            `subscription is '${liveSub.status}', so the local tier write is deferred to the ` +
+            `money path. Entitlement follows payment, not intent.`,
+        );
+      }
       try {
-        await this.db.$transaction(async (tx) => {
-          await tx.organization.update({
-            where: { id: organizationId },
-            data: {
-              ...BillingService.tierEntitlementFields(newTier),
-              billingEventAt: new Date(),
-            },
+        if (grantsTierLocally) {
+          await this.db.$transaction(async (tx) => {
+            await tx.organization.update({
+              where: { id: organizationId },
+              data: {
+                ...tierEntitlementFields(newTier),
+                billingEventAt: new Date(),
+              },
+            });
           });
-        });
+        }
       } catch (dbError) {
         this.logger.error(
           `DB update failed after Stripe subscription change (org: ${organizationId}, stripe sub: ${subscriptionId}). Manual reconciliation needed.`,
@@ -590,7 +624,7 @@ export class BillingService implements OnModuleInit {
       await this.db.organization.update({
         where: { id: organizationId },
         data: {
-          ...BillingService.tierEntitlementFields('free'),
+          ...tierEntitlementFields('free'),
           subscriptionStatus: 'canceled',
           stripeSubscriptionId: org.paymentProvider === 'stripe' ? null : org.stripeSubscriptionId,
           razorpaySubscriptionId:
@@ -628,7 +662,7 @@ export class BillingService implements OnModuleInit {
       await this.db.organization.update({
         where: { id: organizationId },
         data: {
-          ...BillingService.tierEntitlementFields('free'),
+          ...tierEntitlementFields('free'),
           subscriptionStatus: 'canceled',
           razorpaySubscriptionId: null,
           billingEventAt: new Date(),
@@ -693,12 +727,15 @@ export class BillingService implements OnModuleInit {
     // Update subscription to remove cancellation
     await provider.updateSubscription(org.stripeSubscriptionId, subscription.priceId);
 
-    await this.db.organization.update({
-      where: { id: organizationId },
-      data: {
-        subscriptionStatus: 'active',
-      },
-    });
+    // Through the same ordering-aware write as everything else (B-M2). This site
+    // was missed by the first stamping sweep, which re-opened the hole on the
+    // Stripe reactivate flow: an in-flight older webhook could revert it.
+    await this.writeEntitlement(
+      { id: organizationId },
+      { subscriptionStatus: 'active' },
+      new Date(),
+      'stripe subscription reactivation',
+    );
 
     return this.getSubscriptionStatus(organizationId);
   }
@@ -1176,6 +1213,17 @@ export class BillingService implements OnModuleInit {
   private static readonly DUNNING_STATUSES = ['past_due', 'publish_locked', 'suspended'];
 
   /**
+   * Provider-side statuses where the subscription is the customer's CURRENT one
+   * — it exists, it is theirs, and starting a second one would double-bill.
+   *
+   * Deliberately broader than TIER_GRANTING_STATUSES: a `past_due` subscription
+   * is live (and must be plan-changeable and must block a second checkout) but
+   * it does NOT by itself grant a paid tier. Live-ness and entitlement are
+   * different questions and are answered by different sets.
+   */
+  private static readonly LIVE_PROVIDER_STATUSES = ['active', 'past_due', 'unpaid'];
+
+  /**
    * Statuses that ASSERT A LIVE, PAID SUBSCRIPTION — the complete allow-list of
    * statuses permitted to write a paid tier, quota and storage.
    *
@@ -1208,27 +1256,6 @@ export class BillingService implements OnModuleInit {
    * lifecycle event and a cancellation event agree.
    */
   private static readonly TERMINAL_STATUSES = ['canceled'];
-
-  /**
-   * The entitlement fields a tier implies. ONE definition, used by every write
-   * site — webhook, API cancel, API plan change and checkout completion.
-   *
-   * `storageQuotaBytes` is included unconditionally, which is the A-F3 fix: the
-   * free-tier paths used to write tier + screenQuota only, so a cancelled ex-Pro
-   * org kept a 100GB storage quota forever and StorageQuotaService enforced it
-   * verbatim. Free's own 1024MB is truthy, so it flows through the same
-   * expression rather than needing a special case.
-   */
-  private static tierEntitlementFields(tier: string): Record<string, unknown> {
-    const config = PLAN_TIERS[tier];
-    return {
-      subscriptionTier: tier,
-      screenQuota: getScreenQuotaForTier(tier),
-      ...(config?.storageQuotaMb
-        ? { storageQuotaBytes: BigInt(config.storageQuotaMb * 1024 * 1024) }
-        : {}),
-    };
-  }
 
   /**
    * How far into the future a provider timestamp may sit before we refuse to
@@ -1279,13 +1306,26 @@ export class BillingService implements OnModuleInit {
    * Callers must apply this to ENTITLEMENT writes only. billing_transactions is
    * an append-only audit log and is never suppressed by ordering.
    */
+  /**
+   * The bare ordering predicate, with no logging and no Sentry. Used where we
+   * need to KNOW an event is stale without reporting it a second time (the
+   * reconcile guard) — `isStaleBillingEvent` is the reporting wrapper.
+   */
+  private isOlderThanMark(
+    org: { billingEventAt: Date | null },
+    eventAt: Date | undefined,
+  ): boolean {
+    if (!eventAt || !org.billingEventAt) return false;
+    return eventAt.getTime() < org.billingEventAt.getTime();
+  }
+
   private isStaleBillingEvent(
     org: { id: string; billingEventAt: Date | null },
     eventAt: Date | undefined,
     context: string,
   ): boolean {
+    if (!this.isOlderThanMark(org, eventAt)) return false;
     if (!eventAt || !org.billingEventAt) return false;
-    if (eventAt.getTime() >= org.billingEventAt.getTime()) return false;
     const message =
       `Skipping ${context} entitlement write for org ${org.id}: event emitted ` +
       `${eventAt.toISOString()} is older than the applied mark ` +
@@ -1323,10 +1363,17 @@ export class BillingService implements OnModuleInit {
     data: Record<string, unknown>,
     eventAt: Date | undefined,
     context: string,
+    options: { advanceMark?: boolean } = {},
   ): Promise<boolean> {
     if (Object.keys(data).length === 0) return false;
 
-    const payload = { ...data, ...(eventAt ? { billingEventAt: eventAt } : {}) };
+    // `advanceMark: false` still ORDERS the write — it only declines to move the
+    // mark forward. Dropping `eventAt` entirely to skip the stamp (the first
+    // shape of this) also dropped the WHERE predicate, turning the write
+    // unconditional so a concurrent newer status could be clobbered by it
+    // (B-M3 review). Ordering and mark-advancement are separate decisions.
+    const advanceMark = options.advanceMark ?? true;
+    const payload = { ...data, ...(eventAt && advanceMark ? { billingEventAt: eventAt } : {}) };
     const result = await this.db.organization.updateMany({
       where: {
         id: org.id,
@@ -1352,21 +1399,32 @@ export class BillingService implements OnModuleInit {
   }
 
   /**
-   * Stamp the ordering mark for an entitlement write that happened OUTSIDE
-   * `writeEntitlement` — specifically the ladder delegations
-   * (`beginPastDue`/`recover`), which own their own status write.
+   * CLAIM the right to run a ladder transition, by winning the compare-and-set
+   * on `billingEventAt` FIRST. Returns false when a newer event already won.
    *
-   * Without this the mark advanced only on tier writes, so a stale `active`
-   * lifecycle event could sail past the guard and undo a newer `past_due`
-   * (B-M2 / A-F4). Same compare-and-set semantics.
+   * The ladder delegations (`beginPastDue`/`recover`) own their own status
+   * write, so they cannot go through `writeEntitlement`. The first shape of this
+   * called the ladder and THEN stamped the mark — which left the ladder mutation
+   * completely outside the CAS (HIGH-2). Two cluster instances handling
+   * `payment.failed`(T1) and `payment.captured`(T2 > T1) both pass the cheap JS
+   * pre-check against the old mark; capture wins the CAS and sets `active`;
+   * failure's `beginPastDue` then still matches its own
+   * `status IN ('active','trial')` guard and flips the org to past_due with a
+   * fresh episode clock. Its stamp correctly loses — but the damage is already
+   * committed, and because `applyTierFromPlan` leaves the status to the ladder
+   * while an episode is open, NO later lifecycle event rescues them: they ride
+   * the ladder down to publish_locked and suspended having actually paid.
+   *
+   * Claiming first makes the mark the mutex. An event with no timestamp has
+   * nothing to order against and is allowed through unchanged.
    */
-  private async stampBillingEventAt(
+  private async claimEntitlementTransition(
     org: { id: string },
     eventAt: Date | undefined,
     context: string,
-  ): Promise<void> {
-    if (!eventAt) return;
-    await this.writeEntitlement(org, { billingEventAt: eventAt }, eventAt, context);
+  ): Promise<boolean> {
+    if (!eventAt) return true;
+    return this.writeEntitlement(org, { billingEventAt: eventAt }, eventAt, context);
   }
 
   /**
@@ -1406,28 +1464,65 @@ export class BillingService implements OnModuleInit {
    */
   private async applyTierFromPlan(
     provider: string,
-    org: { id: string; subscriptionStatus: string; billingEventAt: Date | null },
+    org: {
+      id: string;
+      subscriptionStatus: string;
+      billingEventAt: Date | null;
+      stripeSubscriptionId: string | null;
+      razorpaySubscriptionId: string | null;
+    },
     planId: string | undefined,
     status: 'trial' | 'active' | 'past_due' | 'canceled' | null,
     eventAt?: Date,
+    rawStatus?: string,
   ): Promise<void> {
     if (this.isStaleBillingEvent(org, eventAt, 'subscription lifecycle')) return;
 
     // Dunning entry is the ladder's, not ours (B3-E3). Tier untouched: a rung
     // gates capability, it does not restate which plan was purchased.
     if (status === 'past_due') {
-      await this.entitlementService.beginPastDue(org.id);
-      await this.stampBillingEventAt(org, eventAt, 'dunning entry');
+      // Claim FIRST (HIGH-2): the ladder write is unconditional, so it must not
+      // run at all unless this event owns the ordering.
+      if (await this.claimEntitlementTransition(org, eventAt, 'dunning entry')) {
+        await this.entitlementService.beginPastDue(org.id);
+      }
       return;
     }
 
     // Terminal: entitlement collapses to free, exactly as on the cancellation
     // event. Resolving the plan id first would be pointless — a cancelled
     // subscription's plan says what they USED to buy.
+    //
+    // A subscription that is DEAD also clears the stored subscription id, which
+    // the first cut omitted (HIGH-3). That divergence from
+    // `handleSubscriptionCanceled` is guaranteed to bite: `total_count: 12`
+    // makes every monthly Razorpay subscriber emit `subscription.completed` at
+    // month twelve. Holding a dead id afterwards is doubly bad — an out-of-band
+    // replacement subscription has EVERY event rejected by
+    // `isForeignSubscription` (the reconcile only adopts into a null field), so
+    // the org can never regain a tier and Sentry fills with
+    // foreign_subscription_event; and `cancelSubscription` passes its null-check
+    // and calls the provider on a subscription that no longer exists, 5xx-ing
+    // the customer.
+    //
+    // `paused` is deliberately NOT dead: Razorpay has stopped billing (so
+    // entitlement collapses) but the subscription is resumable, and nulling the
+    // id would make it uncancellable and unresumable.
     if (status && BillingService.TERMINAL_STATUSES.includes(status)) {
+      const ended = BillingService.isDeadSubscriptionStatus(rawStatus);
       await this.writeEntitlement(
         org,
-        { ...BillingService.tierEntitlementFields('free'), subscriptionStatus: status },
+        {
+          ...tierEntitlementFields('free'),
+          subscriptionStatus: status,
+          ...(ended
+            ? {
+                stripeSubscriptionId: provider === 'stripe' ? null : org.stripeSubscriptionId,
+                razorpaySubscriptionId:
+                  provider === 'razorpay' ? null : org.razorpaySubscriptionId,
+              }
+            : {}),
+        },
         eventAt,
         `${provider} terminal subscription status`,
       );
@@ -1437,9 +1532,22 @@ export class BillingService implements OnModuleInit {
     if (status === null) {
       // Fail closed on both halves: we cannot tell whether this subscription is
       // live and paid, so we assert nothing about it.
-      this.logger.warn(
-        `Skipping entitlement write for org ${org.id}: unmapped/missing ${provider} status`,
-      );
+      //
+      // Escalated, not warn-only. An unknown PLAN id already reports to Sentry;
+      // leaving an unknown STATUS at warn was an asymmetry that would let a
+      // provider adding a new subscription status go silently unhandled while
+      // entitlement quietly froze (§12b).
+      const message =
+        `Skipping entitlement write for org ${org.id}: unmapped/missing ${provider} ` +
+        `subscription status ${rawStatus ? `"${rawStatus}"` : '(absent)'}. ` +
+        `Entitlement is unchanged; teach mapSubscriptionStatus about it.`;
+      this.logger.warn(message);
+      BillingService.captureSentry(new Error(message), {
+        reason: 'unmapped_subscription_status',
+        provider,
+        status: rawStatus ?? null,
+        organizationId: org.id,
+      });
       return;
     }
 
@@ -1483,19 +1591,40 @@ export class BillingService implements OnModuleInit {
     // Tier follows what the provider bills — upgrades AND downgrades (B3-E2) —
     // but only under a status that asserts a live paid subscription.
     if (resolved) {
-      Object.assign(data, BillingService.tierEntitlementFields(resolved.tier));
+      Object.assign(data, tierEntitlementFields(resolved.tier));
       // Ending the trial is only correct because we are granting a PAID tier on
       // an `active` subscription. Never clear it on a 'trial' status — that is
       // the A-F1 lockout.
       data.trialEndsAt = null;
     }
 
-    // B-M3: when the plan id could not be resolved, do NOT advance the mark.
-    // The corrected event that arrives once the env var is fixed would
-    // otherwise be rejected as older than a mark this failed attempt set.
-    const markEventAt = grantsTier && planId && !resolved ? undefined : eventAt;
+    // B-M3: when the plan id could not be resolved, do NOT advance the mark —
+    // the corrected event that arrives once the env var is fixed would otherwise
+    // be rejected as older than a mark this failed attempt set. The write is
+    // still ORDERED (the predicate stays), it just does not move the mark.
+    const advanceMark = !(grantsTier && planId && !resolved);
 
-    await this.writeEntitlement(org, data, markEventAt, `${provider} subscription lifecycle`);
+    await this.writeEntitlement(org, data, eventAt, `${provider} subscription lifecycle`, {
+      advanceMark,
+    });
+  }
+
+  /**
+   * Raw provider statuses where the subscription object is GONE, as opposed to
+   * merely not entitling anything right now. Only these clear the stored
+   * subscription id (HIGH-3) — `paused` collapses entitlement but stays
+   * resumable, and a resumable subscription must remain cancellable.
+   */
+  private static readonly DEAD_SUBSCRIPTION_STATUSES = [
+    'cancelled', // Razorpay
+    'completed', // Razorpay — total_count reached
+    'expired', // Razorpay
+    'canceled', // Stripe
+    'incomplete_expired', // Stripe — initial payment never succeeded
+  ];
+
+  private static isDeadSubscriptionStatus(rawStatus: string | undefined): boolean {
+    return !!rawStatus && BillingService.DEAD_SUBSCRIPTION_STATUSES.includes(rawStatus);
   }
 
   /**
@@ -1554,17 +1683,25 @@ export class BillingService implements OnModuleInit {
       return;
     }
 
-    // Reconcile FIRST: it adopts the id only when we are holding none, so the
-    // identity check below sees the post-reconcile state.
-    await this.reconcileRazorpaySubscriptionId(provider, org, data);
-
-    if (this.isForeignSubscription(provider, org, data)) return;
-
-    // Map status. A missing/unmapped status returns null → leave the org's
+    // Map status FIRST. A missing/unmapped status returns null → leave the org's
     // last-known subscriptionStatus untouched (fail-closed) rather than flip
     // entitlement on a webhook we don't understand. (audit S2-6)
-    const status = this.mapSubscriptionStatus(provider, data.status || data.subscription?.status);
+    const rawStatus = this.rawSubscriptionStatus(data);
+    const status = this.mapSubscriptionStatus(provider, rawStatus);
     const planId = this.planIdFromSubscriptionEvent(provider, data);
+
+    // The reconcile runs AFTER the ordering and terminality checks (MED-6). It
+    // used to run before every guard, so a stale or terminal event's
+    // subscription id was adopted into an empty field — leaving the org holding
+    // the id of a subscription that is already dead, which then makes every
+    // subsequent event for the REAL subscription look foreign.
+    const staleForReconcile = this.isOlderThanMark(org, eventAt);
+    const terminalForReconcile = !!status && BillingService.TERMINAL_STATUSES.includes(status);
+    if (!staleForReconcile && !terminalForReconcile) {
+      await this.reconcileRazorpaySubscriptionId(provider, org, data);
+    }
+
+    if (this.isForeignSubscription(provider, org, data)) return;
 
     this.crossCheckSubscriptionNotes(
       provider,
@@ -1573,7 +1710,18 @@ export class BillingService implements OnModuleInit {
       provider === 'stripe' ? stripePriceIdToTier(planId) : razorpayPlanIdToTier(planId),
     );
 
-    await this.applyTierFromPlan(provider, org, planId, status, eventAt);
+    await this.applyTierFromPlan(provider, org, planId, status, eventAt, rawStatus);
+  }
+
+  /**
+   * The provider's own status string, before mapping. Stripe puts it on the
+   * subscription object itself; Razorpay nests it under the subscription entity.
+   */
+  private rawSubscriptionStatus(data: WebhookData): string | undefined {
+    const raw =
+      BillingService.readAt(data, ['status']) ??
+      BillingService.readAt(data, ['subscription', 'status']);
+    return typeof raw === 'string' && raw ? raw : undefined;
   }
 
   /**
@@ -1604,6 +1752,17 @@ export class BillingService implements OnModuleInit {
 
     // A cancellation of some OTHER subscription this customer once had must not
     // downgrade the org off the one that is currently billing them (B-H3).
+    //
+    // When the stored id is NULL this check passes and the cancellation applies.
+    // That is deliberate, and bounded: after HIGH-3 the id is nulled only by a
+    // path that has already collapsed entitlement to free/canceled (so applying
+    // a cancellation again is idempotent), or it has simply never been set — in
+    // which case the org has no subscription we could be protecting, and
+    // dropping a genuine cancellation would be the worse error. The residual
+    // exposure is an org holding a paid tier with a null id (a checkout whose
+    // id-write was lost AND which has received no webhook yet); a foreign
+    // cancellation would downgrade it, and the next lifecycle event for the real
+    // subscription restores the tier from plan_id.
     if (this.isForeignSubscription(provider, org, data)) return;
 
     // A stale cancellation must not undo a newer reactivation/upgrade.
@@ -1614,7 +1773,7 @@ export class BillingService implements OnModuleInit {
     await this.writeEntitlement(
       org,
       {
-        ...BillingService.tierEntitlementFields('free'),
+        ...tierEntitlementFields('free'),
         subscriptionStatus: 'canceled',
         stripeSubscriptionId: provider === 'stripe' ? null : org.stripeSubscriptionId,
         razorpaySubscriptionId: provider === 'razorpay' ? null : org.razorpaySubscriptionId,
@@ -1660,6 +1819,54 @@ export class BillingService implements OnModuleInit {
       provider,
       eventKind,
     });
+  }
+
+  /**
+   * The subscription a MONEY event belongs to, when the payload says so.
+   *
+   * Razorpay payment/invoice entities carry `subscription_id`; Stripe invoices
+   * carry `subscription`. Absent on one-off payments, which is why the caller
+   * treats "unknown" as "belongs to us" rather than dropping the event.
+   */
+  private subscriptionIdFromMoneyEvent(provider: string, data: WebhookData): string | undefined {
+    const paths: (string | number)[][] =
+      provider === 'stripe'
+        ? [['subscription'], ['parent', 'subscription_details', 'subscription']]
+        : [
+            ['payment', 'subscription_id'],
+            ['invoice', 'subscription_id'],
+            ['subscription', 'id'],
+          ];
+    for (const path of paths) {
+      const raw = BillingService.readAt(data, path);
+      if (typeof raw === 'string' && raw) return raw;
+    }
+    return undefined;
+  }
+
+  /**
+   * True when a money event is about a subscription the org is not on (LOW-2).
+   *
+   * A capture on an abandoned or superseded subscription would otherwise drive
+   * `recover()` on the LIVE one — paying off a dead shell would clear a real
+   * dunning episode. The audit row is still written by the caller; only the
+   * entitlement effect is withheld.
+   */
+  private isForeignMoneySubscription(
+    provider: string,
+    org: { id: string; stripeSubscriptionId: string | null; razorpaySubscriptionId: string | null },
+    data: WebhookData,
+  ): boolean {
+    const storedId =
+      provider === 'stripe' ? org.stripeSubscriptionId : org.razorpaySubscriptionId;
+    if (!storedId) return false;
+    const eventSubscriptionId = this.subscriptionIdFromMoneyEvent(provider, data);
+    if (!eventSubscriptionId || eventSubscriptionId === storedId) return false;
+    this.logger.warn(
+      `Money event for org ${org.id} belongs to subscription ${eventSubscriptionId}, not the ` +
+        `organization's ${storedId}: the transaction is recorded but entitlement is untouched.`,
+    );
+    return true;
   }
 
   private razorpayCustomerIdFromMoneyEvent(data: WebhookData): string | undefined {
@@ -1759,10 +1966,11 @@ export class BillingService implements OnModuleInit {
     // deliberately does not call recover(). An actual captured payment does.
     if (
       BillingService.DUNNING_STATUSES.includes(org.subscriptionStatus) &&
-      !this.isStaleBillingEvent(org, eventAt, 'payment recovery')
+      !this.isForeignMoneySubscription(provider, org, data) &&
+      !this.isStaleBillingEvent(org, eventAt, 'payment recovery') &&
+      (await this.claimEntitlementTransition(org, eventAt, 'payment recovery'))
     ) {
       await this.entitlementService.recover(org.id);
-      await this.stampBillingEventAt(org, eventAt, 'payment recovery');
     }
 
     // Send payment receipt email
@@ -1840,9 +2048,12 @@ export class BillingService implements OnModuleInit {
     // a stale failure from re-opening dunning after a newer recovery, and the
     // mark IS advanced (B-M2): a dunning transition is an entitlement change, so
     // a later-delivered older `active` must not be able to undo it.
-    if (!this.isStaleBillingEvent(org, eventAt, 'payment failure dunning')) {
+    if (
+      !this.isForeignMoneySubscription(provider, org, data) &&
+      !this.isStaleBillingEvent(org, eventAt, 'payment failure dunning') &&
+      (await this.claimEntitlementTransition(org, eventAt, 'payment failure dunning'))
+    ) {
       await this.entitlementService.beginPastDue(org.id);
-      await this.stampBillingEventAt(org, eventAt, 'payment failure dunning');
     }
 
     // Send payment failed email
@@ -1913,9 +2124,27 @@ export class BillingService implements OnModuleInit {
       return;
     }
 
+    // LOW-1: Stripe fires checkout.session.completed for delayed-notification
+    // payment methods BEFORE the money settles, with `payment_status: 'unpaid'`.
+    // Granting a paid tier on that is entitlement without payment; the later
+    // `checkout.session.async_payment_succeeded` / `invoice.payment_succeeded`
+    // is the event that actually means paid.
+    const paymentStatus = BillingService.readAt(data, ['payment_status']);
+    if (
+      typeof paymentStatus === 'string' &&
+      paymentStatus !== 'paid' &&
+      paymentStatus !== 'no_payment_required'
+    ) {
+      this.logger.warn(
+        `Deferring checkout.session.completed for org ${organizationId}: payment_status is ` +
+          `'${paymentStatus}', not paid. Entitlement waits for the payment event.`,
+      );
+      return;
+    }
+
     const org = await this.db.organization.findUnique({
       where: { id: organizationId },
-      select: { id: true, billingEventAt: true },
+      select: { id: true, billingEventAt: true, subscriptionStatus: true },
     });
     if (!org) {
       this.logger.warn(`checkout.session.completed for unknown org ${organizationId}`);
@@ -1929,7 +2158,7 @@ export class BillingService implements OnModuleInit {
     await this.writeEntitlement(
       org,
       {
-        ...BillingService.tierEntitlementFields(planId),
+        ...tierEntitlementFields(planId),
         stripeSubscriptionId: subscriptionId,
         subscriptionStatus: 'active',
         paymentProvider: 'stripe',
@@ -1938,6 +2167,23 @@ export class BillingService implements OnModuleInit {
       eventAt,
       `stripe checkout completion (plan ${planId})`,
     );
+
+    // A completed, PAID checkout is a money event, so it recovers a dunning
+    // episode exactly as handlePaymentSucceeded does. Without this a customer
+    // who pays their way out of suspension keeps dark screens: `recover()` is
+    // the only emitter of `tenant:resumed`, and handlePaymentSucceeded only
+    // calls it while the org is still on a rung — so if
+    // checkout.session.completed lands FIRST and sets status active, the
+    // subsequent invoice.payment_succeeded sees a non-dunning org, skips
+    // recover(), and `entitlementStateSince` stays set with no resume signal
+    // ever reaching the devices.
+    //
+    // This does not contradict A-F8, which bars a LIFECYCLE `active` from
+    // recovering. A checkout completion is payment confirmation, not a
+    // metadata edit.
+    if (BillingService.DUNNING_STATUSES.includes(org.subscriptionStatus)) {
+      await this.entitlementService.recover(org.id);
+    }
   }
 
   /**
@@ -1968,6 +2214,14 @@ export class BillingService implements OnModuleInit {
         incomplete: 'past_due',
         incomplete_expired: 'canceled',
         unpaid: 'past_due',
+        // Entitlement follows BILLING STATE. A paused subscription is not being
+        // charged, so it must not keep granting a paid tier, quota, storage and
+        // API access — leaving it unmapped made the event a total no-op while
+        // the customer stopped paying. It collapses to the terminal write set
+        // WITHOUT clearing the subscription id (see DEAD_SUBSCRIPTION_STATUSES),
+        // and `resumed`/`active` restores the tier from plan_id, so the loop
+        // closes in both directions.
+        paused: 'canceled',
       };
       const mapped = statusMap[status];
       if (!mapped) {
@@ -1985,6 +2239,10 @@ export class BillingService implements OnModuleInit {
         cancelled: 'canceled',
         completed: 'canceled',
         expired: 'canceled',
+        // See the Stripe map above: entitlement follows billing state, and a
+        // paused Razorpay subscription is not being charged. Resumable, so the
+        // subscription id is kept.
+        paused: 'canceled',
       };
       const mapped = statusMap[status];
       if (!mapped) {

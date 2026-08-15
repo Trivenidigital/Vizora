@@ -271,6 +271,35 @@ export const getScreenQuotaForTier = (tier: string): number => {
 };
 
 /**
+ * The complete set of entitlement columns a tier implies.
+ *
+ * ONE definition, shared by EVERY write that moves an organization between
+ * tiers — the billing webhooks, the API cancel/plan-change paths, and the
+ * entitlement ladder's final rung. It lives here rather than on BillingService
+ * because `EntitlementService` must use it too and cannot import the service
+ * (circular).
+ *
+ * `storageQuotaBytes` is the reason this exists (A-F3). Several paths used to
+ * write `subscriptionTier` + `screenQuota` and stop, leaving a downgraded org on
+ * the storage quota of the plan it no longer pays for — and StorageQuotaService
+ * enforces the stored value verbatim. Free's own 1024MB is truthy, so it flows
+ * through the same expression rather than needing a special case.
+ *
+ * Returns a plain object so callers can spread it into a Prisma `data` payload
+ * alongside their own fields.
+ */
+export const tierEntitlementFields = (tier: string): Record<string, unknown> => {
+  const config = PLAN_TIERS[tier];
+  return {
+    subscriptionTier: tier,
+    screenQuota: getScreenQuotaForTier(tier),
+    ...(config?.storageQuotaMb
+      ? { storageQuotaBytes: BigInt(config.storageQuotaMb * 1024 * 1024) }
+      : {}),
+  };
+};
+
+/**
  * Get plan tier by ID
  */
 export const getPlanTier = (tierId: string): PlanTier | undefined => {

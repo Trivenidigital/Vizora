@@ -560,7 +560,7 @@ describe('BillingService', () => {
 
       await expect(
         service.createCheckoutSession('org-123', { planId: 'pro', interval: 'monthly' }),
-      ).rejects.toThrow(/already has an active subscription/);
+      ).rejects.toThrow(/already has a subscription with this payment provider/);
       expect(mockRazorpayProvider.createCheckoutSession).not.toHaveBeenCalled();
     });
 
@@ -910,6 +910,22 @@ describe('BillingService', () => {
       }
     });
 
+    it('MED-3 a STRIPE org with a live subscription is also refused a second checkout', async () => {
+      // The guard was Razorpay-only, which combined with the A-F5 gate to steer
+      // a past_due Stripe customer into creating a SECOND subscription while the
+      // original kept billing and dunning.
+      mockDatabaseService.organization.findUnique.mockResolvedValue(mockOrganization);
+      mockStripeProvider.getSubscription.mockResolvedValue({
+        id: 'sub_stripe123',
+        status: 'past_due',
+      });
+
+      await expect(
+        service.createCheckoutSession('org-123', { planId: 'pro', interval: 'monthly' }),
+      ).rejects.toThrow(/already has a subscription with this payment provider/);
+      expect(mockStripeProvider.createCheckoutSession).not.toHaveBeenCalled();
+    });
+
     it('A-F5 refuses an upgrade when the provider subscription is NOT active', async () => {
       // B3-P1 persisting razorpaySubscriptionId removed the accidental gate that
       // made this endpoint unreachable for Razorpay. An org holding only an
@@ -923,8 +939,34 @@ describe('BillingService', () => {
 
       await expect(
         service.updateSubscription('org-123', { planId: 'pro' }),
-      ).rejects.toThrow(/No active subscription to change/);
+      ).rejects.toThrow(/No live subscription to change/);
+      // And the message must never send them to checkout — that is how a
+      // parallel second subscription gets created.
+      await expect(
+        service.updateSubscription('org-123', { planId: 'pro' }),
+      ).rejects.not.toThrow(/[Cc]omplete checkout/);
       expect(mockRazorpayProvider.updateSubscription).not.toHaveBeenCalled();
+      expect(mockDatabaseService.organization.update).not.toHaveBeenCalled();
+    });
+
+    it('MED-3 a PAST_DUE subscriber may change plan, but gets no local tier grant', async () => {
+      // past_due is the same state SubscriptionActiveGuard grants full dashboard
+      // write access to, and downgrading is exactly what a dunning customer
+      // wants. The provider-side change goes through; the paid-tier write is
+      // deferred to the money path so entitlement still follows PAYMENT.
+      mockDatabaseService.organization.findUnique.mockResolvedValue(razorpayOrg);
+      mockRazorpayProvider.getSubscription.mockResolvedValue({
+        priceId: 'plan_basic_inr',
+        status: 'past_due',
+      });
+      mockRazorpayProvider.updateSubscription.mockResolvedValue({});
+
+      await service.updateSubscription('org-123', { planId: 'pro' });
+
+      expect(mockRazorpayProvider.updateSubscription).toHaveBeenCalledWith(
+        'sub_razorpay123',
+        'plan_pro_inr',
+      );
       expect(mockDatabaseService.organization.update).not.toHaveBeenCalled();
     });
 
