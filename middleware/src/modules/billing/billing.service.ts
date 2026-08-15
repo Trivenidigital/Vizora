@@ -24,9 +24,14 @@ import {
 } from './dto/billing-response.dto';
 import {
   PLAN_TIERS,
+  BILLING_INTERVALS,
   getScreenQuotaForTier,
   getStripePriceId,
   getRazorpayPlanId,
+  razorpayPlanIdToTier,
+  stripePriceIdToTier,
+  getBillingPlanIdConflicts,
+  type ResolvedPlan,
 } from './constants/plans';
 import { MailService } from '../mail/mail.service';
 import { RedisService } from '../redis/redis.service';
@@ -67,17 +72,42 @@ export class BillingService implements OnModuleInit {
    * Opt in once the org's billing path is live.
    */
   onModuleInit(): void {
+    // Duplicate plan ids are a HARD failure regardless of BILLING_VALIDATION_STRICT
+    // (B3-E1). Two tiers collapsed onto one provider plan id means the reverse map
+    // entitles the wrong tier on every webhook for that plan — a silent
+    // mis-entitlement that last-wins would hide. Unlike a MISSING id (which only
+    // breaks checkout for that tier, loudly, at request time), this one is
+    // undetectable at runtime, so it must not boot.
+    const conflicts = getBillingPlanIdConflicts();
+    if (conflicts.length > 0) {
+      const detail = conflicts
+        .map(
+          (c) =>
+            `${c.provider} plan id "${c.planId}" maps to both ` +
+            `${c.existing.tier}/${c.existing.interval} and ${c.duplicate.tier}/${c.duplicate.interval}`,
+        )
+        .join('; ');
+      const message = `Ambiguous billing plan id configuration: ${detail}`;
+      this.logger.error(message);
+      throw new Error(message);
+    }
+
     const missing: string[] = [];
     for (const [tierId, tier] of Object.entries(PLAN_TIERS)) {
       const isPaidTier =
         tier.prices.usd.monthly > 0 || tier.prices.inr.monthly > 0;
       if (!isPaidTier) continue;
-      for (const interval of ['monthly', 'yearly'] as const) {
+      for (const interval of BILLING_INTERVALS) {
         const stripeKey = `STRIPE_${tierId.toUpperCase()}_${interval.toUpperCase()}_PRICE_ID`;
         if (!process.env[stripeKey]) missing.push(stripeKey);
+        // Razorpay is now interval-dimensioned too. Report the canonical key
+        // name, but accept the legacy `RAZORPAY_<TIER>_PLAN_ID` monthly alias —
+        // getRazorpayPlanId resolves it, so a deployment configured under the
+        // old scheme is not reported as missing.
+        if (!getRazorpayPlanId(tierId, interval)) {
+          missing.push(`RAZORPAY_${tierId.toUpperCase()}_${interval.toUpperCase()}_PLAN_ID`);
+        }
       }
-      const razorpayKey = `RAZORPAY_${tierId.toUpperCase()}_PLAN_ID`;
-      if (!process.env[razorpayKey]) missing.push(razorpayKey);
     }
 
     if (missing.length === 0) {
@@ -298,15 +328,19 @@ export class BillingService implements OnModuleInit {
       });
     }
 
-    // Determine the price/plan ID based on interval and provider
+    // Determine the price/plan ID based on interval and provider. The Razorpay
+    // arm used to DROP dto.interval, so a customer who picked yearly was
+    // subscribed to the monthly Razorpay plan and billed monthly (B3-E1).
     const priceId =
       providerType === 'stripe'
         ? getStripePriceId(dto.planId, dto.interval)
-        : getRazorpayPlanId(dto.planId);
+        : getRazorpayPlanId(dto.planId, dto.interval);
 
     if (!priceId) {
       const currency = org.country === 'IN' ? 'inr' : 'usd';
-      throw new BadRequestException(`Price not configured for ${dto.planId} (${currency})`);
+      throw new BadRequestException(
+        `Price not configured for ${dto.planId} ${dto.interval} (${currency})`,
+      );
     }
 
     const baseUrl = resolvePublicAppUrl();
@@ -401,10 +435,20 @@ export class BillingService implements OnModuleInit {
         }
         priceId = getStripePriceId(dto.planId, interval);
       } else {
-        // Razorpay plan IDs are interval-agnostic (getRazorpayPlanId resolves one
-        // plan id per tier, with no monthly/yearly dimension), so there is no
-        // interval to preserve on this path.
-        priceId = getRazorpayPlanId(dto.planId);
+        // Razorpay plan ids ARE interval-dimensioned (B3-E1), so the same rule
+        // applies here as on the Stripe arm: preserve the subscriber's current
+        // cadence or refuse. Razorpay's subscription object exposes plan_id
+        // rather than an interval, so recover the interval by reverse-mapping
+        // the plan the subscriber is on today.
+        const currentSub = await provider.getSubscription(subscriptionId);
+        const currentPlan = razorpayPlanIdToTier(currentSub?.priceId);
+        if (!currentPlan) {
+          throw new BadRequestException(
+            'Unable to determine the current billing interval for this subscription; ' +
+              'refusing to change plans to avoid an incorrect charge.',
+          );
+        }
+        priceId = getRazorpayPlanId(dto.planId, currentPlan.interval);
       }
 
       if (!priceId) {
@@ -778,8 +822,18 @@ export class BillingService implements OnModuleInit {
 
     try {
       switch (event.type) {
+        // All four are "the provider is telling us what this subscription is
+        // now" — they carry the subscription entity with its authoritative
+        // plan_id/price id and status, and are handled identically (B3-P3).
+        // subscription.activated and subscription.charged were previously
+        // UNROUTED, which is why a paid Razorpay subscription never granted a
+        // tier. subscription.charged also carries a payment entity, but the
+        // money row is recorded by payment.captured — recording it here too
+        // would double-count.
         case 'customer.subscription.updated':
         case 'subscription.updated':
+        case 'subscription.activated':
+        case 'subscription.charged':
           await this.handleSubscriptionUpdated(provider, event.data);
           break;
 
@@ -882,7 +936,192 @@ export class BillingService implements OnModuleInit {
   }
 
   /**
-   * Handle subscription updated webhook
+   * Read a nested value out of an untyped webhook payload without asserting a
+   * shape. Returns undefined the moment the path leaves an object, so a
+   * provider changing its nesting degrades to "field absent" instead of
+   * throwing inside a money-path handler.
+   */
+  private static readAt(source: unknown, path: (string | number)[]): unknown {
+    let current: unknown = source;
+    for (const key of path) {
+      if (current === null || typeof current !== 'object') return undefined;
+      current = (current as Record<string | number, unknown>)[key];
+    }
+    return current;
+  }
+
+  /**
+   * The provider plan/price id a subscription lifecycle event is reporting.
+   *
+   * Razorpay: `payload.subscription.entity.plan_id` (the provider unwraps
+   * `.entity` for us). Every subscription.* event carries the subscription
+   * entity, and `plan_id` is AUTHORITATIVE for what the customer is being
+   * billed for — including after a plan change.
+   *
+   * Stripe: `data.object.items.data[0].price.id` on customer.subscription.*.
+   */
+  private planIdFromSubscriptionEvent(
+    provider: string,
+    data: WebhookData,
+  ): string | undefined {
+    const raw =
+      provider === 'stripe'
+        ? BillingService.readAt(data, ['items', 'data', 0, 'price', 'id'])
+        : BillingService.readAt(data, ['subscription', 'plan_id']);
+    return typeof raw === 'string' && raw ? raw : undefined;
+  }
+
+  /**
+   * Log-only cross-check of the `notes` we attached at checkout against the tier
+   * the plan id resolved to (Razorpay).
+   *
+   * Deliberately NOT authoritative. Razorpay echoes subscription notes back on
+   * webhooks, but (a) they serialize as `[]` — an ARRAY — when empty, so the
+   * Array.isArray guard is required before any property read, and (b) whether
+   * notes survive a plan change is inferred, not documented. `plan_id` is what
+   * Razorpay actually bills, so a mismatch is a signal to investigate, never a
+   * reason to write a different tier.
+   */
+  private crossCheckSubscriptionNotes(
+    provider: string,
+    organizationId: string,
+    data: WebhookData,
+    resolved: ResolvedPlan | null,
+  ): void {
+    if (provider !== 'razorpay' || !resolved) return;
+    const notes = BillingService.readAt(data, ['subscription', 'notes']);
+    if (!notes || typeof notes !== 'object' || Array.isArray(notes)) return;
+    const notedPlan = (notes as Record<string, unknown>).planId;
+    if (typeof notedPlan !== 'string' || !notedPlan) return;
+    if (notedPlan !== resolved.tier) {
+      this.logger.warn(
+        `Razorpay subscription notes for org ${organizationId} say planId="${notedPlan}" but ` +
+          `plan_id resolves to tier "${resolved.tier}"; honouring plan_id (what Razorpay bills)`,
+      );
+    }
+  }
+
+  /** Entitlement rungs the degrade ladder owns (EntitlementService). */
+  private static readonly DUNNING_STATUSES = ['past_due', 'publish_locked', 'suspended'];
+
+  /**
+   * THE SINGLE TIER-WRITE SITE for subscription lifecycle webhooks (B3-P3).
+   *
+   * Every path that grants or changes entitlement from a webhook goes through
+   * here — subscription.activated, subscription.charged, subscription.updated
+   * and customer.subscription.updated — so there is exactly one place where
+   * "what Razorpay/Stripe says the customer is paying for" becomes
+   * subscriptionTier + screenQuota + storageQuotaBytes. Do not add a second one.
+   *
+   * Rules, each load-bearing:
+   *
+   * - UNKNOWN plan id → tier write SKIPPED, status still written, logger.error
+   *   + Sentry. It must NEVER fall back to 'free': that would silently downgrade
+   *   a paying customer on the strength of a config gap, which is precisely the
+   *   ratchet this change exists to remove.
+   * - UNMAPPED status (null) → skip ONLY the status write. The old handler
+   *   returned early on a null status, which threw away the tier write too.
+   * - past_due → the LADDER owns entry into dunning, so delegate to
+   *   entitlementService.beginPastDue (it stamps entitlementStateSince and is
+   *   idempotent) instead of writing the status directly, and leave the tier
+   *   alone: rungs gate capability, tier records what was bought (B3-E3).
+   * - active while the org sits on a dunning rung → delegate to
+   *   entitlementService.recover, which clears the episode clock and emits
+   *   tenant:resumed. A direct write here would leave suspended screens on the
+   *   holding screen forever.
+   */
+  private async applyTierFromPlan(
+    provider: string,
+    org: { id: string; subscriptionStatus: string },
+    planId: string | undefined,
+    status: 'trial' | 'active' | 'past_due' | 'canceled' | null,
+  ): Promise<void> {
+    const resolved =
+      provider === 'stripe' ? stripePriceIdToTier(planId) : razorpayPlanIdToTier(planId);
+
+    if (planId && !resolved) {
+      const message =
+        `Unknown ${provider} plan/price id "${planId}" on a subscription event for org ${org.id}: ` +
+        `subscriptionTier and quota were NOT written. The org keeps its previous tier — ` +
+        `it is never coerced to 'free'. Configure the matching ` +
+        `${provider === 'stripe' ? 'STRIPE_<TIER>_<INTERVAL>_PRICE_ID' : 'RAZORPAY_<TIER>_<INTERVAL>_PLAN_ID'} ` +
+        `env var and replay the event.`;
+      this.logger.error(message);
+      BillingService.captureSentry(new Error(message), {
+        provider,
+        planId,
+        organizationId: org.id,
+      });
+    }
+
+    const data: Record<string, unknown> = {};
+
+    if (status === 'past_due') {
+      await this.entitlementService.beginPastDue(org.id);
+    } else if (
+      status === 'active' &&
+      BillingService.DUNNING_STATUSES.includes(org.subscriptionStatus)
+    ) {
+      await this.entitlementService.recover(org.id);
+    } else if (status !== null) {
+      data.subscriptionStatus = status;
+    } else {
+      this.logger.warn(
+        `Skipping subscriptionStatus update for org ${org.id}: unmapped/missing ${provider} status`,
+      );
+    }
+
+    // Tier follows what the provider bills — upgrades AND downgrades (B3-E2).
+    // Skipped for past_due: the dunning rung is a capability gate, not a
+    // statement about which plan was purchased.
+    if (resolved && status !== 'past_due') {
+      const tierConfig = PLAN_TIERS[resolved.tier];
+      data.subscriptionTier = resolved.tier;
+      data.screenQuota = getScreenQuotaForTier(resolved.tier);
+      data.trialEndsAt = null;
+      if (tierConfig?.storageQuotaMb) {
+        data.storageQuotaBytes = BigInt(tierConfig.storageQuotaMb * 1024 * 1024);
+      }
+    }
+
+    if (Object.keys(data).length === 0) return;
+
+    await this.db.$transaction(async (tx) => {
+      await tx.organization.update({ where: { id: org.id }, data });
+    });
+
+    this.logger.log(
+      `Applied ${provider} subscription event for org ${org.id}: ` +
+        `${Object.keys(data).sort().join(', ')}`,
+    );
+  }
+
+  /**
+   * Lazy Sentry capture — middleware boot wires Sentry but tests don't load it,
+   * so an import failure must not poison the webhook path. Mirrors
+   * `AgentsOnboardingService.captureSentry`. Deliberately NOT the global
+   * SentryInterceptor: that only reports 5xx, and an unknown plan id returns
+   * 200 (the event IS handled; the config is what is wrong).
+   */
+  private static captureSentry(err: unknown, tags: Record<string, unknown>): void {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const Sentry = require('@sentry/nestjs');
+      Sentry.captureException(err, { tags: { event: 'billing_unknown_plan_id', ...tags } });
+    } catch {
+      /* Sentry not loaded — silent drop, logger.error already fired */
+    }
+  }
+
+  /**
+   * Handle subscription lifecycle webhooks: subscription.activated,
+   * subscription.charged, subscription.updated (Razorpay) and
+   * customer.subscription.updated (Stripe).
+   *
+   * Never map an EVENT NAME to a status — Razorpay ships ten subscription
+   * events and the entity status is the only truth (subscription.resumed, for
+   * instance, carries status "active"). Read the status off the entity and let
+   * mapSubscriptionStatus fail closed on anything unrecognized.
    */
   private async handleSubscriptionUpdated(provider: string, data: WebhookData): Promise<void> {
     const customerId =
@@ -915,22 +1154,16 @@ export class BillingService implements OnModuleInit {
     // last-known subscriptionStatus untouched (fail-closed) rather than flip
     // entitlement on a webhook we don't understand. (audit S2-6)
     const status = this.mapSubscriptionStatus(provider, data.status || data.subscription?.status);
+    const planId = this.planIdFromSubscriptionEvent(provider, data);
 
-    if (status === null) {
-      this.logger.warn(
-        `Skipping subscriptionStatus update for org ${org.id}: unmapped/missing ${provider} status`,
-      );
-      return;
-    }
+    this.crossCheckSubscriptionNotes(
+      provider,
+      org.id,
+      data,
+      provider === 'stripe' ? stripePriceIdToTier(planId) : razorpayPlanIdToTier(planId),
+    );
 
-    await this.db.organization.update({
-      where: { id: org.id },
-      data: {
-        subscriptionStatus: status,
-      },
-    });
-
-    this.logger.log(`Updated subscription status for org ${org.id}: ${status}`);
+    await this.applyTierFromPlan(provider, org, planId, status);
   }
 
   /**

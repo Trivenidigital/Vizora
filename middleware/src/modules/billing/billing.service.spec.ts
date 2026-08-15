@@ -169,15 +169,23 @@ describe('BillingService', () => {
   });
 
   describe('onModuleInit (price-ID startup validation)', () => {
+    // Razorpay is interval-dimensioned since B3-E1. The legacy single-dimension
+    // names stay in this list so beforeEach clears the ones set in beforeAll.
     const KEYS = [
       'STRIPE_BASIC_MONTHLY_PRICE_ID',
       'STRIPE_BASIC_YEARLY_PRICE_ID',
+      'RAZORPAY_BASIC_MONTHLY_PLAN_ID',
+      'RAZORPAY_BASIC_YEARLY_PLAN_ID',
       'RAZORPAY_BASIC_PLAN_ID',
       'STRIPE_PRO_MONTHLY_PRICE_ID',
       'STRIPE_PRO_YEARLY_PRICE_ID',
+      'RAZORPAY_PRO_MONTHLY_PLAN_ID',
+      'RAZORPAY_PRO_YEARLY_PLAN_ID',
       'RAZORPAY_PRO_PLAN_ID',
       'STRIPE_ENTERPRISE_MONTHLY_PRICE_ID',
       'STRIPE_ENTERPRISE_YEARLY_PRICE_ID',
+      'RAZORPAY_ENTERPRISE_MONTHLY_PLAN_ID',
+      'RAZORPAY_ENTERPRISE_YEARLY_PLAN_ID',
       'RAZORPAY_ENTERPRISE_PLAN_ID',
     ];
     let savedEnv: Record<string, string | undefined>;
@@ -226,6 +234,39 @@ describe('BillingService', () => {
       });
       // Free tier env vars NOT set, but validation should pass — free has no price.
       expect(() => service.onModuleInit()).not.toThrow();
+    });
+
+    it('accepts the legacy RAZORPAY_<TIER>_PLAN_ID as the monthly alias', () => {
+      process.env.BILLING_VALIDATION_STRICT = 'true';
+      KEYS.filter((k) => !k.startsWith('RAZORPAY_')).forEach((k) => {
+        process.env[k] = `${k}_VALUE`;
+      });
+      // Only the legacy names + the yearly names — no interval-scoped monthly.
+      process.env.RAZORPAY_BASIC_PLAN_ID = 'plan_basic_legacy';
+      process.env.RAZORPAY_BASIC_YEARLY_PLAN_ID = 'plan_basic_yearly';
+      process.env.RAZORPAY_PRO_PLAN_ID = 'plan_pro_legacy';
+      process.env.RAZORPAY_PRO_YEARLY_PLAN_ID = 'plan_pro_yearly';
+      process.env.RAZORPAY_ENTERPRISE_PLAN_ID = 'plan_ent_legacy';
+      process.env.RAZORPAY_ENTERPRISE_YEARLY_PLAN_ID = 'plan_ent_yearly';
+
+      expect(() => service.onModuleInit()).not.toThrow();
+    });
+
+    it('throws REGARDLESS of STRICT when one plan id is shared by two tiers', () => {
+      // Ambiguous config is a silent mis-entitlement (the reverse map would
+      // entitle whichever tier won), so it must fail closed at boot even in the
+      // default warn-only mode. STRICT deliberately left unset here.
+      process.env.RAZORPAY_BASIC_MONTHLY_PLAN_ID = 'plan_shared';
+      process.env.RAZORPAY_PRO_MONTHLY_PLAN_ID = 'plan_shared';
+
+      expect(() => service.onModuleInit()).toThrow(/Ambiguous billing plan id/);
+    });
+
+    it('does not treat the legacy alias holding the same value as its monthly var as a conflict', () => {
+      process.env.RAZORPAY_PRO_PLAN_ID = 'plan_pro_inr';
+      process.env.RAZORPAY_PRO_MONTHLY_PLAN_ID = 'plan_pro_inr';
+
+      expect(() => service.onModuleInit()).not.toThrow(/Ambiguous billing plan id/);
     });
   });
 
@@ -678,26 +719,63 @@ describe('BillingService', () => {
       expect(mockStripeProvider.updateSubscription).not.toHaveBeenCalled();
     });
 
-    it('uses the interval-agnostic Razorpay plan id on plan change', async () => {
-      const razorpayOrg = {
-        ...mockOrganization,
-        stripeSubscriptionId: null,
-        razorpaySubscriptionId: 'sub_razorpay123',
-        razorpayCustomerId: 'cust_razorpay123',
-        paymentProvider: 'razorpay',
-      };
+    const razorpayOrg = {
+      ...mockOrganization,
+      stripeSubscriptionId: null,
+      razorpaySubscriptionId: 'sub_razorpay123',
+      razorpayCustomerId: 'cust_razorpay123',
+      paymentProvider: 'razorpay',
+    };
+
+    it('preserves the Razorpay billing interval on plan change (monthly)', async () => {
       mockDatabaseService.organization.findUnique.mockResolvedValue(razorpayOrg);
       mockRazorpayProvider.updateSubscription.mockResolvedValue({});
-      mockRazorpayProvider.getSubscription.mockResolvedValue(null);
+      // Razorpay exposes plan_id, not an interval — the current interval is
+      // recovered by reverse-mapping the plan the subscriber is on today.
+      // 'plan_basic_inr' = RAZORPAY_BASIC_PLAN_ID (legacy → monthly alias).
+      mockRazorpayProvider.getSubscription.mockResolvedValue({ priceId: 'plan_basic_inr' });
       mockDatabaseService.organization.update.mockResolvedValue({});
 
       await service.updateSubscription('org-123', { planId: 'pro' });
 
-      // RAZORPAY_PRO_PLAN_ID = 'plan_pro_inr' (set in beforeAll); no interval dimension.
       expect(mockRazorpayProvider.updateSubscription).toHaveBeenCalledWith(
         'sub_razorpay123',
         'plan_pro_inr',
       );
+    });
+
+    it('preserves the Razorpay billing interval on plan change (yearly)', async () => {
+      process.env.RAZORPAY_BASIC_YEARLY_PLAN_ID = 'plan_basic_inr_yearly';
+      process.env.RAZORPAY_PRO_YEARLY_PLAN_ID = 'plan_pro_inr_yearly';
+      try {
+        mockDatabaseService.organization.findUnique.mockResolvedValue(razorpayOrg);
+        mockRazorpayProvider.updateSubscription.mockResolvedValue({});
+        mockRazorpayProvider.getSubscription.mockResolvedValue({
+          priceId: 'plan_basic_inr_yearly',
+        });
+        mockDatabaseService.organization.update.mockResolvedValue({});
+
+        await service.updateSubscription('org-123', { planId: 'pro' });
+
+        // A yearly subscriber must NOT be re-billed onto the monthly plan.
+        expect(mockRazorpayProvider.updateSubscription).toHaveBeenCalledWith(
+          'sub_razorpay123',
+          'plan_pro_inr_yearly',
+        );
+      } finally {
+        delete process.env.RAZORPAY_BASIC_YEARLY_PLAN_ID;
+        delete process.env.RAZORPAY_PRO_YEARLY_PLAN_ID;
+      }
+    });
+
+    it('refuses a Razorpay plan change when the current plan id is unrecognized', async () => {
+      mockDatabaseService.organization.findUnique.mockResolvedValue(razorpayOrg);
+      mockRazorpayProvider.getSubscription.mockResolvedValue({ priceId: 'plan_from_another_era' });
+
+      await expect(
+        service.updateSubscription('org-123', { planId: 'pro' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockRazorpayProvider.updateSubscription).not.toHaveBeenCalled();
     });
   });
 

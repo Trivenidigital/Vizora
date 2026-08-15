@@ -105,26 +105,150 @@ export const PLAN_TIERS: Record<string, PlanTier> = {
   },
 };
 
+export type BillingInterval = 'monthly' | 'yearly';
+
+/** The two intervals every paid tier is sold at. */
+export const BILLING_INTERVALS: readonly BillingInterval[] = ['monthly', 'yearly'] as const;
+
+/** What a provider price/plan id identifies: which tier, billed how often. */
+export interface ResolvedPlan {
+  tier: string;
+  interval: BillingInterval;
+}
+
+/**
+ * Two DIFFERENT (tier, interval) targets configured against the SAME provider
+ * plan id. Last-writer-wins on this would silently bill (or entitle) the wrong
+ * tier, so the billing module throws on it at startup instead.
+ */
+export interface PlanIdConflict {
+  provider: 'stripe' | 'razorpay';
+  planId: string;
+  existing: ResolvedPlan;
+  duplicate: ResolvedPlan;
+}
+
 /**
  * Get the Stripe price ID for a plan and interval
  * Reads from environment variables at runtime for testability
  */
 export const getStripePriceId = (
   planId: string,
-  interval: 'monthly' | 'yearly',
+  interval: BillingInterval,
 ): string | undefined => {
   const envKey = `STRIPE_${planId.toUpperCase()}_${interval.toUpperCase()}_PRICE_ID`;
-  return process.env[envKey];
+  return process.env[envKey] || undefined;
 };
 
 /**
- * Get the Razorpay plan ID for a plan
- * Reads from environment variables at runtime for testability
+ * Get the Razorpay plan ID for a plan AND INTERVAL (B3-E1).
+ *
+ * Razorpay plan ids are NOT interval-agnostic — a Razorpay Plan carries its own
+ * `period`/`interval`, so monthly and yearly are two distinct plan objects. The
+ * single-dimension `RAZORPAY_<TIER>_PLAN_ID` scheme could therefore only ever
+ * bill one cadence, which is why picking "yearly" in checkout charged the
+ * customer monthly.
+ *
+ * Canonical: `RAZORPAY_<TIER>_<INTERVAL>_PLAN_ID` (mirrors the Stripe scheme).
+ * Legacy `RAZORPAY_<TIER>_PLAN_ID` — the name CLAUDE.md documents and the only
+ * one any existing deployment could have set — is kept as the MONTHLY alias so
+ * an existing configuration keeps working unchanged. There is deliberately no
+ * legacy fallback for yearly: a missing yearly plan id must fail loudly at
+ * checkout rather than quietly re-bill at the monthly cadence.
  */
-export const getRazorpayPlanId = (planId: string): string | undefined => {
-  const envKey = `RAZORPAY_${planId.toUpperCase()}_PLAN_ID`;
-  return process.env[envKey];
+export const getRazorpayPlanId = (
+  planId: string,
+  interval: BillingInterval,
+): string | undefined => {
+  const scoped = process.env[`RAZORPAY_${planId.toUpperCase()}_${interval.toUpperCase()}_PLAN_ID`];
+  if (scoped) return scoped;
+  if (interval === 'monthly') {
+    return process.env[`RAZORPAY_${planId.toUpperCase()}_PLAN_ID`] || undefined;
+  }
+  return undefined;
 };
+
+/**
+ * Build the provider-plan-id → {tier, interval} reverse index.
+ *
+ * Built at CALL TIME, never cached: these are `process.env` reads, and a cached
+ * index would silently serve a stale mapping after a config change (and would
+ * make every test that sets env vars order-dependent).
+ *
+ * Empty/unset values are skipped rather than indexed — prod runs with zero
+ * Razorpay plan ids configured, and indexing '' would collapse every tier onto
+ * one key. Only genuinely duplicated NON-EMPTY ids are reported as conflicts.
+ */
+function buildPlanIdIndex(
+  provider: 'stripe' | 'razorpay',
+): { index: Map<string, ResolvedPlan>; conflicts: PlanIdConflict[] } {
+  const index = new Map<string, ResolvedPlan>();
+  const conflicts: PlanIdConflict[] = [];
+
+  const add = (planId: string | undefined, resolved: ResolvedPlan): void => {
+    if (!planId) return;
+    const existing = index.get(planId);
+    if (!existing) {
+      index.set(planId, resolved);
+      return;
+    }
+    // Same id resolving to the SAME target twice (e.g. the legacy Razorpay
+    // alias holding the same value as the interval-scoped var) is not a
+    // conflict — it is one plan reachable under two env names.
+    if (existing.tier === resolved.tier && existing.interval === resolved.interval) return;
+    conflicts.push({ provider, planId, existing, duplicate: resolved });
+  };
+
+  for (const tier of Object.keys(PLAN_TIERS)) {
+    for (const interval of BILLING_INTERVALS) {
+      add(
+        provider === 'stripe' ? getStripePriceId(tier, interval) : getRazorpayPlanId(tier, interval),
+        { tier, interval },
+      );
+    }
+    if (provider === 'razorpay') {
+      // Index the legacy alias explicitly: when the interval-scoped monthly var
+      // is ALSO set with a different value, getRazorpayPlanId no longer returns
+      // the legacy id, and an in-flight subscription still on that plan would
+      // otherwise reverse-map to "unknown" and lose its tier.
+      add(process.env[`RAZORPAY_${tier.toUpperCase()}_PLAN_ID`] || undefined, {
+        tier,
+        interval: 'monthly',
+      });
+    }
+  }
+
+  return { index, conflicts };
+}
+
+/**
+ * Reverse-map a Razorpay plan id from a webhook to the tier it sells (B3-E1).
+ * Returns null for a plan id this deployment does not know — callers MUST treat
+ * that as "skip the tier write and escalate", never as "free".
+ */
+export const razorpayPlanIdToTier = (planId: string | undefined): ResolvedPlan | null => {
+  if (!planId) return null;
+  return buildPlanIdIndex('razorpay').index.get(planId) ?? null;
+};
+
+/**
+ * Reverse-map a Stripe price id from a webhook to the tier it sells (B3-E1,
+ * Stripe parity). Same contract as razorpayPlanIdToTier.
+ */
+export const stripePriceIdToTier = (priceId: string | undefined): ResolvedPlan | null => {
+  if (!priceId) return null;
+  return buildPlanIdIndex('stripe').index.get(priceId) ?? null;
+};
+
+/**
+ * Every duplicate-plan-id conflict across both providers. The billing module
+ * throws on a non-empty result at startup — a collapsed mapping is a silent
+ * mis-entitlement waiting to happen, and last-wins would hide it.
+ */
+export const getBillingPlanIdConflicts = (): PlanIdConflict[] => [
+  ...buildPlanIdIndex('stripe').conflicts,
+  ...buildPlanIdIndex('razorpay').conflicts,
+];
 
 /**
  * Get the screen quota for a given tier
