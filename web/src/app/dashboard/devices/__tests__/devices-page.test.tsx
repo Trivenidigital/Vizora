@@ -80,7 +80,13 @@ jest.mock('@/lib/hooks/useDebounce', () => ({
 }));
 
 jest.mock('@/lib/hooks', () => ({
-  useRealtimeEvents: jest.fn(() => ({ isConnected: false, isOffline: true })),
+  // emitDeviceUpdate is part of the real hook's contract and the edit flow calls
+  // it; omitting it made the success path throw into the retry error branch.
+  useRealtimeEvents: jest.fn(() => ({
+    isConnected: false,
+    isOffline: true,
+    emitDeviceUpdate: jest.fn(),
+  })),
   useOptimisticState: jest.fn((initialState: any) => ({
     updateOptimistic: jest.fn(),
     commitOptimistic: jest.fn(),
@@ -665,6 +671,82 @@ describe('DevicesClient', () => {
     expect(mockToast.success).toHaveBeenCalledWith('Added 1 device(s) to group');
   });
 
+  /**
+   * A confirmed delete must leave the table, not just the database.
+   *
+   * `useOptimisticState` keeps its own copy of the array and the page never
+   * renders it, so pairing the API call with commitOptimistic alone left the
+   * deleted row on screen until the operator reloaded - the row looked alive
+   * next to a "deleted successfully" toast. Asserted on the DOM with no
+   * refetch: getDisplays is not re-stubbed here, so a row that survives cannot
+   * be papered over by a reload.
+   */
+  it('removes the deleted device from the table without a reload', async () => {
+    render(
+      <DevicesClient
+        initialDevices={sampleDevices as any}
+        initialPlaylists={samplePlaylists as any}
+        initialDevicesComplete
+        initialPlaylistsComplete
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Lobby Display')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Delete')[0]);
+    fireEvent.click(screen.getByText('Confirm'));
+
+    await waitFor(() => {
+      expect(mockDeleteDisplay).toHaveBeenCalledWith('d1');
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText('Lobby Display')).not.toBeInTheDocument();
+    });
+    expect(mockToast.success).toHaveBeenCalledWith('Device deleted successfully');
+    // The other rows stay - the filter must be by id, not a blanket clear.
+    expect(screen.getByText('Conference Room')).toBeInTheDocument();
+    expect(screen.getByText('Cafeteria Screen')).toBeInTheDocument();
+    expect(mockGetDisplays).not.toHaveBeenCalled();
+  });
+
+  // Same root cause as the delete above: the rendered list is `devices`, so a
+  // rename that only committed the optimistic copy showed the old nickname.
+  it('shows the renamed device in the table without a reload', async () => {
+    render(
+      <DevicesClient
+        initialDevices={sampleDevices as any}
+        initialPlaylists={samplePlaylists as any}
+        initialDevicesComplete
+        initialPlaylistsComplete
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Lobby Display')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Edit')[0]);
+    const [nicknameInput] = screen.getAllByPlaceholderText('e.g., Store Front Display');
+    fireEvent.change(nicknameInput, { target: { value: 'Reception Screen' } });
+    fireEvent.click(screen.getByText('Save Changes'));
+
+    await waitFor(() => {
+      expect(mockUpdateDisplay).toHaveBeenCalledWith('d1', {
+        nickname: 'Reception Screen',
+        location: 'Building A - Lobby',
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Reception Screen')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Lobby Display')).not.toBeInTheDocument();
+    expect(mockGetDisplays).not.toHaveBeenCalled();
+  });
+
   it('handles empty device list gracefully', async () => {
     render(<DevicesClient initialDevices={[]} initialPlaylists={[]} />);
     await waitFor(() => {
@@ -739,5 +821,115 @@ describe('DevicesClient bulk selection is confined to visible rows', () => {
     await waitFor(() => {
       expect(selectAllCheckbox()).not.toBeChecked();
     });
+  });
+});
+
+/**
+ * The current page may never point past the end of the list.
+ *
+ * Once a delete actually removes the row, emptying the last page strands the
+ * operator on a blank table under a footer reading "Showing 21 to 20 of 20
+ * devices". The clamp lives in an effect keyed off `totalPages`, not inside
+ * confirmDelete, because every shrink path reaches the same symptom: the single
+ * delete below, a bulk delete of the whole last page, and a search or group
+ * filter that narrows the results.
+ *
+ * 21 devices at the default 10-per-page puts exactly one row on page 3, which
+ * is the boundary. The same boundary exists at every page size the selector
+ * offers - 26 devices at 25/page, 51 at 50/page, 101 at 100/page each put one
+ * row alone on a last page - so this fixture is the cheapest instance of the
+ * condition, not a special case.
+ */
+describe('DevicesClient keeps the current page inside the list', () => {
+  const twentyOneDevices = Array.from({ length: 21 }, (_, i) => ({
+    id: `dev-${i + 1}`,
+    nickname: `Device ${i + 1}`,
+    name: `Device ${i + 1}`,
+    status: 'online',
+    location: 'Seattle',
+    lastSeen: '2026-08-13T10:00:00.000Z',
+  }));
+
+  const renderTwentyOne = () =>
+    render(
+      <DevicesClient
+        initialDevices={twentyOneDevices as any}
+        initialPlaylists={[] as any}
+        initialDevicesComplete
+        initialPlaylistsComplete
+      />,
+    );
+
+  // The footer splits its numbers across <span>s, so read the whole line.
+  const footerText = () =>
+    (screen.getByText(/Showing/).textContent ?? '').replace(/\s+/g, ' ').trim();
+
+  const goToLastPage = async () => {
+    await waitFor(() => expect(screen.getByText('Device 1')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('Next →'));
+    fireEvent.click(screen.getByText('Next →'));
+    await waitFor(() => expect(screen.getByText('Device 21')).toBeInTheDocument());
+    expect(footerText()).toBe('Showing 21 to 21 of 21 devices');
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUser = {
+      id: 'u1',
+      email: 'test@test.com',
+      firstName: 'Test',
+      lastName: 'User',
+      organizationId: 'org-1',
+      role: 'admin',
+    };
+    mockDeleteDisplay.mockResolvedValue({});
+    mockGetDisplayGroups.mockResolvedValue({ data: [] });
+  });
+
+  it('falls back a page when a single delete empties the last page', async () => {
+    renderTwentyOne();
+    await goToLastPage();
+
+    fireEvent.click(screen.getByText('Delete'));
+    fireEvent.click(screen.getByText('Confirm'));
+
+    await waitFor(() => {
+      expect(mockDeleteDisplay).toHaveBeenCalledWith('dev-21');
+    });
+
+    // Without the clamp the slice is empty and this reads "Showing 21 to 20 of
+    // 20 devices" over a blank table. The clamp lands one render after the
+    // removal, so wait for it rather than reading between the two commits.
+    await waitFor(() => {
+      expect(footerText()).toBe('Showing 11 to 20 of 20 devices');
+    });
+    expect(screen.queryByText('Device 21')).not.toBeInTheDocument();
+    expect(screen.getByText('Device 20')).toBeInTheDocument();
+  });
+
+  it('falls back a page when a bulk delete empties the last page', async () => {
+    mockBulkDeleteDisplays.mockResolvedValue({ deleted: 1 });
+    // Bulk delete refetches, so the clamp has to survive a reload too.
+    mockGetDisplays.mockResolvedValue({
+      data: twentyOneDevices.slice(0, 20),
+      meta: { page: 1, limit: 100, total: 20, totalPages: 1 },
+    });
+
+    renderTwentyOne();
+    await goToLastPage();
+
+    fireEvent.click(screen.getByLabelText('Select all devices on this page'));
+    fireEvent.click(screen.getByText('Delete Selected'));
+    fireEvent.click(screen.getByText('Confirm'));
+
+    await waitFor(() => {
+      expect(mockBulkDeleteDisplays).toHaveBeenCalledWith(['dev-21']);
+    });
+
+    await waitFor(() => {
+      expect(footerText()).toBe('Showing 11 to 20 of 20 devices');
+    });
+    expect(screen.queryByText('Device 21')).not.toBeInTheDocument();
+    expect(screen.getByText('Device 20')).toBeInTheDocument();
   });
 });
