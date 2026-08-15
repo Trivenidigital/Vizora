@@ -278,8 +278,12 @@ describe('API-key auth precedence (e2e)', () => {
    * These tests mutate org A's plan, so each restores it.
    */
   describe('entitlement gate on GET /api/content', () => {
+    // Restore BOTH orgs: the browser-path test below mutates org B, and leaving
+    // either one moved would make a later test pass or fail for a reason that
+    // has nothing to do with what it asserts.
     afterEach(async () => {
       await setPlan(orgAId, 'pro', 'active');
+      await setPlan(orgBId, 'free', 'trial');
     });
 
     it('denies a downgraded org — the key is valid, the plan is not', async () => {

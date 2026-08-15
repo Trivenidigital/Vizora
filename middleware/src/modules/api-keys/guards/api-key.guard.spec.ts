@@ -302,6 +302,75 @@ describe('ApiKeyGuard', () => {
       });
     });
 
+    /**
+     * The switch's only purpose is emergency restoration under time pressure.
+     * An operator who sets a near-miss value and sees nothing change has no
+     * signal to correct with, so the ignored value announces itself.
+     */
+    describe('kill switch — ignored-value warning', () => {
+      const ignoredWarn = (warn: jest.SpyInstance) =>
+        warn.mock.calls.map((c) => String(c[0])).filter((l) => l.includes('is IGNORED'));
+
+      it.each(['true', 'FALSE', '0', 'no', 'False'])(
+        'warns that %p is ignored and the gate stays active',
+        async (value) => {
+          const warn = jest.spyOn(guard['logger'], 'warn').mockImplementation(() => undefined);
+          process.env.API_KEY_ENTITLEMENT_GATE_ENABLED = value;
+          mockApiKeysService.validateKey.mockResolvedValue(keyWithPlan('pro', 'active') as any);
+
+          await guard.canActivate(mockExecutionContext);
+
+          const lines = ignoredWarn(warn);
+          expect(lines).toHaveLength(1);
+          expect(lines[0]).toContain(`"${value}"`);
+          expect(lines[0]).toMatch(/remains ACTIVE/);
+          warn.mockRestore();
+        },
+      );
+
+      it('warns ONCE per process, not once per request', async () => {
+        const warn = jest.spyOn(guard['logger'], 'warn').mockImplementation(() => undefined);
+        process.env.API_KEY_ENTITLEMENT_GATE_ENABLED = '0';
+        mockApiKeysService.validateKey.mockResolvedValue(keyWithPlan('pro', 'active') as any);
+
+        await guard.canActivate(mockExecutionContext);
+        await guard.canActivate(mockExecutionContext);
+        await guard.canActivate(mockExecutionContext);
+
+        expect(ignoredWarn(warn)).toHaveLength(1);
+        warn.mockRestore();
+      });
+
+      it.each([undefined, ''])(
+        'stays silent for %p — that is the documented default, not a typo',
+        async (value) => {
+          const warn = jest.spyOn(guard['logger'], 'warn').mockImplementation(() => undefined);
+          if (value === undefined) {
+            delete process.env.API_KEY_ENTITLEMENT_GATE_ENABLED;
+          } else {
+            process.env.API_KEY_ENTITLEMENT_GATE_ENABLED = value;
+          }
+          mockApiKeysService.validateKey.mockResolvedValue(keyWithPlan('pro', 'active') as any);
+
+          await guard.canActivate(mockExecutionContext);
+
+          expect(ignoredWarn(warn)).toHaveLength(0);
+          warn.mockRestore();
+        },
+      );
+
+      it("stays silent for 'false' — the value actually does something", async () => {
+        const warn = jest.spyOn(guard['logger'], 'warn').mockImplementation(() => undefined);
+        process.env.API_KEY_ENTITLEMENT_GATE_ENABLED = 'false';
+        mockApiKeysService.validateKey.mockResolvedValue(keyWithPlan('free', 'active') as any);
+
+        await expect(guard.canActivate(mockExecutionContext)).resolves.toBe(true);
+
+        expect(ignoredWarn(warn)).toHaveLength(0);
+        warn.mockRestore();
+      });
+    });
+
     describe('unchanged behavior', () => {
       it('still returns false (401 path) for an invalid key, entitlement notwithstanding', async () => {
         mockApiKeysService.validateKey.mockResolvedValue(null);

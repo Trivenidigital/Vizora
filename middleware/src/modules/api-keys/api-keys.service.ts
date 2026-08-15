@@ -56,11 +56,13 @@ export class ApiKeysService {
   /**
    * Validate an API key and return the key record if valid.
    *
-   * The owning organization's entitlement fields ride along on the SAME single
-   * indexed query (B2). ApiKeyGuard needs `subscriptionTier`/`subscriptionStatus`
-   * to decide whether key USE is currently permitted, and a second round-trip
-   * per authenticated request would be pure cost — no entitlement path in this
-   * codebase caches, so the read has to happen here anyway.
+   * The owning organization's entitlement fields are fetched here as part of
+   * ONE Prisma client call (B2). Note that `include` is not a SQL join on this
+   * Prisma version — without the `relationJoins` preview feature it issues a
+   * second statement — but that statement is a primary-key lookup selecting two
+   * columns, and it replaces a second round-trip the guard would otherwise have
+   * to make itself. No entitlement path in this codebase caches, so the read
+   * has to happen on each authenticated request either way.
    *
    * Fail-closed on infrastructure by construction: a DB error rejects this
    * promise, the guard never sees a key, and the request is refused. There is
