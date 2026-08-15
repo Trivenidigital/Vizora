@@ -295,15 +295,32 @@ is *charged*; reverse (id → tier, `razorpayPlanIdToTier` / `stripePriceIdToTie
 what the webhook *entitles* them to. An id present in the provider dashboard but absent
 here makes the lifecycle webhook log an error, capture to Sentry and **skip the tier
 write** — it is never coerced to `free`. Two tiers (or two intervals) sharing one id is
-ambiguous and **throws at billing `onModuleInit` regardless of `BILLING_VALIDATION_STRICT`**.
+ambiguous: that id is **removed from the reverse index** (so it resolves to null and takes
+the same skip-and-escalate path) and boot logs an error + Sentry. It deliberately does
+**not** throw — refusing to boot would take displays, content and auth down in both
+cluster instances over a billing typo (#101). A *missing* id still fails boot under
+`BILLING_VALIDATION_STRICT=true`.
 
-**One tier-write site per provider**: `BillingService.applyTierFromPlan`, reached from
-`subscription.activated` / `subscription.charged` / `subscription.updated` /
-`customer.subscription.updated`. Do not add a second. `past_due` delegates to
-`EntitlementService.beginPastDue` and leaves the tier alone (rungs gate capability; tier
-records what was bought); recovery from a dunning rung delegates to `recover()`.
-`Organization.billingEventAt` orders entitlement writes so a retried older event cannot
-overwrite newer state — it is **not** `entitlementStateSince` (the dunning clock).
+**A webhook only grants a paid tier under a status that asserts a LIVE, PAID
+subscription** — `BillingService.TIER_GRANTING_STATUSES`, currently exactly `active`.
+Pre-payment statuses (Razorpay `created`/`authenticated`, Stripe `trialing`) and terminal
+ones (`cancelled`/`completed`/`expired`, `canceled`/`incomplete_expired`) must never write
+one, and `trialEndsAt` is never cleared on a `trial` status — doing so made
+`SubscriptionActiveGuard` deny every write for a tenant that had paid nothing. An
+unmapped status writes nothing at all.
+
+**One entitlement-write site**: `BillingService.writeEntitlement`, used by
+`applyTierFromPlan` (the lifecycle events), the cancellation handler and
+`handleCheckoutCompleted`. Do not add a second. It is a **compare-and-set** —
+`updateMany` carrying the `billingEventAt <= eventAt` predicate in its WHERE, so Postgres
+arbitrates between the two PM2 cluster instances; a read-then-write cannot. `past_due`
+delegates to `EntitlementService.beginPastDue` and leaves the tier alone (rungs gate
+capability; tier records what was bought). **Recovery from a dunning rung happens ONLY on
+the money path** (`handlePaymentSucceeded` → `recover()`): Stripe emits
+`customer.subscription.updated(active)` for metadata edits and payment-method attaches,
+which is not proof the debt was paid. `Organization.billingEventAt` orders entitlement
+writes so a retried older event cannot overwrite newer state — it is **not**
+`entitlementStateSince` (the dunning clock).
 
 Admin `PlanForm` has `razorpayPlanIdMonthly`/`razorpayPlanIdYearly` fields: **not wired**.
 Env is canonical; nothing reads the DB columns.

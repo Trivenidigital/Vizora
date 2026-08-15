@@ -1,15 +1,21 @@
 -- B3 webhook ordering guard: the emission time of the newest billing event whose
 -- entitlement (tier/status) write we actually applied. Payment providers do not
 -- guarantee webhook ordering, so a retried older event could otherwise overwrite
--- newer authoritative state (e.g. a stale `basic` activation landing after an
--- `pro` upgrade). Entitlement writes are skipped when the incoming event is
--- OLDER than this mark; equal timestamps are allowed through (tier writes are
--- idempotent, and Razorpay's top-level created_at has one-second resolution).
+-- newer authoritative state (e.g. a stale `basic` activation landing after a
+-- `pro` upgrade). Enforced as a COMPARE-AND-SET: every entitlement write is an
+-- updateMany carrying `billingEventAt <= :eventAt` in its WHERE, so Postgres —
+-- not application code — arbitrates between two PM2 cluster instances. Equal
+-- timestamps are allowed through (tier writes are idempotent, and both
+-- providers' event timestamps have one-second resolution).
 --
 -- Deliberately NOT entitlementStateSince: that is the dunning-ladder episode
 -- clock, and reusing it here would reset grace windows (the B8 bug class).
 --
 -- Physical table name — Prisma @@map("organizations") on model Organization.
--- CI seeds the test DB with `prisma db push` (schema-direct), so a wrong table
--- name here would pass CI and only fail on prod `migrate deploy`.
+-- Verified by the `migrations` CI job, which replays every migration against an
+-- EMPTY database exactly as `prisma migrate deploy` does on prod, and which
+-- passed on this change. (Note: it is NOT in the required-checks set, so read
+-- its result rather than assuming a green PR covered it. The test/e2e jobs seed
+-- via `prisma db push` and never execute migration SQL at all — that is the gap
+-- the job exists to close, and it is closed.)
 ALTER TABLE "organizations" ADD COLUMN "billingEventAt" TIMESTAMP(3);
