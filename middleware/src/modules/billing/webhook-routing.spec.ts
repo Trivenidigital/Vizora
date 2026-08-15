@@ -179,13 +179,15 @@ describe('billing webhook routing (B3)', () => {
   // ---------------------------------------------------------------------------
   // The behaviour matrix. Each row is one operator ruling.
   // ---------------------------------------------------------------------------
-  const table: Array<{
+  type RoutingCase = {
     name: string;
     provider: 'stripe' | 'razorpay';
     org?: Record<string, unknown>;
     event: { type: string; data: unknown; createdAt?: Date };
     expected: Record<string, unknown> | null;
-  }> = [
+  };
+
+  const table: RoutingCase[] = [
     {
       name: 'known pro plan activated → tier pro persisted with quota and storage',
       provider: 'razorpay',
@@ -431,7 +433,8 @@ describe('billing webhook routing (B3)', () => {
     },
   ];
 
-  it.each(table)('$name', async ({ provider, org, event, expected }) => {
+  it.each(table)('$name', async (testCase: RoutingCase) => {
+    const { provider, org, event, expected } = testCase;
     const record = provider === 'stripe' ? stripeOrg(org) : razorpayOrg(org);
     db.organization.findFirst.mockResolvedValue(record);
 
