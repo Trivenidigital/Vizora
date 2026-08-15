@@ -198,6 +198,10 @@ predate 1.3.11 and must **not** hold up publication — see
 | B1 | **Full-app rebrand — align the authenticated app with the light homepage** | APPROVED, NOT STARTED | Decision 2026-08-03. Today marketing is light and the app is dark, so there is a visual break at login. The app **already has a working light theme**; it just points at the older warm-cream palette — so this is largely a token re-point plus a contrast audit, not a ground-up restyle. **Cost driver: 728 `#00E5A0` occurrences** outside the marketing scope, each needing classification as fill/glow (keep) vs text/border (must become `--mkt-mint-ink`, since neon is 1.65:1 on light). Surface: 42 dashboard + 24 admin routes, 52 components. Full scope, traps and verification plan: `docs/plans/2026-08-03-full-app-rebrand.md`. **Open first:** does dark mode remain supported, and what is the default for existing users? |
 
 
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| B2 | **API-key entitlement gate — deny key auth when the org's current plan lacks API access** | NEW 2026-08-15, NOT STARTED | Became a live commercial-authorization defect when #342 enabled the first API-key business route (`GET /api/v1/content`): an org that downgrades keeps working API keys issued while on a higher tier. Intended invariant (verify against pricing/entitlement code before implementing — do NOT assume "Pro" from UI copy): *key may exist historically, but API-key authentication is denied while current entitlement excludes API access* — deny-at-auth, not revoke-on-downgrade, so re-upgrade restores access without destroying credentials. Enforce in `ApiKeyGuard`/`validateKey` next to the org lookup. |
+
 | # | Item | Effort | Status | Notes |
 |---|------|--------|--------|-------|
 | L1 | Device offline email notification to customers | S (4h) | ✅ DONE | Superseded by **O7** (#63) — `alert-rules` evaluator dispatches in_app/email/slack on device-offline per tag/group with custom recipients. |
