@@ -111,6 +111,13 @@ describe('BillingPage', () => {
     await waitFor(() => {
       expect(screen.getByRole('link', { name: 'Upgrade' })).toBeInTheDocument();
     });
+
+    // The em-dash fallback must never leak into the genuinely-free state.
+    // 'Free' appears twice here (tier headline + status badge), so pin the
+    // headline itself rather than asserting a single match.
+    const freeNodes = screen.getAllByText('Free');
+    expect(freeNodes.some((node) => node.className.includes('text-3xl'))).toBe(true);
+    expect(screen.queryByText('—')).not.toBeInTheDocument();
   });
 
   it('upgrade button navigates to plans page', async () => {
@@ -208,6 +215,9 @@ describe('BillingPage', () => {
       expect(screen.queryByRole('button', { name: 'Cancel Subscription' })).not.toBeInTheDocument();
       expect(screen.queryByText('Free')).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+      // The captured reason must be visible — toasts auto-dismiss, so a
+      // permanently failing load would otherwise leave nothing to act on.
+      expect(screen.getByText('Service Unavailable')).toBeInTheDocument();
     });
 
     it('shows the same error panel when only getOrganization rejects', async () => {
@@ -222,6 +232,37 @@ describe('BillingPage', () => {
 
       expect(screen.queryByRole('button', { name: 'Cancel Subscription' })).not.toBeInTheDocument();
       expect(screen.queryByText('Free')).not.toBeInTheDocument();
+    });
+
+    it('hides provider-derived panels when a RE-load fails after a good load', async () => {
+      // `subscription` is deliberately not cleared in the catch (it keeps the
+      // retry UX intact), so every panel reading from it must sit inside the
+      // guard — otherwise stale provider data renders beside the error.
+      (apiClient.getSubscriptionStatus as jest.Mock)
+        .mockResolvedValueOnce({
+          ...mockSubscription,
+          paymentProvider: 'razorpay',
+          cancelAtPeriodEnd: true,
+        })
+        .mockRejectedValue(new Error('Service Unavailable'));
+      (apiClient.reactivateSubscription as jest.Mock).mockResolvedValue(undefined);
+
+      render(<BillingPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Payments processed by/i)).toBeInTheDocument();
+      });
+      expect(screen.getByText('Tax Information')).toBeInTheDocument();
+
+      // Reactivate triggers a re-load; that second read fails.
+      fireEvent.click(screen.getByRole('button', { name: /Reactivate Subscription/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Unable to load your billing information/i)).toBeInTheDocument();
+      });
+
+      expect(screen.queryByText(/Payments processed by/i)).not.toBeInTheDocument();
+      expect(screen.queryByText('Tax Information')).not.toBeInTheDocument();
     });
 
     it('retry re-invokes the load and renders the plan once it succeeds', async () => {
@@ -242,6 +283,42 @@ describe('BillingPage', () => {
       });
       expect(screen.queryByText(/Unable to load your billing information/i)).not.toBeInTheDocument();
     });
+  });
+
+  it('disables plan actions when the provider period data is degraded', async () => {
+    // cancelAtPeriodEnd is UNKNOWN on this path, not false — a customer who has
+    // already cancelled must not be shown "Cancel Subscription" again.
+    (apiClient.getSubscriptionStatus as jest.Mock).mockResolvedValue({
+      ...mockSubscription,
+      currentPeriodEnd: null,
+      cancelAtPeriodEnd: false,
+      degraded: true,
+    });
+
+    render(<BillingPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Pro')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/Subscription details are temporarily unavailable/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cancel Subscription' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Reactivate Subscription/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not offer Cancel Subscription when the tier field is missing', async () => {
+    const { subscriptionTier, ...withoutTier } = mockSubscription;
+    (apiClient.getSubscriptionStatus as jest.Mock).mockResolvedValue(withoutTier);
+
+    render(<BillingPage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'Upgrade' })).toBeInTheDocument();
+    });
+
+    expect(screen.queryByRole('button', { name: 'Cancel Subscription' })).not.toBeInTheDocument();
   });
 
   it('treats a missing subscription as not-paid rather than offering Cancel Subscription', async () => {

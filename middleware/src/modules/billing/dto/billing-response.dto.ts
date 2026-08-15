@@ -44,6 +44,17 @@ export class SubscriptionStatusResponse {
     enum: ['stripe', 'razorpay', null],
   })
   paymentProvider: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Present (and always `true`) only when the payment provider could not be read. ' +
+      'The tier/status/quota fields are still authoritative — they come from our own ' +
+      'database — but `currentPeriodEnd` and `cancelAtPeriodEnd` are unknown, NOT false. ' +
+      'Clients must not offer subscription actions while this is set: a subscription ' +
+      'already cancelled at the provider is indistinguishable here from an active one.',
+    example: true,
+  })
+  degraded?: true;
 }
 
 /**

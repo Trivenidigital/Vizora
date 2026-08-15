@@ -276,13 +276,32 @@ describe('BillingService', () => {
       mockStripeProvider.getSubscription.mockRejectedValue(
         new ServiceUnavailableException('Stripe is not configured'),
       );
+      const warn = jest.spyOn(service['logger'], 'warn').mockImplementation(() => undefined);
 
       const result = await service.getSubscriptionStatus('org-123');
 
       expect(result.subscriptionTier).toBe('basic');
       expect(result.subscriptionStatus).toBe('active');
       expect(result.currentPeriodEnd).toBeNull();
-      expect(result.cancelAtPeriodEnd).toBe(false);
+      // The period fields are UNKNOWN, not false — say so, so no client offers
+      // "Cancel" to a customer who has already cancelled at the provider.
+      expect(result.degraded).toBe(true);
+
+      // §12b — a degraded read must not be silent.
+      expect(warn).toHaveBeenCalledTimes(1);
+      const message = warn.mock.calls[0][0] as string;
+      expect(message).toContain('org-123');
+      expect(message).toContain('stripe');
+      warn.mockRestore();
+    });
+
+    it('should not mark a healthy read as degraded', async () => {
+      mockDatabaseService.organization.findUnique.mockResolvedValue(mockOrganization);
+      mockStripeProvider.getSubscription.mockResolvedValue(mockSubscription);
+
+      const result = await service.getSubscriptionStatus('org-123');
+
+      expect(result.degraded).toBeUndefined();
     });
   });
 
