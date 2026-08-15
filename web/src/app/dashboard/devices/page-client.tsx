@@ -284,11 +284,7 @@ export default function DevicesClient({
  // commitOptimistic alone left the deleted row on screen until a reload.
  // Same pairing the content page uses (content/page-client.tsx).
  commitOptimistic(deleteId);
- const wasOnlyVisibleDevice = displayDevices.length <= 1;
  setDevices((prev) => prev.filter((d) => d.id !== deletedDeviceId));
- if (wasOnlyVisibleDevice && currentPage > 1) {
- setCurrentPage((page) => Math.max(1, page - 1));
- }
  toast.success('Device deleted successfully');
  setIsDeleteModalOpen(false);
  setSelectedDevice(null);
@@ -490,6 +486,26 @@ export default function DevicesClient({
  return next.size === prev.size ? prev : next;
  });
  }, [visibleIdsKey]);
+
+ /**
+  * The current page may never point past the end of the list.
+  *
+  * Anything that shrinks the filtered set while the operator is on a later page
+  * strands them on an empty slice under a footer reading "Showing 21 to 20 of
+  * 20 devices": a single delete, a bulk delete of the whole last page, and a
+  * search or group filter that narrows the results all reach it. Clamping here
+  * rather than inside each handler covers every shrink path, including the
+  * refetch ones, instead of only the one that happens to be under test.
+  *
+  * `totalPages === 0` (an empty or fully-filtered list) is deliberately left
+  * alone - clamping to 0 would be an invalid page, and the empty case renders
+  * EmptyState instead of the table anyway.
+  */
+ useEffect(() => {
+ if (totalPages > 0 && currentPage > totalPages) {
+ setCurrentPage(totalPages);
+ }
+ }, [totalPages, currentPage]);
 
  useEffect(() => {
  setCurrentPage(1);
