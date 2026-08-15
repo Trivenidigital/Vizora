@@ -21,7 +21,15 @@ describe('AnalyticsService — Proof of play (O2)', () => {
         count: jest.fn().mockResolvedValue(0),
       },
     };
-    service = new AnalyticsService(db as unknown as DatabaseService);
+    service = new AnalyticsService(
+      db as unknown as DatabaseService,
+      null as any, // clickhouse — unused by the proof-of-play reads
+      // Pass-through leader lock. Supplied explicitly rather than left off the
+      // end: ts-jest runs with diagnostics off, so missing arguments compile and
+      // leave `cronLeader` undefined — the next test to touch a leader-locked
+      // path would then fail on an unrelated TypeError.
+      { runExclusive: (_n: string, fn: () => Promise<void>) => fn() } as any,
+    );
   });
 
   // ---------------------------------------------------------------------------

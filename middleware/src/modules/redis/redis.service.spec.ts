@@ -64,14 +64,14 @@ describe('RedisService', () => {
     it('should return true when Redis responds with PONG', async () => {
       await service.onModuleInit();
 
-      // Manually trigger the connect event to set isConnected = true
+      // Trigger 'ready' (not 'connect') — isConnected flips on ready, because a
       const client = service.getClient();
       if (client) {
-        const connectHandler = (client.on as jest.Mock).mock.calls.find(
-          call => call[0] === 'connect'
+        const readyHandler = (client.on as jest.Mock).mock.calls.find(
+          call => call[0] === 'ready'
         );
-        if (connectHandler) {
-          connectHandler[1](); // Call the connect handler
+        if (readyHandler) {
+          readyHandler[1](); // Call the connect handler
         }
       }
 
@@ -90,14 +90,14 @@ describe('RedisService', () => {
     it('should return healthy status when Redis is responsive', async () => {
       await service.onModuleInit();
 
-      // Manually trigger connect
+      // Trigger ready — see isAvailable() coverage below
       const client = service.getClient();
       if (client) {
-        const connectHandler = (client.on as jest.Mock).mock.calls.find(
-          call => call[0] === 'connect'
+        const readyHandler = (client.on as jest.Mock).mock.calls.find(
+          call => call[0] === 'ready'
         );
-        if (connectHandler) {
-          connectHandler[1]();
+        if (readyHandler) {
+          readyHandler[1]();
         }
       }
 
@@ -116,13 +116,13 @@ describe('RedisService', () => {
       await service.onModuleInit();
       const client = service.getClient();
 
-      // Trigger connect
+      // Trigger ready
       if (client) {
-        const connectHandler = (client.on as jest.Mock).mock.calls.find(
-          call => call[0] === 'connect'
+        const readyHandler = (client.on as jest.Mock).mock.calls.find(
+          call => call[0] === 'ready'
         );
-        if (connectHandler) {
-          connectHandler[1]();
+        if (readyHandler) {
+          readyHandler[1]();
         }
 
         // Make ping fail
@@ -140,16 +140,34 @@ describe('RedisService', () => {
       expect(service.isAvailable()).toBe(false);
     });
 
+    // F1. 'connect' means the SOCKET is up; it does NOT mean Redis can serve
+    // commands. A replica replaying a large RDB/AOF answers -LOADING in exactly
+    // that window, and callers that treat isAvailable() as "safe to issue a
+    // command" (the cron leader lock) would send into it and hang. With
+    // enableReadyCheck, 'ready' fires only once ioredis confirms LOADING is over.
+    it('stays UNAVAILABLE on socket connect alone — only ready counts', async () => {
+      await service.onModuleInit();
+      const client = service.getClient();
+
+      const connectHandler = (client!.on as jest.Mock).mock.calls.find(
+        call => call[0] === 'connect'
+      );
+      expect(connectHandler).toBeDefined();
+      connectHandler![1]();
+
+      expect(service.isAvailable()).toBe(false);
+    });
+
     it('should return true when connected', async () => {
       await service.onModuleInit();
       const client = service.getClient();
 
       if (client) {
-        const connectHandler = (client.on as jest.Mock).mock.calls.find(
-          call => call[0] === 'connect'
+        const readyHandler = (client.on as jest.Mock).mock.calls.find(
+          call => call[0] === 'ready'
         );
-        if (connectHandler) {
-          connectHandler[1]();
+        if (readyHandler) {
+          readyHandler[1]();
         }
       }
 
@@ -162,11 +180,11 @@ describe('RedisService', () => {
       await service.onModuleInit();
       const client = service.getClient();
       if (client) {
-        const connectHandler = (client.on as jest.Mock).mock.calls.find(
-          call => call[0] === 'connect'
+        const readyHandler = (client.on as jest.Mock).mock.calls.find(
+          call => call[0] === 'ready'
         );
-        if (connectHandler) {
-          connectHandler[1]();
+        if (readyHandler) {
+          readyHandler[1]();
         }
       }
     });

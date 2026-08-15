@@ -46,7 +46,13 @@ describe('AnalyticsService', () => {
       $queryRaw: jest.fn().mockResolvedValue([]),
     };
 
-    service = new AnalyticsService(mockDb as DatabaseService, mockClickhouse);
+    service = new AnalyticsService(
+      mockDb as DatabaseService,
+      mockClickhouse,
+      // Pass-through leader lock — see cron-leader.service.spec.ts for the
+      // election itself and cluster-cron-policy.spec.ts for the wiring assertion.
+      { runExclusive: (_n: string, fn: () => Promise<void>) => fn() } as any,
+    );
   });
 
   it('should be defined', () => {

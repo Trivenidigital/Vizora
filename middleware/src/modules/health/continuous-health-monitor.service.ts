@@ -106,6 +106,15 @@ export class ContinuousHealthMonitorService {
   // -----------------------------------------------------------------------
   // Scheduled check — every 5 minutes
   // -----------------------------------------------------------------------
+  // MUST run in EVERY instance — do NOT leader-lock this one.
+  // It probes THIS worker (its own event loop, its own connections) and stores
+  // the result in per-instance in-memory state that only this worker's
+  // /health endpoints can serve. Under a leader lock the loser would never
+  // populate its own state, so whichever worker the load balancer routed a
+  // health read to would answer from a permanently empty/stale buffer — and the
+  // one instance that actually crashed is the one that would stop reporting it.
+  // A double-fire here is not a bug; it is two independent probes of two
+  // independent processes, which is the point.
   @Cron(CronExpression.EVERY_5_MINUTES)
   async runHealthCheck(): Promise<ContinuousHealthResult> {
     const [api_latency, database, redis, error_rate, notification_latency, ssl] =

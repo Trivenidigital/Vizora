@@ -10,6 +10,7 @@ import { UpdateTemplateDto } from './dto/update-template.dto';
 import { PreviewTemplateDto } from './dto/preview-template.dto';
 import { BulkUpdateDto, BulkArchiveDto, BulkRestoreDto, BulkDeleteDto, BulkTagDto, BulkDurationDto } from './dto/bulk-operations.dto';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
+import { CronLeaderService } from '../common/services/cron-leader.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { TemplateRenderingService } from './template-rendering.service';
 import { CreateLayoutDto, LayoutZoneDto } from './dto/create-layout.dto';
@@ -83,6 +84,7 @@ export class ContentService {
     private readonly storageService: StorageService,
     private readonly eventEmitter: EventEmitter2,
     private readonly notificationsService: NotificationsService,
+    private readonly cronLeader: CronLeaderService,
   ) {}
 
   // Map database content to API response format
@@ -649,8 +651,36 @@ export class ContentService {
   // CONTENT EXPIRATION
   // ============================================================================
 
+  /**
+   * LEADER-LOCKED. A double-fire cannot corrupt: the second runner's inner
+   * `playlistItem.findMany` comes back empty (the first run already repointed or
+   * deleted those rows) so no second version bump happens, and in the genuinely
+   * concurrent case both bump `playlist.updatedAt`, which is monotonic and
+   * therefore safe against the vizora-tv `>` gate.
+   *
+   * It is wrapped because it is wasteful-but-real-work — the same profile as
+   * data-retention and the analytics cleanup: a redundant identical fleet push to
+   * every device plus a duplicate `content.expired` emit, every hour. The
+   * mid-run-loss tradeoff is accepted here because the cron is hourly, so a lost
+   * run costs at most an hour of expiry latency (see K18 in backlog.md).
+   *
+   * Returns what THIS instance did. A skipped (non-leader) tick reports
+   * `{processed: 0, playlistsRefreshed: 0}`, which is INDISTINGUISHABLE from
+   * "this instance was the leader and nothing was due" — so do not treat a zero
+   * as evidence that no content expired anywhere. Any caller that needs
+   * "did the sweep happen" must ask the leader-lock logs, not this value.
+   */
   @Cron(CronExpression.EVERY_HOUR)
   async checkExpiredContent() {
+    let outcome = { processed: 0, playlistsRefreshed: 0 };
+    await this.cronLeader.runExclusive('content-expiration', async () => {
+      outcome = await this.expireDueContent();
+    });
+    return outcome;
+  }
+
+  /** The actual expiry sweep. Split out so the cron entry point can leader-lock it. */
+  private async expireDueContent(): Promise<{ processed: number; playlistsRefreshed: number }> {
     const now = new Date();
 
     // Find all expired content that is still active

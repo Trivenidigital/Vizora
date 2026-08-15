@@ -10,6 +10,7 @@ import { SubscriptionActiveGuard } from './guards/subscription-active.guard';
 import { DatabaseService } from '../database/database.service';
 import { MailModule } from '../mail/mail.module';
 import { RedisModule } from '../redis/redis.module';
+import { CommonModule } from '../common/common.module';
 import { DisplayGroupsModule } from '../display-groups/display-groups.module';
 import { DisplayGroupsController } from '../display-groups/display-groups.controller';
 import { FoldersModule } from '../folders/folders.module';
@@ -114,7 +115,10 @@ describe('dashboard subscription write gates', () => {
       };
 
       const moduleRef = await Test.createTestingModule({
-        imports: [MailModule, RedisModule, moduleType],
+        // CommonModule is @Global and supplies CronLeaderService, which
+        // BillingLifecycleService (pulled in transitively by BillingModule) now
+        // depends on — same reason RedisModule is listed here.
+        imports: [MailModule, RedisModule, CommonModule, moduleType],
       })
         .overrideProvider(DatabaseService)
         .useValue(databaseService)

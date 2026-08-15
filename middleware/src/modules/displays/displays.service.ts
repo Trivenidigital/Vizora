@@ -305,6 +305,13 @@ export class DisplaysService {
    * cron and the realtime health read (HeartbeatService.getDeviceHealth) agree
    * on when a device is offline — see that constant for the value rationale.
    */
+  // Deliberately NOT leader-locked: both the write and the fan-out are already
+  // safe under a cluster double-fire. The write is an idempotent `updateMany`
+  // setting status to a constant, and the duplicate `device.offline` event is
+  // absorbed downstream by `AlertRulesService.tryClaimDedupWindow` — an atomic
+  // updateMany on lastFiredAt plus a P2002 catch on the unique index — so only
+  // one instance's event produces a customer email. Wrapping this every-minute
+  // cron would put a Redis round-trip on a hot path for no behavioural gain.
   @Cron(CronExpression.EVERY_MINUTE)
   async detectOfflineDevices(): Promise<void> {
     const threshold = new Date(Date.now() - DEVICE_OFFLINE_THRESHOLD_MS);
@@ -352,6 +359,9 @@ export class DisplaysService {
    * operator action and the cost of a 30-60min delay on cleanup is
    * trivial.
    */
+  // Deliberately NOT leader-locked: idempotent `updateMany` to a constant status
+  // and — unlike detectOfflineDevices — it emits no event at all, so a double-fire
+  // has no observable effect beyond a duplicated log line.
   @Cron(CronExpression.EVERY_HOUR)
   async resetStalePairingDevices(): Promise<void> {
     const threshold = new Date(Date.now() - 30 * 60 * 1000); // 30 minutes ago

@@ -3,6 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { RedisService } from '../redis/redis.service';
 import { DatabaseService } from '../database/database.service';
+import { CronLeaderService } from '../common/services/cron-leader.service';
 
 /**
  * Tier 2 — Event-Driven Validation Monitor
@@ -56,6 +57,7 @@ export class ValidationMonitorService {
 
   constructor(
     private readonly db: DatabaseService,
+    private readonly cronLeader: CronLeaderService,
     @Optional() private readonly redis?: RedisService,
   ) {}
 
@@ -83,8 +85,20 @@ export class ValidationMonitorService {
 
   // ─── Scheduled Full Scan (Fallback) ──────────────────────────────────────
 
+  // LEADER-LOCKED. Not for correctness — the scan writes only a Redis snapshot,
+  // last-writer-wins on identical data — but for cost. Each run walks up to 50
+  // orgs and issues four findMany(take: 500) per org, so the double-fire was
+  // ~400 unnecessary queries every hour against live tables. Locking halves real
+  // DB load for no behavioural change.
   @Cron(CronExpression.EVERY_HOUR)
   async handleHourlyValidation() {
+    await this.cronLeader.runExclusive('health-hourly-validation', () =>
+      this.runHourlyScan(),
+    );
+  }
+
+  /** The actual scan. Split out so the cron entry point can leader-lock it. */
+  private async runHourlyScan(): Promise<void> {
     this.logger.log('Running hourly full validation scan');
     try {
       // Get all orgs with active content

@@ -45,8 +45,19 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
       // Set up event handlers
       this.client.on('connect', () => {
+        // NB: 'connect' means the SOCKET is up — NOT that Redis can serve
+        // commands. A replica replaying a large RDB/AOF answers -LOADING, and
+        // commands sent in that window hang or fail. `isConnected` therefore
+        // flips on 'ready' (below), which with `enableReadyCheck: true` fires
+        // only after ioredis has confirmed the server is out of LOADING.
+        // `isAvailable()` is consumed as "safe to issue a command" (e.g. the
+        // cron leader lock), so this distinction is load-bearing.
+        this.logger.log('Redis socket connected');
+      });
+
+      this.client.on('ready', () => {
         this.isConnected = true;
-        this.logger.log('✅ Redis connected successfully');
+        this.logger.log('✅ Redis ready (accepting commands)');
       });
 
       this.client.on('error', (error) => {

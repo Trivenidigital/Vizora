@@ -32,7 +32,8 @@ describe('ContentService — Approval pipeline (O10)', () => {
     notifications = { create: jest.fn() };
 
     // ContentService(db, templateRendering, dataSourceRegistry,
-    //                storageQuota, storage, eventEmitter, notifications)
+    //                storageQuota, storage, eventEmitter, notifications,
+    //                cronLeader)
     service = new ContentService(
       db,
       null as any,        // templateRendering
@@ -41,6 +42,11 @@ describe('ContentService — Approval pipeline (O10)', () => {
       null as any,        // storage
       events,             // eventEmitter
       notifications,      // notifications
+      // Pass-through leader lock. Supplied explicitly rather than left off the
+      // end: ts-jest runs with diagnostics off, so a missing argument compiles
+      // and leaves `cronLeader` undefined — the next test to touch a
+      // leader-locked path would then fail on an unrelated TypeError.
+      { runExclusive: (_n: string, fn: () => Promise<void>) => fn() } as any,
     );
   });
 

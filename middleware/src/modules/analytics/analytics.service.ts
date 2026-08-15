@@ -20,6 +20,7 @@ import type {
   UptimeSummaryDevice,
   ExportAnalyticsResult,
 } from './dto/analytics-response.dto';
+import { CronLeaderService } from '../common/services/cron-leader.service';
 
 @Injectable()
 export class AnalyticsService {
@@ -28,6 +29,7 @@ export class AnalyticsService {
   constructor(
     private readonly db: DatabaseService,
     private readonly clickhouse: ClickHouseService,
+    private readonly cronLeader: CronLeaderService,
   ) {}
 
   private getRangeDays(range: string): number {
@@ -589,9 +591,23 @@ export class AnalyticsService {
 
   /**
    * Cleanup old impressions (older than 90 days) - runs daily at 2 AM
+   *
+   * LEADER-LOCKED. The batched delete loop is idempotent, but two instances
+   * running it concurrently interleave their `findMany`/`deleteMany` pairs on the
+   * same rows: the loser's deleteMany matches fewer rows than it selected, so
+   * `batchDeleted === batchSize` goes false early and the loop exits with work
+   * left behind — while both instances hammer content_impressions, the largest
+   * table in the schema.
    */
   @Cron('0 2 * * *')
   async cleanupOldImpressions() {
+    await this.cronLeader.runExclusive('analytics-cleanup-impressions', () =>
+      this.purgeOldImpressions(),
+    );
+  }
+
+  /** The actual batched purge. Split out so the cron entry point can leader-lock it. */
+  private async purgeOldImpressions(): Promise<void> {
     const ninetyDaysAgo = new Date();
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 

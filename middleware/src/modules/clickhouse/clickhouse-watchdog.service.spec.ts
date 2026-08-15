@@ -15,7 +15,15 @@ describe('ClickHouseWatchdogService (§12a freshness watchdog)', () => {
       isEnabled: true,
       getLatestSampleTime: jest.fn().mockResolvedValue({ available: true, lastSample: new Date() }),
     };
-    service = new ClickHouseWatchdogService(mockDb as any, mockClickhouse as any);
+    service = new ClickHouseWatchdogService(
+      mockDb as any,
+      mockClickhouse as any,
+      // Pass-through leader lock: these tests assert watchdog behaviour, not
+      // cluster election. The election itself is covered in
+      // cron-leader.service.spec.ts, and the fact that this cron IS wrapped is
+      // covered by the leader-lock wiring test in cluster-cron-policy.spec.ts.
+      { runExclusive: (_n: string, fn: () => Promise<void>) => fn() } as any,
+    );
     // The alert path logs at error level before hitting Sentry (which is absent
     // in unit tests) — assert on the log as the observable alert signal.
     errorSpy = jest.spyOn((service as any).logger, 'error').mockImplementation(() => undefined);
