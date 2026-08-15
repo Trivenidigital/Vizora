@@ -62,6 +62,14 @@ export type EnvMap = Record<string, string>;
 
 export type ServiceName = 'middleware' | 'realtime' | 'web';
 
+/**
+ * What a finding is ABOUT. Wider than `ServiceName` because the ops-agent
+ * credential control (below) covers the credentialed `ops-*` cron agents, which
+ * are not one of the three application services and must not be reported as if
+ * they were.
+ */
+export type DriftScope = ServiceName | typeof OPS_AGENT_SCOPE;
+
 /** Drift severity classes from design §7. */
 export type DriftClass = 'CRITICAL' | 'HIGH' | 'WARNING';
 
@@ -227,7 +235,7 @@ export function assessStability(
 export interface DriftFinding {
   driftClass: DriftClass;
   type: string;
-  service: ServiceName;
+  service: DriftScope;
   /** Stable across runs — drives incident dedup via `makeIncidentId`. */
   targetId: string;
   message: string;
@@ -330,6 +338,13 @@ const SECRET_KEYS = [
 
 /** Pool/tuning params carried in `DATABASE_URL`'s query string. */
 const POOL_PARAMS = ['connection_limit', 'pool_timeout', 'statement_timeout'] as const;
+
+/**
+ * Incident scope for the ops-agent credential control. Its own scope — not
+ * `global` — so it resolves on its own evidence rather than waiting for all
+ * three services to be fully evaluated.
+ */
+export const OPS_AGENT_SCOPE = 'ops-agents';
 
 /**
  * Boot-time required variables, transcribed from the actual validators —
@@ -1311,6 +1326,153 @@ function detectBudgetFindings(
       verdict === 'UNSAFE'
         ? 'Lower connection_limit per service or raise the server max_connections. Do not restart until resolved.'
         : 'Restore the read-only max_connections query (or the missing connection_limit) so the budget can be evaluated. Absence of a problem was NOT established.',
+  }];
+}
+
+// ─── Ops-agent credentials (2026-08-15 incident) ────────────────────────────
+
+/**
+ * The credential pair the four credentialed ops agents actually resolve, as
+ * they resolve it.
+ *
+ * `fleet-manager.ts:111`, `schedule-doctor.ts:72`, `content-lifecycle.ts:440`
+ * and `ops-reporter.ts:276` all read
+ * `process.env.OPS_EMAIL || process.env.VALIDATOR_EMAIL || ''` (and the same for
+ * the password) and treat a falsy result as FATAL. The `|| undefined` tail
+ * reproduces that exactly: an EMPTY value falls through to the fallback
+ * variable, and a pair that is empty on both ends is absent, not present —
+ * matching the production predicate rather than a convenient approximation.
+ */
+function resolveOpsCredentialPair(env: EnvMap): { email?: string; password?: string } {
+  return {
+    email: env.OPS_EMAIL || env.VALIDATOR_EMAIL || undefined,
+    password: env.OPS_PASSWORD || env.VALIDATOR_PASSWORD || undefined,
+  };
+}
+
+/**
+ * **The ops agents' own credentials** — same PM2-shadow class as the service
+ * checks above, on a surface the three-service scope cannot see.
+ *
+ * Observed on prod 2026-08-15: `/opt/vizora/app/.env` held a
+ * VALIDATOR_EMAIL/VALIDATOR_PASSWORD pair that 401s against the database, while
+ * the running ops agents authenticated fine because PM2's stored env carried a
+ * different, working pair. `import 'dotenv/config'` never overwrites a variable
+ * already present in `process.env`, so the PM2-injected values shadowed the file
+ * on every cron firing. A cold start consuming `.env` fresh would have FATAL'd
+ * all four credentialed agents at once — fleet-manager, schedule-doctor,
+ * content-lifecycle and ops-reporter — and nothing would have said so, because
+ * the hourly detector's scope was the three application services only.
+ *
+ * Two sides, resolved independently and each with the agents' own fallback
+ * order:
+ *
+ *   runtime  `resolvePrecedence(pm2Stored, dotenv)` — PM2 wins, as it does live.
+ *   restart  dotenv alone — the cold-start path that assumes no PM2 stored env.
+ *
+ * Sampled from ONE credentialed agent (`ops-fleet-manager`). All four resolve
+ * the identical expression from the identical environment, so four findings
+ * would be one root cause reported four times.
+ *
+ * Both components are treated as SECRETS: the email is an account identifier
+ * and the password obviously so. They are compared through
+ * `compareSecretValues` and only the MATCH/DRIFT verdict tokens — never a value,
+ * hash, length or fingerprint — reach the finding.
+ *
+ * `pm2StoredEnv === null` means the agent's PM2 entry could not be read at all.
+ * That is reported as unobservable rather than silently passed: absence of a
+ * finding must never be manufactured from an absence of evidence.
+ */
+export function analyzeOpsAgentCredentialDrift(
+  pm2StoredEnv: EnvMap | null,
+  rootDotenv: EnvMap | null,
+): DriftFinding[] {
+  if (pm2StoredEnv === null) {
+    return [{
+      driftClass: 'WARNING',
+      type: 'ops-credentials-unobservable',
+      service: OPS_AGENT_SCOPE,
+      targetId: `${OPS_AGENT_SCOPE}:observability`,
+      message:
+        'cannot determine ops-agent credential drift — the PM2 stored environment for ' +
+        'ops-fleet-manager could not be read. Absence of drift was NOT established.',
+      remediation:
+        'Check `pm2 jlist` succeeds for the user running this agent and that the ' +
+        'ops-fleet-manager entry exists. ' + NO_REPAIR,
+    }];
+  }
+
+  // The cron agents run from the repo root, so the repo-root `.env` is the file
+  // their `import 'dotenv/config'` loads — and the one a cold start would use.
+  const runtime = resolveOpsCredentialPair(resolvePrecedence(pm2StoredEnv, rootDotenv));
+  const restart = resolveOpsCredentialPair(rootDotenv ?? {});
+
+  const runtimeHasPair = runtime.email !== undefined && runtime.password !== undefined;
+  const restartHasPair = restart.email !== undefined && restart.password !== undefined;
+
+  if (!runtimeHasPair && !restartHasPair) {
+    return [{
+      driftClass: 'CRITICAL',
+      type: 'ops-credentials-absent',
+      service: OPS_AGENT_SCOPE,
+      targetId: `${OPS_AGENT_SCOPE}:credentials`,
+      message:
+        'the credentialed ops agents (fleet-manager, schedule-doctor, content-lifecycle, ' +
+        'ops-reporter) resolve no OPS_EMAIL/OPS_PASSWORD (or VALIDATOR_* fallback) pair on ' +
+        'EITHER path — neither the running PM2 environment nor the persisted .env. They ' +
+        'cannot authenticate at all.',
+      remediation: NO_REPAIR,
+    }];
+  }
+
+  if (!restartHasPair) {
+    return [{
+      driftClass: 'HIGH',
+      type: 'config-shadow',
+      service: OPS_AGENT_SCOPE,
+      targetId: `${OPS_AGENT_SCOPE}:credentials`,
+      message:
+        'the credentialed ops agents authenticate with a credential pair the persisted config ' +
+        'cannot reproduce: the running PM2 environment resolves an OPS_EMAIL/OPS_PASSWORD (or ' +
+        'VALIDATOR_* fallback) pair, the persisted .env resolves NO pair at all. A cold start ' +
+        'consuming .env fresh would FATAL every credentialed ops agent — fleet-manager, ' +
+        'schedule-doctor, content-lifecycle and ops-reporter.',
+      remediation: NO_REPAIR,
+    }];
+  }
+
+  if (!runtimeHasPair) {
+    return [{
+      driftClass: 'HIGH',
+      type: 'config-shadow',
+      service: OPS_AGENT_SCOPE,
+      targetId: `${OPS_AGENT_SCOPE}:credentials`,
+      message:
+        'the persisted .env resolves an OPS_EMAIL/OPS_PASSWORD (or VALIDATOR_* fallback) pair ' +
+        'but the running PM2 environment resolves NO pair — a PM2-injected empty value shadows ' +
+        'the file, so the credentialed ops agents are FATALing on every firing while the ' +
+        'persisted config looks correct.',
+      remediation: NO_REPAIR,
+    }];
+  }
+
+  const emailVerdict = compareSecretValues(runtime.email, restart.email);
+  const passwordVerdict = compareSecretValues(runtime.password, restart.password);
+  if (emailVerdict === 'MATCH' && passwordVerdict === 'MATCH') return [];
+
+  return [{
+    driftClass: 'HIGH',
+    type: 'config-shadow',
+    service: OPS_AGENT_SCOPE,
+    targetId: `${OPS_AGENT_SCOPE}:credentials`,
+    message:
+      'the credentialed ops agents authenticate with a credential the persisted config cannot ' +
+      `reproduce — email: ${emailVerdict}, password: ${passwordVerdict} between the running PM2 ` +
+      'environment and the persisted .env. The running values come from a higher-precedence ' +
+      'layer (PM2 stored env; dotenv never overwrites an already-set variable), so a cold start ' +
+      'consuming .env fresh would FATAL every credentialed ops agent — fleet-manager, ' +
+      'schedule-doctor, content-lifecycle and ops-reporter.',
+    remediation: NO_REPAIR,
   }];
 }
 

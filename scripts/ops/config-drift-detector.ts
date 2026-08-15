@@ -13,6 +13,12 @@
  * Design + ruling: docs/plans/2026-08-12-config-drift-detection-design.md
  * Comparison core: lib/config-drift.ts (pure, separately unit-tested)
  *
+ * Beyond the three application services it also runs ONE separate small control:
+ * the credentialed ops agents' own login pair, comparing what PM2's stored env
+ * resolves against what the persisted `.env` alone would (2026-08-15 incident —
+ * a working PM2-injected pair shadowed a `.env` pair that 401s, so a cold start
+ * would have FATAL'd all four credentialed ops agents with nothing reporting it).
+ *
  * ─── What this agent does NOT do ────────────────────────────────────────────
  *
  *   - never repairs anything (`issuesFixed` is 0 by design)
@@ -50,8 +56,10 @@ import type { AgentResult, Incident } from './lib/types.js';
 import {
   AGENT,
   BUILD_TIME_EXCLUSION,
+  OPS_AGENT_SCOPE,
   buildMaxConnectionsCandidates,
   analyzeDrift,
+  analyzeOpsAgentCredentialDrift,
   findingsToIncidents,
   assessStability,
   parseProcEnviron,
@@ -85,6 +93,16 @@ const PM2_NAME_BY_SERVICE: Record<ServiceName, string> = {
 };
 
 const SERVICES: ServiceName[] = ['middleware', 'realtime', 'web'];
+
+/**
+ * The credentialed ops agent sampled for the credential control.
+ *
+ * All four credentialed agents resolve the identical expression from the
+ * identical environment, so one sample answers for all of them. This one is a
+ * cron app and is USUALLY `stopped` between firings — `pm2_env` is readable
+ * either way, so the sample deliberately does not require a live pid.
+ */
+const OPS_CREDENTIALED_PM2_NAME = 'ops-fleet-manager';
 
 const PM2_TIMEOUT_MS = 15_000;
 
@@ -266,6 +284,13 @@ export interface Collection {
   notes: string[];
   /** Effective DATABASE_URL used for the max_connections query, if any. */
   databaseUrl?: string;
+  /**
+   * PM2's stored env for the sampled credentialed ops agent, or `null` when its
+   * PM2 entry could not be read — which is reported, never read as agreement.
+   */
+  opsAgentPm2Env: EnvMap | null;
+  /** Repo-root `.env` — the file the ops cron agents load. `null` when absent. */
+  rootDotenv: EnvMap | null;
 }
 
 function collect(): Collection {
@@ -349,7 +374,23 @@ function collect(): Collection {
     }
   }
 
-  return { observations, notes, databaseUrl };
+  // Ops-agent credential control. The ops cron entries declare no `cwd`, so PM2
+  // runs them from the ecosystem file's directory — the repo root — which is
+  // where their `import 'dotenv/config'` looks. An explicit `cwd` is honoured if
+  // one is ever added, rather than assumed away.
+  const opsApp = apps.find(a => a.name === OPS_CREDENTIALED_PM2_NAME);
+  const opsProcess = processes.find(p => p.name === OPS_CREDENTIALED_PM2_NAME);
+  if (!opsProcess) {
+    notes.push(`ops credentials: no PM2 process named ${OPS_CREDENTIALED_PM2_NAME}`);
+  }
+  // An EMPTY stored env is unobservable, not "nothing configured" — the same
+  // rule `analyzeDrift` applies to a service's pm2Env.
+  const sampledOpsEnv = toEnvMap(opsProcess?.pm2_env);
+  const opsAgentPm2Env = Object.keys(sampledOpsEnv).length > 0 ? sampledOpsEnv : null;
+  const opsCwd = opsApp?.cwd ? resolve(REPO_ROOT, opsApp.cwd) : REPO_ROOT;
+  const rootDotenv = readServiceDotenv(opsCwd);
+
+  return { observations, notes, databaseUrl, opsAgentPm2Env, rootDotenv };
 }
 
 // ─── Run ────────────────────────────────────────────────────────────────────
@@ -368,7 +409,17 @@ export function runDetection(collection: Collection, maxConnections: number | nu
   const started = Date.now();
   const detectedAt = new Date().toISOString();
 
-  const { findings, evaluated } = analyzeDrift(collection.observations, { maxConnections });
+  const { findings: serviceFindings, evaluated } = analyzeDrift(collection.observations, { maxConnections });
+
+  // Separate small control, on a surface the three-service scope cannot see:
+  // the credentialed ops agents' own login pair (2026-08-15 incident).
+  const opsFindings = analyzeOpsAgentCredentialDrift(collection.opsAgentPm2Env, collection.rootDotenv);
+  const findings = [...serviceFindings, ...opsFindings];
+
+  // The ops scope is evaluated — and so may CLEAR a stale finding — only when
+  // the runtime side was actually readable.
+  if (collection.opsAgentPm2Env !== null) evaluated.push(OPS_AGENT_SCOPE);
+
   const incidents = findingsToIncidents(findings, detectedAt);
 
   return {

@@ -325,6 +325,7 @@ all historical alerts), and exact length (leaks meaningfully for short secrets).
 > DB / Redis / MinIO             INCLUDED
 > production URLs / CORS         INCLUDED
 > pool parameters / budget       INCLUDED
+> ops-agent credentials          INCLUDED — added 2026-08-15, see below
 > NEXT_PUBLIC build-time intent  EXCLUDED — awaiting B2 build manifest
 > ```
 >
@@ -508,6 +509,24 @@ being incidental.
 
 4. **Scope of services.** middleware, realtime, web are in scope. The 7 ops agents
    and the Hermes runtime also read `.env` — out of scope for v1, worth noting.
+
+   **PARTIALLY SUPERSEDED 2026-08-15.** The ops agents' *credentials* are now in
+   scope as one separate small control — `analyzeOpsAgentCredentialDrift` in
+   `lib/config-drift.ts`, wired in `runDetection`, incident scope `ops-agents`.
+   Trigger: prod's `/opt/vizora/app/.env` held a VALIDATOR_EMAIL/VALIDATOR_PASSWORD
+   pair that 401s while the running agents authenticated fine on a different,
+   working pair carried in PM2's stored env — `import 'dotenv/config'` never
+   overwrites an already-set variable, so the PM2 values shadowed the file. Same
+   config-shadow class as realtime's `PORT`, on a surface the three-service scope
+   could not see; a cold start would have FATAL'd all four credentialed agents
+   (fleet-manager, schedule-doctor, content-lifecycle, ops-reporter) at once.
+
+   The control samples ONE credentialed agent (`ops-fleet-manager`) — a cron app,
+   usually `stopped`, whose `pm2_env` is readable without a live pid — and
+   resolves `OPS_* || VALIDATOR_*` exactly as the agents do, on each side
+   independently. Email and password are BOTH treated as secrets; only MATCH/DRIFT
+   verdict tokens reach a finding. The rest of the ops-agent config surface, and
+   the Hermes runtime, remain out of scope.
 
 5. **Build-artifact grep brittleness.** §5's approach depends on the origin
    appearing as a literal in the bundle. Minification currently preserves it;

@@ -16,7 +16,9 @@ import test from 'node:test';
 import {
   BUILD_TIME_EXCLUSION,
   DRIFT_CLASS_TO_SEVERITY,
+  OPS_AGENT_SCOPE,
   analyzeDrift,
+  analyzeOpsAgentCredentialDrift,
   assessStability,
   incidentScope,
   resolveClearedFindings,
@@ -1114,4 +1116,191 @@ test('detectDrift is pure: it does not mutate the observations it is given', () 
   const before = JSON.stringify(obs);
   findingsFor([obs]);
   assert.equal(JSON.stringify(obs), before);
+});
+
+// ─── Ops-agent credentials (2026-08-15 incident) ─────────────────────────────
+
+/**
+ * The prod incident's exact shape: PM2's stored env carried a WORKING credential
+ * pair while `/opt/vizora/app/.env` held one that 401s. dotenv never overwrites
+ * an already-set variable, so the running agents authenticated fine and a cold
+ * start would have FATAL'd all four credentialed ops agents at once.
+ *
+ * Canary values, asserted never to reach any finding.
+ */
+const OPS_EMAIL_LIVE = 'OPSEMAIL-do-not-leak-live@vizora.test';
+const OPS_EMAIL_STALE = 'OPSEMAIL-do-not-leak-stale@vizora.test';
+const OPS_PW_LIVE = 'OPSPW-do-not-leak-live-4d5e';
+const OPS_PW_STALE = 'OPSPW-do-not-leak-stale-6f7a';
+
+const OPS_CANARIES = [OPS_EMAIL_LIVE, OPS_EMAIL_STALE, OPS_PW_LIVE, OPS_PW_STALE];
+
+test('ops credentials: both sides resolve the same pair — no finding', () => {
+  const env: EnvMap = { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE };
+  assert.deepEqual(analyzeOpsAgentCredentialDrift({ ...env }, { ...env }), []);
+});
+
+test('ops credentials: password differs between PM2 and .env — HIGH', () => {
+  // Expressed through the VALIDATOR_* fallback, which is the pair prod actually
+  // had set on 2026-08-15.
+  const findings = analyzeOpsAgentCredentialDrift(
+    { VALIDATOR_EMAIL: OPS_EMAIL_LIVE, VALIDATOR_PASSWORD: OPS_PW_LIVE },
+    { VALIDATOR_EMAIL: OPS_EMAIL_LIVE, VALIDATOR_PASSWORD: OPS_PW_STALE },
+  );
+  assert.equal(findings.length, 1, `expected one finding, got ${types(findings)}`);
+  assert.equal(findings[0].driftClass, 'HIGH');
+  assert.equal(findings[0].type, 'config-shadow');
+  assert.match(findings[0].message, /email: MATCH/);
+  assert.match(findings[0].message, /password: DRIFT/);
+});
+
+test('ops credentials: email differs between PM2 and .env — HIGH', () => {
+  const findings = analyzeOpsAgentCredentialDrift(
+    { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
+    { OPS_EMAIL: OPS_EMAIL_STALE, OPS_PASSWORD: OPS_PW_LIVE },
+  );
+  assert.equal(findings.length, 1, `expected one finding, got ${types(findings)}`);
+  assert.equal(findings[0].driftClass, 'HIGH');
+  assert.match(findings[0].message, /email: DRIFT/);
+  assert.match(findings[0].message, /password: MATCH/);
+});
+
+test('ops credentials: .env resolves no pair while PM2 does — HIGH', () => {
+  // A cold start consuming .env fresh FATALs every credentialed ops agent.
+  const findings = analyzeOpsAgentCredentialDrift(
+    { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
+    { OPS_EMAIL: OPS_EMAIL_LIVE },
+  );
+  assert.equal(findings.length, 1, `expected one finding, got ${types(findings)}`);
+  assert.equal(findings[0].driftClass, 'HIGH');
+  assert.match(findings[0].message, /NO pair at all/);
+});
+
+test('ops credentials: a missing .env entirely is the same HIGH, not silence', () => {
+  const findings = analyzeOpsAgentCredentialDrift(
+    { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
+    null,
+  );
+  assert.equal(findings.length, 1, `expected one finding, got ${types(findings)}`);
+  assert.equal(findings[0].driftClass, 'HIGH');
+});
+
+test('ops credentials: neither side resolves a pair — CRITICAL', () => {
+  const findings = analyzeOpsAgentCredentialDrift({ NODE_ENV: 'production' }, { NODE_ENV: 'production' });
+  assert.equal(findings.length, 1, `expected one finding, got ${types(findings)}`);
+  assert.equal(findings[0].driftClass, 'CRITICAL');
+  assert.equal(findings[0].type, 'ops-credentials-absent');
+});
+
+test('ops credentials: PM2 shadowing the .env pair with an empty value — HIGH', () => {
+  // The inverse shadow: PM2 injects an EMPTY OPS_EMAIL, which wins over the
+  // file. The agents' `|| ''` chain then falls through to an absent
+  // VALIDATOR_EMAIL and they FATAL on every firing while .env looks correct.
+  const findings = analyzeOpsAgentCredentialDrift(
+    { OPS_EMAIL: '', OPS_PASSWORD: OPS_PW_LIVE },
+    { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
+  );
+  assert.equal(findings.length, 1, `expected one finding, got ${types(findings)}`);
+  assert.equal(findings[0].driftClass, 'HIGH');
+  assert.match(findings[0].message, /shadows/);
+});
+
+test('ops credentials: OPS_* beats VALIDATOR_* on the RUNTIME side independently', () => {
+  // PM2 carries both pairs; the agents read OPS_* first. If the fallback order
+  // were inverted here, runtime would resolve the stale pair and this would
+  // report drift.
+  const findings = analyzeOpsAgentCredentialDrift(
+    {
+      OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE,
+      VALIDATOR_EMAIL: OPS_EMAIL_STALE, VALIDATOR_PASSWORD: OPS_PW_STALE,
+    },
+    { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
+  );
+  assert.deepEqual(findings, [], `expected no finding, got ${JSON.stringify(findings, null, 2)}`);
+});
+
+test('ops credentials: OPS_* beats VALIDATOR_* on the RESTART side independently', () => {
+  // Same proof for the cold-start side, which resolves from .env alone. PM2
+  // carries BOTH names at the LIVE value so the runtime side resolves the same
+  // pair under either fallback order — leaving the restart side as the only
+  // thing this case can be measuring.
+  const findings = analyzeOpsAgentCredentialDrift(
+    {
+      OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE,
+      VALIDATOR_EMAIL: OPS_EMAIL_LIVE, VALIDATOR_PASSWORD: OPS_PW_LIVE,
+    },
+    {
+      OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE,
+      VALIDATOR_EMAIL: OPS_EMAIL_STALE, VALIDATOR_PASSWORD: OPS_PW_STALE,
+    },
+  );
+  assert.deepEqual(findings, [], `expected no finding, got ${JSON.stringify(findings, null, 2)}`);
+});
+
+test('ops credentials: VALIDATOR_* is used when OPS_* is absent on one side only', () => {
+  // .env has only the VALIDATOR_* pair — the exact prod shape. Same values, so
+  // the fallback must resolve to a MATCH rather than a phantom drift.
+  const findings = analyzeOpsAgentCredentialDrift(
+    { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
+    { VALIDATOR_EMAIL: OPS_EMAIL_LIVE, VALIDATOR_PASSWORD: OPS_PW_LIVE },
+  );
+  assert.deepEqual(findings, [], `expected no finding, got ${JSON.stringify(findings, null, 2)}`);
+});
+
+test('ops credentials: an unreadable PM2 entry is reported, never read as agreement', () => {
+  const findings = analyzeOpsAgentCredentialDrift(null, { OPS_EMAIL: OPS_EMAIL_LIVE });
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].type, 'ops-credentials-unobservable');
+  assert.equal(findings[0].driftClass, 'WARNING');
+  assert.match(findings[0].message, /NOT established/);
+});
+
+test('ops credentials: findings carry their own resolvable scope', () => {
+  const findings = analyzeOpsAgentCredentialDrift(
+    { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
+    { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_STALE },
+  );
+  assert.equal(findings[0].service, OPS_AGENT_SCOPE);
+  assert.equal(incidentScope(findings[0].targetId), OPS_AGENT_SCOPE);
+
+  // A cleared drift must resolve like any other finding.
+  const incidents = findingsToIncidents(findings, '2026-08-15T10:00:00.000Z');
+  const cleared = resolveClearedFindings(incidents, [], [OPS_AGENT_SCOPE], '2026-08-15T11:00:00.000Z');
+  assert.equal(cleared.length, 1);
+  assert.equal(cleared[0].status, 'resolved');
+
+  // ...and must NOT resolve on a run that did not cover the ops scope.
+  assert.deepEqual(
+    resolveClearedFindings(incidents, [], ['middleware', 'realtime', 'web', 'global'], '2026-08-15T11:00:00.000Z'),
+    [],
+    'absence of drift was not established for a scope the run never evaluated',
+  );
+});
+
+test('ops credentials: no credential VALUE appears in any finding', () => {
+  const everyShape = [
+    ...analyzeOpsAgentCredentialDrift(
+      { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
+      { OPS_EMAIL: OPS_EMAIL_STALE, OPS_PASSWORD: OPS_PW_STALE },
+    ),
+    ...analyzeOpsAgentCredentialDrift({ OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE }, {}),
+    ...analyzeOpsAgentCredentialDrift({}, {}),
+    ...analyzeOpsAgentCredentialDrift(null, { OPS_PASSWORD: OPS_PW_STALE }),
+  ];
+  const serialized = JSON.stringify(findingsToIncidents(everyShape, '2026-08-15T10:00:00.000Z'));
+
+  for (const canary of OPS_CANARIES) {
+    assert.ok(!serialized.includes(canary), `credential leaked into output: ${canary.slice(0, 12)}...`);
+  }
+  // Nor any digest fragment derived from one.
+  const hexRun = serialized.match(/\b[0-9a-f]{12,}\b/i);
+  assert.equal(hexRun, null, `derived token found in output: ${hexRun?.[0]}`);
+});
+
+test('ops credentials: the analysis does not mutate its inputs', () => {
+  const pm2: EnvMap = { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE };
+  const dotenv: EnvMap = { OPS_EMAIL: OPS_EMAIL_STALE };
+  const before = JSON.stringify([pm2, dotenv]);
+  analyzeOpsAgentCredentialDrift(pm2, dotenv);
+  assert.equal(JSON.stringify([pm2, dotenv]), before);
 });
