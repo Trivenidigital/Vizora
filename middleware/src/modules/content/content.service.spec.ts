@@ -11,6 +11,8 @@ import { ContentService, TemplateMetadata } from './content.service';
 import { DatabaseService } from '../database/database.service';
 import { TemplateRenderingService } from './template-rendering.service';
 import { DataSourceRegistryService } from './data-source-registry.service';
+import { CronLeaderService } from '../common/services/cron-leader.service';
+import { RedisService } from '../redis/redis.service';
 import { StorageQuotaService } from '../storage/storage-quota.service';
 import { CreateTemplateDto } from './dto/create-template.dto';
 
@@ -149,6 +151,9 @@ describe('ContentService', () => {
       mockStorageService,
       mockEventEmitter as any,
       mockNotificationsService as any,
+      // Pass-through leader lock — see cron-leader.service.spec.ts for the
+      // election itself and cluster-cron-policy.spec.ts for the wiring assertion.
+      { runExclusive: (_n: string, fn: () => Promise<void>) => fn() } as any,
     );
   });
 
@@ -2002,6 +2007,65 @@ describe('ContentService', () => {
           status: 'active',
         },
       });
+    });
+
+    // CALL-SITE test for the leader lock. cron-leader.service.spec.ts drives a
+    // bare fn and so cannot detect the wrapper being deleted from THIS method.
+    // Two instances = the two PM2 cluster workers, sharing one Redis.
+    it('runs once across two cluster instances firing the cron together', async () => {
+      const expired = {
+        ...mockContent,
+        id: 'exp-1',
+        organizationId: 'org-123',
+        expiresAt: new Date('2020-01-01'),
+        status: 'active',
+      };
+      mockDatabaseService.content.findMany.mockResolvedValue([expired]);
+      mockDatabaseService.playlistItem.findMany.mockResolvedValue([{ playlistId: 'pl-a' }]);
+      mockDatabaseService.playlistItem.deleteMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.content.update.mockResolvedValue({ status: 'expired' });
+
+      // SET NX EX over a Map — enough to arbitrate two racing instances.
+      const store = new Map<string, string>();
+      const sharedRedis = {
+        isAvailable: () => true,
+        getClient: () => ({
+          set: async (key: string, value: string) => {
+            if (store.has(key)) return null;
+            store.set(key, value);
+            return 'OK';
+          },
+        }),
+      } as unknown as RedisService;
+
+      const build = () => {
+        const leader = new CronLeaderService(sharedRedis);
+        jest.spyOn(leader['logger'], 'log').mockImplementation(() => undefined);
+        return new ContentService(
+          mockDatabaseService as DatabaseService,
+          mockTemplateRendering,
+          mockDataSourceRegistry,
+          mockStorageQuotaService,
+          mockStorageService,
+          mockEventEmitter as any,
+          { create: jest.fn().mockResolvedValue({}) } as any,
+          leader,
+        );
+      };
+
+      mockEventEmitter.emit.mockClear();
+      await Promise.all([build().checkExpiredContent(), build().checkExpiredContent()]);
+
+      // Once each, not twice. Remove the runExclusive wrapper and both become 2:
+      // a duplicate content.expired signal and a redundant identical fleet push.
+      const expiredEmits = mockEventEmitter.emit.mock.calls.filter(
+        (c: unknown[]) => c[0] === 'content.expired',
+      );
+      const pushEmits = mockEventEmitter.emit.mock.calls.filter(
+        (c: unknown[]) => c[0] === 'playlist.updated',
+      );
+      expect(expiredEmits).toHaveLength(1);
+      expect(pushEmits).toHaveLength(1);
     });
   });
 

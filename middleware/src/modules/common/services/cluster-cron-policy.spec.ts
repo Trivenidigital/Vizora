@@ -61,6 +61,13 @@ describe('cluster cron policy', () => {
       lockName: 'health-hourly-validation',
       why: '~400 redundant queries per hour against live tables',
     },
+    {
+      file: 'content/content.service.ts',
+      lockName: 'content-expiration',
+      why:
+        'a redundant identical fleet push to every device plus a duplicate content.expired emit ' +
+        'every hour — wasteful-but-real-work, the same profile as data-retention',
+    },
   ];
 
   describe.each(LEADER_LOCKED)('$file is leader-locked', ({ file, lockName, why }) => {

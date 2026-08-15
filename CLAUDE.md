@@ -146,12 +146,16 @@ exported by the `@Global` `CommonModule`) takes a per-cron Redis `SET NX EX` loc
 runs per tick. **Do NOT wrap every cron** — the decision is per-cron and both directions are
 enforced by a source-scan test (`common/services/cluster-cron-policy.spec.ts`).
 
-- **Leader-locked (6)**: `billing-lifecycle.handleTrialLifecycle` (trial reminder email has no
+- **Leader-locked (7)**: `billing-lifecycle.handleTrialLifecycle` (trial reminder email has no
   dedup at all — the only customer-visible double-fire), `template-refresh.processTemplateRefresh`
   (doubles outbound calls to customer data sources + OpenWeather quota every minute, and races on
   the `metadata` blob), `data-retention.runRetentionPolicy`, `analytics.cleanupOldImpressions`,
-  `clickhouse-watchdog.checkDeviceHealthFreshness` (duplicate Sentry alerts), and
-  `validation-monitor.handleHourlyValidation` (cost only — ~400 redundant queries/hour).
+  `clickhouse-watchdog.checkDeviceHealthFreshness` (duplicate Sentry alerts),
+  `validation-monitor.handleHourlyValidation` (cost only — ~400 redundant queries/hour), and
+  `content.checkExpiredContent` (cannot corrupt — the second runner's `playlistItem.findMany`
+  comes back empty, and concurrent `playlist.updatedAt` bumps are monotonic so the vizora-tv `>`
+  gate is safe — but it costs a redundant identical fleet push to every device plus a duplicate
+  `content.expired` emit every hour).
 - **Deliberately NOT locked** because something else already dedupes: `detectOfflineDevices` +
   `resetStalePairingDevices` (idempotent `updateMany`; the duplicate `device.offline` is absorbed
   by `AlertRulesService.tryClaimDedupWindow`), `handleGracePeriodExpiry` (the status-guarded CAS in
