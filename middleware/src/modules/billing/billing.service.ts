@@ -834,22 +834,22 @@ export class BillingService implements OnModuleInit {
         case 'subscription.updated':
         case 'subscription.activated':
         case 'subscription.charged':
-          await this.handleSubscriptionUpdated(provider, event.data);
+          await this.handleSubscriptionUpdated(provider, event.data, event.createdAt);
           break;
 
         case 'customer.subscription.deleted':
         case 'subscription.cancelled':
-          await this.handleSubscriptionCanceled(provider, event.data);
+          await this.handleSubscriptionCanceled(provider, event.data, event.createdAt);
           break;
 
         case 'invoice.payment_succeeded':
         case 'payment.captured':
-          await this.handlePaymentSucceeded(provider, event.data, event.id);
+          await this.handlePaymentSucceeded(provider, event.data, event.id, event.createdAt);
           break;
 
         case 'invoice.payment_failed':
         case 'payment.failed':
-          await this.handlePaymentFailed(provider, event.data);
+          await this.handlePaymentFailed(provider, event.data, event.createdAt);
           break;
 
         case 'checkout.session.completed':
@@ -1005,6 +1005,34 @@ export class BillingService implements OnModuleInit {
   private static readonly DUNNING_STATUSES = ['past_due', 'publish_locked', 'suspended'];
 
   /**
+   * Webhook ordering guard (B3-P4). True when this event was EMITTED BY THE
+   * PROVIDER before the newest billing event we have already applied.
+   *
+   * Neither Stripe nor Razorpay guarantees delivery order, and both retry, so a
+   * stale `basic` activation can land after a `pro` upgrade and silently
+   * downgrade a paying customer. Equal timestamps pass: provider timestamps have
+   * one-second resolution, two events can share a second, and tier writes are
+   * idempotent — so equality must not drop the second one.
+   *
+   * Callers must apply this to ENTITLEMENT writes only. billing_transactions is
+   * an append-only audit log and is never suppressed by ordering.
+   */
+  private isStaleBillingEvent(
+    org: { id: string; billingEventAt: Date | null },
+    eventAt: Date | undefined,
+    context: string,
+  ): boolean {
+    if (!eventAt || !org.billingEventAt) return false;
+    if (eventAt.getTime() >= org.billingEventAt.getTime()) return false;
+    this.logger.warn(
+      `Skipping ${context} entitlement write for org ${org.id}: event emitted ` +
+        `${eventAt.toISOString()} is older than the applied mark ` +
+        `${org.billingEventAt.toISOString()} (out-of-order delivery)`,
+    );
+    return true;
+  }
+
+  /**
    * THE SINGLE TIER-WRITE SITE for subscription lifecycle webhooks (B3-P3).
    *
    * Every path that grants or changes entitlement from a webhook goes through
@@ -1032,10 +1060,13 @@ export class BillingService implements OnModuleInit {
    */
   private async applyTierFromPlan(
     provider: string,
-    org: { id: string; subscriptionStatus: string },
+    org: { id: string; subscriptionStatus: string; billingEventAt: Date | null },
     planId: string | undefined,
     status: 'trial' | 'active' | 'past_due' | 'canceled' | null,
+    eventAt?: Date,
   ): Promise<void> {
+    if (this.isStaleBillingEvent(org, eventAt, 'subscription lifecycle')) return;
+
     const resolved =
       provider === 'stripe' ? stripePriceIdToTier(planId) : razorpayPlanIdToTier(planId);
 
@@ -1086,6 +1117,10 @@ export class BillingService implements OnModuleInit {
 
     if (Object.keys(data).length === 0) return;
 
+    // Advance the ordering mark only for events whose entitlement write we
+    // actually applied, so a later out-of-order delivery is recognisable.
+    if (eventAt) data.billingEventAt = eventAt;
+
     await this.db.$transaction(async (tx) => {
       await tx.organization.update({ where: { id: org.id }, data });
     });
@@ -1123,7 +1158,11 @@ export class BillingService implements OnModuleInit {
    * instance, carries status "active"). Read the status off the entity and let
    * mapSubscriptionStatus fail closed on anything unrecognized.
    */
-  private async handleSubscriptionUpdated(provider: string, data: WebhookData): Promise<void> {
+  private async handleSubscriptionUpdated(
+    provider: string,
+    data: WebhookData,
+    eventAt?: Date,
+  ): Promise<void> {
     const customerId =
       provider === 'stripe'
         ? typeof data.customer === 'string'
@@ -1163,13 +1202,17 @@ export class BillingService implements OnModuleInit {
       provider === 'stripe' ? stripePriceIdToTier(planId) : razorpayPlanIdToTier(planId),
     );
 
-    await this.applyTierFromPlan(provider, org, planId, status);
+    await this.applyTierFromPlan(provider, org, planId, status, eventAt);
   }
 
   /**
    * Handle subscription canceled webhook
    */
-  private async handleSubscriptionCanceled(provider: string, data: WebhookData): Promise<void> {
+  private async handleSubscriptionCanceled(
+    provider: string,
+    data: WebhookData,
+    eventAt?: Date,
+  ): Promise<void> {
     const customerId =
       provider === 'stripe'
         ? typeof data.customer === 'string'
@@ -1188,6 +1231,9 @@ export class BillingService implements OnModuleInit {
 
     if (!org) return;
 
+    // A stale cancellation must not undo a newer reactivation/upgrade.
+    if (this.isStaleBillingEvent(org, eventAt, 'subscription cancellation')) return;
+
     // Downgrade to free tier
     await this.db.organization.update({
       where: { id: org.id },
@@ -1197,6 +1243,7 @@ export class BillingService implements OnModuleInit {
         screenQuota: getScreenQuotaForTier('free'),
         stripeSubscriptionId: provider === 'stripe' ? null : org.stripeSubscriptionId,
         razorpaySubscriptionId: provider === 'razorpay' ? null : org.razorpaySubscriptionId,
+        ...(eventAt ? { billingEventAt: eventAt } : {}),
       },
     });
 
@@ -1235,7 +1282,12 @@ export class BillingService implements OnModuleInit {
   /**
    * Handle payment succeeded webhook
    */
-  private async handlePaymentSucceeded(provider: string, data: WebhookData, eventId?: string): Promise<void> {
+  private async handlePaymentSucceeded(
+    provider: string,
+    data: WebhookData,
+    eventId?: string,
+    eventAt?: Date,
+  ): Promise<void> {
     const invoiceId = provider === 'stripe' ? data.id : data.invoice?.id;
     const amount = provider === 'stripe' ? data.amount_paid : data.payment?.amount;
     const currency = provider === 'stripe' ? data.currency : data.payment?.currency;
@@ -1297,7 +1349,15 @@ export class BillingService implements OnModuleInit {
     // Recover from any degradation rung → active. EntitlementService clears the
     // episode clock and emits tenant:resumed IFF the org had reached `suspended`
     // (B3 ladder). Covers past_due / publish_locked / suspended uniformly.
-    if (['past_due', 'publish_locked', 'suspended'].includes(org.subscriptionStatus)) {
+    //
+    // The ordering guard applies to this ENTITLEMENT write only — the
+    // billing_transactions insert above is append-only audit and is deliberately
+    // recorded first, unconditionally. The mark is NOT advanced here: money
+    // events are not the tier authority, the subscription lifecycle events are.
+    if (
+      BillingService.DUNNING_STATUSES.includes(org.subscriptionStatus) &&
+      !this.isStaleBillingEvent(org, eventAt, 'payment recovery')
+    ) {
       await this.entitlementService.recover(org.id);
     }
 
@@ -1326,7 +1386,11 @@ export class BillingService implements OnModuleInit {
   /**
    * Handle payment failed webhook
    */
-  private async handlePaymentFailed(provider: string, data: WebhookData): Promise<void> {
+  private async handlePaymentFailed(
+    provider: string,
+    data: WebhookData,
+    eventAt?: Date,
+  ): Promise<void> {
     const customerId =
       provider === 'stripe'
         ? typeof data.customer === 'string'
@@ -1365,8 +1429,12 @@ export class BillingService implements OnModuleInit {
 
     // Begin the degradation episode (past_due + episode clock). Idempotent — a
     // repeat payment-failed while already past_due/publish_locked/suspended does
-    // NOT reset the clock or un-advance the ladder (B3).
-    await this.entitlementService.beginPastDue(org.id);
+    // NOT reset the clock or un-advance the ladder (B3). The ordering guard stops
+    // a stale failure from re-opening dunning after a newer recovery; the mark is
+    // not advanced (money events are not the tier authority).
+    if (!this.isStaleBillingEvent(org, eventAt, 'payment failure dunning')) {
+      await this.entitlementService.beginPastDue(org.id);
+    }
 
     // Send payment failed email
     const admin = org.users[0];

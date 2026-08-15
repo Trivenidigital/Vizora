@@ -37,6 +37,11 @@ model Organization {
   // Timestamp of the last entitlement-rung transition. The ladder clock keys on THIS,
   // not updatedAt (which any unrelated org write resets — B8 grace-reset bug).
   entitlementStateSince  DateTime?
+  // Emission time of the newest billing webhook whose entitlement write was applied
+  // (B3 ordering guard). Providers do not guarantee webhook order, so an older event
+  // must not overwrite newer authoritative tier/status. Equal timestamps pass.
+  // NOT the dunning clock — see entitlementStateSince above; conflating them is B8.
+  billingEventAt         DateTime?
   // Per-org MFA enforcement (auth #2). When true, members who are NOT enrolled
   // are forced through TOTP enrollment before they receive session tokens;
   // enrolled members hit the normal login challenge. Opt-in, default off.

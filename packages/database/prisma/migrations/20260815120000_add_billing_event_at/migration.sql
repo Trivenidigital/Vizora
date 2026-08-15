@@ -1,0 +1,15 @@
+-- B3 webhook ordering guard: the emission time of the newest billing event whose
+-- entitlement (tier/status) write we actually applied. Payment providers do not
+-- guarantee webhook ordering, so a retried older event could otherwise overwrite
+-- newer authoritative state (e.g. a stale `basic` activation landing after an
+-- `pro` upgrade). Entitlement writes are skipped when the incoming event is
+-- OLDER than this mark; equal timestamps are allowed through (tier writes are
+-- idempotent, and Razorpay's top-level created_at has one-second resolution).
+--
+-- Deliberately NOT entitlementStateSince: that is the dunning-ladder episode
+-- clock, and reusing it here would reset grace windows (the B8 bug class).
+--
+-- Physical table name — Prisma @@map("organizations") on model Organization.
+-- CI seeds the test DB with `prisma db push` (schema-direct), so a wrong table
+-- name here would pass CI and only fail on prod `migrate deploy`.
+ALTER TABLE "organizations" ADD COLUMN "billingEventAt" TIMESTAMP(3);
