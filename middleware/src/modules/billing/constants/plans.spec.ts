@@ -227,5 +227,25 @@ describe('provider plan id resolution (B3-E1)', () => {
       process.env.RAZORPAY_PRO_MONTHLY_PLAN_ID = 'plan_pro';
       expect(getBillingPlanIdConflicts()).toEqual([]);
     });
+
+    it('C-F2 an ambiguous id resolves to NULL rather than a guessed tier', () => {
+      // This is what makes degrading-instead-of-throwing safe at boot: the
+      // ambiguous id is removed from the index entirely, so every webhook
+      // carrying it takes the skip-the-tier-write-and-escalate path. Neither
+      // first-wins nor last-wins would be acceptable — both silently entitle one
+      // of the two candidate tiers.
+      process.env.RAZORPAY_BASIC_MONTHLY_PLAN_ID = 'plan_shared';
+      process.env.RAZORPAY_PRO_MONTHLY_PLAN_ID = 'plan_shared';
+
+      expect(razorpayPlanIdToTier('plan_shared')).toBeNull();
+    });
+
+    it('C-F2 an ambiguous id does not poison the OTHER ids', () => {
+      process.env.RAZORPAY_BASIC_MONTHLY_PLAN_ID = 'plan_shared';
+      process.env.RAZORPAY_PRO_MONTHLY_PLAN_ID = 'plan_shared';
+      process.env.RAZORPAY_PRO_YEARLY_PLAN_ID = 'plan_pro_y';
+
+      expect(razorpayPlanIdToTier('plan_pro_y')).toEqual({ tier: 'pro', interval: 'yearly' });
+    });
   });
 });

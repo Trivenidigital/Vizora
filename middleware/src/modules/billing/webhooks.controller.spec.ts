@@ -1,7 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { WebhooksController } from './webhooks.controller';
 import { BillingService } from './billing.service';
-import { BadRequestException, UnauthorizedException, RawBodyRequest } from '@nestjs/common';
+import {
+  BadRequestException,
+  InternalServerErrorException,
+  ServiceUnavailableException,
+  UnauthorizedException,
+  RawBodyRequest,
+} from '@nestjs/common';
 import { Request } from 'express';
 
 describe('WebhooksController', () => {
@@ -67,6 +73,32 @@ describe('WebhooksController', () => {
 
       await expect(controller.handleStripeWebhook(mockReq, signature)).rejects.toThrow(
         UnauthorizedException,
+      );
+    });
+
+    it('B-M5 an INTERNAL failure is a 500, not a bogus 401 signature error', async () => {
+      // Every non-503 failure used to become "Invalid webhook signature". That
+      // sends the operator hunting for a secret mismatch that does not exist —
+      // and both PSPs DISABLE an endpoint after sustained failures, so a
+      // transient internal fault masquerading as auth can cost the endpoint.
+      const mockReq = { rawBody: Buffer.from('{}') } as RawBodyRequest<Request>;
+      mockBillingService.handleWebhookEvent.mockRejectedValue(
+        new Error('Unique constraint failed on the fields: (`provider`)'),
+      );
+
+      await expect(controller.handleStripeWebhook(mockReq, 'sig')).rejects.toThrow(
+        InternalServerErrorException,
+      );
+    });
+
+    it('B-M5 a missing-configuration failure stays a 503', async () => {
+      const mockReq = { rawBody: Buffer.from('{}') } as RawBodyRequest<Request>;
+      mockBillingService.handleWebhookEvent.mockRejectedValue(
+        new Error('Stripe is not configured. Set STRIPE_SECRET_KEY'),
+      );
+
+      await expect(controller.handleStripeWebhook(mockReq, 'sig')).rejects.toThrow(
+        ServiceUnavailableException,
       );
     });
 

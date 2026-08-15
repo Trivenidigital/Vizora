@@ -118,8 +118,12 @@ export interface ResolvedPlan {
 
 /**
  * Two DIFFERENT (tier, interval) targets configured against the SAME provider
- * plan id. Last-writer-wins on this would silently bill (or entitle) the wrong
- * tier, so the billing module throws on it at startup instead.
+ * plan id. Last-writer-wins would silently entitle the wrong tier, so an
+ * ambiguous id is instead REMOVED from the reverse index entirely: it resolves
+ * to null, which routes to the existing "skip the tier write and escalate"
+ * path. Boot logs an error and reports to Sentry — it does NOT throw. A billing
+ * config typo must not take down displays, content and auth in both PM2 cluster
+ * instances (the #101 boot-validator lesson).
  */
 export interface PlanIdConflict {
   provider: 'stripe' | 'razorpay';
@@ -184,9 +188,11 @@ function buildPlanIdIndex(
 ): { index: Map<string, ResolvedPlan>; conflicts: PlanIdConflict[] } {
   const index = new Map<string, ResolvedPlan>();
   const conflicts: PlanIdConflict[] = [];
+  const ambiguous = new Set<string>();
 
   const add = (planId: string | undefined, resolved: ResolvedPlan): void => {
     if (!planId) return;
+    if (ambiguous.has(planId)) return;
     const existing = index.get(planId);
     if (!existing) {
       index.set(planId, resolved);
@@ -197,6 +203,11 @@ function buildPlanIdIndex(
     // conflict — it is one plan reachable under two env names.
     if (existing.tier === resolved.tier && existing.interval === resolved.interval) return;
     conflicts.push({ provider, planId, existing, duplicate: resolved });
+    // Fail CLOSED rather than last-wins or first-wins: an ambiguous id resolves
+    // to nothing, so the webhook skips the tier write and escalates instead of
+    // silently entitling one of the two candidate tiers.
+    ambiguous.add(planId);
+    index.delete(planId);
   };
 
   for (const tier of Object.keys(PLAN_TIERS)) {
@@ -242,8 +253,9 @@ export const stripePriceIdToTier = (priceId: string | undefined): ResolvedPlan |
 
 /**
  * Every duplicate-plan-id conflict across both providers. The billing module
- * throws on a non-empty result at startup — a collapsed mapping is a silent
- * mis-entitlement waiting to happen, and last-wins would hide it.
+ * reports a non-empty result at startup (logger.error + Sentry) and keeps
+ * booting; the ids themselves are already unresolvable, so the runtime effect
+ * is the safe skip-and-escalate path rather than a wrong entitlement.
  */
 export const getBillingPlanIdConflicts = (): PlanIdConflict[] => [
   ...buildPlanIdIndex('stripe').conflicts,
