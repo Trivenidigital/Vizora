@@ -63,8 +63,14 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+# Temp roots created by the scripts/ops agent tests (mkdtempSync inside the
+# repo, because the agents resolve their state/ecosystem paths relative to it).
+# They are rmSync'd on success — these patterns keep a killed or crashed run
+# from leaking a tree into `git status`.
 .tmp-ops-watchdog-*/
 .tmp-health-guardian-*/
+.tmp-tv-surface-*/
+.tmp-edge-vs-local-*/
 .cache/
 .turbo/
 .swc/

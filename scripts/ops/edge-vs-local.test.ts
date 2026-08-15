@@ -10,7 +10,8 @@
  *
  * The oracle for "no restart happened" is a real one: the fake `pm2` on PATH
  * appends every argv it is invoked with to a file. A test that expects no
- * restart asserts that file contains nothing but `jlist`.
+ * restart asserts that file contains nothing but `jlist`; a test that expects
+ * one asserts the exact command is present.
  */
 
 import assert from 'node:assert/strict';
@@ -38,18 +39,24 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const DEAD_EDGE = 'https://edge.invalid';
 const DEAD_EDGE_INCIDENT_ID = 'health-guardian:edge-unreachable:edge.invalid';
 const WEB_DOWN_INCIDENT_ID = 'health-guardian:service-down:web';
+const MIDDLEWARE_DOWN_INCIDENT_ID = 'health-guardian:service-down:middleware';
 
 // ─── Fixture server ──────────────────────────────────────────────────────────
 
-type RootMode = 'healthy' | 'root-500';
+/**
+ * `root-500` breaks only the web-backed edge path (`/`); `middleware-down`
+ * breaks only the middleware-backed one (`/api/v1/health/ready`). Keeping them
+ * separable is what lets the per-path attribution be tested at all.
+ */
+type ServerMode = 'healthy' | 'root-500' | 'middleware-down';
 
 /**
  * One server answering all three services' health routes. Bound to 0.0.0.0 so
  * it can also be addressed as `http://0.0.0.0:<port>` — a NON-loopback host
  * that still reaches this process, which is how the tests exercise the
- * remediable guard and the edge-recovery path without a real domain.
+ * probeRemediable guard and the edge paths without a real domain.
  */
-function startServer(mode: RootMode): Promise<{ server: Server; port: number }> {
+function startServer(mode: ServerMode): Promise<{ server: Server; port: number }> {
   const server = createServer((req, res) => {
     const url = req.url ?? '/';
 
@@ -67,6 +74,12 @@ function startServer(mode: RootMode): Promise<{ server: Server; port: number }> 
     if (url.startsWith('/_next/static/')) {
       res.writeHead(200, { 'content-type': 'application/javascript', connection: 'close' });
       return res.end('console.log("chunk");');
+    }
+    if (url === '/api/v1/health/ready' && mode === 'middleware-down') {
+      // What nginx returns through the edge when middleware is down, and what
+      // the LOCAL middleware probe sees at the same time.
+      res.writeHead(502, { connection: 'close' });
+      return res.end('bad gateway');
     }
 
     res.writeHead(200, { 'content-type': 'application/json', connection: 'close' });
@@ -117,7 +130,33 @@ function reserveClosedPort(): Promise<number> {
   });
 }
 
+/**
+ * `0.0.0.0` reaches this box on every platform we run on, but is not one of the
+ * loopback hosts — the only address shape that is both non-loopback and
+ * guaranteed local. If that is ever untrue on a host, tests skip rather than lie.
+ */
+async function nonLoopbackReachable(port: number): Promise<boolean> {
+  try {
+    return (await fetch(`http://0.0.0.0:${port}/api/health`)).ok;
+  } catch {
+    return false;
+  }
+}
+
 // ─── Temp root + fake pm2 ────────────────────────────────────────────────────
+
+interface FakeProc {
+  name: string;
+  pm_id: number;
+  status: string;
+  memoryMB: number;
+}
+
+const ALL_ONLINE: FakeProc[] = [
+  { name: 'vizora-middleware', pm_id: 0, status: 'online', memoryMB: 64 },
+  { name: 'vizora-realtime', pm_id: 0, status: 'online', memoryMB: 64 },
+  { name: 'vizora-web', pm_id: 0, status: 'online', memoryMB: 64 },
+];
 
 function pm2LogPath(tmpRoot: string): string {
   return join(tmpRoot, 'pm2-argv.log');
@@ -125,17 +164,17 @@ function pm2LogPath(tmpRoot: string): string {
 
 /**
  * Fake `pm2` that APPENDS every invocation's argv to a file. That file is the
- * no-restart oracle — a test asserting "we never restarted" reads it rather
- * than inferring absence from an incident field.
+ * restart oracle — both directions are asserted from it rather than inferred
+ * from an incident field.
  */
-function writeFakePm2(tmpRoot: string): void {
+function writeFakePm2(tmpRoot: string, procs: FakeProc[] = ALL_ONLINE): void {
   const binDir = join(tmpRoot, 'bin');
   const jlist = JSON.stringify(
-    ['vizora-middleware', 'vizora-realtime', 'vizora-web'].map(name => ({
-      name,
-      pm_id: 0,
-      pm2_env: { status: 'online' },
-      monit: { memory: 64 * 1024 * 1024, cpu: 0 },
+    procs.map(p => ({
+      name: p.name,
+      pm_id: p.pm_id,
+      pm2_env: { status: p.status },
+      monit: { memory: p.memoryMB * 1024 * 1024, cpu: 0 },
     })),
   );
   const pm2Js = join(binDir, 'pm2');
@@ -158,12 +197,24 @@ function readPm2Invocations(tmpRoot: string): string[] {
   return readFileSync(path, 'utf8').split('\n').filter(Boolean);
 }
 
-function setupTmpRoot(seedIncidents: Incident[] = []): string {
+/**
+ * The memory check is SKIPPED when the canonical limit cannot be read, so a
+ * test about high memory has to supply an ecosystem file in its own tree.
+ */
+function writeEcosystemConfig(tmpRoot: string, limits: Record<string, string>): void {
+  const apps = Object.entries(limits).map(([name, max_memory_restart]) => ({ name, max_memory_restart }));
+  writeFileSync(
+    join(tmpRoot, 'ecosystem.config.js'),
+    `module.exports = ${JSON.stringify({ apps }, null, 2)};\n`,
+  );
+}
+
+function setupTmpRoot(seedIncidents: Incident[] = [], procs: FakeProc[] = ALL_ONLINE): string {
   const tmpRoot = mkdtempSync(join(repoRoot, '.tmp-edge-vs-local-'));
   cpSync(join(repoRoot, 'scripts', 'ops'), join(tmpRoot, 'scripts', 'ops'), { recursive: true });
   mkdirSync(join(tmpRoot, 'logs'), { recursive: true });
   mkdirSync(join(tmpRoot, 'bin'), { recursive: true });
-  writeFakePm2(tmpRoot);
+  writeFakePm2(tmpRoot, procs);
 
   const state: OpsState = {
     systemStatus: 'HEALTHY',
@@ -204,10 +255,10 @@ function patchLocalProbePorts(
  * Disable the loopback substitution in the copied tree so a NON-loopback URL
  * survives into `ServiceDef.healthUrl`.
  *
- * This is deliberate: substitution and the `remediable` guard are two
+ * This is deliberate: substitution and the `probeRemediable` guard are two
  * independent layers, and layer 2 can only be observed with layer 1 switched
  * off. `isLoopback` itself is untouched — health-guardian still computes
- * `remediable` with the real predicate.
+ * `probeRemediable` with the real predicate.
  */
 function disableLoopbackSubstitution(tmpRoot: string): void {
   const path = join(tmpRoot, PROBE_TARGETS_REL);
@@ -290,6 +341,9 @@ test('an unreachable public edge raises edge-unreachable and never restarts web'
     assert.match(edgeIncident.remediation, /nginx -t/);
     assert.match(edgeIncident.remediation, /do NOT restart Node services/);
     assert.match(edgeIncident.message, /NOT external DNS\/firewall reachability/);
+    // Both paths were probed, and each names the service that backs it.
+    assert.match(edgeIncident.error ?? '', /backed by web/);
+    assert.match(edgeIncident.error ?? '', /backed by middleware/);
 
     // The local web probe was substituted to loopback, so web stayed healthy.
     assert.equal(
@@ -314,13 +368,17 @@ test('an unreachable public edge raises edge-unreachable and never restarts web'
   }
 });
 
-test('local web down AND edge down produces one incident, not two', async () => {
-  const { server, port } = await startServer('healthy');
+test('an edge path whose backing service is locally down is not counted twice', async t => {
+  const { server, port } = await startServer('root-500');
   const closedPort = await reserveClosedPort();
   const tmpRoot = setupTmpRoot();
   try {
+    if (!(await nonLoopbackReachable(port))) {
+      return t.skip('0.0.0.0 is not routable to this process on this host');
+    }
     // Local web probe points at a port nothing listens on: the service really
-    // is down, and a restart really is the right answer.
+    // is down, and a restart really is the right answer. The edge is reachable
+    // but fails on `/` — the path web backs — so that failure is already owned.
     patchLocalProbePorts(tmpRoot, { middleware: port, realtime: port, web: closedPort });
 
     const result = await runAgent(
@@ -328,7 +386,7 @@ test('local web down AND edge down produces one incident, not two', async () => 
       {
         VALIDATOR_BASE_URL: `http://127.0.0.1:${port}`,
         REALTIME_URL: `http://127.0.0.1:${port}`,
-        WEB_URL: DEAD_EDGE,
+        WEB_URL: `http://0.0.0.0:${port}`,
       },
       // A real restart path sleeps RESTART_COOLDOWN_MS before re-checking.
       120_000,
@@ -341,9 +399,9 @@ test('local web down AND edge down produces one incident, not two', async () => 
       `one outage must produce exactly one incident\n${result.stdout}`,
     );
     assert.equal(
-      incidents.find(i => i.id === DEAD_EDGE_INCIDENT_ID),
+      incidents.find(i => i.type === 'edge-unreachable'),
       undefined,
-      'edge must stay quiet while the local probe already owns the finding',
+      'the edge path backed by the locally-down service must not raise its own incident',
     );
 
     // A loopback probe DID fail, so remediation is legitimate here.
@@ -358,29 +416,61 @@ test('local web down AND edge down produces one incident, not two', async () => 
   }
 });
 
-test('a non-loopback probe target raises an incident but can never restart', async t => {
-  const { server, port } = await startServer('root-500');
-  const nonLoopback = `http://0.0.0.0:${port}`;
+test('a middleware outage does not masquerade as an edge fault (per-path attribution)', async t => {
+  // nginx serves `/` from web and `/api/v1/health/ready` from middleware. With
+  // middleware down the edge returns 502 on the API path while `/` still
+  // answers — gating the whole edge check on web's local health would file a
+  // critical `edge-unreachable` and send the operator to nginx.
+  const { server, port } = await startServer('middleware-down');
   const tmpRoot = setupTmpRoot();
   try {
-    // 0.0.0.0 reaches this box on every platform we run on, but is not one of
-    // the loopback hosts. If that is ever untrue here, skip rather than lie.
-    let reachable = false;
-    try {
-      reachable = (await fetch(`${nonLoopback}/api/health`)).ok;
-    } catch {
-      reachable = false;
-    }
-    if (!reachable) {
+    if (!(await nonLoopbackReachable(port))) {
       return t.skip('0.0.0.0 is not routable to this process on this host');
     }
+    patchLocalProbePorts(tmpRoot, { middleware: port, realtime: port, web: port });
 
+    const result = await runAgent(
+      tmpRoot,
+      {
+        VALIDATOR_BASE_URL: `http://127.0.0.1:${port}`,
+        REALTIME_URL: `http://127.0.0.1:${port}`,
+        WEB_URL: `http://0.0.0.0:${port}`,
+      },
+      120_000,
+    );
+
+    const incidents = readIncidents(tmpRoot);
+    assert.ok(
+      incidents.find(i => i.id === MIDDLEWARE_DOWN_INCIDENT_ID),
+      `expected the middleware outage to be reported as service-down\n${result.stdout}`,
+    );
+    assert.equal(
+      incidents.find(i => i.type === 'edge-unreachable'),
+      undefined,
+      'a middleware outage must never be filed as edge-unreachable',
+    );
+    // Local web was healthy, so `/` was still probed through the edge — the
+    // check degraded to partial evidence rather than switching off entirely.
+    assert.match(result.stdout, /skipped: \/api\/v1\/health\/ready \(local middleware not healthy\)/);
+  } finally {
+    server.close();
+    rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
+
+test('a non-loopback probe target raises an incident but can never restart', async t => {
+  const { server, port } = await startServer('root-500');
+  const tmpRoot = setupTmpRoot();
+  try {
+    if (!(await nonLoopbackReachable(port))) {
+      return t.skip('0.0.0.0 is not routable to this process on this host');
+    }
     disableLoopbackSubstitution(tmpRoot);
 
     const result = await runAgent(tmpRoot, {
       VALIDATOR_BASE_URL: `http://127.0.0.1:${port}`,
       REALTIME_URL: `http://127.0.0.1:${port}`,
-      WEB_URL: nonLoopback,
+      WEB_URL: `http://0.0.0.0:${port}`,
     });
 
     const incident = readIncidents(tmpRoot).find(i => i.id === WEB_DOWN_INCIDENT_ID);
@@ -396,6 +486,62 @@ test('a non-loopback probe target raises an incident but can never restart', asy
       `a non-loopback probe must never reach pm2, got: ${JSON.stringify(pm2Calls)}`,
     );
     assert.equal(result.code, 1, `${result.stderr}\n${result.stdout}`);
+  } finally {
+    server.close();
+    rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
+
+test('pm2 jlist findings still remediate when the probe target was non-loopback', async t => {
+  // The durable proof of the design ruling: `probeRemediable` gates the
+  // PROBE-driven path only. PM2's own view of a crashed or bloated process is
+  // local authoritative evidence with no edge component, so it must still act.
+  const { server, port } = await startServer('healthy');
+  const tmpRoot = setupTmpRoot(
+    [],
+    [
+      { name: 'vizora-middleware', pm_id: 0, status: 'online', memoryMB: 64 },
+      { name: 'vizora-realtime', pm_id: 0, status: 'online', memoryMB: 64 },
+      { name: 'vizora-web', pm_id: 0, status: 'errored', memoryMB: 64 },
+      { name: 'vizora-web', pm_id: 1, status: 'online', memoryMB: 95 },
+    ],
+  );
+  try {
+    if (!(await nonLoopbackReachable(port))) {
+      return t.skip('0.0.0.0 is not routable to this process on this host');
+    }
+    // 100M limit -> the 95MB process is at 95%, over the 85% reload threshold.
+    writeEcosystemConfig(tmpRoot, { 'vizora-web': '100M' });
+    disableLoopbackSubstitution(tmpRoot);
+
+    const result = await runAgent(tmpRoot, {
+      VALIDATOR_BASE_URL: `http://127.0.0.1:${port}`,
+      REALTIME_URL: `http://127.0.0.1:${port}`,
+      WEB_URL: `http://0.0.0.0:${port}`,
+    });
+
+    // The probe itself is healthy, so nothing here comes from the probe path.
+    assert.equal(
+      readIncidents(tmpRoot).find(i => i.id === WEB_DOWN_INCIDENT_ID),
+      undefined,
+      `the probe was healthy; no service-down expected\n${result.stdout}`,
+    );
+    assert.match(
+      result.stdout,
+      /web: probe target http:\/\/0\.0\.0\.0:\d+\/ is not loopback/,
+      'the web probe target must genuinely be non-loopback for this test to mean anything',
+    );
+
+    const pm2Calls = readPm2Invocations(tmpRoot);
+    assert.ok(
+      pm2Calls.includes('restart vizora-web'),
+      `an errored PM2 process must still be restarted, got: ${JSON.stringify(pm2Calls)}`,
+    );
+    assert.ok(
+      pm2Calls.includes('reload vizora-web'),
+      `an over-memory PM2 process must still be reloaded, got: ${JSON.stringify(pm2Calls)}`,
+    );
+    assert.equal(result.code, 0, `${result.stderr}\n${result.stdout}`);
   } finally {
     server.close();
     rmSync(tmpRoot, { recursive: true, force: true });
@@ -423,16 +569,9 @@ test('a recovered edge resolves the open edge-unreachable incident', async t => 
 
   const tmpRoot = setupTmpRoot([openIncident]);
   try {
-    let reachable = false;
-    try {
-      reachable = (await fetch(`${edge}/api/health`)).ok;
-    } catch {
-      reachable = false;
-    }
-    if (!reachable) {
+    if (!(await nonLoopbackReachable(port))) {
       return t.skip('0.0.0.0 is not routable to this process on this host');
     }
-
     patchLocalProbePorts(tmpRoot, { middleware: port, realtime: port, web: port });
 
     const result = await runAgent(tmpRoot, {
@@ -445,6 +584,75 @@ test('a recovered edge resolves the open edge-unreachable incident', async t => 
     assert.ok(incident, `incident should still be tracked after recovery\n${result.stdout}`);
     assert.equal(incident.status, 'resolved');
     assert.ok(incident.resolvedAt, 'resolvedAt must be stamped');
+    assert.equal(result.code, 0, `${result.stderr}\n${result.stdout}`);
+  } finally {
+    server.close();
+    rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
+
+test('disabling the edge watch closes the incident it can no longer observe', async () => {
+  const { server, port } = await startServer('healthy');
+  const incidentId = 'health-guardian:edge-unreachable:vizora.cloud';
+  const staleIncident: Incident = {
+    id: incidentId,
+    agent: 'health-guardian',
+    type: 'edge-unreachable',
+    severity: 'critical',
+    target: 'edge',
+    targetId: 'vizora.cloud',
+    detected: new Date(Date.now() - 86_400_000).toISOString(),
+    message: 'Public edge https://vizora.cloud failed a path',
+    remediation: 'nginx -t; systemctl status nginx; certbot certificates',
+    status: 'open',
+    attempts: 0,
+    error: 'fetch failed',
+  };
+
+  const tmpRoot = setupTmpRoot([staleIncident]);
+  try {
+    // Loopback-only config: the watch is off, so nothing will ever observe this
+    // incident recovering. Left open it pins ops-state CRITICAL forever.
+    const result = await runAgent(tmpRoot, {
+      VALIDATOR_BASE_URL: `http://127.0.0.1:${port}`,
+      REALTIME_URL: `http://127.0.0.1:${port}`,
+      WEB_URL: `http://127.0.0.1:${port}`,
+    });
+
+    const incident = readIncidents(tmpRoot).find(i => i.id === incidentId);
+    assert.ok(incident, `incident should still be tracked\n${result.stdout}`);
+    assert.equal(incident.status, 'resolved');
+    assert.ok(incident.resolvedAt, 'resolvedAt must be stamped');
+    assert.match(incident.message, /edge watch disabled by configuration/);
+    assert.equal(result.code, 0, `${result.stderr}\n${result.stdout}`);
+  } finally {
+    server.close();
+    rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
+
+test('a non-loopback REALTIME_URL is substituted and explicitly NOT watched', async () => {
+  const { server, port } = await startServer('healthy');
+  const tmpRoot = setupTmpRoot();
+  try {
+    patchLocalProbePorts(tmpRoot, { middleware: port, realtime: port, web: port });
+
+    // Only WEB_URL is the public origin. A stray non-loopback REALTIME_URL must
+    // not become "the edge" and inherit nginx/certbot remediation text.
+    const result = await runAgent(tmpRoot, {
+      VALIDATOR_BASE_URL: `http://127.0.0.1:${port}`,
+      REALTIME_URL: DEAD_EDGE,
+      WEB_URL: `http://127.0.0.1:${port}`,
+    });
+
+    assert.equal(
+      readIncidents(tmpRoot).find(i => i.type === 'edge-unreachable'),
+      undefined,
+      `REALTIME_URL must never be adopted as the edge\n${result.stdout}`,
+    );
+    assert.match(result.stdout, /REALTIME_URL=https:\/\/edge\.invalid is NOT WATCHED as an edge/);
+    // And the skip reason names WEB_URL, not a generic "everything is loopback".
+    assert.match(result.stdout, /edge watch: skipped — WEB_URL is loopback \(or unset\)/);
     assert.equal(result.code, 0, `${result.stderr}\n${result.stdout}`);
   } finally {
     server.close();

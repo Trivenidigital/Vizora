@@ -78,12 +78,24 @@ export function isLoopback(url: string): boolean {
 export interface ProbeTargets {
   /** Loopback base URL to probe per service. Always safe to remediate off. */
   local: Record<ProbeService, string>;
-  /** Public edge base URL, or null when every configured value is loopback. */
+  /** Public edge base URL, or null when no watchable edge was configured. */
   edge: string | null;
-  /** Which service's env var supplied `edge`. */
-  edgeSource: ProbeService | null;
+  /**
+   * Which service's env var supplied `edge`. Only ever `'web'`: `WEB_URL` is
+   * the public origin BY DEFINITION (it is what backend email links are built
+   * from), so it is the only value that can be asserted to address the edge.
+   */
+  edgeSource: 'web' | null;
   /** Log lines the caller must emit — substitutions are never silent. */
   notes: string[];
+  /**
+   * Why `edge` is null, or null when an edge WAS resolved.
+   *
+   * Distinct reasons matter: "everything is loopback" is the expected dev/CI
+   * shape, while "WEB_URL is not an http(s) URL" is a misconfiguration that
+   * would otherwise be reported with the same reassuring sentence.
+   */
+  noEdgeReason: string | null;
 }
 
 function normalize(url: string): string {
@@ -103,14 +115,21 @@ function isHttpUrl(url: string): boolean {
  * Resolve the loopback probe targets and the (optional) public edge.
  *
  * Per service: a loopback value is used as-is; a non-loopback value is ignored
- * for probing and replaced by `http://127.0.0.1:<local port>`. The FIRST
- * non-loopback value — in practice `WEB_URL` — becomes the edge.
+ * for probing and replaced by `http://127.0.0.1:<local port>`.
+ *
+ * The edge is taken from `WEB_URL` **and only from `WEB_URL`**. Adopting the
+ * first non-loopback value found would let a stray `REALTIME_URL` silently
+ * become "the public edge" and be reported with nginx/certbot remediation text,
+ * which is a claim we cannot support: `WEB_URL` is the one value the system
+ * already defines as the public origin. Any other non-loopback value is
+ * substituted for probing and explicitly noted as NOT WATCHED — substituted and
+ * unwatched is a defensible state, substituted and silently mislabelled is not.
  */
 export function splitProbeTargets(env: NodeJS.ProcessEnv): ProbeTargets {
   const local = {} as Record<ProbeService, string>;
   const notes: string[] = [];
-  let edge: string | null = null;
-  let edgeSource: ProbeService | null = null;
+  /** Non-loopback raw values, by service, in declaration order. */
+  const nonLoopback = new Map<ProbeService, string>();
 
   for (const service of PROBE_SERVICES) {
     const key = PROBE_ENV_KEYS[service];
@@ -128,17 +147,40 @@ export function splitProbeTargets(env: NodeJS.ProcessEnv): ProbeTargets {
     }
 
     local[service] = fallback;
+    nonLoopback.set(service, raw);
     notes.push(
       `${key}=${raw} is NOT a loopback address — ignored as a probe target ` +
         `(a restart cannot fix an edge fault); probing ${fallback} instead`,
     );
-
-    if (edge === null && isHttpUrl(raw)) {
-      edge = normalize(raw);
-      edgeSource = service;
-      notes.push(`${key} adopted as the alert-only edge watch target: ${edge}`);
-    }
   }
 
-  return { local, edge, edgeSource, notes };
+  const webRaw = nonLoopback.get('web');
+  let edge: string | null = null;
+  let edgeSource: 'web' | null = null;
+  let noEdgeReason: string | null = null;
+
+  if (webRaw !== undefined && isHttpUrl(webRaw)) {
+    edge = normalize(webRaw);
+    edgeSource = 'web';
+    notes.push(`WEB_URL adopted as the alert-only edge watch target: ${edge}`);
+  } else if (webRaw !== undefined) {
+    noEdgeReason =
+      `WEB_URL=${webRaw} is neither loopback nor an http(s) URL, so it was substituted ` +
+      `for probing and there is nothing watchable to treat as the public edge`;
+  } else {
+    noEdgeReason =
+      'WEB_URL is loopback (or unset), so there is no public edge to watch ' +
+      '(expected in dev/CI; on prod WEB_URL supplies it)';
+  }
+
+  // Every OTHER non-loopback value: substituted above, and never watched.
+  for (const [service, raw] of nonLoopback) {
+    if (service === 'web') continue;
+    notes.push(
+      `${PROBE_ENV_KEYS[service]}=${raw} is NOT WATCHED as an edge — only WEB_URL is the ` +
+        `public origin; this value was substituted for probing and is otherwise ignored`,
+    );
+  }
+
+  return { local, edge, edgeSource, notes, noEdgeReason };
 }
