@@ -504,6 +504,84 @@ describe('RazorpayProvider', () => {
       expect(data.payment.amount).toBe(379900);
     });
 
+    it('carries the top-level created_at through as WebhookEvent.createdAt (B3-P4)', () => {
+      // A real subscription.charged body: the subscription AND payment entities
+      // side by side under payload, each behind its own `.entity`, plus the
+      // TOP-LEVEL created_at — the EVENT emission time in unix SECONDS, which is
+      // a different field from each entity's own created_at.
+      const eventCreatedAt = 1786000000;
+      const payload = Buffer.from(
+        JSON.stringify({
+          entity: 'event',
+          account_id: 'acc_test',
+          event: 'subscription.charged',
+          contains: ['subscription', 'payment'],
+          payload: {
+            subscription: {
+              entity: {
+                id: 'sub_charged_1',
+                entity: 'subscription',
+                plan_id: 'plan_pro_inr',
+                customer_id: 'cust_charged_1',
+                status: 'active',
+                created_at: 1785000000, // entity created_at — deliberately different
+                notes: [], // Razorpay serializes empty notes as an ARRAY
+              },
+            },
+            payment: {
+              entity: {
+                id: 'pay_charged_1',
+                entity: 'payment',
+                amount: 59900,
+                currency: 'INR',
+                status: 'captured',
+                invoice_id: 'inv_charged_1', // a STRING on the payment entity
+                customer_id: 'cust_charged_1',
+              },
+            },
+          },
+          created_at: eventCreatedAt,
+        }),
+      );
+      const signature = crypto
+        .createHmac('sha256', 'webhook_secret_123')
+        .update(payload)
+        .digest('hex');
+
+      // Signature verification is REAL here — this is the only layer that proves it.
+      const event = provider.verifyWebhookSignature(payload, signature);
+      const data = event.data as unknown as {
+        subscription: { plan_id: string; customer_id: string; status: string; notes: unknown };
+        payment: { amount: number; invoice_id: string; customer_id: string };
+      };
+
+      expect(event.type).toBe('subscription.charged');
+      expect(event.createdAt).toEqual(new Date(eventCreatedAt * 1000));
+      // Not the entity's created_at — that one is a full 1000s earlier.
+      expect(event.createdAt).not.toEqual(new Date(1785000000 * 1000));
+      // Both entities unwrapped; plan_id is what the tier is derived from.
+      expect(data.subscription.plan_id).toBe('plan_pro_inr');
+      expect(data.subscription.status).toBe('active');
+      expect(data.payment.customer_id).toBe('cust_charged_1');
+      expect(data.payment.invoice_id).toBe('inv_charged_1');
+      expect(Array.isArray(data.subscription.notes)).toBe(true);
+    });
+
+    it('omits createdAt when the body has no top-level created_at (never fabricated)', () => {
+      const payload = Buffer.from(
+        JSON.stringify({
+          event: 'subscription.activated',
+          payload: { subscription: { entity: { id: 'sub_1', plan_id: 'plan_pro_inr' } } },
+        }),
+      );
+      const signature = crypto
+        .createHmac('sha256', 'webhook_secret_123')
+        .update(payload)
+        .digest('hex');
+
+      expect(provider.verifyWebhookSignature(payload, signature).createdAt).toBeUndefined();
+    });
+
     it('should throw on invalid signature', () => {
       const payload = Buffer.from(
         JSON.stringify({
