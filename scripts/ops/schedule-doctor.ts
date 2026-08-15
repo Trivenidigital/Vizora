@@ -131,28 +131,30 @@ async function main(): Promise<void> {
   let schedules: ScheduleItem[];
   let displays: DisplayItem[];
   let playlists: Playlist[];
+  let scanComplete: boolean;
 
   try {
-    [schedules, displays, playlists] = await Promise.all([
-      api.getAll<ScheduleItem>('/schedules'),
-      api.getAll<DisplayItem>('/displays'),
-      api.getAll<Playlist>('/playlists'),
+    // getAllScan, not getAll: the completeness verdict is what gates incident
+    // resolution below, and it must come from the fetch layer that actually
+    // knows (server-reported `meta.total` where present) rather than from a
+    // length comparison here. An unrecognized response shape now THROWS into
+    // this catch instead of yielding a silent empty list.
+    const [scheduleScan, displayScan, playlistScan] = await Promise.all([
+      api.getAllScan<ScheduleItem>('/schedules'),
+      api.getAllScan<DisplayItem>('/displays'),
+      api.getAllScan<Playlist>('/playlists'),
     ]);
+    schedules = scheduleScan.items;
+    displays = displayScan.items;
+    playlists = playlistScan.items;
+    // Measured on the RAW scans, before the disabled-display filter below,
+    // which only ever shortens the list.
+    scanComplete = scheduleScan.complete && displayScan.complete && playlistScan.complete;
   } catch (err) {
     log(AGENT, `FATAL: failed to fetch data — ${err instanceof Error ? err.message : err}`);
     process.exitCode = 2;
     return;
   }
-
-  // Completeness of the sweep. `getAll` stops at MAX_ENTITIES, so a list that
-  // comes back at the cap may be missing entities this run never examined —
-  // and an entity never examined cannot be evidence that its incident cleared.
-  // Measured on the RAW lists, before the disabled-display filter below, which
-  // only ever shortens them.
-  const scanComplete =
-    schedules.length < MAX_ENTITIES &&
-    displays.length < MAX_ENTITIES &&
-    playlists.length < MAX_ENTITIES;
 
   // Same rule as fleet-manager: an operator-disabled display must not raise
   // incidents. #259 filtered fleet-manager only, so schedule-doctor kept
@@ -186,27 +188,32 @@ async function main(): Promise<void> {
   // put a legitimately-large tenant into a permanent no-resolution regime —
   // incidents accumulating forever with no signal saying why — which is the
   // same shape of invisible failure this whole change exists to remove.
+  //
+  // INFO, and deliberately NOT counted in `issuesFound`. Only a code change
+  // (raising the cap, or scoping the queries) can clear this, so a tenant that
+  // legitimately exceeds the cap would otherwise sit at exit 1 / DEGRADED and
+  // alert on every single run, forever — precisely the alert-fatigue pattern
+  // the db-maintenance exit-code rule exists to prevent. The finding is still
+  // recorded and still visible; it just stops masquerading as a failed run.
   if (!scanComplete) {
-    issuesFound++;
     log(
       AGENT,
-      `Entity scan hit the ${MAX_ENTITIES}-item page-walk cap ` +
-      `(schedules=${schedules.length}, displays=${displays.length}, playlists=${playlists.length}) — ` +
-      'no incident will be resolved this run',
+      `Entity scan was incomplete ` +
+      `(schedules=${schedules.length}, displays=${displays.length}, playlists=${playlists.length}, ` +
+      `cap=${MAX_ENTITIES}) — no incident will be resolved this run`,
     );
     incidents.push({
       id: makeIncidentId(AGENT, 'scan-truncated', 'entity-lists'),
       agent: AGENT,
       type: 'scan-truncated',
-      severity: 'warning',
+      severity: 'info',
       target: 'schedules',
       targetId: 'entity-lists',
       detected: new Date().toISOString(),
       message:
-        `Schedule audit could not see the whole tenant: one or more entity lists reached the ` +
-        `${MAX_ENTITIES}-item page-walk cap (schedules=${schedules.length}, displays=${displays.length}, ` +
-        `playlists=${playlists.length}). Findings are still valid, but no prior incident can be cleared ` +
-        'from a partial scan.',
+        `Schedule audit could not see the whole tenant (schedules=${schedules.length}, ` +
+        `displays=${displays.length}, playlists=${playlists.length}, page-walk cap ${MAX_ENTITIES}). ` +
+        'Findings are still valid, but no prior incident can be cleared from a partial scan.',
       remediation: `Raise the getAll page-walk cap in scripts/ops/lib/api-client.ts, or scope this agent's queries.`,
       status: 'open',
       attempts: 0,

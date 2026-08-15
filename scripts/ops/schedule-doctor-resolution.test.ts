@@ -38,6 +38,15 @@ interface Fixture {
   playlists: Record<string, unknown>[];
   /** When set, GET /schedules answers with this status instead of data. */
   schedulesStatus?: number;
+  /**
+   * Response shape for the list endpoints:
+   *   'items'        — { items: [...] }, no total (the cap-proxy fallback path)
+   *   'paginated'    — { data: [...], meta: { total } }, the real API shape
+   *   'unrecognized' — neither, which must now THROW rather than read as empty
+   */
+  shape?: 'items' | 'paginated' | 'unrecognized';
+  /** Override the server-reported total for /schedules under 'paginated'. */
+  scheduleTotal?: number;
 }
 
 /** A healthy tenant: one display WITH a playlist, so nothing is detected. */
@@ -67,9 +76,24 @@ function startServer(fixture: Fixture): Promise<{ server: Server; baseUrl: strin
       return json(201, { success: true, data: {} });
     }
 
-    // `getAll` walks 100 at a time and stops when a page comes back short.
-    const paged = (all: Record<string, unknown>[]): void => {
+    // The page walk requests 100 at a time and stops when a page comes back short.
+    const paged = (all: Record<string, unknown>[], total?: number): void => {
       const slice = all.slice((page - 1) * 100, page * 100);
+      if (fixture.shape === 'unrecognized') {
+        // Neither an array, nor { items }, nor { data } — a response-shape
+        // drift. This used to yield an empty list reported as success.
+        return json(200, { success: true, data: { results: slice, count: slice.length } });
+      }
+      if (fixture.shape === 'paginated') {
+        const reported = total ?? all.length;
+        return json(200, {
+          success: true,
+          data: {
+            data: slice,
+            meta: { page, limit: 100, total: reported, totalPages: Math.ceil(reported / 100) },
+          },
+        });
+      }
       json(200, { success: true, data: { items: slice } });
     };
 
@@ -77,7 +101,7 @@ function startServer(fixture: Fixture): Promise<{ server: Server; baseUrl: strin
       if (fixture.schedulesStatus) {
         return json(fixture.schedulesStatus, { success: false, message: 'boom' });
       }
-      return paged(fixture.schedules);
+      return paged(fixture.schedules, fixture.scheduleTotal);
     }
     if (path === '/api/v1/displays') return paged(fixture.displays);
     if (path === '/api/v1/playlists') return paged(fixture.playlists);
@@ -286,8 +310,178 @@ test('NEGATIVE: a truncated scan resolves nothing and raises scan-truncated', as
       const truncated = state.incidents.find(i => i.id === TRUNCATED_ID);
       assert.ok(truncated, `expected a ${TRUNCATED_ID} incident\n${result.stdout}`);
       assert.equal(truncated.status, 'open');
-      assert.equal(truncated.severity, 'warning');
+      // INFO, not warning: only a code change can clear this, so counting it as
+      // a failure would pin a legitimately-large tenant at exit 1 / DEGRADED on
+      // every run forever.
+      assert.equal(truncated.severity, 'info');
       assert.match(truncated.message, /page-walk cap/i);
+      assert.equal(result.code, 0, 'an incomplete scan is not by itself a failed run');
+      // NB: systemStatus is DEGRADED here, but from the SEEDED warning that
+      // correctly stayed open — not from the info incident. The test below
+      // isolates that.
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+test('scan-truncated ALONE leaves the platform HEALTHY and the run green', async () => {
+  // A tenant that legitimately exceeds the cap must not sit at exit 1 /
+  // DEGRADED and alert on every run forever over a condition only a code
+  // change can clear — the alert-fatigue pattern the db-maintenance exit-code
+  // rule exists to prevent. No seeded incidents, so scan-truncated is the only
+  // thing in state.
+  const fixture = healthyFixture();
+  fixture.schedules = Array.from({ length: 500 }, (_, i) => ({
+    id: `sched-${i}`,
+    name: `Schedule ${i}`,
+    isActive: false,
+  }));
+
+  await withServer(fixture, async baseUrl => {
+    const tmpRoot = setupTmpRoot();
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+      const state = readState(tmpRoot);
+
+      assert.ok(state.incidents.find(i => i.id === TRUNCATED_ID), 'the finding is still recorded');
+      assert.equal(result.code, 0, `${result.stdout}`);
+      assert.equal(state.systemStatus, 'HEALTHY', 'an info finding must not degrade the platform');
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── Completeness gate: the LOWER bound, not just the cap ────────────────────
+
+test('NEGATIVE: an unrecognized list shape exits 2 and resolves nothing', async () => {
+  // `getAll` used to `break` on an unrecognized shape, returning [] as a
+  // SUCCESS. Zero items passes any `length < cap` completeness proxy, so a
+  // response-shape drift would have made the agent resolve EVERY incident,
+  // report HEALTHY and exit 0 — in silence. Pre-PR the agent resolved nothing,
+  // so the sweep is what creates that harm; the throw is what closes it.
+  const fixture: Fixture = { ...healthyFixture(), shape: 'unrecognized' };
+
+  await withServer(fixture, async baseUrl => {
+    const tmpRoot = setupTmpRoot([seedIncident()]);
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+      assert.equal(result.code, 2, `${result.stderr}\n${result.stdout}`);
+
+      const state = readState(tmpRoot);
+      const incident = state.incidents.find(i => i.id === COVERAGE_GAP_ID);
+      assert.ok(incident, 'the incident must survive');
+      assert.equal(incident.status, 'open', 'an empty list from a shape drift must clear nothing');
+      assert.equal(state.lastRun['schedule-doctor'], undefined, 'no run recorded');
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+test('a genuinely empty tenant (meta.total=0) is a COMPLETE scan and resolves normally', async () => {
+  // Don't over-block: zero entities with the server agreeing there are zero is
+  // a complete observation, not a truncated one.
+  const fixture: Fixture = {
+    schedules: [],
+    displays: [],
+    playlists: [],
+    shape: 'paginated',
+  };
+
+  await withServer(fixture, async baseUrl => {
+    const tmpRoot = setupTmpRoot([seedIncident()]);
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+      assert.equal(result.code, 0, `${result.stderr}\n${result.stdout}`);
+
+      const state = readState(tmpRoot);
+      assert.equal(
+        state.incidents.find(i => i.id === COVERAGE_GAP_ID)?.status,
+        'resolved',
+        'the display is gone and the server confirms the collection is empty',
+      );
+      assert.equal(
+        state.incidents.find(i => i.id === TRUNCATED_ID),
+        undefined,
+        'an empty-but-complete scan must not file scan-truncated',
+      );
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+test('NEGATIVE: a short walk (items < meta.total) resolves nothing and files scan-truncated', async () => {
+  // The exactness the cap proxy cannot give. Server reports 99 schedules but
+  // the walk retrieved 1 — a server that did not honour the requested page
+  // size, or a walk cut short. Well under MAX_ENTITIES, so a cap comparison
+  // would have called this complete and resolved on unseen data.
+  const fixture: Fixture = {
+    ...healthyFixture(),
+    schedules: [{ id: 'sched-1', name: 'One', isActive: false }],
+    shape: 'paginated',
+    scheduleTotal: 99,
+  };
+
+  await withServer(fixture, async baseUrl => {
+    const tmpRoot = setupTmpRoot([seedIncident()]);
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+
+      const state = readState(tmpRoot);
+      assert.equal(
+        state.incidents.find(i => i.id === COVERAGE_GAP_ID)?.status,
+        'open',
+        'a walk that saw 1 of 99 must not clear anything',
+      );
+
+      const truncated = state.incidents.find(i => i.id === TRUNCATED_ID);
+      assert.ok(truncated, `expected scan-truncated\n${result.stdout}`);
+      assert.equal(truncated.severity, 'info');
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── Resolutions must never green a red run ──────────────────────────────────
+
+test('a run with an open finding exits 1 even while it resolves a stale incident', async () => {
+  // display-2 has no playlist and no schedule -> coverage_gap raised open.
+  // display-1's stale incident resolves in the same run. The exit code is
+  // pinned to detection, so the resolution cannot mask the live finding.
+  const fixture: Fixture = {
+    schedules: [],
+    displays: [
+      { id: 'display-1', name: 'Lobby', currentPlaylistId: 'pl-1' },
+      { id: 'display-2', name: 'Cafe' },
+    ],
+    playlists: [{ id: 'pl-1', name: 'Main', items: [{ contentId: 'c-1' }] }],
+  };
+
+  await withServer(fixture, async baseUrl => {
+    const tmpRoot = setupTmpRoot([seedIncident()]);
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+
+      const state = readState(tmpRoot);
+      assert.equal(
+        state.incidents.find(i => i.id === COVERAGE_GAP_ID)?.status,
+        'resolved',
+        'display-1 recovered',
+      );
+      assert.equal(
+        state.incidents.find(i => i.id === 'schedule-doctor:coverage_gap:display-2')?.status,
+        'open',
+        'display-2 is a live finding',
+      );
+      assert.equal(
+        result.code,
+        1,
+        `resolutions must not green a run holding an open finding\n${result.stdout}`,
+      );
     } finally {
       rmSync(tmpRoot, { recursive: true, force: true });
     }

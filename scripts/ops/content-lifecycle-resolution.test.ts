@@ -37,6 +37,8 @@ interface Fixture {
   playlists: Record<string, unknown>[];
   /** null → `/health` answers 500. number → that usage percentage. */
   storagePct: number | null;
+  /** 'items' (default) or 'unrecognized' — neither array, { items } nor { data }. */
+  shape?: 'items' | 'unrecognized';
 }
 
 function fixture(over: Partial<Fixture> = {}): Fixture {
@@ -54,7 +56,12 @@ function startServer(f: Fixture): Promise<{ server: Server; baseUrl: string }> {
       res.end(JSON.stringify(body));
     };
     const paged = (all: Record<string, unknown>[]): void => {
-      json(200, { success: true, data: { items: all.slice((page - 1) * 100, page * 100) } });
+      const slice = all.slice((page - 1) * 100, page * 100);
+      if (f.shape === 'unrecognized') {
+        // A response-shape drift. This used to yield [] reported as success.
+        return json(200, { success: true, data: { results: slice, count: slice.length } });
+      }
+      json(200, { success: true, data: { items: slice } });
     };
 
     if (path === '/api/v1/auth/login') {
@@ -242,6 +249,10 @@ test('NEGATIVE: /health 500 leaves storage_high OPEN and stays CRITICAL', async 
         'CRITICAL',
         'the unverified critical must keep pinning systemStatus',
       );
+
+      // Resolutions can never green a red run — the exit code is pinned to
+      // detection, and storage_check_failed is a live open finding.
+      assert.equal(result.code, 1, `${result.stderr}\n${result.stdout}`);
     } finally {
       rmSync(tmpRoot, { recursive: true, force: true });
     }
@@ -275,6 +286,14 @@ test('MIXED: content checks clear their incident while /health 500 keeps storage
         high.status,
         'open',
         'the storage probe did NOT complete — its finding must survive the same run',
+      );
+
+      // The load-bearing exit-code pin: this run RESOLVED an incident and
+      // still holds an open storage_check_failed. It must stay red.
+      assert.equal(
+        result.code,
+        1,
+        `a resolution must not green a run with an open finding\n${result.stdout}`,
       );
     } finally {
       rmSync(tmpRoot, { recursive: true, force: true });
@@ -340,6 +359,34 @@ test('a /health with no storage fields clears storage_check_failed but not stora
   }
 });
 
+// ─── Completeness gate: the LOWER bound, not just the cap ────────────────────
+
+test('NEGATIVE: an unrecognized list shape exits 2 and resolves nothing', async () => {
+  // Zero items passes any `length < cap` completeness proxy, so before the
+  // throw a response-shape drift would have had this agent resolve EVERY
+  // incident and report HEALTHY. Storage is fine in this fixture, which is
+  // exactly what makes the silent version dangerous: the run looks perfect.
+  await withServer(fixture({ storagePct: 40, shape: 'unrecognized' }), async baseUrl => {
+    const tmpRoot = setupTmpRoot([storageHighIncident(), expiredContentIncident()]);
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+      assert.equal(result.code, 2, `${result.stderr}\n${result.stdout}`);
+
+      const state = readState(tmpRoot);
+      for (const id of [STORAGE_HIGH_ID, EXPIRED_ID]) {
+        assert.equal(
+          state.incidents.find(i => i.id === id)?.status,
+          'open',
+          `${id} must not be cleared off a shape drift`,
+        );
+      }
+      assert.equal(state.lastRun['content-lifecycle'], undefined, 'no run recorded');
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
 // ─── Truncation: content lists at the cap resolve no content incident ────────
 
 test('NEGATIVE: a truncated content scan resolves nothing and raises scan-truncated', async () => {
@@ -369,7 +416,10 @@ test('NEGATIVE: a truncated content scan resolves nothing and raises scan-trunca
         i => i.id === 'content-lifecycle:scan-truncated:entity-lists',
       );
       assert.ok(truncated, `expected a scan-truncated incident\n${result.stdout}`);
-      assert.equal(truncated.severity, 'warning');
+      // INFO, not warning: only a code change can clear it, so counting it as a
+      // failure would pin a legitimately-large tenant at exit 1 / DEGRADED on
+      // every run forever.
+      assert.equal(truncated.severity, 'info');
       assert.match(truncated.message, /page-walk cap/i);
     } finally {
       rmSync(tmpRoot, { recursive: true, force: true });

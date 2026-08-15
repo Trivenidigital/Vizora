@@ -299,14 +299,25 @@ function retainLogs(): LogRetentionResult {
  * a backup that silently produces no file. The non-empty assertion below is
  * what makes that failure impossible to repeat.
  */
-function runBackup(): { attempted: boolean; ok: boolean; error?: string } {
+function runBackup(): { attempted: boolean; ok: boolean; error?: string; configured: boolean } {
   const bucket = process.env.BACKUP_S3_BUCKET;
   if (!bucket) {
     log(AGENT, 'Backup skipped: BACKUP_S3_BUCKET not set');
-    return { attempted: false, ok: true };
+    return { attempted: false, ok: true, configured: false };
   }
   if (!/^s3:\/\/[a-zA-Z0-9.\-_/]+$|^[a-zA-Z0-9.\-_/]+$/.test(bucket)) {
-    return { attempted: false, ok: true, error: 'BACKUP_S3_BUCKET has invalid format' };
+    // A malformed bucket is a FAILURE, not a disable. This previously returned
+    // `{ attempted: false, ok: true }`, which `buildMaintenanceIncidents` reads
+    // as "no backup was requested" — so a typo in BACKUP_S3_BUCKET produced no
+    // backup, no incident and exit 0, indistinguishable from backups being
+    // deliberately off. The operator asked for backups; they are not happening.
+    log(AGENT, 'Backup FAILED: BACKUP_S3_BUCKET is set but malformed');
+    return {
+      attempted: true,
+      ok: false,
+      configured: true,
+      error: 'BACKUP_S3_BUCKET is set but has an invalid format — no backup was taken',
+    };
   }
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -314,7 +325,7 @@ function runBackup(): { attempted: boolean; ok: boolean; error?: string } {
   const gzPath = `${rawPath}.gz`;
   const candidates = buildPgDumpCandidates(process.env.DATABASE_URL, PG_CONTAINER, rawPath);
   if (candidates.length === 0) {
-    return { attempted: true, ok: false, error: 'DATABASE_URL missing or unparseable' };
+    return { attempted: true, ok: false, configured: true, error: 'DATABASE_URL missing or unparseable' };
   }
 
   const attempts: string[] = [];
@@ -342,7 +353,7 @@ function runBackup(): { attempted: boolean; ok: boolean; error?: string } {
     }
   }
 
-  if (!source) return { attempted: true, ok: false, error: attempts.join('; ') };
+  if (!source) return { attempted: true, ok: false, configured: true, error: attempts.join('; ') };
 
   try {
     execFileSync('gzip', ['-f', rawPath], { timeout: 60_000, stdio: 'pipe' });
@@ -352,10 +363,10 @@ function runBackup(): { attempted: boolean; ok: boolean; error?: string } {
       timeout: 300_000, stdio: 'pipe',
     });
     log(AGENT, `Backup uploaded to ${s3Dest}`);
-    return { attempted: true, ok: true };
+    return { attempted: true, ok: true, configured: true };
   } catch (err) {
     const msg = redactUrlCredentials(err instanceof Error ? err.message.split('\n')[0] : String(err));
-    return { attempted: true, ok: false, error: `dump ok via ${source} but post-processing failed: ${msg}` };
+    return { attempted: true, ok: false, configured: true, error: `dump ok via ${source} but post-processing failed: ${msg}` };
   }
 }
 
@@ -433,7 +444,7 @@ async function main(): Promise<void> {
       const resolved = resolveClearedMaintenanceIncidents(
         state.incidents,
         new Set(incidents.map(i => i.id)),
-        tableCheck.checked,
+        { tableCheckRan: tableCheck.checked, backupConfigured: report.backup.configured },
         detectedAt,
       );
       for (const r of resolved) {

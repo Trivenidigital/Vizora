@@ -526,13 +526,21 @@ async function main(): Promise<void> {
 
   let content: ContentItem[];
   let playlists: Playlist[];
+  let contentScanComplete: boolean;
 
   try {
     log(AGENT, 'Fetching content and playlists');
-    [content, playlists] = await Promise.all([
-      api.getAll<ContentItem>('/content'),
-      api.getAll<Playlist>('/playlists'),
+    // getAllScan, not getAll: the completeness verdict gates incident
+    // resolution below and must come from the fetch layer that actually knows
+    // (server-reported `meta.total` where present). An unrecognized response
+    // shape now THROWS into this catch instead of yielding a silent empty list.
+    const [contentScan, playlistScan] = await Promise.all([
+      api.getAllScan<ContentItem>('/content'),
+      api.getAllScan<Playlist>('/playlists'),
     ]);
+    content = contentScan.items;
+    playlists = playlistScan.items;
+    contentScanComplete = contentScan.complete && playlistScan.complete;
     log(AGENT, `Fetched ${content.length} content item(s) and ${playlists.length} playlist(s)`);
   } catch (err) {
     log(AGENT, `FATAL: Failed to fetch data — ${err instanceof Error ? err.message : err}`);
@@ -548,11 +556,7 @@ async function main(): Promise<void> {
     issuesFixed: 0,
     issuesEscalated: 0,
     fatalDetected: false,
-    // `getAll` stops at MAX_ENTITIES, so a list at the cap may be missing items
-    // this run never examined — and an item never examined cannot be evidence
-    // that its incident cleared.
-    contentScanComplete:
-      content.length < MAX_ENTITIES && playlists.length < MAX_ENTITIES,
+    contentScanComplete,
     storageVerdictReached: false,
     storageProbeReached: false,
   };
@@ -560,26 +564,29 @@ async function main(): Promise<void> {
   // Truncation is announced, never silent. Withholding resolution quietly would
   // drop a legitimately-large tenant into a permanent no-resolution regime with
   // no signal saying why.
+  //
+  // INFO, and deliberately NOT counted in `issuesFound`. Only a code change can
+  // clear it, so counting it would pin a legitimately-large tenant at exit 1 /
+  // DEGRADED on every run forever — the alert-fatigue pattern the
+  // db-maintenance exit-code rule exists to prevent.
   if (!counters.contentScanComplete) {
-    counters.issuesFound++;
     log(
       AGENT,
-      `Content scan hit the ${MAX_ENTITIES}-item page-walk cap ` +
-      `(content=${content.length}, playlists=${playlists.length}) — ` +
-      'no content incident will be resolved this run',
+      `Content scan was incomplete (content=${content.length}, playlists=${playlists.length}, ` +
+      `cap=${MAX_ENTITIES}) — no content incident will be resolved this run`,
     );
     incidents.push({
       id: makeIncidentId(AGENT, 'scan-truncated', 'entity-lists'),
       agent: AGENT,
       type: 'scan-truncated',
-      severity: 'warning',
+      severity: 'info',
       target: 'content',
       targetId: 'entity-lists',
       detected: new Date().toISOString(),
       message:
-        `Content lifecycle could not see the whole tenant: content=${content.length}, ` +
-        `playlists=${playlists.length} against a ${MAX_ENTITIES}-item page-walk cap. Findings are ` +
-        'still valid, but no prior content incident can be cleared from a partial scan.',
+        `Content lifecycle could not see the whole tenant (content=${content.length}, ` +
+        `playlists=${playlists.length}, page-walk cap ${MAX_ENTITIES}). Findings are still valid, ` +
+        'but no prior content incident can be cleared from a partial scan.',
       remediation: `Raise the getAll page-walk cap in scripts/ops/lib/api-client.ts, or scope this agent's queries.`,
       status: 'open',
       attempts: 0,
