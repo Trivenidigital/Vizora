@@ -80,7 +80,13 @@ jest.mock('@/lib/hooks/useDebounce', () => ({
 }));
 
 jest.mock('@/lib/hooks', () => ({
-  useRealtimeEvents: jest.fn(() => ({ isConnected: false, isOffline: true })),
+  // emitDeviceUpdate is part of the real hook's contract and the edit flow calls
+  // it; omitting it made the success path throw into the retry error branch.
+  useRealtimeEvents: jest.fn(() => ({
+    isConnected: false,
+    isOffline: true,
+    emitDeviceUpdate: jest.fn(),
+  })),
   useOptimisticState: jest.fn((initialState: any) => ({
     updateOptimistic: jest.fn(),
     commitOptimistic: jest.fn(),
@@ -663,6 +669,82 @@ describe('DevicesClient', () => {
       expect(mockBulkAssignGroup).toHaveBeenCalledWith(['d1', 'd2'], 'g1');
     });
     expect(mockToast.success).toHaveBeenCalledWith('Added 1 device(s) to group');
+  });
+
+  /**
+   * A confirmed delete must leave the table, not just the database.
+   *
+   * `useOptimisticState` keeps its own copy of the array and the page never
+   * renders it, so pairing the API call with commitOptimistic alone left the
+   * deleted row on screen until the operator reloaded - the row looked alive
+   * next to a "deleted successfully" toast. Asserted on the DOM with no
+   * refetch: getDisplays is not re-stubbed here, so a row that survives cannot
+   * be papered over by a reload.
+   */
+  it('removes the deleted device from the table without a reload', async () => {
+    render(
+      <DevicesClient
+        initialDevices={sampleDevices as any}
+        initialPlaylists={samplePlaylists as any}
+        initialDevicesComplete
+        initialPlaylistsComplete
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Lobby Display')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Delete')[0]);
+    fireEvent.click(screen.getByText('Confirm'));
+
+    await waitFor(() => {
+      expect(mockDeleteDisplay).toHaveBeenCalledWith('d1');
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText('Lobby Display')).not.toBeInTheDocument();
+    });
+    expect(mockToast.success).toHaveBeenCalledWith('Device deleted successfully');
+    // The other rows stay - the filter must be by id, not a blanket clear.
+    expect(screen.getByText('Conference Room')).toBeInTheDocument();
+    expect(screen.getByText('Cafeteria Screen')).toBeInTheDocument();
+    expect(mockGetDisplays).not.toHaveBeenCalled();
+  });
+
+  // Same root cause as the delete above: the rendered list is `devices`, so a
+  // rename that only committed the optimistic copy showed the old nickname.
+  it('shows the renamed device in the table without a reload', async () => {
+    render(
+      <DevicesClient
+        initialDevices={sampleDevices as any}
+        initialPlaylists={samplePlaylists as any}
+        initialDevicesComplete
+        initialPlaylistsComplete
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Lobby Display')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getAllByText('Edit')[0]);
+    const [nicknameInput] = screen.getAllByPlaceholderText('e.g., Store Front Display');
+    fireEvent.change(nicknameInput, { target: { value: 'Reception Screen' } });
+    fireEvent.click(screen.getByText('Save Changes'));
+
+    await waitFor(() => {
+      expect(mockUpdateDisplay).toHaveBeenCalledWith('d1', {
+        nickname: 'Reception Screen',
+        location: 'Building A - Lobby',
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Reception Screen')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Lobby Display')).not.toBeInTheDocument();
+    expect(mockGetDisplays).not.toHaveBeenCalled();
   });
 
   it('handles empty device list gracefully', async () => {

@@ -224,7 +224,16 @@ export default function DevicesClient({
  return true;
  },
  () => {
+ // Same reason as confirmDelete: the optimistic copy is not what the table
+ // renders, so the renamed device kept its old name until a reload.
  commitOptimistic(updateId);
+ setDevices((prev) =>
+ prev.map((d) =>
+ d.id === selectedDevice.id
+ ? { ...d, nickname: editForm.nickname, location: editForm.location }
+ : d
+ )
+ );
  toast.success('Device updated successfully');
  setIsEditModalOpen(false);
  emitDeviceUpdate({
@@ -270,7 +279,16 @@ export default function DevicesClient({
  return true;
  },
  () => {
+ // Commit the optimistic update AND the rendered state. useOptimisticState
+ // holds its own copy of the array; the table renders `devices`, so
+ // commitOptimistic alone left the deleted row on screen until a reload.
+ // Same pairing the content page uses (content/page-client.tsx).
  commitOptimistic(deleteId);
+ const wasOnlyVisibleDevice = displayDevices.length <= 1;
+ setDevices((prev) => prev.filter((d) => d.id !== deletedDeviceId));
+ if (wasOnlyVisibleDevice && currentPage > 1) {
+ setCurrentPage((page) => Math.max(1, page - 1));
+ }
  toast.success('Device deleted successfully');
  setIsDeleteModalOpen(false);
  setSelectedDevice(null);
