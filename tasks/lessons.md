@@ -344,3 +344,38 @@ Three corrections were needed this session, all the same shape — a conclusion 
 - **Rule:** the merge/deploy command must be conditioned on the explicit success marker the
   poll emits (`ALLGREEN` flag/exit status), never placed sequentially after a bounded wait.
   A poll that can time out must leave the dangerous action untaken.
+
+
+## 2026-08-15 — The migration-edit hook guards `Edit` but NOT `Write` of a new migration file
+
+- Found while adding `20260815120000_add_billing_event_at/migration.sql` for B3 (#354).
+  The global `PreToolUse` hook matches `tool == 'Edit' && tool_input.file_path matches
+  'migrations/'`, so creating a brand-new migration with `Write` sails straight past it.
+- That was the LEGITIMATE use here — a hand-written migration is exactly what the repo
+  wants for a schema change. The guard is one-sided by accident, not by design, and the
+  next author should know it: **the absence of a block is not approval.** Creating or
+  replacing a migration file still needs the care an `Edit` would have prompted for.
+- The asymmetry also means a full-file `Write` can silently REPLACE an existing migration —
+  the destructive case the hook exists to prevent — because only `Edit` is matched.
+- **Rule:** treat any `Write` under `prisma/migrations/` as if the block had fired: confirm
+  the file is genuinely new, use the PHYSICAL (`@@map`) table and column names, and verify
+  it against the `migrations` CI job (which replays every migration from an empty database)
+  rather than assuming a green PR covered it — that job is not in the required-checks set.
+
+## 2026-08-15 — `git checkout --` is not a mutation-testing undo; the script already restored the file
+
+- Cost me two full re-implementations of a large source change during the #354 review round.
+  My mutation-testing script wrote the mutation, ran jest, and wrote the ORIGINAL text back
+  before printing. When the print then crashed on a Unicode encode error, I read "crash" as
+  "the file may still be mutated" and ran `git checkout -- <file>` to be safe.
+- The file was already correct. What `checkout` actually reverted was every UNCOMMITTED fix
+  in it — restoring it to the last commit and destroying ~600 lines of work. Twice, because
+  after the first loss I repeated the reflex on the next crash.
+- The tell I ignored: `git diff --stat <file>` printed NOTHING right after the checkout,
+  which is only possible if the file matched HEAD — i.e. if my changes were gone.
+- **Rules:** (1) never run `git checkout --` / `git restore` on a file holding uncommitted
+  work as a precaution — inspect first (`git diff`, or grep for a token you added).
+  (2) When a long edit sequence reaches green, COMMIT before starting any mutation or
+  experiment loop; the commit is the undo. (3) A script that mutates tracked source must
+  restore in a `finally`, and must not run anything that can throw between the mutation and
+  the restore.

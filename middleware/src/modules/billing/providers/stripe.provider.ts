@@ -229,6 +229,12 @@ export class StripeProvider implements PaymentProvider {
       id: event.id,
       type: event.type,
       data: event.data.object as unknown as WebhookEventData,
+      // Stripe `event.created` is the emission time in unix SECONDS. Orders
+      // entitlement writes only — Stripe does not guarantee delivery order.
+      createdAt:
+        typeof event.created === 'number' && Number.isFinite(event.created)
+          ? new Date(event.created * 1000)
+          : undefined,
     };
   }
 

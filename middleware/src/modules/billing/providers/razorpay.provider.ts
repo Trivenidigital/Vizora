@@ -217,6 +217,14 @@ export class RazorpayProvider implements PaymentProvider {
       id: `rzp_${crypto.createHash('sha256').update(payload).digest('hex').slice(0, 40)}`,
       type: event.event,
       data: data as WebhookEventData,
+      // Top-level `created_at` is the EVENT emission time in unix SECONDS — a
+      // different field from each entity's own created_at. It is not unique
+      // (Razorpay can emit several events in the same second), so it orders
+      // entitlement writes and is never used for dedup.
+      createdAt:
+        typeof event.created_at === 'number' && Number.isFinite(event.created_at)
+          ? new Date(event.created_at * 1000)
+          : undefined,
     };
   }
 

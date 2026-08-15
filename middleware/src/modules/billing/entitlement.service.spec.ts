@@ -134,6 +134,50 @@ describe('EntitlementService (B3 ladder)', () => {
     expect(notifier.emit).not.toHaveBeenCalled();
   });
 
+  it('rung 3 writes the FULL free-tier entitlement set, storage included (A-F3)', async () => {
+    // This is the HIGHEST-VOLUME route to the free tier — silent non-payment,
+    // not an explicit cancellation. It used to hardcode
+    // `{ subscriptionTier: 'free', screenQuota: 5 }` with no storageQuotaBytes,
+    // so an ex-Pro org kept a 100GB storage quota forever and
+    // StorageQuotaService enforced the stored value verbatim.
+    db.organization.findMany.mockImplementation(({ where }: any) =>
+      where.subscriptionStatus === 'suspended'
+        ? [{ id: 'o1', entitlementStateSince: daysAgo(LADDER.DAYS_TO_CANCEL) }]
+        : [],
+    );
+
+    await service.advanceLadder(NOW);
+
+    const rung3 = db.organization.updateMany.mock.calls
+      .map((c: any[]) => c[0])
+      .find((arg: any) => arg?.data?.subscriptionStatus === 'canceled');
+
+    expect(rung3.data.storageQuotaBytes).toBe(BigInt(1024 * 1024 * 1024));
+    // And the ordering mark, so a late-delivered older billing webhook cannot
+    // sail past the guard and undo the downgrade (B-M2).
+    expect(rung3.data.billingEventAt).toEqual(NOW);
+  });
+
+  it('rung 3 sources its quota from the shared tier definition, not a literal', async () => {
+    // The duplicated `screenQuota: 5` literal silently diverges the day the free
+    // tier's quota changes. Pinning it to the shared helper is the point of the
+    // fix, so assert they agree rather than re-hardcoding 5 here.
+    const { tierEntitlementFields } = await import('./constants/plans');
+    db.organization.findMany.mockImplementation(({ where }: any) =>
+      where.subscriptionStatus === 'suspended'
+        ? [{ id: 'o1', entitlementStateSince: daysAgo(LADDER.DAYS_TO_CANCEL) }]
+        : [],
+    );
+
+    await service.advanceLadder(NOW);
+
+    const rung3 = db.organization.updateMany.mock.calls
+      .map((c: any[]) => c[0])
+      .find((arg: any) => arg?.data?.subscriptionStatus === 'canceled');
+
+    expect(rung3.data).toMatchObject(tierEntitlementFields('free'));
+  });
+
   // ---- idempotency ----
 
   it('is idempotent per run: a concurrent flip (updateMany count 0) does not double-advance or emit', async () => {

@@ -60,6 +60,18 @@ export interface WebhookEvent {
    * across delivery retries but distinct across genuinely different events.
    */
   id: string;
+  /**
+   * When the PROVIDER emitted this event (Stripe `event.created`, Razorpay
+   * top-level `created_at` — both unix SECONDS). Used only to order entitlement
+   * writes against `Organization.billingEventAt` so a retried older event cannot
+   * overwrite newer state.
+   *
+   * NOT an idempotency key: it is not unique (two events can share a second),
+   * and it is distinct from the entity's own `created_at`. Dedup is `id`.
+   * Optional — a provider that does not supply one simply gets no ordering
+   * guard, never a fabricated timestamp.
+   */
+  createdAt?: Date;
 }
 
 export interface PaymentProvider {

@@ -90,9 +90,14 @@ describe('BillingService', () => {
         findUnique: jest.fn(),
         findFirst: jest.fn(),
         update: jest.fn(),
+        // Every entitlement write is a conditional updateMany (compare-and-set
+        // on billingEventAt) — see BillingService.writeEntitlement.
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       billingTransaction: {
-        create: jest.fn(),
+        // UPSERT, not create: the audit row must survive a retry after a
+        // partial apply without poisoning it with P2002 (B-H1).
+        upsert: jest.fn(),
       },
       // updateSubscription wraps its local write in $transaction — run the
       // callback against the same mock so tx.organization.update is captured.
@@ -169,15 +174,23 @@ describe('BillingService', () => {
   });
 
   describe('onModuleInit (price-ID startup validation)', () => {
+    // Razorpay is interval-dimensioned since B3-E1. The legacy single-dimension
+    // names stay in this list so beforeEach clears the ones set in beforeAll.
     const KEYS = [
       'STRIPE_BASIC_MONTHLY_PRICE_ID',
       'STRIPE_BASIC_YEARLY_PRICE_ID',
+      'RAZORPAY_BASIC_MONTHLY_PLAN_ID',
+      'RAZORPAY_BASIC_YEARLY_PLAN_ID',
       'RAZORPAY_BASIC_PLAN_ID',
       'STRIPE_PRO_MONTHLY_PRICE_ID',
       'STRIPE_PRO_YEARLY_PRICE_ID',
+      'RAZORPAY_PRO_MONTHLY_PLAN_ID',
+      'RAZORPAY_PRO_YEARLY_PLAN_ID',
       'RAZORPAY_PRO_PLAN_ID',
       'STRIPE_ENTERPRISE_MONTHLY_PRICE_ID',
       'STRIPE_ENTERPRISE_YEARLY_PRICE_ID',
+      'RAZORPAY_ENTERPRISE_MONTHLY_PLAN_ID',
+      'RAZORPAY_ENTERPRISE_YEARLY_PLAN_ID',
       'RAZORPAY_ENTERPRISE_PLAN_ID',
     ];
     let savedEnv: Record<string, string | undefined>;
@@ -226,6 +239,54 @@ describe('BillingService', () => {
       });
       // Free tier env vars NOT set, but validation should pass — free has no price.
       expect(() => service.onModuleInit()).not.toThrow();
+    });
+
+    it('accepts the legacy RAZORPAY_<TIER>_PLAN_ID as the monthly alias', () => {
+      process.env.BILLING_VALIDATION_STRICT = 'true';
+      KEYS.filter((k) => !k.startsWith('RAZORPAY_')).forEach((k) => {
+        process.env[k] = `${k}_VALUE`;
+      });
+      // Only the legacy names + the yearly names — no interval-scoped monthly.
+      process.env.RAZORPAY_BASIC_PLAN_ID = 'plan_basic_legacy';
+      process.env.RAZORPAY_BASIC_YEARLY_PLAN_ID = 'plan_basic_yearly';
+      process.env.RAZORPAY_PRO_PLAN_ID = 'plan_pro_legacy';
+      process.env.RAZORPAY_PRO_YEARLY_PLAN_ID = 'plan_pro_yearly';
+      process.env.RAZORPAY_ENTERPRISE_PLAN_ID = 'plan_ent_legacy';
+      process.env.RAZORPAY_ENTERPRISE_YEARLY_PLAN_ID = 'plan_ent_yearly';
+
+      expect(() => service.onModuleInit()).not.toThrow();
+    });
+
+    it('reports an ambiguous plan id LOUDLY but still boots (C-F2)', () => {
+      // Ambiguous config is a real misconfiguration, but throwing takes the
+      // whole middleware down — displays, content, auth — in both cluster
+      // instances, over a billing typo, on a deployment where billing may be
+      // dormant. That is the #101 boot-validator lesson.
+      //
+      // Degrading is safe because the ambiguous id is REMOVED from the reverse
+      // index, so it resolves to null and every webhook carrying it takes the
+      // skip-the-tier-write-and-escalate path. Nobody gets a guessed tier.
+      process.env.RAZORPAY_BASIC_MONTHLY_PLAN_ID = 'plan_shared';
+      process.env.RAZORPAY_PRO_MONTHLY_PLAN_ID = 'plan_shared';
+      const errorSpy = jest
+        .spyOn((service as unknown as { logger: { error: jest.Mock } }).logger, 'error')
+        .mockImplementation(() => undefined);
+
+      expect(() => service.onModuleInit()).not.toThrow();
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Ambiguous billing plan id'));
+      errorSpy.mockRestore();
+    });
+
+    it('a MISSING id still fails boot under STRICT (that check is unchanged)', () => {
+      process.env.BILLING_VALIDATION_STRICT = 'true';
+      expect(() => service.onModuleInit()).toThrow(/Missing billing price/);
+    });
+
+    it('does not treat the legacy alias holding the same value as its monthly var as a conflict', () => {
+      process.env.RAZORPAY_PRO_PLAN_ID = 'plan_pro_inr';
+      process.env.RAZORPAY_PRO_MONTHLY_PLAN_ID = 'plan_pro_inr';
+
+      expect(() => service.onModuleInit()).not.toThrow(/Ambiguous billing plan id/);
     });
   });
 
@@ -418,6 +479,112 @@ describe('BillingService', () => {
       interval: 'monthly' as const,
     };
 
+    /** An India-country org, so getDefaultProviderForCountry picks Razorpay. */
+    const razorpayCheckoutOrg = (overrides: Record<string, unknown> = {}) => ({
+      ...mockOrganization,
+      country: 'IN',
+      paymentProvider: 'razorpay',
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      razorpayCustomerId: 'cust_razorpay123',
+      razorpaySubscriptionId: null,
+      ...overrides,
+    });
+
+    it('B3-P1 persists the Razorpay subscription id returned by checkout', async () => {
+      // Without this write razorpaySubscriptionId stays null forever and both
+      // updateSubscription and cancelSubscription 400 with "No active
+      // subscription found" for every paying Razorpay customer. Deleting the
+      // six lines that do it used to leave the whole suite green (C-F3).
+      mockDatabaseService.organization.findUnique.mockResolvedValue(razorpayCheckoutOrg());
+      mockRazorpayProvider.createCheckoutSession.mockResolvedValue({
+        url: 'https://rzp.io/i/abc',
+        sessionId: 'sub_rzp_new',
+      });
+      mockDatabaseService.organization.update.mockResolvedValue({});
+
+      await service.createCheckoutSession('org-123', { planId: 'pro', interval: 'monthly' });
+
+      expect(mockDatabaseService.organization.update).toHaveBeenCalledWith({
+        where: { id: 'org-123' },
+        data: { razorpaySubscriptionId: 'sub_rzp_new' },
+      });
+    });
+
+    it('B3-E1 a YEARLY selection reaches the provider as the YEARLY plan id', async () => {
+      // The headline bug: the Razorpay arm dropped dto.interval, so picking
+      // yearly subscribed the customer to the monthly plan and billed monthly.
+      process.env.RAZORPAY_PRO_YEARLY_PLAN_ID = 'plan_pro_inr_yearly';
+      try {
+        mockDatabaseService.organization.findUnique.mockResolvedValue(razorpayCheckoutOrg());
+        mockRazorpayProvider.createCheckoutSession.mockResolvedValue({
+          url: 'https://rzp.io/i/abc',
+          sessionId: 'sub_rzp_y',
+        });
+        mockDatabaseService.organization.update.mockResolvedValue({});
+
+        await service.createCheckoutSession('org-123', { planId: 'pro', interval: 'yearly' });
+
+        expect(mockRazorpayProvider.createCheckoutSession).toHaveBeenCalledWith(
+          expect.objectContaining({ priceId: 'plan_pro_inr_yearly' }),
+        );
+      } finally {
+        delete process.env.RAZORPAY_PRO_YEARLY_PLAN_ID;
+      }
+    });
+
+    it('B3-E1 refuses a yearly checkout when no yearly plan id is configured', async () => {
+      // There is deliberately NO legacy fallback for yearly: silently billing a
+      // yearly customer at the monthly cadence is worse than refusing.
+      delete process.env.RAZORPAY_PRO_YEARLY_PLAN_ID;
+      mockDatabaseService.organization.findUnique.mockResolvedValue(razorpayCheckoutOrg());
+
+      await expect(
+        service.createCheckoutSession('org-123', { planId: 'pro', interval: 'yearly' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockRazorpayProvider.createCheckoutSession).not.toHaveBeenCalled();
+    });
+
+    it('B-H2 refuses a second checkout while a Razorpay subscription is ACTIVE', async () => {
+      // P1 overwrote razorpaySubscriptionId unconditionally, so a double-click
+      // or a second purchase attempt replaced the id of the subscription that is
+      // actually charging the customer. Cancel would then close the unpaid shell
+      // and report success while the real one kept billing.
+      mockDatabaseService.organization.findUnique.mockResolvedValue(
+        razorpayCheckoutOrg({ razorpaySubscriptionId: 'sub_live' }),
+      );
+      mockRazorpayProvider.getSubscription.mockResolvedValue({
+        id: 'sub_live',
+        status: 'active',
+      });
+
+      await expect(
+        service.createCheckoutSession('org-123', { planId: 'pro', interval: 'monthly' }),
+      ).rejects.toThrow(/already has a subscription with this payment provider/);
+      expect(mockRazorpayProvider.createCheckoutSession).not.toHaveBeenCalled();
+    });
+
+    it('B-H2 ALLOWS a retry when the stored subscription is an unpaid shell', async () => {
+      // `created`/`authenticated` is an abandoned or double-clicked checkout —
+      // nobody is being charged, so retrying must stay possible.
+      mockDatabaseService.organization.findUnique.mockResolvedValue(
+        razorpayCheckoutOrg({ razorpaySubscriptionId: 'sub_abandoned' }),
+      );
+      mockRazorpayProvider.getSubscription.mockResolvedValue({
+        id: 'sub_abandoned',
+        status: 'incomplete',
+      });
+      mockRazorpayProvider.createCheckoutSession.mockResolvedValue({
+        url: 'https://rzp.io/i/abc',
+        sessionId: 'sub_retry',
+      });
+      mockDatabaseService.organization.update.mockResolvedValue({});
+
+      await service.createCheckoutSession('org-123', { planId: 'pro', interval: 'monthly' });
+
+      expect(mockRazorpayProvider.createCheckoutSession).toHaveBeenCalled();
+    });
+
     it('should create checkout session with Stripe for US organization', async () => {
       mockDatabaseService.organization.findUnique.mockResolvedValue(mockOrganization);
       mockStripeProvider.createCheckoutSession.mockResolvedValue({
@@ -582,9 +749,21 @@ describe('BillingService', () => {
       await service.cancelSubscription('org-123', false);
 
       expect(mockRazorpayProvider.cancelSubscription).toHaveBeenCalledWith('sub_razorpay123', false);
+      // Same entitlement fields as the immediate branch and the webhook (B3-P5):
+      // the provider has already cancelled, so leaving ANY paid entitlement
+      // behind keeps what the customer no longer pays for. storageQuotaBytes is
+      // part of that set (A-F3), and the dead subscription id is cleared so a
+      // later plan-change/cancel cannot act on it (A-F7).
       expect(mockDatabaseService.organization.update).toHaveBeenCalledWith({
         where: { id: 'org-123' },
-        data: { subscriptionStatus: 'canceled' },
+        data: {
+          subscriptionStatus: 'canceled',
+          subscriptionTier: 'free',
+          screenQuota: 5,
+          storageQuotaBytes: BigInt(1024 * 1024 * 1024),
+          razorpaySubscriptionId: null,
+          billingEventAt: expect.any(Date),
+        },
       });
     });
 
@@ -678,26 +857,182 @@ describe('BillingService', () => {
       expect(mockStripeProvider.updateSubscription).not.toHaveBeenCalled();
     });
 
-    it('uses the interval-agnostic Razorpay plan id on plan change', async () => {
-      const razorpayOrg = {
-        ...mockOrganization,
-        stripeSubscriptionId: null,
-        razorpaySubscriptionId: 'sub_razorpay123',
-        razorpayCustomerId: 'cust_razorpay123',
-        paymentProvider: 'razorpay',
-      };
+    const razorpayOrg = {
+      ...mockOrganization,
+      stripeSubscriptionId: null,
+      razorpaySubscriptionId: 'sub_razorpay123',
+      razorpayCustomerId: 'cust_razorpay123',
+      paymentProvider: 'razorpay',
+    };
+
+    it('preserves the Razorpay billing interval on plan change (monthly)', async () => {
       mockDatabaseService.organization.findUnique.mockResolvedValue(razorpayOrg);
       mockRazorpayProvider.updateSubscription.mockResolvedValue({});
-      mockRazorpayProvider.getSubscription.mockResolvedValue(null);
+      // Razorpay exposes plan_id, not an interval — the current interval is
+      // recovered by reverse-mapping the plan the subscriber is on today.
+      // 'plan_basic_inr' = RAZORPAY_BASIC_PLAN_ID (legacy → monthly alias).
+      mockRazorpayProvider.getSubscription.mockResolvedValue({
+        priceId: 'plan_basic_inr',
+        status: 'active',
+      });
       mockDatabaseService.organization.update.mockResolvedValue({});
 
       await service.updateSubscription('org-123', { planId: 'pro' });
 
-      // RAZORPAY_PRO_PLAN_ID = 'plan_pro_inr' (set in beforeAll); no interval dimension.
       expect(mockRazorpayProvider.updateSubscription).toHaveBeenCalledWith(
         'sub_razorpay123',
         'plan_pro_inr',
       );
+    });
+
+    it('preserves the Razorpay billing interval on plan change (yearly)', async () => {
+      process.env.RAZORPAY_BASIC_YEARLY_PLAN_ID = 'plan_basic_inr_yearly';
+      process.env.RAZORPAY_PRO_YEARLY_PLAN_ID = 'plan_pro_inr_yearly';
+      try {
+        mockDatabaseService.organization.findUnique.mockResolvedValue(razorpayOrg);
+        mockRazorpayProvider.updateSubscription.mockResolvedValue({});
+        mockRazorpayProvider.getSubscription.mockResolvedValue({
+          priceId: 'plan_basic_inr_yearly',
+          status: 'active',
+        });
+        mockDatabaseService.organization.update.mockResolvedValue({});
+
+        await service.updateSubscription('org-123', { planId: 'pro' });
+
+        // A yearly subscriber must NOT be re-billed onto the monthly plan.
+        expect(mockRazorpayProvider.updateSubscription).toHaveBeenCalledWith(
+          'sub_razorpay123',
+          'plan_pro_inr_yearly',
+        );
+      } finally {
+        delete process.env.RAZORPAY_BASIC_YEARLY_PLAN_ID;
+        delete process.env.RAZORPAY_PRO_YEARLY_PLAN_ID;
+      }
+    });
+
+    it('MED-3 a STRIPE org with a live subscription is also refused a second checkout', async () => {
+      // The guard was Razorpay-only, which combined with the A-F5 gate to steer
+      // a past_due Stripe customer into creating a SECOND subscription while the
+      // original kept billing and dunning.
+      mockDatabaseService.organization.findUnique.mockResolvedValue(mockOrganization);
+      mockStripeProvider.getSubscription.mockResolvedValue({
+        id: 'sub_stripe123',
+        status: 'past_due',
+      });
+
+      await expect(
+        service.createCheckoutSession('org-123', { planId: 'pro', interval: 'monthly' }),
+      ).rejects.toThrow(/already has a subscription with this payment provider/);
+      expect(mockStripeProvider.createCheckoutSession).not.toHaveBeenCalled();
+    });
+
+    it('A-F5 refuses an upgrade when the provider subscription is NOT active', async () => {
+      // B3-P1 persisting razorpaySubscriptionId removed the accidental gate that
+      // made this endpoint unreachable for Razorpay. An org holding only an
+      // unpaid `created` shell from an abandoned checkout must not be able to
+      // grant itself a paid tier locally.
+      mockDatabaseService.organization.findUnique.mockResolvedValue(razorpayOrg);
+      mockRazorpayProvider.getSubscription.mockResolvedValue({
+        priceId: 'plan_basic_inr',
+        status: 'incomplete',
+      });
+
+      await expect(
+        service.updateSubscription('org-123', { planId: 'pro' }),
+      ).rejects.toThrow(/No live subscription to change/);
+      // And the message must never send them to checkout — that is how a
+      // parallel second subscription gets created.
+      await expect(
+        service.updateSubscription('org-123', { planId: 'pro' }),
+      ).rejects.not.toThrow(/[Cc]omplete checkout/);
+      expect(mockRazorpayProvider.updateSubscription).not.toHaveBeenCalled();
+      expect(mockDatabaseService.organization.update).not.toHaveBeenCalled();
+    });
+
+    it('MED-3 a PAST_DUE subscriber may change plan, but gets no local tier grant', async () => {
+      // past_due is the same state SubscriptionActiveGuard grants full dashboard
+      // write access to, and downgrading is exactly what a dunning customer
+      // wants. The provider-side change goes through; the paid-tier write is
+      // deferred to the money path so entitlement still follows PAYMENT.
+      mockDatabaseService.organization.findUnique.mockResolvedValue(razorpayOrg);
+      mockRazorpayProvider.getSubscription.mockResolvedValue({
+        priceId: 'plan_basic_inr',
+        status: 'past_due',
+      });
+      mockRazorpayProvider.updateSubscription.mockResolvedValue({});
+
+      await service.updateSubscription('org-123', { planId: 'pro' });
+
+      expect(mockRazorpayProvider.updateSubscription).toHaveBeenCalledWith(
+        'sub_razorpay123',
+        'plan_pro_inr',
+      );
+      expect(mockDatabaseService.organization.update).not.toHaveBeenCalled();
+    });
+
+    it('A-F5 refuses a self-serve upgrade to the sales-led enterprise tier', async () => {
+      // `enterprise` is priced -1 (custom) and `free` is priced 0 — neither is
+      // purchasable, but both are valid PLAN_TIERS keys, and the old `if (!plan)`
+      // check let them through. Enterprise carries screenQuota -1 (UNLIMITED)
+      // and 500GB of storage.
+      mockDatabaseService.organization.findUnique.mockResolvedValue(razorpayOrg);
+      mockRazorpayProvider.getSubscription.mockResolvedValue({
+        priceId: 'plan_basic_inr',
+        status: 'active',
+      });
+
+      await expect(
+        service.updateSubscription('org-123', { planId: 'enterprise' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockRazorpayProvider.updateSubscription).not.toHaveBeenCalled();
+      expect(mockDatabaseService.organization.update).not.toHaveBeenCalled();
+    });
+
+    it('A-F5 refuses a "downgrade" to the free tier through the paid-change path', async () => {
+      mockDatabaseService.organization.findUnique.mockResolvedValue(razorpayOrg);
+      mockRazorpayProvider.getSubscription.mockResolvedValue({
+        priceId: 'plan_basic_inr',
+        status: 'active',
+      });
+
+      await expect(
+        service.updateSubscription('org-123', { planId: 'free' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('B-M2 an API plan change stamps billingEventAt so an older webhook cannot revert it', async () => {
+      mockDatabaseService.organization.findUnique.mockResolvedValue(razorpayOrg);
+      mockRazorpayProvider.getSubscription.mockResolvedValue({
+        priceId: 'plan_basic_inr',
+        status: 'active',
+      });
+      mockRazorpayProvider.updateSubscription.mockResolvedValue({});
+      mockDatabaseService.organization.update.mockResolvedValue({});
+
+      await service.updateSubscription('org-123', { planId: 'pro' });
+
+      expect(mockDatabaseService.organization.update).toHaveBeenCalledWith({
+        where: { id: 'org-123' },
+        data: expect.objectContaining({
+          subscriptionTier: 'pro',
+          // A-F3: storage travels with the tier on this path too.
+          storageQuotaBytes: BigInt(102400 * 1024 * 1024),
+          billingEventAt: expect.any(Date),
+        }),
+      });
+    });
+
+    it('refuses a Razorpay plan change when the current plan id is unrecognized', async () => {
+      mockDatabaseService.organization.findUnique.mockResolvedValue(razorpayOrg);
+      mockRazorpayProvider.getSubscription.mockResolvedValue({
+        priceId: 'plan_from_another_era',
+        status: 'active',
+      });
+
+      await expect(
+        service.updateSubscription('org-123', { planId: 'pro' }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockRazorpayProvider.updateSubscription).not.toHaveBeenCalled();
     });
   });
 
@@ -740,7 +1075,9 @@ describe('BillingService', () => {
         id: 'evt_123',
         type: 'customer.subscription.updated',
         data: {
-          id: 'sub_123',
+          // Must be the subscription the org is actually on — an event about a
+          // different subscription is ignored (B-H3).
+          id: 'sub_stripe123',
           customer: 'cus_stripe123',
           status: 'active',
         },
@@ -750,7 +1087,9 @@ describe('BillingService', () => {
 
       expect(result).toEqual({ received: true });
       expect(mockStripeProvider.verifyWebhookSignature).toHaveBeenCalledWith(rawBody, signature);
-      expect(mockDatabaseService.organization.update).toHaveBeenCalledWith({
+      // No price id in the payload, so no tier is resolved and only the status
+      // is written. Entitlement writes go through the compare-and-set updateMany.
+      expect(mockDatabaseService.organization.updateMany).toHaveBeenCalledWith({
         where: { id: 'org-123' },
         data: { subscriptionStatus: 'active' },
       });
@@ -786,25 +1125,31 @@ describe('BillingService', () => {
         id: 'evt_456',
         type: 'customer.subscription.deleted',
         data: {
-          id: 'sub_456',
+          id: 'sub_stripe123',
           customer: 'cus_stripe123',
         },
       });
 
       await service.handleWebhookEvent('stripe', { rawBody, signature });
 
-      expect(mockDatabaseService.organization.update).toHaveBeenCalledWith({
+      expect(mockDatabaseService.organization.updateMany).toHaveBeenCalledWith({
         where: { id: 'org-123' },
         data: expect.objectContaining({
           subscriptionTier: 'free',
           subscriptionStatus: 'canceled',
           screenQuota: 5,
+          // Storage is part of the free-tier set too, or a cancelled ex-Pro
+          // keeps a 100GB quota forever (A-F3).
+          storageQuotaBytes: BigInt(1024 * 1024 * 1024),
         }),
       });
     });
 
     it('should handle checkout.session.completed', async () => {
-      mockDatabaseService.organization.update.mockResolvedValue({});
+      mockDatabaseService.organization.findUnique.mockResolvedValue({
+        id: 'org-123',
+        billingEventAt: null,
+      });
       mockStripeProvider.verifyWebhookSignature.mockReturnValue({
         id: 'evt_cs_789',
         type: 'checkout.session.completed',
@@ -820,7 +1165,10 @@ describe('BillingService', () => {
 
       await service.handleWebhookEvent('stripe', { rawBody, signature });
 
-      expect(mockDatabaseService.organization.update).toHaveBeenCalledWith({
+      // B-M6: checkout completion goes through the SAME writeEntitlement path as
+      // the lifecycle events, so it inherits the compare-and-set ordering guard
+      // instead of being a second, unguarded tier-write site.
+      expect(mockDatabaseService.organization.updateMany).toHaveBeenCalledWith({
         where: { id: 'org-123' },
         data: expect.objectContaining({
           stripeSubscriptionId: 'sub_new123',
@@ -831,10 +1179,34 @@ describe('BillingService', () => {
       });
     });
 
+    it('rejects an unrecognized plan in checkout.session.completed metadata (B-M6)', async () => {
+      mockDatabaseService.organization.findUnique.mockResolvedValue({
+        id: 'org-123',
+        billingEventAt: null,
+      });
+      mockStripeProvider.verifyWebhookSignature.mockReturnValue({
+        id: 'evt_cs_bad',
+        type: 'checkout.session.completed',
+        data: {
+          id: 'cs_bad',
+          subscription: 'sub_new456',
+          // Stripe metadata is a free-form string map. This used to be written
+          // straight into subscriptionTier, with getScreenQuotaForTier silently
+          // falling back to the free-tier 5 — a corrupt tier and a mismatched
+          // quota, nothing logged.
+          metadata: { organizationId: 'org-123', planId: 'platinum-elite' },
+        },
+      });
+
+      await service.handleWebhookEvent('stripe', { rawBody, signature });
+
+      expect(mockDatabaseService.organization.updateMany).not.toHaveBeenCalled();
+    });
+
     it('should record transaction on payment succeeded', async () => {
       mockDatabaseService.organization.findFirst.mockResolvedValue(mockOrganization);
       mockDatabaseService.organization.update.mockResolvedValue({});
-      mockDatabaseService.billingTransaction.create.mockResolvedValue({});
+      mockDatabaseService.billingTransaction.upsert.mockResolvedValue({});
       mockStripeProvider.verifyWebhookSignature.mockReturnValue({
         id: 'evt_inv_123',
         type: 'invoice.payment_succeeded',
@@ -848,16 +1220,18 @@ describe('BillingService', () => {
 
       await service.handleWebhookEvent('stripe', { rawBody, signature });
 
-      expect(mockDatabaseService.billingTransaction.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          organizationId: 'org-123',
-          provider: 'stripe',
-          type: 'subscription',
-          status: 'succeeded',
-          amount: 2900,
-          currency: 'usd',
+      expect(mockDatabaseService.billingTransaction.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            organizationId: 'org-123',
+            provider: 'stripe',
+            type: 'subscription',
+            status: 'succeeded',
+            amount: 2900,
+            currency: 'usd',
+          }),
         }),
-      });
+      );
     });
 
     it('acks 200 for a COMPLETED duplicate (event genuinely already processed)', async () => {
@@ -912,10 +1286,9 @@ describe('BillingService', () => {
       // Regression for the object-id keying bug: two different events for the
       // same subscription must both process.
       mockDatabaseService.organization.findFirst.mockResolvedValue(mockOrganization);
-      mockDatabaseService.organization.update.mockResolvedValue({});
       mockStripeProvider.verifyWebhookSignature
-        .mockReturnValueOnce({ id: 'evt_A', type: 'customer.subscription.updated', data: { id: 'sub_shared', customer: 'cus_stripe123', status: 'active' } })
-        .mockReturnValueOnce({ id: 'evt_B', type: 'customer.subscription.updated', data: { id: 'sub_shared', customer: 'cus_stripe123', status: 'active' } });
+        .mockReturnValueOnce({ id: 'evt_A', type: 'customer.subscription.updated', data: { id: 'sub_stripe123', customer: 'cus_stripe123', status: 'active' } })
+        .mockReturnValueOnce({ id: 'evt_B', type: 'customer.subscription.updated', data: { id: 'sub_stripe123', customer: 'cus_stripe123', status: 'active' } });
 
       await service.handleWebhookEvent('stripe', { rawBody, signature });
       await service.handleWebhookEvent('stripe', { rawBody, signature });
@@ -925,16 +1298,16 @@ describe('BillingService', () => {
       expect(mockRedisClient.set).toHaveBeenCalledWith('webhook:processed:stripe:evt_B', 'pending', 'EX', 300, 'NX');
       // Each successful process flips its key pending → completed.
       expect(mockRedisClient.set).toHaveBeenCalledWith('webhook:processed:stripe:evt_A', 'completed', 'EX', 172800);
-      expect(mockDatabaseService.organization.update).toHaveBeenCalledTimes(2);
+      expect(mockDatabaseService.organization.updateMany).toHaveBeenCalledTimes(2);
     });
 
     it('claim-then-crash: a handler THROW releases the claim so the PSP retry re-enters', async () => {
       // First delivery: claim ok, but the handler throws AFTER the claim.
       mockStripeProvider.verifyWebhookSignature.mockReturnValue({
-        id: 'evt_crash', type: 'customer.subscription.updated', data: { id: 'sub_c', customer: 'cus_stripe123', status: 'active' },
+        id: 'evt_crash', type: 'customer.subscription.updated', data: { id: 'sub_stripe123', customer: 'cus_stripe123', status: 'active' },
       });
       mockDatabaseService.organization.findFirst.mockResolvedValue(mockOrganization);
-      mockDatabaseService.organization.update.mockRejectedValueOnce(new Error('DB write failed'));
+      mockDatabaseService.organization.updateMany.mockRejectedValueOnce(new Error('DB write failed'));
 
       await expect(service.handleWebhookEvent('stripe', { rawBody, signature })).rejects.toThrow('DB write failed');
 
@@ -985,15 +1358,26 @@ describe('BillingService', () => {
         description: 'Monthly subscription',
       };
 
-      mockDatabaseService.billingTransaction.create.mockResolvedValue({
+      mockDatabaseService.billingTransaction.upsert.mockResolvedValue({
         id: 'txn-123',
         ...transactionData,
       });
 
       const result = await service.recordTransaction(transactionData);
 
-      expect(mockDatabaseService.billingTransaction.create).toHaveBeenCalledWith({
-        data: transactionData,
+      // Idempotent by construction (B-H1): keyed on the provider transaction id
+      // so a retry after a partial apply re-observes the row instead of dying
+      // on P2002 before the entitlement recovery runs. Append-only, so the
+      // update half is deliberately empty.
+      expect(mockDatabaseService.billingTransaction.upsert).toHaveBeenCalledWith({
+        where: {
+          provider_providerTransactionId: {
+            provider: 'stripe',
+            providerTransactionId: 'pi_123',
+          },
+        },
+        create: transactionData,
+        update: {},
       });
       expect(result.id).toBe('txn-123');
     });

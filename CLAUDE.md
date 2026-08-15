@@ -65,6 +65,13 @@ pnpm --filter @vizora/middleware test -- "api-key|plans"   # alternation works
 # Middleware E2E tests (Jest, real DB via docker-compose.test.yml)
 pnpm --filter @vizora/middleware test:e2e
 pnpm --filter @vizora/middleware test:e2e:full  # starts test DB, runs tests, stops DB
+# `test:e2e:setup` runs `prisma` from the middleware package, where it is not on
+# PATH; if it fails on "Command "prisma" not found", push the schema from the
+# database package instead:
+#   DATABASE_URL=postgresql://postgres:postgres@localhost:5433/vizora_test #     pnpm --filter @vizora/database exec prisma db push --skip-generate
+# `billing-persistence.e2e-spec.ts` is the ONLY proof that the billing upsert and
+# the billingEventAt compare-and-set behave as claimed — every other billing spec
+# mocks Prisma, so neither construct had ever executed against Postgres.
 
 # Web unit tests (Jest + jsdom + React Testing Library)
 pnpm --filter @vizora/web test
@@ -92,9 +99,12 @@ mirroring `SubscriptionActiveGuard`, so `past_due`/`publish_locked` keep working
 `API_ACCESS_TIERS` is a product decision** — it silently breaks live customer integrations.
 **Creating a key is deliberately ungated in v1** — a free-tier admin can still mint one that will
 never authenticate (`api-keys.controller.ts` POST has `RolesGuard` only); warning at create time is
-a tracked UX follow-up, not an oversight. **The allow branch is currently unreachable for Razorpay
-customers**: `subscriptionTier` is never written on that purchase path (backlog B3), so they sit on
-tier `free` and are denied — granting access needs a super-admin tier edit
+a tracked UX follow-up, not an oversight. **The allow branch was unreachable for Razorpay
+customers until B3** — `subscriptionTier` was never written on that purchase path, so they sat on
+tier `free` and were denied. B3 closed it: `subscription.activated`/`subscription.charged` persist
+the tier through `applyTierFromPlan`, provided the matching
+`RAZORPAY_<TIER>_<INTERVAL>_PLAN_ID` is configured (an unrecognized plan id skips the tier write
+and escalates rather than downgrading). The manual escape hatches remain a super-admin tier edit
 (`PATCH /api/v1/admin/organizations/:id`) or the kill switch
 `API_KEY_ENTITLEMENT_GATE_ENABLED=false` (only that exact string works; anything else is ignored
 and warned about once).
@@ -188,9 +198,11 @@ MFA_ENCRYPTION_KEY      # AES-256-GCM key (min 32 chars) for TOTP-secret encrypt
 API_KEY_ENTITLEMENT_GATE_ENABLED  # B2 API-key entitlement gate. ENABLED BY DEFAULT (leave unset).
                               #   Only the exact string 'false' disables it — 'true'/'0'/anything
                               #   else is IGNORED and leaves it ON (warned once at startup).
-                              #   Emergency lever only: `subscriptionTier` is NEVER written on the
-                              #   Razorpay purchase path (see B3), so a paying Razorpay customer
-                              #   sits on tier 'free' and gets denied.
+                              #   Emergency lever only. Before B3 `subscriptionTier` was never
+                              #   written on the Razorpay purchase path, so a paying Razorpay
+                              #   customer sat on tier 'free' and got denied; B3 fixed that, but
+                              #   a MISSING RAZORPAY_<TIER>_<INTERVAL>_PLAN_ID still leaves the
+                              #   tier unwritten (loudly — logger.error + Sentry).
 INTERNAL_API_SECRET     # Required in prod — service-to-service auth (middleware ↔ realtime)
 BCRYPT_ROUNDS           # Password hashing rounds (10-15, default 12)
 GOOGLE_CLIENT_ID        # Optional — Google OAuth client ID
@@ -266,9 +278,82 @@ BACKUP_RETENTION_DAYS   # Daily backup retention (default 7)
 
 ### Billing
 
+> Provider is picked from the org's country: `IN` → Razorpay, everything else → Stripe.
+> Full annotated block is in `.env.example` (it had ZERO billing vars before B3).
+
 ```
-RAZORPAY_KEY_ID, RAZORPAY_BASIC_PLAN_ID, RAZORPAY_PRO_PLAN_ID
+STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET
+STRIPE_<TIER>_<INTERVAL>_PRICE_ID      # STRIPE_PRO_YEARLY_PRICE_ID, ...
+RAZORPAY_<TIER>_<INTERVAL>_PLAN_ID     # RAZORPAY_PRO_YEARLY_PLAN_ID, ...
+RAZORPAY_<TIER>_PLAN_ID                # LEGACY — honoured as the MONTHLY alias only
+BILLING_VALIDATION_STRICT              # 'true' fails boot on a MISSING id; default warns
 ```
+
+**Razorpay plan ids are interval-dimensioned (B3).** A Razorpay Plan carries its own
+period, so monthly and yearly are two distinct plan objects. The old single-dimension
+`RAZORPAY_<TIER>_PLAN_ID` could only ever bill one cadence — picking "yearly" in
+checkout billed monthly. The legacy name still resolves as the **monthly** alias; there
+is deliberately **no legacy fallback for yearly** (a missing yearly id must fail loudly
+at checkout, not quietly re-bill).
+
+**These ids are read in BOTH directions.** Forward (tier → id) decides what the customer
+is *charged*; reverse (id → tier, `razorpayPlanIdToTier` / `stripePriceIdToTier`) decides
+what the webhook *entitles* them to. An id present in the provider dashboard but absent
+here makes the lifecycle webhook log an error, capture to Sentry and **skip the tier
+write** — it is never coerced to `free`. Two tiers (or two intervals) sharing one id is
+ambiguous: that id is **removed from the reverse index** (so it resolves to null and takes
+the same skip-and-escalate path) and boot logs an error + Sentry. It deliberately does
+**not** throw — refusing to boot would take displays, content and auth down in both
+cluster instances over a billing typo (#101). A *missing* id still fails boot under
+`BILLING_VALIDATION_STRICT=true`.
+
+**A webhook only grants a paid tier under a status that asserts a LIVE, PAID
+subscription** — `BillingService.TIER_GRANTING_STATUSES`, currently exactly `active`.
+Pre-payment statuses (Razorpay `created`/`authenticated`, Stripe `trialing`) and terminal
+ones (`cancelled`/`completed`/`expired`, `canceled`/`incomplete_expired`) must never write
+one, and `trialEndsAt` is never cleared on a `trial` status — doing so made
+`SubscriptionActiveGuard` deny every write for a tenant that had paid nothing. An
+unmapped status writes nothing at all.
+
+**One entitlement-write site**: `BillingService.writeEntitlement`, used by
+`applyTierFromPlan` (the lifecycle events), the cancellation handler and
+`handleCheckoutCompleted`. Do not add a second. It is a **compare-and-set** —
+`updateMany` carrying the `billingEventAt <= eventAt` predicate in its WHERE, so Postgres
+arbitrates between the two PM2 cluster instances; a read-then-write cannot. Declining to
+advance the mark never drops the predicate — ordering and mark-advancement are separate
+decisions (`advanceMark`). `Organization.billingEventAt` orders entitlement writes so a
+retried older event cannot overwrite newer state — it is **not** `entitlementStateSince`
+(the dunning clock).
+
+**The ladder's own writes are NOT inside `writeEntitlement`**, so any path that delegates
+to `EntitlementService` must WIN THE CAS FIRST via `claimEntitlementTransition` and only
+then call `beginPastDue`/`recover`. Calling the ladder and stamping afterwards leaves the
+mutation unguarded: a concurrent capture and failure both pass the cheap JS pre-check, the
+capture wins the CAS, and the failure's `beginPastDue` still flips the org to `past_due`
+with a fresh clock — after which nothing rescues it, because `applyTierFromPlan` leaves the
+status to the ladder while an episode is open.
+
+**Entitlement follows BILLING STATE, and every tier move writes the whole set.**
+`tierEntitlementFields()` in `constants/plans.ts` is the single definition of what a tier
+implies (tier + screenQuota + **storageQuotaBytes**) and is used by the webhooks, the API
+cancel/plan-change paths **and entitlement-ladder rung 3** — which is the highest-volume
+route to free (silent non-payment) and used to write a hardcoded pair, leaving a downgraded
+org on its old storage quota forever. `paused` collapses entitlement (the provider has
+stopped charging) but does NOT clear the subscription id, because it is resumable;
+only genuinely dead statuses do (`DEAD_SUBSCRIPTION_STATUSES`). **Recovery from a dunning
+rung happens only on a MONEY event** — `handlePaymentSucceeded` and a paid
+`checkout.session.completed`, never a lifecycle `active`, which Stripe also emits for
+metadata edits and payment-method attaches.
+
+**Being LIVE and being ENTITLED are different questions.** `LIVE_PROVIDER_STATUSES`
+(active/past_due/unpaid) decides whether a subscription is the customer's current one — it
+gates the second-checkout guard (both providers) and permits a plan change from dunning.
+`TIER_GRANTING_STATUSES` (active only) decides whether a paid tier may be written. A
+past_due subscriber may therefore change plan while the local tier write waits for payment.
+
+Admin `PlanForm` has `razorpayPlanIdMonthly`/`razorpayPlanIdYearly` fields: **not wired**.
+Env is canonical; nothing reads the DB columns.
 
 ### Observability
 
