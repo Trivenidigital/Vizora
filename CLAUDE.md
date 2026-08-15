@@ -65,6 +65,13 @@ pnpm --filter @vizora/middleware test -- "api-key|plans"   # alternation works
 # Middleware E2E tests (Jest, real DB via docker-compose.test.yml)
 pnpm --filter @vizora/middleware test:e2e
 pnpm --filter @vizora/middleware test:e2e:full  # starts test DB, runs tests, stops DB
+# `test:e2e:setup` runs `prisma` from the middleware package, where it is not on
+# PATH; if it fails on "Command "prisma" not found", push the schema from the
+# database package instead:
+#   DATABASE_URL=postgresql://postgres:postgres@localhost:5433/vizora_test #     pnpm --filter @vizora/database exec prisma db push --skip-generate
+# `billing-persistence.e2e-spec.ts` is the ONLY proof that the billing upsert and
+# the billingEventAt compare-and-set behave as claimed — every other billing spec
+# mocks Prisma, so neither construct had ever executed against Postgres.
 
 # Web unit tests (Jest + jsdom + React Testing Library)
 pnpm --filter @vizora/web test
@@ -313,14 +320,37 @@ unmapped status writes nothing at all.
 `applyTierFromPlan` (the lifecycle events), the cancellation handler and
 `handleCheckoutCompleted`. Do not add a second. It is a **compare-and-set** —
 `updateMany` carrying the `billingEventAt <= eventAt` predicate in its WHERE, so Postgres
-arbitrates between the two PM2 cluster instances; a read-then-write cannot. `past_due`
-delegates to `EntitlementService.beginPastDue` and leaves the tier alone (rungs gate
-capability; tier records what was bought). **Recovery from a dunning rung happens ONLY on
-the money path** (`handlePaymentSucceeded` → `recover()`): Stripe emits
-`customer.subscription.updated(active)` for metadata edits and payment-method attaches,
-which is not proof the debt was paid. `Organization.billingEventAt` orders entitlement
-writes so a retried older event cannot overwrite newer state — it is **not**
-`entitlementStateSince` (the dunning clock).
+arbitrates between the two PM2 cluster instances; a read-then-write cannot. Declining to
+advance the mark never drops the predicate — ordering and mark-advancement are separate
+decisions (`advanceMark`). `Organization.billingEventAt` orders entitlement writes so a
+retried older event cannot overwrite newer state — it is **not** `entitlementStateSince`
+(the dunning clock).
+
+**The ladder's own writes are NOT inside `writeEntitlement`**, so any path that delegates
+to `EntitlementService` must WIN THE CAS FIRST via `claimEntitlementTransition` and only
+then call `beginPastDue`/`recover`. Calling the ladder and stamping afterwards leaves the
+mutation unguarded: a concurrent capture and failure both pass the cheap JS pre-check, the
+capture wins the CAS, and the failure's `beginPastDue` still flips the org to `past_due`
+with a fresh clock — after which nothing rescues it, because `applyTierFromPlan` leaves the
+status to the ladder while an episode is open.
+
+**Entitlement follows BILLING STATE, and every tier move writes the whole set.**
+`tierEntitlementFields()` in `constants/plans.ts` is the single definition of what a tier
+implies (tier + screenQuota + **storageQuotaBytes**) and is used by the webhooks, the API
+cancel/plan-change paths **and entitlement-ladder rung 3** — which is the highest-volume
+route to free (silent non-payment) and used to write a hardcoded pair, leaving a downgraded
+org on its old storage quota forever. `paused` collapses entitlement (the provider has
+stopped charging) but does NOT clear the subscription id, because it is resumable;
+only genuinely dead statuses do (`DEAD_SUBSCRIPTION_STATUSES`). **Recovery from a dunning
+rung happens only on a MONEY event** — `handlePaymentSucceeded` and a paid
+`checkout.session.completed`, never a lifecycle `active`, which Stripe also emits for
+metadata edits and payment-method attaches.
+
+**Being LIVE and being ENTITLED are different questions.** `LIVE_PROVIDER_STATUSES`
+(active/past_due/unpaid) decides whether a subscription is the customer's current one — it
+gates the second-checkout guard (both providers) and permits a plan change from dunning.
+`TIER_GRANTING_STATUSES` (active only) decides whether a paid tier may be written. A
+past_due subscriber may therefore change plan while the local tier write waits for payment.
 
 Admin `PlanForm` has `razorpayPlanIdMonthly`/`razorpayPlanIdYearly` fields: **not wired**.
 Env is canonical; nothing reads the DB columns.

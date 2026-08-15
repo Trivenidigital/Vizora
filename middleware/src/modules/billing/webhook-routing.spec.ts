@@ -752,6 +752,38 @@ describe('billing webhook routing (B3)', () => {
     expect(entitlement.beginPastDue).not.toHaveBeenCalled();
   });
 
+  it('HIGH-2 a LIFECYCLE past_due does not enter dunning when it loses the CAS', async () => {
+    // The same hazard on the other call site. `subscription.halted` maps to
+    // past_due and delegates to the ladder, whose write is unconditional — so
+    // it must not run at all unless this event owns the ordering. Covering only
+    // the money path left this one able to regress silently.
+    db.organization.findFirst.mockResolvedValue(razorpayOrg());
+    db.organization.updateMany.mockResolvedValue({ count: 0 });
+
+    await deliver('razorpay', {
+      type: 'subscription.halted',
+      data: rzpSubscription('plan_pro_m', 'halted'),
+      createdAt: NEWER,
+    });
+
+    expect(entitlement.beginPastDue).not.toHaveBeenCalled();
+  });
+
+  it('HIGH-2 a payment recovery does not run when it loses the CAS', async () => {
+    db.organization.findFirst.mockResolvedValue(
+      razorpayOrg({ subscriptionStatus: 'suspended' }),
+    );
+    db.organization.updateMany.mockResolvedValue({ count: 0 });
+
+    await deliver('razorpay', {
+      type: 'payment.captured',
+      data: { payment: { id: 'pay_lose', customer_id: 'cust_rzp', amount: 100, currency: 'INR' } },
+      createdAt: NEWER,
+    });
+
+    expect(entitlement.recover).not.toHaveBeenCalled();
+  });
+
   it('HIGH-2 the ladder DOES run when this event wins the CAS', async () => {
     db.organization.findFirst.mockResolvedValue(razorpayOrg());
 
