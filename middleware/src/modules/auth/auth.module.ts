@@ -13,10 +13,12 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { APP_GUARD } from '@nestjs/core';
+import { ApiKeysModule } from '../api-keys/api-keys.module';
 import { getAccessTokenTtlSeconds } from './jwt-expiry';
 
 @Module({
   imports: [
+    ApiKeysModule,
     DatabaseModule,
     BillingModule,
     // forwardRef because NotificationsModule's AlertRulesController uses
