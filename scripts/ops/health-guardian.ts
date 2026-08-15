@@ -6,10 +6,21 @@
  * PM2 process status. Restarts crashed/errored services automatically.
  *
  * Checks:
- *   1. Service HTTP endpoints (middleware, realtime, web)
+ *   1. Service HTTP endpoints (middleware, realtime, web) — LOOPBACK ONLY
  *   2. PM2 process status (errored/stopped → restart, high memory → reload)
- *   3. Customer APK install surface — /tv + /downloads/vizora-display.apk
+ *   3. Public edge watch — ALERT ONLY, never a restart (see below)
+ *   4. Customer APK install surface — /tv + /downloads/vizora-display.apk
  *      (opt-in via TV_DOWNLOAD_MONITOR_ENABLED; no auto-remediation)
+ *
+ * Restarts key ONLY off loopback probes. `WEB_URL` is the public origin
+ * (https://vizora.cloud) because email links need it, so probing it sent every
+ * check through nginx + TLS and turned edge faults into `pm2 restart
+ * vizora-web` — a remediation that cannot fix them. `lib/probe-targets.ts`
+ * substitutes the local port for any non-loopback value and hands the original
+ * back as the alert-only `edge`; `ServiceDef.probeRemediable` is the structural
+ * backstop that keeps a non-loopback PROBE from ever reaching pm2. The `pm2
+ * jlist` findings are not gated by it — PM2's own view of a crashed or bloated
+ * process is local authoritative evidence with no edge component.
  *
  * Escalation: After 2 failed restart attempts, incident is marked 'escalated'.
  *
@@ -17,6 +28,10 @@
  *   0 — all services healthy
  *   1 — issues found (some may have been auto-fixed)
  *   2 — fatal error (agent could not complete)
+ *
+ * Exit code and dead-man heartbeat DIVERGE on purpose: the heartbeat reports
+ * only what this box owns (local + PM2), so an edge or install-surface fault
+ * cannot make the external dead-man read "health-guardian is broken".
  *
  * Security note: All execSync calls use hardcoded PM2 command strings with
  * no user input interpolation. This is safe — no injection risk.
@@ -33,8 +48,9 @@ import {
   addRemediation,
   makeIncidentId,
 } from './lib/state.js';
-import { log, pingHeartbeat } from './lib/alerting.js';
+import { log, pingHeartbeat, sendInlineAlert } from './lib/alerting.js';
 import { readEcosystemMemoryPolicy } from './lib/ecosystem.js';
+import { isLoopback, splitProbeTargets, type ProbeService } from './lib/probe-targets.js';
 import { probeWebAssets, type ProbeFetch } from './lib/web-assets.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -77,49 +93,95 @@ const APK_CONTENT_TYPE = 'application/vnd.android.package-archive';
  * threshold is precisely the defect being removed here.
  */
 interface ServiceDef {
-  name: string;
+  name: ProbeService;
   healthUrl: string;
   pm2Name: string;
   memoryLimitBytes: number | null;
+  /**
+   * Whether THE PROBE's verdict may key a `pm2 restart`.
+   *
+   * Named for its evidence, not for the service: it says "this probe observed
+   * THIS box's process", so a failure it reports is a failure a restart can
+   * address. False means the probe measured something through a shared edge,
+   * and a restart cannot fix what it measured — the incident is still raised,
+   * just never answered with pm2.
+   *
+   * Deliberately scoped to the probe-driven `service-down` path ONLY. The
+   * `pm2 jlist` findings (errored/stopped, high memory) are local authoritative
+   * evidence from PM2 itself and carry no edge component, so they are NOT
+   * gated by this — see the comments at those two sites.
+   *
+   * `lib/probe-targets.ts` already substitutes loopback for non-loopback
+   * config, so in practice this is the second layer: it holds even if a future
+   * edit reintroduces a public URL as a probe target.
+   */
+  probeRemediable: boolean;
   /** Follow a reference from the served HTML before declaring this healthy. */
   probeAssets?: boolean;
   /** Origin the referenced asset paths are resolved against. */
   assetBaseUrl?: string;
 }
 
-function getServiceDefs(): ServiceDef[] {
-  const middlewareUrl = process.env.VALIDATOR_BASE_URL || 'http://localhost:3000';
-  const realtimeUrl = process.env.REALTIME_URL || 'http://localhost:3002';
-  const webUrl = process.env.WEB_URL || 'http://localhost:3001';
+interface ResolvedTargets {
+  services: ServiceDef[];
+  /** Public edge base URL to watch alert-only, or null. */
+  edge: string | null;
+  /** Why there is no edge to watch — logged instead of a silent skip. */
+  noEdgeReason: string | null;
+}
+
+function getServiceDefs(): ResolvedTargets {
+  const targets = splitProbeTargets(process.env);
+  for (const note of targets.notes) {
+    log(AGENT, note);
+  }
+
+  const middlewareUrl = targets.local.middleware;
+  const realtimeUrl = targets.local.realtime;
+  const webUrl = targets.local.web;
 
   const policy = readEcosystemMemoryPolicy();
   if (policy.error) {
     log(AGENT, `WARNING: ecosystem memory policy unreadable (${policy.error}) — memory checks will be skipped`);
   }
 
-  return [
+  const services: ServiceDef[] = [
     {
       name: 'middleware',
       healthUrl: `${middlewareUrl}/api/v1/health/ready`,
       pm2Name: 'vizora-middleware',
       memoryLimitBytes: policy.limits['vizora-middleware'] ?? null,
+      probeRemediable: isLoopback(middlewareUrl),
     },
     {
       name: 'realtime',
       healthUrl: `${realtimeUrl}/api/health`,
       pm2Name: 'vizora-realtime',
       memoryLimitBytes: policy.limits['vizora-realtime'] ?? null,
+      probeRemediable: isLoopback(realtimeUrl),
     },
     {
       name: 'web',
       healthUrl: `${webUrl}/`,
       pm2Name: 'vizora-web',
       memoryLimitBytes: policy.limits['vizora-web'] ?? null,
+      probeRemediable: isLoopback(webUrl),
       // A 200 on the HTML shell is NOT proof the app works — see probeWebAssets.
       probeAssets: true,
       assetBaseUrl: webUrl,
     },
   ];
+
+  for (const svc of services) {
+    if (!svc.probeRemediable) {
+      log(
+        AGENT,
+        `${svc.name}: probe target ${svc.healthUrl} is not loopback — a failing PROBE will raise an incident but never auto-restart`,
+      );
+    }
+  }
+
+  return { services, edge: targets.edge, noEdgeReason: targets.noEdgeReason };
 }
 
 // ─── Health Check ────────────────────────────────────────────────────────────
@@ -179,6 +241,99 @@ async function probeWebAssetHealth(baseUrl: string): Promise<{ ok: boolean; deta
   return probeWebAssets(baseUrl, boundedFetch);
 }
 
+
+// ─── Public Edge Watch (alert-only) ──────────────────────────────────────────
+
+/**
+ * What a VPS self-probe of the public edge can and cannot see. Carried into
+ * every log line and incident so nobody reads a green edge as proof that
+ * customers can reach us.
+ */
+const EDGE_SELF_PROBE_CAVEAT =
+  'probed from the VPS itself — detects nginx/TLS/config faults, NOT external DNS/firewall reachability';
+
+/** Operator playbook for an edge fault. Deliberately contains no pm2 command. */
+const EDGE_REMEDIATION =
+  'nginx -t; systemctl status nginx; certbot certificates — do NOT restart Node services; local health is green';
+
+/**
+ * Paths probed through the edge, each tagged with the LOCAL service that backs
+ * it.
+ *
+ * The attribution is load-bearing, not documentation. nginx serves `/` from
+ * web and `/api/v1/health/ready` from middleware, so a middleware outage makes
+ * the edge return 502 on the API path while `/` still answers. Gating the whole
+ * edge check on one service's local health (web, say) would then report a
+ * middleware outage as `edge-unreachable` — a critical incident whose
+ * remediation text sends the operator to nginx while the actual fault is a Node
+ * process. A path is only evidence about the edge when the service behind it is
+ * locally healthy.
+ */
+interface EdgeProbePath {
+  path: string;
+  backedBy: ProbeService;
+}
+
+const EDGE_PROBE_PATHS: readonly EdgeProbePath[] = [
+  { path: '/', backedBy: 'web' },
+  { path: '/api/v1/health/ready', backedBy: 'middleware' },
+];
+
+interface EdgeVerdict {
+  verdict: 'healthy' | 'unreachable' | 'no-verdict';
+  detail: string;
+  /** True when every path was probed — nothing was skipped for a local outage. */
+  complete: boolean;
+}
+
+/**
+ * Probe the public edge. NO remediation exists on this path by construction —
+ * an edge fault lives in nginx, TLS or DNS, none of which a `pm2 restart`
+ * touches. The check exists because the failure is otherwise invisible from
+ * inside the box: every local probe stays green while no customer can load the
+ * app.
+ *
+ * Paths whose backing service is locally unhealthy are SKIPPED: `service-down`
+ * already owns that finding, and probing them through the edge would only
+ * re-measure the same outage with the wrong label. When every path is skipped
+ * the result is `no-verdict` — we learned nothing, which is different from
+ * learning the edge is fine.
+ */
+async function checkEdge(
+  edgeBaseUrl: string,
+  localHealthy: ReadonlyMap<ProbeService, boolean>,
+): Promise<EdgeVerdict> {
+  const failures: string[] = [];
+  const checked: string[] = [];
+  const skipped: string[] = [];
+
+  for (const { path, backedBy } of EDGE_PROBE_PATHS) {
+    if (localHealthy.get(backedBy) !== true) {
+      skipped.push(`${path} (local ${backedBy} not healthy)`);
+      continue;
+    }
+    checked.push(path);
+    const res = await checkEndpoint(`${edgeBaseUrl}${path}`);
+    if (!res.ok) {
+      failures.push(`${path} [backed by ${backedBy}] -> ${res.error ?? `HTTP ${res.status}`}`);
+    }
+  }
+
+  const complete = skipped.length === 0;
+  const suffix = complete ? '' : ` (skipped: ${skipped.join('; ')})`;
+
+  if (checked.length === 0) {
+    return {
+      verdict: 'no-verdict',
+      detail: `no edge path had a locally healthy backing service${suffix}`,
+      complete: false,
+    };
+  }
+  if (failures.length > 0) {
+    return { verdict: 'unreachable', detail: `${failures.join('; ')}${suffix}`, complete };
+  }
+  return { verdict: 'healthy', detail: `${checked.join(' + ')} answered${suffix}`, complete };
+}
 
 // ─── APK Download Surface Check ──────────────────────────────────────────────
 
@@ -339,12 +494,19 @@ async function main(): Promise<void> {
   // 30s restart cooldowns, health-endpoint fetches. The real locked
   // read→merge→write is at the very end. See scripts/ops/lib/state.ts.
   const priorState = readOpsStateSnapshot();
-  const services = getServiceDefs();
+  const { services, edge, noEdgeReason } = getServiceDefs();
   const incidents: Incident[] = [];
   const remediations: RemediationAction[] = [];
   let issuesFound = 0;
   let issuesFixed = 0;
   let issuesEscalated = 0;
+  // Findings this box cannot own: the public edge and the customer install
+  // surface both live outside the three PM2 processes. They are subtracted from
+  // the dead-man heartbeat below — see the exit-code note in the file header.
+  let offBoxFound = 0;
+  let offBoxFixed = 0;
+  /** Per-service local probe verdict this cycle — gates the edge alert. */
+  const localHealthy = new Map<ProbeService, boolean>();
 
   // ─── 1. Service Endpoint Checks ──────────────────────────────────────────
 
@@ -363,6 +525,8 @@ async function main(): Promise<void> {
         result = { ok: false, status: result.status, error: `referenced assets unhealthy: ${assets.detail}` };
       }
     }
+
+    localHealthy.set(svc.name, result.ok);
 
     if (result.ok) {
       log(AGENT, `${svc.name}: healthy (status ${result.status})`);
@@ -385,6 +549,32 @@ async function main(): Promise<void> {
     issuesFound++;
     const errorDetail = result.error || `HTTP ${result.status}`;
     log(AGENT, `${svc.name}: UNHEALTHY (${errorDetail})`);
+
+    // A non-loopback probe observed something other than this box's process.
+    // Raise the incident, never answer it with pm2 — see probeRemediable.
+    if (!svc.probeRemediable) {
+      log(AGENT, `${svc.name}: NOT auto-restarting — ${svc.healthUrl} is not a loopback probe target`);
+      incidents.push({
+        id: incidentId,
+        agent: AGENT,
+        type: 'service-down',
+        severity: 'critical',
+        target: 'service',
+        targetId: svc.name,
+        detected: existingIncident?.detected ?? new Date().toISOString(),
+        message:
+          `${svc.name} is unhealthy at ${svc.healthUrl}, which is not a loopback ` +
+          `probe target — no restart attempted, because a restart cannot fix what a ` +
+          `non-loopback probe measures`,
+        remediation:
+          `Investigate the path to ${svc.healthUrl} (nginx / TLS / DNS) before touching ` +
+          `${svc.pm2Name}; point the probe at http://127.0.0.1:<service port> to make it remediable`,
+        status: 'open',
+        attempts: existingIncident?.attempts ?? 0,
+        error: errorDetail,
+      });
+      continue;
+    }
 
     // Check if already escalated
     if (existingIncident && existingIncident.status === 'escalated') {
@@ -549,6 +739,10 @@ async function main(): Promise<void> {
         const existingIncident = existingPm2ErroredIncident;
         const previousAttempts = existingIncident?.attempts ?? 0;
 
+        // NOT gated on probeRemediable, deliberately: `pm2 jlist` is local
+        // authoritative evidence straight from PM2 and carries no edge
+        // component, so restarting a crashed process is correct or neutral —
+        // never the wrong lever the probe-driven path could pick.
         if (existingIncident?.status === 'escalated') {
           log(AGENT, `${procLabel}: already escalated`);
           incidents.push(existingIncident);
@@ -634,6 +828,9 @@ async function main(): Promise<void> {
         const incidentId = makeIncidentId(AGENT, 'high-memory', procLabel);
         log(AGENT, `${procLabel}: high memory ${memoryMB}MB / ${memoryLimitMB}MB (${memoryPct.toFixed(1)}%)`);
 
+        // NOT gated on probeRemediable, deliberately: the memory reading comes
+        // from `pm2 jlist` against the local process, so it is never an edge
+        // observation and a graceful reload is always a coherent answer.
         const success = pm2Reload(svc.pm2Name);
 
         const remediation: RemediationAction = {
@@ -686,7 +883,105 @@ async function main(): Promise<void> {
     }
   }
 
-  // ─── 3. Customer APK Install Surface ──────────────────────────────────────
+  // ─── 3. Public Edge Watch (alert-only, never a restart) ───────────────────
+
+  if (edge === null) {
+    // Emit the ACTUAL reason. "Everything is loopback" is the expected dev/CI
+    // shape; "WEB_URL is not an http(s) URL" is a misconfiguration, and
+    // reporting the second with the first's reassuring sentence hides it.
+    log(AGENT, `edge watch: skipped — ${noEdgeReason ?? 'no edge resolved'}`);
+
+    // The watch is off, so nothing will ever observe this incident recovering.
+    // Leaving it open makes ops-state permanently CRITICAL over a check that
+    // no longer runs — close it and say why.
+    for (const stale of priorState.incidents) {
+      if (stale.agent !== AGENT || stale.type !== 'edge-unreachable') continue;
+      if (stale.status === 'resolved') continue;
+      log(AGENT, `edge watch: closing stale incident ${stale.id} — the watch is disabled by configuration`);
+      incidents.push({
+        ...stale,
+        status: 'resolved',
+        resolvedAt: new Date().toISOString(),
+        message: `${stale.message} — edge watch disabled by configuration; closing stale incident`,
+      });
+      issuesFixed++;
+      offBoxFixed++;
+    }
+  } else {
+    const edgeHost = new URL(edge).hostname;
+    const incidentId = makeIncidentId(AGENT, 'edge-unreachable', edgeHost);
+    const existingIncident = priorState.incidents.find(i => i.id === incidentId);
+
+    log(AGENT, `Checking public edge: ${edge} (${EDGE_SELF_PROBE_CAVEAT})`);
+    const edgeResult = await checkEdge(edge, localHealthy);
+
+    if (edgeResult.verdict === 'no-verdict') {
+      // Every path's backing service is locally down. `service-down` owns those
+      // findings; re-measuring the same outage through the edge would
+      // double-count it and label it with nginx remediation.
+      log(AGENT, `edge watch: no verdict — ${edgeResult.detail}`);
+    } else if (edgeResult.verdict === 'healthy') {
+      log(AGENT, `edge: healthy (${edgeResult.detail})`);
+      if (!edgeResult.complete) {
+        // Partial evidence closes nothing: the skipped path is exactly where an
+        // edge fault would still be hiding.
+        log(AGENT, 'edge: partial evidence only — not resolving any open incident on it');
+      } else if (existingIncident && existingIncident.status !== 'resolved') {
+        log(AGENT, `edge: recovered — resolving incident ${incidentId}`);
+        incidents.push({
+          ...existingIncident,
+          status: 'resolved',
+          resolvedAt: new Date().toISOString(),
+        });
+        issuesFixed++;
+        offBoxFixed++;
+      }
+    } else {
+      issuesFound++;
+      offBoxFound++;
+      log(AGENT, `edge: UNREACHABLE — ${edgeResult.detail}`);
+      const message =
+        `Public edge ${edge} failed a path whose backing service is locally healthy: ` +
+        `${edgeResult.detail} — ${EDGE_SELF_PROBE_CAVEAT}`;
+
+      incidents.push({
+        id: incidentId,
+        agent: AGENT,
+        type: 'edge-unreachable',
+        severity: 'critical',
+        target: 'edge',
+        targetId: edgeHost,
+        detected: existingIncident?.detected ?? new Date().toISOString(),
+        message,
+        remediation: EDGE_REMEDIATION,
+        status: 'open',
+        attempts: existingIncident?.attempts ?? 0,
+        error: edgeResult.detail,
+      });
+
+      // §12b: alert on the OPEN TRANSITION only. A continuing edge outage is
+      // already visible in ops-state and the 30-min ops-reporter digest; an
+      // inline alert every 5 minutes trains operators to mute the channel,
+      // which is how the next real alert gets missed.
+      const wasOpen = existingIncident !== undefined && existingIncident.status !== 'resolved';
+      if (!wasOpen) {
+        await sendInlineAlert(
+          AGENT,
+          'critical',
+          `Public edge ${edgeHost} failed a path backed by a locally healthy service`,
+          [
+            edgeResult.detail,
+            EDGE_SELF_PROBE_CAVEAT,
+            EDGE_REMEDIATION,
+          ].join('\n'),
+        );
+      } else {
+        log(AGENT, 'edge: incident already open — inline alert suppressed (transition-only, §12b)');
+      }
+    }
+  }
+
+  // ─── 4. Customer APK Install Surface ──────────────────────────────────────
   // Gated off until an approved APK is published — see TV_DOWNLOAD_MONITOR_ENABLED.
 
   if (TV_DOWNLOAD_MONITOR_ENABLED) {
@@ -706,9 +1001,11 @@ async function main(): Promise<void> {
           resolvedAt: new Date().toISOString(),
         });
         issuesFixed++;
+        offBoxFixed++;
       }
     } else {
       issuesFound++;
+      offBoxFound++;
       log(AGENT, `install surface: BROKEN — ${surface.problem} (${surface.detail})`);
       // No auto-remediation: a missing APK or reverted nginx config needs a
       // human. Reported as open so ops-reporter escalates it.
@@ -731,7 +1028,7 @@ async function main(): Promise<void> {
     }
   }
 
-  // ─── 4. Record Results & Write State ──────────────────────────────────────
+  // ─── 5. Record Results & Write State ──────────────────────────────────────
 
   const durationMs = Date.now() - startTime;
 
@@ -758,12 +1055,34 @@ async function main(): Promise<void> {
     writeOpsState(state);
   }
 
-  // ─── 5. Summary ──────────────────────────────────────────────────────────
+  // ─── 6. Summary ──────────────────────────────────────────────────────────
 
   log(AGENT, `Cycle complete in ${durationMs}ms — found: ${issuesFound}, fixed: ${issuesFixed}, escalated: ${issuesEscalated}`);
 
+  // Exit code reflects EVERY finding — an edge or install-surface fault is a
+  // real issue and must not exit 0.
   const success = !(issuesFound > 0 && issuesFixed < issuesFound);
   process.exitCode = success ? 0 : 1;
+
+  // The dead-man verdict is narrower on purpose. healthchecks.io answers one
+  // question — "is this box's health-guardian still doing its job?" — and
+  // `edge-unreachable` / `tv-download-surface` are findings about things
+  // OUTSIDE the three PM2 processes. Letting them POST /fail would make an
+  // nginx cert problem read as "the ops agent is broken", which is the wrong
+  // page at 3am and, worse, desensitises the one signal that means the VPS
+  // itself is gone. NOTE: this changes the install-surface check's dead-man
+  // contribution (moot today — TV_DOWNLOAD_MONITOR_ENABLED is false and
+  // HEALTHCHECKS_HEALTH_GUARDIAN_URL is empty on prod).
+  const deadManFound = issuesFound - offBoxFound;
+  const deadManFixed = issuesFixed - offBoxFixed;
+  const deadManOk = !(deadManFound > 0 && deadManFixed < deadManFound);
+  if (deadManOk !== success) {
+    log(
+      AGENT,
+      `dead-man reports ok=${deadManOk} while exit reports ok=${success} — ` +
+        `${offBoxFound} off-box finding(s) are excluded from the heartbeat`,
+    );
+  }
 
   // External heartbeat: ping healthchecks.io (or compatible) every cycle.
   // Success path increments the dead-man counter; unfixed-issues path POSTs
@@ -772,7 +1091,7 @@ async function main(): Promise<void> {
   await pingHeartbeat(
     AGENT,
     process.env.HEALTHCHECKS_HEALTH_GUARDIAN_URL,
-    success ? 'success' : 'fail',
+    deadManOk ? 'success' : 'fail',
   );
 }
 
