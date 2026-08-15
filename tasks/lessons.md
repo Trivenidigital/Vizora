@@ -331,3 +331,16 @@ Three corrections were needed this session, all the same shape — a conclusion 
   written, notifications recorded), comparing counts and payload fields against the
   production predicate (see the oracle-matching rule above). A log-only acceptance is
   an incomplete acceptance.
+
+## 2026-08-15 — Gate the merge on the poll's ALLGREEN flag, not on loop exhaustion
+
+- Self-caught during the #347 merge: my CI-poll loop ran N iterations and the merge command
+  was sequenced unconditionally AFTER the loop — so when the loop exhausted with the e2e job
+  still `in_progress`, the merge fired anyway. The job later finished green and the diff
+  (e2e-tests/** only) could not have affected it, but the exact-head-fully-green rule exists
+  precisely for the surprises "could not have" misses.
+- The failure shape is a script-structure bug, not a judgment bug: `for ...; done; merge`
+  encodes "merge when the loop ENDS", while the intent is "merge when the loop PROVES green".
+- **Rule:** the merge/deploy command must be conditioned on the explicit success marker the
+  poll emits (`ALLGREEN` flag/exit status), never placed sequentially after a bounded wait.
+  A poll that can time out must leave the dangerous action untaken.
