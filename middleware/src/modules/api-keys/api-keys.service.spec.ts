@@ -157,6 +157,13 @@ describe('ApiKeysService', () => {
           revokedAt: null,
           OR: [{ expiresAt: null }, { expiresAt: { gt: expect.any(Date) } }],
         },
+        // B2: the entitlement fields ride along on this same query so
+        // ApiKeyGuard needs no second round-trip per request.
+        include: {
+          organization: {
+            select: { subscriptionTier: true, subscriptionStatus: true },
+          },
+        },
       });
     });
 

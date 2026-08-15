@@ -148,7 +148,29 @@ describe('API-key auth precedence (e2e)', () => {
       .set('Authorization', `Bearer ${orgAToken}`)
       .send({ name: 'displays-read', scopes: ['read:displays'] });
     displaysOnlyKey = displaysOnlyKeyRes.body.key;
+
+    // Registration leaves an org on tier 'free' / status 'trial', which the B2
+    // entitlement gate denies. Every key-path assertion in this file therefore
+    // presupposes an API-entitled plan, so promote org A explicitly rather than
+    // relying on a default that the gate has since made wrong.
+    await setPlan(orgAId, 'pro', 'active');
   });
+
+  /** Move an org to a plan/status pair, the way a billing event would. */
+  const setPlan = async (
+    organizationId: string,
+    subscriptionTier: string,
+    subscriptionStatus: string,
+  ) => {
+    const updated = await db.organization.update({
+      where: { id: organizationId },
+      data: { subscriptionTier, subscriptionStatus },
+      select: { subscriptionTier: true, subscriptionStatus: true },
+    });
+    // Assert the promotion landed — a silently-failed update would make the
+    // entitlement assertions below pass or fail for the wrong reason.
+    expect(updated).toEqual({ subscriptionTier, subscriptionStatus });
+  };
 
   afterAll(async () => {
     for (const organizationId of [orgAId, orgBId]) {
@@ -240,6 +262,100 @@ describe('API-key auth precedence (e2e)', () => {
           const ids = res.body.data.map((c: any) => c.id);
           expect(ids).toContain(orgBContentId);
           expect(ids).not.toContain(orgAContentId);
+        });
+    });
+  });
+
+  /**
+   * B2 — entitlement gate, driven through the REAL route rather than the guard.
+   *
+   * The unit spec proves the guard's decision. It cannot prove that the
+   * decision survives the guard chain to become a 403 on the wire: JwtAuthGuard
+   * wraps ApiKeyGuard and converts a falsy result into 401, so only an
+   * end-to-end status assertion distinguishes "denied for lacking entitlement"
+   * from "rejected as a bad credential".
+   *
+   * These tests mutate org A's plan, so each restores it.
+   */
+  describe('entitlement gate on GET /api/content', () => {
+    afterEach(async () => {
+      await setPlan(orgAId, 'pro', 'active');
+    });
+
+    it('denies a downgraded org — the key is valid, the plan is not', async () => {
+      await setPlan(orgAId, 'free', 'active');
+
+      const res = await request(app.getHttpServer())
+        .get('/api/content?limit=100')
+        .set('x-api-key', contentReadKey)
+        .expect(403);
+
+      // The message must not misreport a good credential as a bad one.
+      expect(JSON.stringify(res.body)).not.toMatch(/invalid api key/i);
+    });
+
+    it('restores access on re-upgrade using the SAME key — downgrade revoked nothing', async () => {
+      await setPlan(orgAId, 'free', 'active');
+      await request(app.getHttpServer())
+        .get('/api/content?limit=100')
+        .set('x-api-key', contentReadKey)
+        .expect(403);
+
+      await setPlan(orgAId, 'pro', 'active');
+
+      // Same plaintext key, never reissued.
+      await request(app.getHttpServer())
+        .get('/api/content?limit=100')
+        .set('x-api-key', contentReadKey)
+        .expect(200)
+        .expect((res) => {
+          const ids = res.body.data.map((c: any) => c.id);
+          expect(ids).toContain(orgAContentId);
+        });
+    });
+
+    it('denies a suspended org even on an API-capable tier', async () => {
+      await setPlan(orgAId, 'pro', 'suspended');
+
+      await request(app.getHttpServer())
+        .get('/api/content?limit=100')
+        .set('x-api-key', contentReadKey)
+        .expect(403);
+    });
+
+    it('allows past_due — dunning grace keeps the integration alive', async () => {
+      await setPlan(orgAId, 'pro', 'past_due');
+
+      await request(app.getHttpServer())
+        .get('/api/content?limit=100')
+        .set('x-api-key', contentReadKey)
+        .expect(200);
+    });
+
+    it('still returns 403 for a wrong-scope key when entitlement IS satisfied', async () => {
+      await request(app.getHttpServer())
+        .get('/api/content?limit=100')
+        .set('x-api-key', displaysOnlyKey)
+        .expect(403);
+    });
+
+    it('still returns 401 for an unknown key when entitlement IS satisfied', async () => {
+      await request(app.getHttpServer())
+        .get('/api/content?limit=100')
+        .set('x-api-key', 'vz_live_definitely-not-a-real-key')
+        .expect(401);
+    });
+
+    it('leaves the cookie/JWT browser path open for a free org — humans are governed by roles, not key entitlement', async () => {
+      await setPlan(orgBId, 'free', 'active');
+
+      await request(app.getHttpServer())
+        .get('/api/content?limit=100')
+        .set('Authorization', `Bearer ${orgBToken}`)
+        .expect(200)
+        .expect((res) => {
+          const ids = res.body.data.map((c: any) => c.id);
+          expect(ids).toContain(orgBContentId);
         });
     });
   });

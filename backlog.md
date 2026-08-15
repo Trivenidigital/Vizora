@@ -200,7 +200,7 @@ predate 1.3.11 and must **not** hold up publication — see
 
 | # | Item | Status | Notes |
 |---|------|--------|-------|
-| B2 | **API-key entitlement gate — deny key auth when the org's current plan lacks API access** | NEW 2026-08-15, NOT STARTED | Became a live commercial-authorization defect when #342 enabled the first API-key business route (`GET /api/v1/content`): an org that downgrades keeps working API keys issued while on a higher tier. Intended invariant (verify against pricing/entitlement code before implementing — do NOT assume "Pro" from UI copy): *key may exist historically, but API-key authentication is denied while current entitlement excludes API access* — deny-at-auth, not revoke-on-downgrade, so re-upgrade restores access without destroying credentials. Enforce in `ApiKeyGuard`/`validateKey` next to the org lookup. |
+| B2 | **API-key entitlement gate — deny key auth when the org's current plan lacks API access** | NEW 2026-08-15, IN PR | Became a live commercial-authorization defect when #342 enabled the first API-key business route (`GET /api/v1/content`): an org that downgrades keeps working API keys issued while on a higher tier. Intended invariant (verify against pricing/entitlement code before implementing — do NOT assume "Pro" from UI copy): *key may exist historically, but API-key authentication is denied while current entitlement excludes API access* — deny-at-auth, not revoke-on-downgrade, so re-upgrade restores access without destroying credentials. Enforce in `ApiKeyGuard`/`validateKey` next to the org lookup. |
 
 | # | Item | Effort | Status | Notes |
 |---|------|--------|--------|-------|

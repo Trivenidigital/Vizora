@@ -22,7 +22,15 @@ const reflectorFor = (meta: Record<string, any>) => ({
 }) as any;
 
 describe('API-key authentication', () => {
-  const validKey = { id: 'key-1', organizationId: 'org-A', scopes: ['read:content'] };
+  // B2: an entitled org — these tests are about opt-in and precedence, which
+  // only come into play once the entitlement gate has passed. The gate is
+  // covered in api-keys/guards/api-key.guard.spec.ts.
+  const validKey = {
+    id: 'key-1',
+    organizationId: 'org-A',
+    scopes: ['read:content'],
+    organization: { subscriptionTier: 'pro', subscriptionStatus: 'active' },
+  };
 
   const apiKeyGuardFor = (record: any) => {
     const service = {

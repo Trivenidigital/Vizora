@@ -155,3 +155,72 @@ export const isPaidTier = (tier: string): boolean => {
   const plan = PLAN_TIERS[tier];
   return plan ? plan.prices.usd.monthly > 0 : false;
 };
+
+/**
+ * Tiers whose subscription includes programmatic API access (B2).
+ *
+ * This is a NEW machine-readable product decision, not a restatement of
+ * something that already existed. Nothing in the codebase encoded API access
+ * before: `Plan.features` / `Plan.featureFlags` are dead storage with no
+ * consumer, and the `PLAN_TIERS[x].features` arrays above are DISPLAY STRINGS
+ * — no code may ever match on them, because editing marketing copy would then
+ * silently change authorization.
+ *
+ * Chosen from the LIVE product promise, asserted in two independent places:
+ * the public pricing page lists 'API access' under Pro
+ * (`web/src/components/landing/PricingSection.tsx:164`), and the in-app plan
+ * chooser renders the same string from `PLAN_TIERS.pro.features` above.
+ * Enterprise is 'Everything in Pro', so it inherits.
+ *
+ * `scripts/seed-production.ts` disagrees (it marks API access enterprise-only),
+ * but that script is broken against the current schema, is excluded from
+ * typecheck, has never been run, and nothing reads its output — so it is not
+ * evidence of the shipped promise.
+ *
+ * CHANGING THIS SET IS A PRODUCT DECISION, not a refactor: removing a tier
+ * silently breaks every live integration that tier's customers have built.
+ */
+export const API_ACCESS_TIERS = new Set<string>(['pro', 'enterprise']);
+
+/**
+ * Subscription statuses that deny API-key use even on an API-capable tier (B2).
+ *
+ * Mirrors the deny set of `SubscriptionActiveGuard` — the terminal rungs of the
+ * B3 entitlement ladder. `past_due` and `publish_locked` are deliberately
+ * ALLOWED for ladder consistency: `past_due` is a 7-day dunning grace where one
+ * failed card must not lock anything, and `publish_locked` blocks only pushing
+ * NEW content to screens (EntitlementPublishGuard), not general access.
+ *
+ * Spelling notes: 'canceled' (single 'l') is this codebase's spelling, and there
+ * is NO 'expired' status — trial expiry flips `subscriptionStatus` to 'canceled'
+ * in `billing-lifecycle.service.ts`.
+ */
+export const API_BLOCKED_STATUSES = new Set<string>(['suspended', 'canceled']);
+
+/**
+ * Whether an organization's CURRENT entitlement permits API access (B2).
+ *
+ * Deliberately a pure function of the two stored fields so the decision is
+ * testable and has exactly one definition. Callers gate at authentication time;
+ * keys are never revoked on downgrade, so a re-upgrade restores access without
+ * destroying the customer's credentials.
+ *
+ * Trials are denied naturally rather than by a special case: orgs trial on tier
+ * 'free' (`auth.service.ts` registration sets `subscriptionTier: 'free'`) and
+ * the tier only rises on payment. There is no trial-of-Pro in this codebase.
+ *
+ * The two clauses are deliberately asymmetric:
+ *   tier   — ALLOW-list. An absent or unrecognized tier denies (fail closed);
+ *            a tier cannot acquire API access by being unknown.
+ *   status — DENY-list, mirroring SubscriptionActiveGuard. Only the terminal
+ *            rungs block, so an org already on an API-capable tier is not cut
+ *            off by a status this function has not been taught about. Adding a
+ *            new terminal rung means adding it to API_BLOCKED_STATUSES.
+ * The tier gate is what a non-paying org cannot get past, and it fails closed.
+ */
+export function hasApiAccess(
+  tier: string | null | undefined,
+  status: string | null | undefined,
+): boolean {
+  return API_ACCESS_TIERS.has(tier ?? '') && !API_BLOCKED_STATUSES.has(status ?? '');
+}

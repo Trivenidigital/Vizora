@@ -54,7 +54,17 @@ export class ApiKeysService {
   }
 
   /**
-   * Validate an API key and return the key record if valid
+   * Validate an API key and return the key record if valid.
+   *
+   * The owning organization's entitlement fields ride along on the SAME single
+   * indexed query (B2). ApiKeyGuard needs `subscriptionTier`/`subscriptionStatus`
+   * to decide whether key USE is currently permitted, and a second round-trip
+   * per authenticated request would be pure cost — no entitlement path in this
+   * codebase caches, so the read has to happen here anyway.
+   *
+   * Fail-closed on infrastructure by construction: a DB error rejects this
+   * promise, the guard never sees a key, and the request is refused. There is
+   * no path where an outage yields an entitled-by-default answer.
    */
   async validateKey(plainKey: string) {
     const prefix = plainKey.slice(0, 8);
@@ -66,6 +76,11 @@ export class ApiKeysService {
         hashedKey,
         revokedAt: null,
         OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      include: {
+        organization: {
+          select: { subscriptionTier: true, subscriptionStatus: true },
+        },
       },
     });
   }
