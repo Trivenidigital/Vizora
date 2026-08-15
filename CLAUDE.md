@@ -92,9 +92,12 @@ mirroring `SubscriptionActiveGuard`, so `past_due`/`publish_locked` keep working
 `API_ACCESS_TIERS` is a product decision** — it silently breaks live customer integrations.
 **Creating a key is deliberately ungated in v1** — a free-tier admin can still mint one that will
 never authenticate (`api-keys.controller.ts` POST has `RolesGuard` only); warning at create time is
-a tracked UX follow-up, not an oversight. **The allow branch is currently unreachable for Razorpay
-customers**: `subscriptionTier` is never written on that purchase path (backlog B3), so they sit on
-tier `free` and are denied — granting access needs a super-admin tier edit
+a tracked UX follow-up, not an oversight. **The allow branch was unreachable for Razorpay
+customers until B3** — `subscriptionTier` was never written on that purchase path, so they sat on
+tier `free` and were denied. B3 closed it: `subscription.activated`/`subscription.charged` persist
+the tier through `applyTierFromPlan`, provided the matching
+`RAZORPAY_<TIER>_<INTERVAL>_PLAN_ID` is configured (an unrecognized plan id skips the tier write
+and escalates rather than downgrading). The manual escape hatches remain a super-admin tier edit
 (`PATCH /api/v1/admin/organizations/:id`) or the kill switch
 `API_KEY_ENTITLEMENT_GATE_ENABLED=false` (only that exact string works; anything else is ignored
 and warned about once).
@@ -188,9 +191,11 @@ MFA_ENCRYPTION_KEY      # AES-256-GCM key (min 32 chars) for TOTP-secret encrypt
 API_KEY_ENTITLEMENT_GATE_ENABLED  # B2 API-key entitlement gate. ENABLED BY DEFAULT (leave unset).
                               #   Only the exact string 'false' disables it — 'true'/'0'/anything
                               #   else is IGNORED and leaves it ON (warned once at startup).
-                              #   Emergency lever only: `subscriptionTier` is NEVER written on the
-                              #   Razorpay purchase path (see B3), so a paying Razorpay customer
-                              #   sits on tier 'free' and gets denied.
+                              #   Emergency lever only. Before B3 `subscriptionTier` was never
+                              #   written on the Razorpay purchase path, so a paying Razorpay
+                              #   customer sat on tier 'free' and got denied; B3 fixed that, but
+                              #   a MISSING RAZORPAY_<TIER>_<INTERVAL>_PLAN_ID still leaves the
+                              #   tier unwritten (loudly — logger.error + Sentry).
 INTERNAL_API_SECRET     # Required in prod — service-to-service auth (middleware ↔ realtime)
 BCRYPT_ROUNDS           # Password hashing rounds (10-15, default 12)
 GOOGLE_CLIENT_ID        # Optional — Google OAuth client ID
@@ -266,9 +271,42 @@ BACKUP_RETENTION_DAYS   # Daily backup retention (default 7)
 
 ### Billing
 
+> Provider is picked from the org's country: `IN` → Razorpay, everything else → Stripe.
+> Full annotated block is in `.env.example` (it had ZERO billing vars before B3).
+
 ```
-RAZORPAY_KEY_ID, RAZORPAY_BASIC_PLAN_ID, RAZORPAY_PRO_PLAN_ID
+STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET
+STRIPE_<TIER>_<INTERVAL>_PRICE_ID      # STRIPE_PRO_YEARLY_PRICE_ID, ...
+RAZORPAY_<TIER>_<INTERVAL>_PLAN_ID     # RAZORPAY_PRO_YEARLY_PLAN_ID, ...
+RAZORPAY_<TIER>_PLAN_ID                # LEGACY — honoured as the MONTHLY alias only
+BILLING_VALIDATION_STRICT              # 'true' fails boot on a MISSING id; default warns
 ```
+
+**Razorpay plan ids are interval-dimensioned (B3).** A Razorpay Plan carries its own
+period, so monthly and yearly are two distinct plan objects. The old single-dimension
+`RAZORPAY_<TIER>_PLAN_ID` could only ever bill one cadence — picking "yearly" in
+checkout billed monthly. The legacy name still resolves as the **monthly** alias; there
+is deliberately **no legacy fallback for yearly** (a missing yearly id must fail loudly
+at checkout, not quietly re-bill).
+
+**These ids are read in BOTH directions.** Forward (tier → id) decides what the customer
+is *charged*; reverse (id → tier, `razorpayPlanIdToTier` / `stripePriceIdToTier`) decides
+what the webhook *entitles* them to. An id present in the provider dashboard but absent
+here makes the lifecycle webhook log an error, capture to Sentry and **skip the tier
+write** — it is never coerced to `free`. Two tiers (or two intervals) sharing one id is
+ambiguous and **throws at billing `onModuleInit` regardless of `BILLING_VALIDATION_STRICT`**.
+
+**One tier-write site per provider**: `BillingService.applyTierFromPlan`, reached from
+`subscription.activated` / `subscription.charged` / `subscription.updated` /
+`customer.subscription.updated`. Do not add a second. `past_due` delegates to
+`EntitlementService.beginPastDue` and leaves the tier alone (rungs gate capability; tier
+records what was bought); recovery from a dunning rung delegates to `recover()`.
+`Organization.billingEventAt` orders entitlement writes so a retried older event cannot
+overwrite newer state — it is **not** `entitlementStateSince` (the dunning clock).
+
+Admin `PlanForm` has `razorpayPlanIdMonthly`/`razorpayPlanIdYearly` fields: **not wired**.
+Env is canonical; nothing reads the DB columns.
 
 ### Observability
 

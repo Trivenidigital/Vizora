@@ -23,6 +23,15 @@ export function PlanForm({ plan, onSubmit, onCancel, isLoading = false }: PlanFo
     priceUsdYearly: 0,
     priceInrMonthly: 0,
     priceInrYearly: 0,
+    // NOT WIRED — these four provider-id fields are carried in form state and
+    // round-trip to the Plan row, but NOTHING reads them. Billing resolves
+    // provider ids from environment variables only
+    // (STRIPE_<TIER>_<INTERVAL>_PRICE_ID / RAZORPAY_<TIER>_<INTERVAL>_PLAN_ID,
+    // see middleware/src/modules/billing/constants/plans.ts). Env stays
+    // canonical (B3-E4): a DB-sourced id would give the money path two
+    // disagreeing sources of truth with no reconciliation. Do not render inputs
+    // for these expecting them to take effect, and do not point the billing
+    // code at the DB columns without a deliberate decision to migrate.
     stripePriceIdMonthly: '',
     stripePriceIdYearly: '',
     razorpayPlanIdMonthly: '',
