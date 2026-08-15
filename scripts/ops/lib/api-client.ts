@@ -20,8 +20,20 @@ import { log } from './alerting.js';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const PROBE_TIMEOUT_MS = 5_000;
-const MAX_ENTITIES = 500;
 const RATE_LIMIT_MS = 100;
+
+/**
+ * Hard ceiling on how many entities `getAll` will walk. Exported because it is
+ * not an implementation detail to its callers: a list that comes back with
+ * EXACTLY this many items may have been cut short, and a caller reasoning about
+ * whether it saw the whole tenant needs the number to test against.
+ *
+ * `list.length >= MAX_ENTITIES` is "possibly truncated", not "definitely" — a
+ * tenant with exactly 500 schedules reads as truncated. That false positive is
+ * in the safe direction: it withholds incident resolution rather than granting
+ * it on unseen data.
+ */
+export const MAX_ENTITIES = 500;
 
 // ─── Standalone Login ───────────────────────────────────────────────────────
 
