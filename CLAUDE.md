@@ -464,11 +464,20 @@ Available at `http://localhost:3000/api/v1/docs` in development mode only.
 - **Ops scripts**: **154 / 154 tests pass** via `pnpm test:ops` (node:test + tsx) — verified 2026-08-12.
   Note `pnpm test:ops` runs under tsx, which strips types without checking them, and CI's
   `typecheck` job covers only `display` while `lint` covers only `middleware/src` + `realtime/src`.
-  `scripts/` **is** now type-checked in CI: `pnpm typecheck:ops` (`scripts/tsconfig.json`)
-  runs in the `test` job, after `nx build @vizora/database` — the middleware validator that
-  `scripts/ops` imports needs that package resolvable. Excluded: `**/*.spec.ts` (jest globals),
-  `scripts/release/**`, and `scripts/seed-production.ts` (broken against the current schema —
-  it writes `Plan.monthlyPrice`/`yearlyPrice`, which do not exist).
+  `scripts/` **is** now type-checked in CI by TWO configs, both in the `test` job:
+  `pnpm typecheck:ops` (`scripts/tsconfig.json`) and `pnpm typecheck:release`
+  (`scripts/release/tsconfig.json`). Both run after `nx build @vizora/database` — the
+  middleware validator that `scripts/ops` imports needs that package resolvable.
+  The release gate needs its own config because `typecheck:ops` checks `*.ts` only
+  while the gate's two executables are `.mjs`; that config adds `allowJs` + `checkJs`
+  **scoped to `scripts/release/`**, since enabling them globally would drag in ~17
+  unrelated one-off `.js`/`.mjs` helpers. The `.mjs` files carry JSDoc types rather
+  than being converted to `.ts` — `publish-display-apk.sh` invokes them by exact
+  filename. Remaining exclusions: `**/*.spec.ts` (jest globals), `scripts/seed-production.ts`
+  (broken against the current schema — it writes `Plan.monthlyPrice`/`yearlyPrice`, which
+  do not exist), and the single strict flag `useUnknownInCatchVariables` in the release
+  config (satisfying it would mean rewriting 10 `catch` bodies in the publish gate;
+  every other strict check, `noImplicitAny` included, is on).
   **Locally you must run `prisma generate` + `nx build @vizora/database` first** — `packages/database/dist`
   is gitignored, so a fresh clone reports module-resolution errors rather than real ones.
 - **Aggregate**: 4517+ unit/integration tests passing, **ZERO failures**.

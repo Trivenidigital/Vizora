@@ -119,6 +119,13 @@ jobs:
       - name: Typecheck ops scripts
         run: pnpm typecheck:ops
 
+      # scripts/release is the APK publish gate and is EXCLUDED from typecheck:ops
+      # (that config checks *.ts only; the gate's two executables are .mjs). It gets
+      # its own config, which adds allowJs + checkJs for the release surface alone —
+      # global checkJs would drag in ~17 unrelated one-off .js/.mjs helpers.
+      - name: Typecheck release scripts
+        run: pnpm typecheck:release
+
       - name: Run ops unit tests
         run: pnpm test:ops
 
