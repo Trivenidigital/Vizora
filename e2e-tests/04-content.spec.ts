@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures/auth.fixture';
+import { test, expect, apiPost, readData } from './fixtures/auth.fixture';
 
 test.describe('Content Management', () => {
   test('should show content library', async ({ authenticatedPage }) => {
@@ -77,14 +77,12 @@ test.describe('Content Management', () => {
     const contentTypes = ['image', 'video'];
     
     for (const type of contentTypes) {
-      await authenticatedPage.request.post('http://localhost:3000/api/v1/content', {
-        headers: { Authorization: `Bearer ${token}` },
-        data: {
-          name: `Test ${type} ${Date.now()}`,
-          type,
-          url: `https://example.com/test.${type === 'image' ? 'jpg' : 'mp4'}`,
-        },
+      const res = await apiPost(authenticatedPage, token, 'http://localhost:3000/api/v1/content', {
+        name: `Test ${type} ${Date.now()}`,
+        type,
+        url: `https://example.com/test.${type === 'image' ? 'jpg' : 'mp4'}`,
       });
+      expect(res.ok(), `content create failed: ${res.status()} ${await res.text()}`).toBeTruthy();
     }
     
     await authenticatedPage.goto('/dashboard/content');
@@ -111,55 +109,37 @@ test.describe('Content Management', () => {
 
   test('should delete content', async ({ authenticatedPage, token }) => {
     // Create content via API
-    const contentRes = await authenticatedPage.request.post('http://localhost:3000/api/v1/content', {
-      headers: { Authorization: `Bearer ${token}` },
-      data: {
-        name: `Test Content ${Date.now()}`,
-        type: 'image',
-        url: 'https://example.com/test.jpg',
-      },
-    }).catch(() => null);
-    
-    if (!contentRes || !contentRes.ok()) {
-      // If API fails, just verify page loads
-      await authenticatedPage.goto('/dashboard/content');
-      await authenticatedPage.waitForLoadState('networkidle');
-      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Content Library' })).toBeVisible();
-      return;
-    }
-    
-    const content = await contentRes.json();
-    
+    const contentRes = await apiPost(authenticatedPage, token, 'http://localhost:3000/api/v1/content', {
+      name: `Test Content ${Date.now()}`,
+      type: 'image',
+      url: 'https://example.com/test.jpg',
+    });
+
+    expect(contentRes.ok(), `content create failed: ${contentRes.status()} ${await contentRes.text()}`).toBeTruthy();
+
+    const content = await readData(contentRes);
+    expect(content.name, 'created content must carry a name').toBeTruthy();
+
     await authenticatedPage.goto('/dashboard/content');
     await authenticatedPage.waitForLoadState('networkidle');
-    
-    // Try to find content
-    const contentText = authenticatedPage.locator(`text="${content.name}"`);
-    if (!await contentText.isVisible({ timeout: 5000 }).catch(() => false)) {
-      // Content not visible, maybe it's in a different view or didn't save
-      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Content Library' })).toBeVisible();
-      return;
-    }
-    
-    // Find the content card/row
-    const contentItem = contentText.locator('..').locator('..');
-    
-    // Look for delete button
-    const deleteButton = contentItem.locator('button').last(); // Delete usually last button
-    
-    if (await deleteButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await deleteButton.click();
-      await authenticatedPage.waitForTimeout(500);
-      
-      // Try to confirm if modal appears
-      const confirmButton = authenticatedPage.locator('button').filter({ hasText: /confirm|yes|delete/i }).first();
-      if (await confirmButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await confirmButton.click();
-        await authenticatedPage.waitForTimeout(1000);
-      }
-    }
-    
-    // Success if page still works
+
+    // Content created through the API must be listed, then must be removable.
+    // Scope to the `.eh-dash-card` the item renders in, not two DOM levels up.
+    const contentItem = authenticatedPage.locator('.eh-dash-card').filter({ hasText: content.name }).first();
+    await expect(contentItem).toBeVisible({ timeout: 10000 });
+
+    const deleteButton = contentItem.locator('button.eh-icon-btn-danger').first();
+    await expect(deleteButton).toBeVisible({ timeout: 5000 });
+    await deleteButton.click();
+
+    // Confirm inside the dialog. An unscoped match here picks the card's own
+    // Delete button, which sits behind the modal overlay and never becomes clickable.
+    const dialog = authenticatedPage.locator('[role="dialog"]').first();
+    await expect(dialog).toBeVisible({ timeout: 5000 });
+    await dialog.locator('button').filter({ hasText: /^\s*(confirm|yes|delete)\s*$/i }).first().click();
+
+    // The deleted item must actually disappear from the library.
+    await expect(authenticatedPage.locator(`text="${content.name}"`)).toHaveCount(0, { timeout: 10000 });
     await expect(authenticatedPage.locator('h2').filter({ hasText: 'Content Library' })).toBeVisible();
   });
 });

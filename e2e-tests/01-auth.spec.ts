@@ -38,8 +38,16 @@ test.describe('Authentication Flow', () => {
     await page.locator('#password').click();
     await page.locator('#password').fill(password);
 
+    // Submit stays disabled until confirmPassword matches AND terms are accepted.
+    await page.locator('#confirmPassword').click();
+    await page.locator('#confirmPassword').fill(password);
+
+    await page.locator('#agreeTerms').check();
+
     // Small delay to ensure form state is updated
     await page.waitForTimeout(300);
+
+    await expect(page.locator('button[type="submit"]')).toBeEnabled();
 
     // Submit and wait for navigation (or error)
     await page.click('button[type="submit"]');

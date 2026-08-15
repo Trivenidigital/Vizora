@@ -22,10 +22,12 @@ test.describe('In-App Notifications (Wave 4)', () => {
       // Bell should always be visible
       await expect(bellButton).toBeVisible({ timeout: 10000 });
 
-      // Badge visibility depends on notifications
+      // Badge presence depends on notification count, so only record which way it went.
       const hasBadge = await badge.isVisible({ timeout: 3000 }).catch(() => false);
-      // This is informational - badge presence depends on notification count
-      expect(hasBadge || true).toBeTruthy();
+      test.info().annotations.push({
+        type: 'skipped-branch',
+        description: `unread badge ${hasBadge ? 'present' : 'absent'} — count-dependent, not asserted`,
+      });
     });
 
     test('should open notification dropdown on click', async ({ authenticatedPage }) => {
@@ -67,12 +69,13 @@ test.describe('In-App Notifications (Wave 4)', () => {
       const bellButton = authenticatedPage.locator('button[aria-label*="notification" i], [data-testid="notification-bell"]').first();
       await bellButton.click();
 
-      // Look for mark all as read
+      // "Mark all read" only renders when there are notifications; record which way it went.
       const markAllButton = authenticatedPage.locator('button, a').filter({ hasText: /mark all|read all|clear all/i }).first();
       const hasMarkAll = await markAllButton.isVisible({ timeout: 5000 }).catch(() => false);
-
-      // May not be visible if no notifications
-      expect(hasMarkAll || true).toBeTruthy();
+      test.info().annotations.push({
+        type: 'skipped-branch',
+        description: `"mark all as read" ${hasMarkAll ? 'present' : 'absent'} — count-dependent, not asserted`,
+      });
     });
 
     test('should close dropdown when clicking outside', async ({ authenticatedPage }) => {

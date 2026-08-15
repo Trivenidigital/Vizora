@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures/auth.fixture';
+import { test, expect, apiPost, readData } from './fixtures/auth.fixture';
 
 test.describe('Display Management', () => {
   test('should show empty state when no displays', async ({ authenticatedPage }) => {
@@ -35,21 +35,27 @@ test.describe('Display Management', () => {
   });
 
   test('should create new display', async ({ authenticatedPage, token }) => {
-    // Try to create a pairing request via API
+    // RequestPairingDto requires deviceIdentifier; posting an empty body always
+    // 400s, which used to send every run down the fallback branch below.
     const pairingRes = await authenticatedPage.request.post('http://localhost:3000/api/v1/devices/pairing/request', {
       headers: { Authorization: `Bearer ${token}` },
+      data: { deviceIdentifier: `e2e-gate-${Date.now()}` },
     }).catch(() => null);
-    
+
     if (!pairingRes || !pairingRes.ok()) {
-      // If API fails, skip this test gracefully
+      test.info().annotations.push({
+        type: 'skipped-branch',
+        description: `pairing request failed (status ${pairingRes?.status() ?? 'no response'}) — pairing form not exercised`,
+      });
       await authenticatedPage.goto('/dashboard/devices/pair');
       await authenticatedPage.waitForLoadState('networkidle');
       await expect(authenticatedPage.locator('h2').filter({ hasText: /pair/i })).toBeVisible();
       return;
     }
-    
-    const pairing = await pairingRes.json();
-    
+
+    const pairing = await readData(pairingRes);
+    expect(pairing.code, 'pairing response must carry a code').toBeTruthy();
+
     await authenticatedPage.goto('/dashboard/devices/pair');
     await authenticatedPage.waitForLoadState('networkidle');
     
@@ -68,72 +74,61 @@ test.describe('Display Management', () => {
   });
 
   test('should show pairing code for display', async ({ authenticatedPage, token }) => {
-    // Create display via API
-    const displayRes = await authenticatedPage.request.post('http://localhost:3000/api/v1/displays', {
-      headers: { Authorization: `Bearer ${token}` },
-      data: {
-        nickname: `Test Display ${Date.now()}`,
-        location: 'Test Location',
-      },
-    }).catch(() => null);
-    
-    if (!displayRes || !displayRes.ok()) {
-      // If API fails, just verify page loads
-      await authenticatedPage.goto('/dashboard/devices');
-      await authenticatedPage.waitForLoadState('networkidle');
-      await expect(authenticatedPage.locator('text=No devices yet')).toBeVisible();
-      return;
-    }
-    
-    const display = await displayRes.json();
-    
+    // CreateDisplayDto takes { name, deviceId } and maps them to nickname /
+    // deviceIdentifier; posting { nickname } is rejected as a non-whitelisted property.
+    const displayRes = await apiPost(authenticatedPage, token, 'http://localhost:3000/api/v1/displays', {
+      name: `Test Display ${Date.now()}`,
+      deviceId: `e2e-gate-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      location: 'Test Location',
+    });
+
+    expect(displayRes.ok(), `display create failed: ${displayRes.status()} ${await displayRes.text()}`).toBeTruthy();
+
+    const display = await readData(displayRes);
+    expect(display.nickname, 'created display must carry a nickname').toBeTruthy();
+
     await authenticatedPage.goto('/dashboard/devices');
     await authenticatedPage.waitForLoadState('networkidle');
-    
-    // Find the display row and look for action buttons
+
+    // The display the API just created must actually be listed in the UI.
     const deviceRow = authenticatedPage.locator(`text="${display.nickname}"`).locator('..').locator('..');
-    
+    await expect(deviceRow.first()).toBeVisible({ timeout: 10000 });
+
     // Look for "Generate Pairing" or similar button
     const pairButton = deviceRow.locator('button').filter({ hasText: /pair|generate|code/i }).first();
-    
+
     // If button exists, click it
     if (await pairButton.isVisible({ timeout: 2000 }).catch(() => false)) {
       await pairButton.click();
-      
+
       // Should show pairing modal with code
       await expect(authenticatedPage.locator('[role="dialog"]')).toBeVisible({ timeout: 5000 });
-      
+
       // Visual regression
       // await expect(authenticatedPage).toHaveScreenshot('display-pairing.png', { maxDiffPixels: 100 });
     } else {
-      // If no pairing button, just verify device is visible
-      await expect(deviceRow).toBeVisible();
+      test.info().annotations.push({
+        type: 'skipped-branch',
+        description: 'no per-row pairing/generate button rendered — pairing modal not exercised',
+      });
     }
   });
 
   test('should delete display', async ({ authenticatedPage, token }) => {
-    // Create display via API
-    const displayRes = await authenticatedPage.request.post('http://localhost:3000/api/v1/displays', {
-      headers: { Authorization: `Bearer ${token}` },
-      data: {
-        nickname: `Test Display ${Date.now()}`,
-        location: 'Test Location',
-      },
-    }).catch(() => null);
-    
-    if (!displayRes || !displayRes.ok()) {
-      // If API fails, just verify page loads
-      await authenticatedPage.goto('/dashboard/devices');
-      await authenticatedPage.waitForLoadState('networkidle');
-      await expect(authenticatedPage.locator('text=No devices yet')).toBeVisible();
-      return;
-    }
-    
-    const display = await displayRes.json();
-    
+    const displayRes = await apiPost(authenticatedPage, token, 'http://localhost:3000/api/v1/displays', {
+      name: `Test Display ${Date.now()}`,
+      deviceId: `e2e-gate-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      location: 'Test Location',
+    });
+
+    expect(displayRes.ok(), `display create failed: ${displayRes.status()} ${await displayRes.text()}`).toBeTruthy();
+
+    const display = await readData(displayRes);
+    expect(display.nickname, 'created display must carry a nickname').toBeTruthy();
+
     await authenticatedPage.goto('/dashboard/devices');
     await authenticatedPage.waitForLoadState('networkidle');
-    
+
     // Find the device in the table
     const deviceRow = authenticatedPage.locator('tr').filter({ hasText: display.nickname });
     await expect(deviceRow).toBeVisible({ timeout: 10000 });
