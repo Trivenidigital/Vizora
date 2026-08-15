@@ -317,3 +317,17 @@ Three corrections were needed this session, all the same shape — a conclusion 
   transcribe every clause, or you will spend the investigation proving your own SQL
   wrong. Cheap insurance: pin the predicate with a test that asserts the literal
   `where` the production code passes, so a future divergence fails loudly.
+
+## 2026-08-15 — Cron acceptance must reconcile against authoritative persisted outcomes, not log lines (operator standing rule)
+
+- Promoted to a standing rule by the operator after the #331/#336 experience: the
+  acceptance proof that followed `eligible → claimed → dispatched → notifications`
+  through the DATABASE immediately exposed the `undefined is offline` defect that a
+  "cron ran" log check would have passed.
+- Log lines prove the process woke up; they do not prove the pipeline produced the
+  outcomes it exists to produce, nor that the payloads were well-formed.
+- **Rule:** when accepting any cron/scheduled pipeline (new or changed), trace the
+  persisted outcome chain end-to-end in the authoritative store (rows claimed, rows
+  written, notifications recorded), comparing counts and payload fields against the
+  production predicate (see the oracle-matching rule above). A log-only acceptance is
+  an incomplete acceptance.
