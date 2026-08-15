@@ -14,6 +14,13 @@
  *   1 — maintenance completed but something failed (incidents recorded)
  *   2 — fatal error (agent could not complete)
  *
+ * Incident clearing: none of this agent's incidents could clear before —
+ * including the `vacuum-all-failed` that prod actually carried, which stayed
+ * open after the underlying psql problem was fixed. A run now resolves what it
+ * did not re-raise, EXCEPT `vacuum-table-missing` when the table-existence
+ * check itself could not run. The exit code is computed before the sweep, so
+ * resolutions can never green a red run.
+ *
  * ─── `pm2 flush` is GONE. Do not reintroduce it ──────────────────────────────
  *
  * Called bare, `pm2 flush` truncates the logs of EVERY app PM2 manages.
@@ -66,6 +73,7 @@ import {
   buildPgDumpCandidates,
   buildPsqlCandidates,
   redactUrlCredentials,
+  resolveClearedMaintenanceIncidents,
   summarize,
   type MaintenanceReport,
   type PgCandidate,
@@ -291,14 +299,25 @@ function retainLogs(): LogRetentionResult {
  * a backup that silently produces no file. The non-empty assertion below is
  * what makes that failure impossible to repeat.
  */
-function runBackup(): { attempted: boolean; ok: boolean; error?: string } {
+function runBackup(): { attempted: boolean; ok: boolean; error?: string; configured: boolean } {
   const bucket = process.env.BACKUP_S3_BUCKET;
   if (!bucket) {
     log(AGENT, 'Backup skipped: BACKUP_S3_BUCKET not set');
-    return { attempted: false, ok: true };
+    return { attempted: false, ok: true, configured: false };
   }
   if (!/^s3:\/\/[a-zA-Z0-9.\-_/]+$|^[a-zA-Z0-9.\-_/]+$/.test(bucket)) {
-    return { attempted: false, ok: true, error: 'BACKUP_S3_BUCKET has invalid format' };
+    // A malformed bucket is a FAILURE, not a disable. This previously returned
+    // `{ attempted: false, ok: true }`, which `buildMaintenanceIncidents` reads
+    // as "no backup was requested" — so a typo in BACKUP_S3_BUCKET produced no
+    // backup, no incident and exit 0, indistinguishable from backups being
+    // deliberately off. The operator asked for backups; they are not happening.
+    log(AGENT, 'Backup FAILED: BACKUP_S3_BUCKET is set but malformed');
+    return {
+      attempted: true,
+      ok: false,
+      configured: true,
+      error: 'BACKUP_S3_BUCKET is set but has an invalid format — no backup was taken',
+    };
   }
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -306,7 +325,7 @@ function runBackup(): { attempted: boolean; ok: boolean; error?: string } {
   const gzPath = `${rawPath}.gz`;
   const candidates = buildPgDumpCandidates(process.env.DATABASE_URL, PG_CONTAINER, rawPath);
   if (candidates.length === 0) {
-    return { attempted: true, ok: false, error: 'DATABASE_URL missing or unparseable' };
+    return { attempted: true, ok: false, configured: true, error: 'DATABASE_URL missing or unparseable' };
   }
 
   const attempts: string[] = [];
@@ -334,7 +353,7 @@ function runBackup(): { attempted: boolean; ok: boolean; error?: string } {
     }
   }
 
-  if (!source) return { attempted: true, ok: false, error: attempts.join('; ') };
+  if (!source) return { attempted: true, ok: false, configured: true, error: attempts.join('; ') };
 
   try {
     execFileSync('gzip', ['-f', rawPath], { timeout: 60_000, stdio: 'pipe' });
@@ -344,10 +363,10 @@ function runBackup(): { attempted: boolean; ok: boolean; error?: string } {
       timeout: 300_000, stdio: 'pipe',
     });
     log(AGENT, `Backup uploaded to ${s3Dest}`);
-    return { attempted: true, ok: true };
+    return { attempted: true, ok: true, configured: true };
   } catch (err) {
     const msg = redactUrlCredentials(err instanceof Error ? err.message.split('\n')[0] : String(err));
-    return { attempted: true, ok: false, error: `dump ok via ${source} but post-processing failed: ${msg}` };
+    return { attempted: true, ok: false, configured: true, error: `dump ok via ${source} but post-processing failed: ${msg}` };
   }
 }
 
@@ -397,6 +416,12 @@ async function main(): Promise<void> {
         attempts: 0,
       });
     }
+    // ORDER IS THE CONTRACT: `summarize` runs on the DETECTED set, and the
+    // resolution sweep below happens after it, inside the locked block. So
+    // `counts.exitCode` cannot see a single resolved incident, and a failed
+    // VACUUM keeps both its incident and its exit 1 no matter how many stale
+    // findings the same run clears. Moving the sweep above this line would let
+    // resolutions green a red run — pinned by a test.
     const counts = summarize(incidents);
     const durationMs = Date.now() - startTime;
 
@@ -412,6 +437,23 @@ async function main(): Promise<void> {
 
     const state = readOpsState();
     try {
+      // Blanket sweep, correct here because every task runs every run down a
+      // single path and the incident set is fully recomputed. A fatal throw
+      // lands in the catch below BEFORE this point, so a run that died partway
+      // writes no state and cannot falsely resolve anything.
+      const resolved = resolveClearedMaintenanceIncidents(
+        state.incidents,
+        new Set(incidents.map(i => i.id)),
+        { tableCheckRan: tableCheck.checked, backupConfigured: report.backup.configured },
+        detectedAt,
+      );
+      for (const r of resolved) {
+        log(AGENT, `Resolving cleared incident: ${r.id}`);
+      }
+      result.incidents = [...incidents, ...resolved];
+      // Resolutions, not repairs — this agent still fixes nothing.
+      result.issuesFixed = resolved.length;
+
       recordAgentRun(state, result);
     } finally {
       writeOpsState(state);

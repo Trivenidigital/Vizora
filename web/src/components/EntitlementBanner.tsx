@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { apiClient } from '@/lib/api';
 import type { EntitlementBanner as EntitlementBannerData } from '@/lib/types';
@@ -16,18 +16,89 @@ import type { EntitlementBanner as EntitlementBannerData } from '@/lib/types';
  *
  * Non-ladder states (active/trial/canceled) render nothing here — trial is owned
  * by TrialBanner, and the two never overlap (ladder states sit on a paid tier).
+ *
+ * A FAILED read renders a degraded notice, never silence (B5). The population
+ * this banner exists for — past_due / publish_locked / suspended — is exactly
+ * the population a swallowed error used to leave with no warning at all, and a
+ * blank bar is indistinguishable from a healthy account. Same semantic model as
+ * the billing page (#350): a read that succeeded renders the real state, a read
+ * that failed renders an explicitly unknown state, and neither ever renders a
+ * fabricated benign one.
  */
 export default function EntitlementBanner() {
   const [data, setData] = useState<EntitlementBannerData | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
-  useEffect(() => {
-    apiClient.getEntitlementBanner().then(setData).catch(() => {});
+  const load = useCallback(() => {
+    setLoading(true);
+    // The error is cleared on SUCCESS, not on attempt — clearing it here would
+    // blank the notice for a tick and re-show it on every failed retry.
+    apiClient
+      .getEntitlementBanner()
+      .then((banner) => {
+        setData(banner);
+        setLoadError(null);
+      })
+      .catch((err: unknown) => {
+        setLoadError(
+          (err instanceof Error && err.message) || 'The subscription status request failed',
+        );
+      })
+      .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // Self-heal on network restore. `ApiClient.request` retries only AbortError
+  // (timeouts) and replays once through /auth/refresh on a 401 — a dropped
+  // connection rejects with a plain `TypeError: Failed to fetch` and reaches us
+  // un-retried. Since the notice is not dismissible, without this it would sit
+  // over a healthy org's dashboard for the whole session unless they hit Retry.
+  useEffect(() => {
+    const onOnline = () => load();
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, [load]);
+
+  // Degraded — state UNKNOWN. Neutral tone, and it asserts nothing about the
+  // account beyond the fact that we could not check it.
+  //
+  // NOT dismissible, for the same reason publish_locked isn't: this state may be
+  // masking a rung, so it is load-bearing. Dismissing it would restore exactly
+  // the silence this fixes — and permanently, since the retry lives inside the
+  // notice, so a dismissal would also throw away the only recovery route.
+  if (loadError) {
+    return (
+      <DegradedNotice
+        detail={`Any billing warning that applies to your account is missing from this bar until it loads. (${loadError})`}
+        onRetry={load}
+        loading={loading}
+      />
+    );
+  }
 
   if (!data) return null;
 
   const { status, daysUntilNextRung } = data;
+
+  // The SERVER's own degraded sentinel: getBannerState returns status 'unknown'
+  // when it cannot read the org row, i.e. "I could not determine this". Rendering
+  // nothing for it is the same silent failure as swallowing the fetch error, one
+  // layer back — so it gets the same degraded notice, worded for a server-side
+  // determination failure rather than a transport one.
+  if (status === 'unknown') {
+    return (
+      <DegradedNotice
+        detail="We couldn’t determine your account’s billing state, so any warning that applies to it is missing from this bar."
+        onRetry={load}
+        loading={loading}
+      />
+    );
+  }
   const days = daysUntilNextRung ?? 0;
   const dayLabel = days === 1 ? 'day' : 'days';
 
@@ -68,15 +139,18 @@ export default function EntitlementBanner() {
   return null;
 }
 
-type Tone = 'amber' | 'orange' | 'red';
+// 'slate' is the degraded/unknown tone — not a ladder rung, so it must not read
+// as one of the escalating warnings.
+type Tone = 'slate' | 'amber' | 'orange' | 'red';
 
 const TONE_BG: Record<Tone, string> = {
+  slate: 'bg-gradient-to-r from-slate-800/70 to-slate-700/50 border-b border-slate-600/40',
   amber: 'bg-gradient-to-r from-amber-900/60 to-amber-800/40 border-b border-amber-700/40',
   orange: 'bg-gradient-to-r from-orange-900/70 to-orange-800/50 border-b border-orange-700/50',
   red: 'bg-gradient-to-r from-red-900/80 to-red-800/60 border-b border-red-700/50',
 };
-const TONE_DOT: Record<Tone, string> = { amber: 'bg-amber-400', orange: 'bg-orange-400', red: 'bg-red-400' };
-const TONE_TEXT: Record<Tone, string> = { amber: 'text-amber-100', orange: 'text-orange-100', red: 'text-red-100' };
+const TONE_DOT: Record<Tone, string> = { slate: 'bg-slate-400', amber: 'bg-amber-400', orange: 'bg-orange-400', red: 'bg-red-400' };
+const TONE_TEXT: Record<Tone, string> = { slate: 'text-slate-200', amber: 'text-amber-100', orange: 'text-orange-100', red: 'text-red-100' };
 
 function BannerShell({ tone, message, actions }: { tone: Tone; message: React.ReactNode; actions: React.ReactNode }) {
   return (
@@ -100,6 +174,46 @@ function PayLink({ label = 'Update Payment' }: { label?: string }) {
     >
       {label}
     </Link>
+  );
+}
+
+/**
+ * The one degraded/unknown rendering, shared by both ways the state can be
+ * unknown: the read failed in transit, or the server told us it could not
+ * determine it. Neither may render as silence or as a benign state.
+ */
+function DegradedNotice({
+  detail,
+  onRetry,
+  loading,
+}: {
+  detail: string;
+  onRetry: () => void;
+  loading: boolean;
+}) {
+  return (
+    <BannerShell
+      tone="slate"
+      message={
+        <>
+          <strong>Couldn&rsquo;t check your subscription status.</strong>
+          <span className="hidden sm:inline">{' '}{detail}</span>
+        </>
+      }
+      actions={<RetryButton onClick={onRetry} loading={loading} />}
+    />
+  );
+}
+
+function RetryButton({ onClick, loading }: { onClick: () => void; loading: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={loading}
+      className="shrink-0 px-3 py-1.5 text-sm font-medium text-slate-100 bg-slate-700/60 border border-slate-500/50 rounded-md hover:bg-slate-600/60 disabled:opacity-60 transition-colors"
+    >
+      {loading ? 'Retrying…' : 'Retry'}
+    </button>
   );
 }
 

@@ -391,6 +391,42 @@ export function resolveNotReraised(
 }
 
 /**
+ * Coverage-aware variant of `resolveNotReraised`: same predicate, plus the
+ * incident's `type` must be in `coveredTypes`.
+ *
+ * `resolveNotReraised` reads "not re-raised" as "resolved", which is only true
+ * when the run actually LOOKED. An agent whose checks partially failed — a
+ * storage probe that threw, an entity list truncated at the page-walk cap —
+ * did not observe the thing it would have re-raised, so a blanket sweep would
+ * report recovery on the strength of a run that could not see. That is a false
+ * all-clear: the incident disappears from the dashboard and `systemStatus`
+ * returns to HEALTHY while the underlying fault is untouched.
+ *
+ * So an agent passes only the types its COMPLETED checks covered this run. A
+ * degraded run resolves the subset it genuinely verified and leaves the rest
+ * open. Passing every type it can raise is equivalent to `resolveNotReraised`
+ * and is correct only for an agent that recomputes its whole incident set on
+ * every run through a single path.
+ *
+ * `resolveNotReraised` above is deliberately left untouched — fleet-manager
+ * recomputes its full set every run and is correct as-is.
+ */
+export function resolveNotReraisedForTypes(
+  priorIncidents: Incident[],
+  agent: string,
+  currentIncidentIds: Set<string>,
+  coveredTypes: ReadonlySet<string>,
+  now: string = new Date().toISOString(),
+): Incident[] {
+  return priorIncidents
+    .filter((i) => i.agent === agent)
+    .filter(isActiveIncident)
+    .filter((i) => !currentIncidentIds.has(i.id))
+    .filter((i) => coveredTypes.has(i.type))
+    .map((i) => ({ ...i, status: 'resolved' as const, resolvedAt: now }));
+}
+
+/**
  * Determine overall system status based on active incidents:
  * - CRITICAL: any active incident with severity 'critical'
  * - DEGRADED: any active incident with severity 'warning'

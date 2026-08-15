@@ -20,8 +20,47 @@ import { log } from './alerting.js';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const PROBE_TIMEOUT_MS = 5_000;
-const MAX_ENTITIES = 500;
 const RATE_LIMIT_MS = 100;
+
+/**
+ * Hard ceiling on how many entities `getAll` will walk. Exported because it is
+ * not an implementation detail to its callers: a list that comes back with
+ * EXACTLY this many items may have been cut short, and a caller reasoning about
+ * whether it saw the whole tenant needs the number to test against.
+ *
+ * Prefer `getAllScan().complete` over comparing against this — the server's
+ * `meta.total` gives an EXACT answer where it is present, and this ceiling is
+ * only the fallback proxy.
+ */
+export const MAX_ENTITIES = 500;
+
+/**
+ * Page size requested by the page walk.
+ *
+ * COUPLED to the API's `PaginationDto`, which declares `@Max(100)` on `limit`
+ * (middleware/src/modules/common/dto/pagination.dto.ts). This value must never
+ * exceed that maximum, and the walk's "a short page means the last page"
+ * heuristic silently depends on the server honouring the requested size:
+ * a server that CLAMPED limit to something smaller would return a short first
+ * page and the walk would stop, reporting a partial list as the whole
+ * collection. The `meta.total` check in `getAllScan` is what makes that
+ * failure detectable rather than silent.
+ */
+const PAGE_SIZE = 100;
+
+/** Result of a full page walk, with an explicit completeness verdict. */
+export interface ListScan<T> {
+  /** Items actually retrieved (never more than MAX_ENTITIES). */
+  items: T[];
+  /**
+   * True only when the walk PROVABLY covered the entire server-side
+   * collection. Callers that resolve incidents must gate on this: an entity
+   * the walk never retrieved cannot be evidence that its incident cleared.
+   */
+  complete: boolean;
+  /** Server-reported collection size, when the envelope carried one. */
+  total: number | null;
+}
 
 // ─── Standalone Login ───────────────────────────────────────────────────────
 
@@ -258,26 +297,77 @@ export class OpsApiClient {
   /**
    * Paginated GET — walks pages until exhausted or MAX_ENTITIES reached.
    * Handles multiple response shapes: array, { items }, { data }.
+   *
+   * Returns items only. Callers deciding whether they saw the WHOLE collection
+   * must use `getAllScan` instead — a bare array cannot distinguish "this
+   * tenant has 500 schedules" from "this tenant has 5000 and you saw 500".
    */
   async getAll<T>(path: string, params?: Record<string, string | number>): Promise<T[]> {
-    const items: T[] = [];
+    return (await this.getAllScan<T>(path, params)).items;
+  }
+
+  /**
+   * Paginated GET that also reports whether the walk was COMPLETE.
+   *
+   * Two failure modes are handled here rather than left to callers:
+   *
+   *  - Unrecognized response shape THROWS. It previously `break`ed, yielding an
+   *    empty list that every caller read as a successful "this tenant has zero
+   *    entities". A response-shape drift would therefore have made every ops
+   *    agent see an empty fleet simultaneously — and an agent that resolves
+   *    incidents it did not re-raise would then clear EVERYTHING, report
+   *    HEALTHY and exit 0. Throwing routes it into each agent's existing fetch
+   *    try/catch, which exits 2 and writes no state.
+   *
+   *  - Incomplete walks are reported, not guessed at. `meta.total` (present on
+   *    every `PaginatedResponse` endpoint) makes the verdict EXACT and covers
+   *    both truncation at the cap AND a short walk caused by a server that did
+   *    not honour the requested page size. The `< MAX_ENTITIES` proxy is only
+   *    the fallback for endpoints that report no total.
+   */
+  async getAllScan<T>(
+    path: string,
+    params?: Record<string, string | number>,
+  ): Promise<ListScan<T>> {
+    const collected: T[] = [];
     let page = 1;
-    while (items.length < MAX_ENTITIES) {
-      const data = await this.get<T[] | { items?: T[]; data?: T[] }>(path, {
-        ...params,
-        page: String(page),
-        limit: '100',
-      });
+    let total: number | null = null;
+
+    while (collected.length < MAX_ENTITIES) {
+      const data = await this.get<T[] | { items?: T[]; data?: T[]; meta?: { total?: number } }>(
+        path,
+        { ...params, page: String(page), limit: String(PAGE_SIZE) },
+      );
+
       let batch: T[];
       if (Array.isArray(data)) batch = data;
       else if (Array.isArray(data?.items)) batch = data.items;
       else if (Array.isArray(data?.data)) batch = data.data;
-      else break;
-      items.push(...batch);
-      if (batch.length < 100) break;
+      else {
+        throw new Error(
+          `API returned an unrecognized list shape for ${path} — expected an array, ` +
+            `{ items: [] } or { data: [] }, got keys [${
+              data && typeof data === 'object' ? Object.keys(data).join(', ') : typeof data
+            }]. Refusing to report this as an empty collection.`,
+        );
+      }
+
+      const reported = (data as { meta?: { total?: unknown } })?.meta?.total;
+      if (typeof reported === 'number' && Number.isFinite(reported)) total = reported;
+
+      collected.push(...batch);
+      if (batch.length < PAGE_SIZE) break;
       page++;
     }
-    return items.slice(0, MAX_ENTITIES);
+
+    const items = collected.slice(0, MAX_ENTITIES);
+    // Exact when the server told us the size; otherwise fall back to the cap
+    // proxy, which reads "exactly 500" as possibly-truncated. That false
+    // positive is in the safe direction — it withholds incident resolution
+    // rather than granting it on unseen data.
+    const complete = total !== null ? items.length === total : collected.length < MAX_ENTITIES;
+
+    return { items, complete, total };
   }
 
   // ─── PATCH ──────────────────────────────────────────────────────────────

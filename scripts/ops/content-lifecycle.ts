@@ -11,10 +11,20 @@
  *   2. Orphaned content — archives content not in any playlist, older than 30 days
  *   3. Storage monitoring — warns at >80%, critical at >90% utilization
  *
+ * Incident clearing is PER-CHECK, not per-run. This agent degrades in parts —
+ * the content checks and the storage probe fail independently — so it tracks
+ * three coverage keys and resolves only the incident types whose check actually
+ * completed. `storage_high` in particular could never clear before: the healthy
+ * branch pushes no incident, so a warning raised at 91% survived every
+ * subsequent run at 40%, pinning ops-state at CRITICAL forever.
+ *
  * Exit codes:
  *   0 — no issues found
  *   1 — issues found (some may have been auto-fixed)
  *   2 — fatal error (agent could not complete)
+ *
+ * The exit code is computed from DETECTION only — resolving stale incidents can
+ * never turn a run with an open finding green.
  */
 
 import 'dotenv/config';
@@ -25,8 +35,9 @@ import {
   recordAgentRun,
   addRemediation,
   makeIncidentId,
+  resolveNotReraisedForTypes,
 } from './lib/state.js';
-import { login, releaseSessions, OpsApiClient } from './lib/api-client.js';
+import { login, releaseSessions, OpsApiClient, MAX_ENTITIES } from './lib/api-client.js';
 import { log, sendInlineAlert } from './lib/alerting.js';
 import { classifyArchiveError } from './lib/archive-error.js';
 
@@ -65,7 +76,54 @@ type ContentLifecycleCounters = {
   issuesFixed: number;
   issuesEscalated: number;
   fatalDetected: boolean;
+
+  // ─── Coverage keys ────────────────────────────────────────────────────────
+  //
+  // Which of this agent's checks actually COMPLETED this run. They gate
+  // incident resolution, because "not re-raised" only means "resolved" when
+  // the run looked. Unlike schedule-doctor's single all-or-nothing fetch,
+  // content-lifecycle degrades in parts: the content checks and the storage
+  // probe fail independently, so a run where `/health` threw still completed
+  // the content checks. A blanket sweep would report storage recovered on the
+  // strength of a run that could not read storage.
+
+  /** Content + playlists both fetched, neither at the page-walk cap. */
+  contentScanComplete: boolean;
+  /** `/health` answered AND a numeric usage percentage was derived from it. */
+  storageVerdictReached: boolean;
+  /** The `/health` GET did not throw — whatever it then contained. */
+  storageProbeReached: boolean;
 };
+
+/** Types covered by `contentScanComplete`. */
+const CONTENT_SCAN_TYPES: ReadonlySet<string> = new Set([
+  'expired_content',
+  'orphaned_content',
+  // Raised when the scan was NOT complete, so a complete scan must clear it.
+  'scan-truncated',
+]);
+
+/**
+ * Types covered by `storageVerdictReached`.
+ *
+ * A verdict means a number was actually read. The three no-verdict exits —
+ * `/health` has no storage field, the field is unparseable, the GET threw —
+ * resolve NOTHING here (health-guardian's `no-verdict` precedent). Storage
+ * sitting at 91% is exactly the state where the probe is most likely to be
+ * unreadable, and clearing the incident on a run that read nothing is a false
+ * all-clear on the loudest possible signal.
+ */
+const STORAGE_VERDICT_TYPES: ReadonlySet<string> = new Set(['storage_high']);
+
+/**
+ * Types covered by `storageProbeReached`.
+ *
+ * `storage_check_failed` says "the probe threw". Its subject is the request,
+ * not the payload — so a `/health` that answers 200 with no storage fields
+ * DISPROVES it and clears it, even though that same run reaches no storage
+ * verdict and so cannot touch `storage_high`.
+ */
+const STORAGE_PROBE_TYPES: ReadonlySet<string> = new Set(['storage_check_failed']);
 
 // ─── Check: Expired Content ──────────────────────────────────────────────────
 
@@ -337,6 +395,10 @@ async function checkStorageUsage(
   try {
     const health = await api.get<Record<string, unknown>>('/health');
 
+    // The request itself succeeded. That alone disproves `storage_check_failed`
+    // — whose subject is "the probe threw" — regardless of what came back.
+    state.storageProbeReached = true;
+
     // Try to extract storage info from various response shapes
     const storage = (health.storage ?? health.disk ?? health.diskUsage) as
       | { usedPercent?: number; usedPct?: number; percentUsed?: number; used?: number; total?: number }
@@ -365,6 +427,8 @@ async function checkStorageUsage(
       return;
     }
 
+    // A real number was read, so this run is entitled to say storage recovered.
+    state.storageVerdictReached = true;
     log(AGENT, `Storage usage: ${usagePct.toFixed(1)}%`);
 
     const incidentId = makeIncidentId(AGENT, 'storage_high', 'system');
@@ -462,13 +526,21 @@ async function main(): Promise<void> {
 
   let content: ContentItem[];
   let playlists: Playlist[];
+  let contentScanComplete: boolean;
 
   try {
     log(AGENT, 'Fetching content and playlists');
-    [content, playlists] = await Promise.all([
-      api.getAll<ContentItem>('/content'),
-      api.getAll<Playlist>('/playlists'),
+    // getAllScan, not getAll: the completeness verdict gates incident
+    // resolution below and must come from the fetch layer that actually knows
+    // (server-reported `meta.total` where present). An unrecognized response
+    // shape now THROWS into this catch instead of yielding a silent empty list.
+    const [contentScan, playlistScan] = await Promise.all([
+      api.getAllScan<ContentItem>('/content'),
+      api.getAllScan<Playlist>('/playlists'),
     ]);
+    content = contentScan.items;
+    playlists = playlistScan.items;
+    contentScanComplete = contentScan.complete && playlistScan.complete;
     log(AGENT, `Fetched ${content.length} content item(s) and ${playlists.length} playlist(s)`);
   } catch (err) {
     log(AGENT, `FATAL: Failed to fetch data — ${err instanceof Error ? err.message : err}`);
@@ -484,7 +556,42 @@ async function main(): Promise<void> {
     issuesFixed: 0,
     issuesEscalated: 0,
     fatalDetected: false,
+    contentScanComplete,
+    storageVerdictReached: false,
+    storageProbeReached: false,
   };
+
+  // Truncation is announced, never silent. Withholding resolution quietly would
+  // drop a legitimately-large tenant into a permanent no-resolution regime with
+  // no signal saying why.
+  //
+  // INFO, and deliberately NOT counted in `issuesFound`. Only a code change can
+  // clear it, so counting it would pin a legitimately-large tenant at exit 1 /
+  // DEGRADED on every run forever — the alert-fatigue pattern the
+  // db-maintenance exit-code rule exists to prevent.
+  if (!counters.contentScanComplete) {
+    log(
+      AGENT,
+      `Content scan was incomplete (content=${content.length}, playlists=${playlists.length}, ` +
+      `cap=${MAX_ENTITIES}) — no content incident will be resolved this run`,
+    );
+    incidents.push({
+      id: makeIncidentId(AGENT, 'scan-truncated', 'entity-lists'),
+      agent: AGENT,
+      type: 'scan-truncated',
+      severity: 'info',
+      target: 'content',
+      targetId: 'entity-lists',
+      detected: new Date().toISOString(),
+      message:
+        `Content lifecycle could not see the whole tenant (content=${content.length}, ` +
+        `playlists=${playlists.length}, page-walk cap ${MAX_ENTITIES}). Findings are still valid, ` +
+        'but no prior content incident can be cleared from a partial scan.',
+      remediation: `Raise the getAll page-walk cap in scripts/ops/lib/api-client.ts, or scope this agent's queries.`,
+      status: 'open',
+      attempts: 0,
+    });
+  }
 
   // 3a. Expired content
   await checkExpiredContent(api, content, incidents, counters);
@@ -499,6 +606,15 @@ async function main(): Promise<void> {
 
   const durationMs = Date.now() - startTime;
 
+  // Pin the exit code to DETECTION, before resolutions inflate `issuesFixed`.
+  // A run that clears three stale incidents while storage is still at 91% is a
+  // failing run; letting resolutions count toward the fixed tally greens it.
+  const detectionExitCode = counters.fatalDetected
+    ? 2
+    : counters.issuesFound > 0 && counters.issuesFixed < counters.issuesFound
+      ? 1
+      : 0;
+
   const result: AgentResult = {
     agent: AGENT,
     timestamp: new Date().toISOString(),
@@ -509,8 +625,34 @@ async function main(): Promise<void> {
     incidents,
   };
 
+  // Only the checks that actually COMPLETED get to clear their own incidents.
+  // Assembling the covered set from the three coverage keys is what keeps a
+  // degraded run honest: with `/health` down, the content checks still clear
+  // their findings while `storage_high` correctly stays open.
+  const coveredTypes = new Set<string>([
+    ...(counters.contentScanComplete ? CONTENT_SCAN_TYPES : []),
+    ...(counters.storageVerdictReached ? STORAGE_VERDICT_TYPES : []),
+    ...(counters.storageProbeReached ? STORAGE_PROBE_TYPES : []),
+  ]);
+
+  // Brief locked read→merge→write. The sweep is pure computation over
+  // `opsState.incidents` — no network, no subprocess — and has to be here
+  // because prior incidents are only readable under the lock.
   const opsState = readOpsState();
   try {
+    const resolved = resolveNotReraisedForTypes(
+      opsState.incidents,
+      AGENT,
+      new Set(incidents.map(i => i.id)),
+      coveredTypes,
+    );
+    for (const r of resolved) {
+      log(AGENT, `Resolving stale incident: ${r.id}`);
+      incidents.push(r);
+    }
+    counters.issuesFixed += resolved.length;
+    result.issuesFixed = counters.issuesFixed;
+
     recordAgentRun(opsState, result);
 
     for (const r of api.auditLog) {
@@ -524,13 +666,7 @@ async function main(): Promise<void> {
 
   log(AGENT, `Cycle complete in ${durationMs}ms — found: ${counters.issuesFound}, fixed: ${counters.issuesFixed}, escalated: ${counters.issuesEscalated}${counters.fatalDetected ? ', FATAL API drift detected' : ''}`);
 
-  if (counters.fatalDetected) {
-    process.exitCode = 2;
-  } else if (counters.issuesFound > 0 && counters.issuesFixed < counters.issuesFound) {
-    process.exitCode = 1;
-  } else {
-    process.exitCode = 0;
-  }
+  process.exitCode = detectionExitCode;
 }
 
 // ─── Entry Point ─────────────────────────────────────────────────────────────
