@@ -257,7 +257,7 @@ test('no origins pin outside publishing is reported as SKIP, never a silent pass
 });
 
 test('the marker is read whether terser emitted single or double quotes', () => {
-  for (const quote of ["'", '"']) {
+  for (const quote of ["'", '"'] as const) {
     withApk([{ name: 'assets/public/assets/index-abc.js', body: bundleWith(PINNED_ORIGINS, quote) }], apk => {
       assert.deepEqual(readPackagedOrigins(apk).origins, PINNED_ORIGINS, `quote style ${quote} should parse`);
     });

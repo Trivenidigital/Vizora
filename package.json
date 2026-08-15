@@ -15,6 +15,7 @@
     "test": "nx run-many --target=test --all",
     "test:ops": "node --import tsx --test \"scripts/**/*.test.ts\"",
     "typecheck:ops": "tsc -p scripts/tsconfig.json",
+    "typecheck:release": "tsc -p scripts/release/tsconfig.json",
     "test:e2e": "pnpm --filter @vizora/middleware test:e2e",
     "smoke:email-readiness": "node scripts/smoke/email-readiness.mjs",
     "e2e:customer-critical": "node scripts/smoke/playwright-customer-critical.mjs",

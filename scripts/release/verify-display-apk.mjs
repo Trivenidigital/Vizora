@@ -38,6 +38,45 @@ import { pathToFileURL } from 'node:url';
 const DEFAULT_PACKAGE = 'com.vizora.display';
 
 /**
+ * Shapes used across the gate. These describe values parsed out of release.json
+ * and out of the APK, so the optional/null members are the real three-state
+ * distinctions the checks turn on (absent vs null vs present), not defensive
+ * padding.
+ *
+ * @typedef {{ package: string|null, versionCode: number|null, versionName: string|null }} ManifestFields
+ *
+ * @typedef {{ [key: string]: string|null|undefined }} OriginsRecord
+ *   The three compiled-in backend origins, keyed by ORIGIN_KEYS.
+ *
+ * @typedef {OriginsRecord|null|undefined} MaybeOrigins
+ *
+ * @typedef {{ name: string, pass: boolean, detail: string, skipped?: boolean }} CheckResult
+ *   One gate assertion. `skipped` rides along with `pass: true` — see computeVerdict
+ *   for why those two are not the same statement.
+ *
+ * @typedef {{ from?: MaybeOrigins, to?: MaybeOrigins,
+ *             approvedBy?: string|null, approvedAt?: string|null }} OriginTransition
+ *   release.json's out-of-band authorisation for moving the artifact between backends.
+ *
+ * @typedef {{ package?: string|null, versionName?: string|null, versionCode?: unknown,
+ *             apkSha256?: string|null, apkBytes?: unknown,
+ *             signingCertSha256?: string|null,
+ *             compiledOrigins?: MaybeOrigins }} CandidateRecord
+ *   release.json's `candidate` block. `versionCode` / `apkBytes` are deliberately
+ *   `unknown`: the binder's whole job on those two fields is to reject the non-integer
+ *   values that would poison the promoted baseline, so typing them as numbers here
+ *   would assume away the thing being checked.
+ *
+ * @typedef {{ package: string|null, versionName: string|null, versionCode: number|null,
+ *             apkSha256: string, apkBytes: number, signingCertSha256: string,
+ *             compiledOrigins: OriginsRecord|null }} ActualArtifact
+ *   What was actually read out of the APK in front of us.
+ *
+ * @typedef {{ artifactApprovedSha256?: string|null,
+ *             artifactApprovedBy?: string|null }} ApprovalRecord
+ */
+
+/**
  * The three compiled-in backend origins every release must pin and record.
  *
  * Named once so "all three are asserted" cannot drift into "whichever the data
@@ -59,7 +98,14 @@ const ATTR_RES_ID = {
   versionName: 0x0101021c,
 };
 
-/** Read a length-prefixed string-pool entry. Lengths are varints. */
+/**
+ * Read a length-prefixed string-pool entry. Lengths are varints.
+ *
+ * @param {Buffer} buf
+ * @param {number} base
+ * @param {boolean} isUtf8
+ * @returns {string}
+ */
 function readPoolString(buf, base, isUtf8) {
   if (isUtf8) {
     let p = base;
@@ -91,12 +137,18 @@ function readPoolString(buf, base, isUtf8) {
  * Extract package / versionCode / versionName from a binary AndroidManifest.xml.
  * Walks chunks rather than assuming fixed offsets, so it tolerates the
  * resource-map and namespace chunks that aapt2 emits.
+ *
+ * @param {Buffer} buf
+ * @returns {ManifestFields}
  */
 function parseAndroidManifest(buf) {
   if (buf.length < 8) throw new Error('AndroidManifest.xml is truncated');
 
+  /** @type {string[]} */
   let strings = [];
+  /** @type {number[]} */
   let resourceMap = [];
+  /** @type {ManifestFields} */
   let result = { package: null, versionCode: null, versionName: null };
 
   // Top-level XML chunk header is 8 bytes; child chunks follow.
@@ -174,7 +226,12 @@ function parseAndroidManifest(buf) {
 
 // ─── APK reading ─────────────────────────────────────────────────────────────
 
-/** List the entry names inside an APK (a zip) using the bundled `unzip`. */
+/**
+ * List the entry names inside an APK (a zip) using the bundled `unzip`.
+ *
+ * @param {string} apkPath
+ * @returns {string[]}
+ */
 function listEntries(apkPath) {
   const out = execFileSync('unzip', ['-Z1', apkPath], {
     encoding: 'utf8',
@@ -205,8 +262,11 @@ function listEntries(apkPath) {
  * "the right hosts are in there somewhere" is exactly the fuzzy check that passes
  * when it should not.
  *
- * @param apkPath path to the APK
- * @returns {{origins: object|null, entry: string|null, problem: string|null}}
+ * @param {string} apkPath path to the APK
+ * @param {{ listEntries?: (apkPath: string) => string[],
+ *           extractEntry?: (apkPath: string, entryName: string) => Buffer }} [deps]
+ *   Injection seam for the tests, which drive this without an APK fixture.
+ * @returns {{origins: OriginsRecord|null, entry: string|null, problem: string|null}}
  */
 export function readPackagedOrigins(apkPath, deps = {}) {
   const list = deps.listEntries || listEntries;
@@ -292,15 +352,17 @@ export function readPackagedOrigins(apkPath, deps = {}) {
  * Pure, so the fail-closed behaviour is unit-testable without an APK fixture —
  * same shape as evaluatePinnedCert below, and for the same reason.
  *
- * @param pinned   expected origins from release.json ({} / null when unset)
- * @param actual   origins read out of the APK (null when unreadable)
- * @param problem  why they could not be read, if they could not
- * @param required true when publishing (--require-pinned-origins)
+ * @param {MaybeOrigins} pinned   expected origins from release.json ({} / null when unset)
+ * @param {MaybeOrigins} actual   origins read out of the APK (null when unreadable)
+ * @param {string|null} problem   why they could not be read, if they could not
+ * @param {boolean} required      true when publishing (--require-pinned-origins)
+ * @returns {CheckResult}
  */
 export function evaluatePackagedOrigins(pinned, actual, problem, required) {
   const name = 'compiled default origins match the pinned expectation';
   const keys = ORIGIN_KEYS;
 
+  /** @type {(obj: MaybeOrigins, k: string) => boolean} */
   const isFilled = (obj, k) => typeof obj?.[k] === 'string' && obj[k].length > 0;
   const pinnedKeys = keys.filter(k => isFilled(pinned, k));
 
@@ -364,8 +426,8 @@ export function evaluatePackagedOrigins(pinned, actual, problem, required) {
   }
 
   const mismatches = keys
-    .filter(k => actual[k] !== pinned[k])
-    .map(k => `${k}: apk compiled with ${actual[k]}, pin expects ${pinned[k]}`);
+    .filter(k => actual[k] !== pinned?.[k])
+    .map(k => `${k}: apk compiled with ${actual[k]}, pin expects ${pinned?.[k]}`);
 
   if (mismatches.length) {
     return {
@@ -390,12 +452,21 @@ export function evaluatePackagedOrigins(pinned, actual, problem, required) {
  * Absent baseline is an explicit SKIP, never a silent pass: releases predating the
  * origins marker have nothing to compare against, and that must not read as a
  * continuity check that ran and succeeded.
+ *
+ * @param {MaybeOrigins} baselineOrigins published.compiledOrigins (null predates the marker)
+ * @param {MaybeOrigins} actual          origins read out of this APK
+ * @param {OriginTransition|null|undefined} transition the out-of-band migration approval
+ * @param {MaybeOrigins} pinned          the releaseOrigins policy pin, for corroboration
+ * @returns {CheckResult}
  */
 export function evaluateOriginsBaseline(baselineOrigins, actual, transition, pinned) {
   const name = 'compiled default origins match the previously published release';
   const keys = ORIGIN_KEYS;
+  /** @type {(obj: MaybeOrigins, k: string) => boolean} */
   const isFilled = (obj, k) => typeof obj?.[k] === 'string' && obj[k].length > 0;
+  /** @type {(obj: MaybeOrigins) => boolean} */
   const complete = obj => Boolean(obj) && keys.every(k => isFilled(obj, k));
+  /** @type {(obj: MaybeOrigins) => string} */
   const describe = obj => keys.map(k => `${k}=${obj?.[k] ?? '(absent)'}`).join('  ');
 
   // ABSENT is special; MALFORMED is not. A null baseline genuinely has nothing to
@@ -468,9 +539,10 @@ export function evaluateOriginsBaseline(baselineOrigins, actual, transition, pin
     };
   }
 
+  /** @type {string[]} */
   const problems = [];
   if (!complete(transition.from)) problems.push('originTransition.from does not name all three origins');
-  else if (keys.some(k => transition.from[k] !== baselineOrigins[k])) {
+  else if (keys.some(k => transition.from?.[k] !== baselineOrigins[k])) {
     problems.push(
       `originTransition.from does not match the live published baseline ` +
         `(transition says ${describe(transition.from)}; published is ${describe(baselineOrigins)}). ` +
@@ -480,7 +552,7 @@ export function evaluateOriginsBaseline(baselineOrigins, actual, transition, pin
 
   if (!complete(transition.to)) problems.push('originTransition.to does not name all three origins');
   else {
-    if (keys.some(k => transition.to[k] !== actual[k])) {
+    if (keys.some(k => transition.to?.[k] !== actual[k])) {
       problems.push(
         `originTransition.to does not match what this APK was actually compiled with ` +
           `(transition says ${describe(transition.to)}; apk has ${describe(actual)})`,
@@ -488,7 +560,7 @@ export function evaluateOriginsBaseline(baselineOrigins, actual, transition, pin
     }
     if (!complete(pinned)) {
       problems.push('releaseOrigins is missing or incomplete, so the transition target cannot be corroborated');
-    } else if (keys.some(k => transition.to[k] !== pinned[k])) {
+    } else if (keys.some(k => transition.to?.[k] !== pinned?.[k])) {
       problems.push(
         `originTransition.to does not match the releaseOrigins policy pin ` +
           `(transition says ${describe(transition.to)}; pin is ${describe(pinned)})`,
@@ -535,6 +607,11 @@ export function evaluateOriginsBaseline(baselineOrigins, actual, transition, pin
  * build must record null and a marker-era build must record all three, and which is
  * correct is decided by the bytes. Neither an omission nor a stale value can pass as
  * the other.
+ *
+ * @param {CandidateRecord|null|undefined} candidate the release.json candidate block
+ * @param {ActualArtifact} actual                    what the APK actually contains
+ * @param {boolean} required                         true when publishing
+ * @returns {CheckResult}
  */
 export function evaluateCandidateBinding(candidate, actual, required) {
   const name = 'candidate record matches this exact APK';
@@ -552,7 +629,9 @@ export function evaluateCandidateBinding(candidate, actual, required) {
     return { name, pass: true, skipped: true, detail: 'SKIPPED — no candidate block. Publish always requires one.' };
   }
 
+  /** @type {string[]} */
   const problems = [];
+  /** @type {(field: string, expected: unknown, got: unknown, normalise?: (v: any) => unknown) => void} */
   const cmp = (field, expected, got, normalise = v => v) => {
     if (expected === undefined || expected === null || expected === '') {
       problems.push(`candidate.${field} is missing — it must describe the artifact being published`);
@@ -577,7 +656,7 @@ export function evaluateCandidateBinding(candidate, actual, required) {
   // NEXT release. A type error in a value that becomes a safety baseline is not a
   // cosmetic difference — poisoning the promoted baseline is precisely what this
   // binder exists to prevent.
-  if (!Number.isInteger(candidate.versionCode) || candidate.versionCode <= 0) {
+  if (!Number.isInteger(candidate.versionCode) || /** @type {number} */ (candidate.versionCode) <= 0) {
     problems.push(
       `candidate.versionCode must be a positive integer — got ${JSON.stringify(candidate.versionCode)}. ` +
         `This value is promoted into published.versionCode, where a non-integer disables the ` +
@@ -594,7 +673,7 @@ export function evaluateCandidateBinding(candidate, actual, required) {
   // silently and the candidate still passed — the same malformed-data-narrows-the-
   // check defect removed from the origins pin and the origins baseline, surviving
   // here in the one field where it looked like a harmless guard.
-  if (!Number.isInteger(candidate.apkBytes) || candidate.apkBytes <= 0) {
+  if (!Number.isInteger(candidate.apkBytes) || /** @type {number} */ (candidate.apkBytes) <= 0) {
     problems.push(
       `candidate.apkBytes must be a positive integer — got ${JSON.stringify(candidate.apkBytes)}. ` +
         `A missing or non-numeric size cannot be compared, and must not pass as though it had been.`,
@@ -603,6 +682,7 @@ export function evaluateCandidateBinding(candidate, actual, required) {
     problems.push(`candidate.apkBytes is ${candidate.apkBytes} but the APK is ${actual.apkBytes} bytes`);
   }
 
+  /** @type {(obj: MaybeOrigins, k: string) => boolean} */
   const isFilled = (obj, k) => typeof obj?.[k] === 'string' && obj[k].length > 0;
   const co = candidate.compiledOrigins;
   const apkHasMarker = Boolean(actual.compiledOrigins);
@@ -622,11 +702,14 @@ export function evaluateCandidateBinding(candidate, actual, required) {
   } else if (!apkHasMarker) {
     problems.push('candidate.compiledOrigins records origins but this APK carries no marker to corroborate them');
   } else {
-    const wrong = ORIGIN_KEYS.filter(k => co[k] !== actual.compiledOrigins[k]);
+    // apkHasMarker is true here, so compiledOrigins is present; the cast just tells
+    // the checker what the Boolean() above already established.
+    const apkOrigins = /** @type {OriginsRecord} */ (actual.compiledOrigins);
+    const wrong = ORIGIN_KEYS.filter(k => co[k] !== apkOrigins[k]);
     if (wrong.length) {
       problems.push(
         'candidate.compiledOrigins disagrees with the APK: ' +
-          wrong.map(k => `${k} recorded ${co[k]}, apk has ${actual.compiledOrigins[k]}`).join('; '),
+          wrong.map(k => `${k} recorded ${co[k]}, apk has ${apkOrigins[k]}`).join('; '),
       );
     }
   }
@@ -658,6 +741,12 @@ export function evaluateCandidateBinding(candidate, actual, required) {
  * `artifactApprovedBy` was non-null and never compared the approved hash to the APK
  * in front of it, so an approval for one binary would wave through a different one:
  * exactly the failure the prose warns about.
+ *
+ * @param {ApprovalRecord|null|undefined} approval the release.json approval block
+ * @param {string|null|undefined} candidateSha     candidate.apkSha256, when recorded
+ * @param {string} actualSha                       the SHA-256 of the bytes in front of us
+ * @param {boolean} required                       true when publishing
+ * @returns {CheckResult}
  */
 export function evaluateGateABinding(approval, candidateSha, actualSha, required) {
   const name = 'Gate A approval is bound to this exact APK';
@@ -690,6 +779,7 @@ export function evaluateGateABinding(approval, candidateSha, actualSha, required
   }
 
   const a = normalizeFingerprint(approved);
+  /** @type {string[]} */
   const problems = [];
   if (a !== normalizeFingerprint(actualSha)) {
     problems.push(
@@ -711,7 +801,13 @@ export function evaluateGateABinding(approval, candidateSha, actualSha, required
   return { name, pass: true, detail: `${formatFingerprint(a)} approved by ${approval.artifactApprovedBy}` };
 }
 
-/** Extract a single entry from the APK (a zip) using the bundled `unzip`. */
+/**
+ * Extract a single entry from the APK (a zip) using the bundled `unzip`.
+ *
+ * @param {string} apkPath
+ * @param {string} entryName
+ * @returns {Buffer}
+ */
 function extractEntry(apkPath, entryName) {
   try {
     return execFileSync('unzip', ['-p', apkPath, entryName], {
@@ -731,13 +827,20 @@ function extractEntry(apkPath, entryName) {
  * not notice. Full cross-scheme validation needs `apksigner verify`, which
  * requires the Android SDK. We detect the presence of the v2/v3 signing block
  * so the report can state exactly what was and was not checked.
+ *
+ * @param {Buffer} buf
+ * @param {boolean} hasV1
  */
 function detectSignatureSchemes(buf, hasV1) {
   const magic = Buffer.from('APK Sig Block 42', 'utf8');
   return { v1: hasV1, v2OrV3Block: buf.includes(magic) };
 }
 
-/** Extract the signing certificate SHA-256 via keytool. */
+/**
+ * Extract the signing certificate SHA-256 via keytool.
+ *
+ * @param {string} apkPath
+ */
 function readSigningCert(apkPath) {
   let out;
   try {
@@ -793,9 +896,12 @@ function findApksigner() {
     process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, 'Android', 'Sdk') : null,
     process.env.HOME ? join(process.env.HOME, 'Android', 'Sdk') : null,
     process.env.HOME ? join(process.env.HOME, 'Library', 'Android', 'sdk') : null,
-  ].filter(Boolean);
+  ];
+  // `.filter(Boolean)` drops the nulls AND any env var set to the empty string;
+  // the cast records that, since Boolean is not a type predicate to the checker.
+  const presentRoots = /** @type {string[]} */ (sdkRoots.filter(Boolean));
 
-  for (const root of sdkRoots) {
+  for (const root of presentRoots) {
     const buildTools = join(root, 'build-tools');
     if (!existsSync(buildTools)) continue;
     let versions;
@@ -822,6 +928,9 @@ function findApksigner() {
  * APK whose v2/v3 blocks were signed with a DIFFERENT key would pass a keytool
  * check. apksigner validates every scheme and reports each signer's certificate
  * digest, letting us assert they all agree.
+ *
+ * @param {string} binary  path to (or name of) the apksigner executable
+ * @param {string} apkPath
  */
 function runApksigner(binary, apkPath) {
   let out;
@@ -848,6 +957,7 @@ function runApksigner(binary, apkPath) {
   }
 
   // `[\d.]+` so "v3.1" is its own key rather than colliding with "v3".
+  /** @type {Record<string, boolean>} */
   const schemes = {};
   for (const m of out.matchAll(/Verified using (v[\d.]+) scheme[^:]*:\s*(true|false)/gi)) {
     schemes[m[1].toLowerCase()] = m[2].toLowerCase() === 'true';
@@ -866,7 +976,6 @@ function runApksigner(binary, apkPath) {
   };
 }
 
-/** Fingerprints compare case-insensitively and ignore colon separators. */
 /**
  * The RELEASE-BINDING checks — the ones that tie this artifact to the recorded release:
  * its pinned signing identity, its pinned origins, its candidate record, and its Gate A
@@ -896,6 +1005,10 @@ export const RELEASE_BINDING_CHECKS = Object.freeze([
  * The middle one exists because "no binding check ran" and "every binding check
  * passed" are completely different statements about an artifact, and they used to
  * print the same word.
+ *
+ * @param {CheckResult[]} checks
+ * @param {readonly string[]} [bindingNames]
+ * @returns {'FAIL'|'PASS_WITH_SKIPS'|'PASS'}
  */
 export function computeVerdict(checks, bindingNames = RELEASE_BINDING_CHECKS) {
   if (!checks.every(c => c.pass)) return 'FAIL';
@@ -903,15 +1016,30 @@ export function computeVerdict(checks, bindingNames = RELEASE_BINDING_CHECKS) {
   return checks.some(c => c.skipped && binding.has(c.name)) ? 'PASS_WITH_SKIPS' : 'PASS';
 }
 
-/** Exit code per verdict. Distinct, so a caller cannot mistake incomplete for bound. */
+/**
+ * Exit code per verdict. Distinct, so a caller cannot mistake incomplete for bound.
+ *
+ * @param {string} verdict
+ * @returns {number}
+ */
 export function exitCodeForVerdict(verdict) {
   return verdict === 'PASS' ? 0 : verdict === 'FAIL' ? 1 : 3;
 }
 
+/**
+ * Fingerprints compare case-insensitively and ignore colon separators.
+ *
+ * @param {unknown} fp
+ * @returns {string}
+ */
 export function normalizeFingerprint(fp) {
   return String(fp).replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
 }
 
+/**
+ * @param {string} hex
+ * @returns {string}
+ */
 export function formatFingerprint(hex) {
   return (hex.match(/.{2}/g) || []).join(':');
 }
@@ -925,9 +1053,10 @@ export function formatFingerprint(hex) {
  * 2026-08-10 mismatch was found — the only release APK was signed with a key
  * that is not on the build machine.
  *
- * @param pinned   normalized fingerprint from release.json signing.canonicalCertSha256 ('' when unset)
- * @param actual   normalized fingerprint read from the APK
- * @param required true when publishing (--require-pinned-cert)
+ * @param {string} pinned   normalized fingerprint from release.json signing.canonicalCertSha256 ('' when unset)
+ * @param {string} actual   normalized fingerprint read from the APK
+ * @param {boolean} required true when publishing (--require-pinned-cert)
+ * @returns {CheckResult}
  */
 export function evaluatePinnedCert(pinned, actual, required) {
   const name = 'certificate matches the pinned canonical signing identity';
@@ -967,7 +1096,12 @@ export function evaluatePinnedCert(pinned, actual, required) {
 
 // ─── CLI ─────────────────────────────────────────────────────────────────────
 
+/**
+ * @param {string[]} argv
+ * @returns {Record<string, string|true|undefined>}
+ */
 function parseArgs(argv) {
+  /** @type {Record<string, string|true|undefined>} */
   const args = {};
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -1055,7 +1189,9 @@ async function main() {
 
   // ─── Assertions ────────────────────────────────────────────────────────────
 
+  /** @type {CheckResult[]} */
   const checks = [];
+  /** @type {(name: string, pass: boolean, detail: string) => number} */
   const check = (name, pass, detail) => checks.push({ name, pass, detail });
 
   // 1. package id
@@ -1253,8 +1389,11 @@ async function main() {
           `though it had.`,
       );
     } else {
-      const strictlyGreater = manifest.versionCode > baseline.versionCode;
-      const same = manifest.versionCode === baseline.versionCode;
+      // `versionName / versionCode readable` above already asserted the integer;
+      // a null here fails that check, it does not reach this comparison.
+      const manifestVersionCode = /** @type {number} */ (manifest.versionCode);
+      const strictlyGreater = manifestVersionCode > baseline.versionCode;
+      const same = manifestVersionCode === baseline.versionCode;
       check(
         'versionCode strictly greater than published',
         strictlyGreater || same,
@@ -1351,7 +1490,7 @@ async function main() {
       `  schemes         v1(JAR)=${schemes.v1 ? 'yes' : 'no'}  v2/v3 block=${schemes.v2OrV3Block ? 'present' : 'absent'}`,
     );
     console.log(
-      `  apksigner       ${apksignerBin ? `${apksignerBin} -> ${apksigner.verified ? 'VERIFIES' : 'FAILED'}` : 'not installed'}`,
+      `  apksigner       ${apksignerBin ? `${apksignerBin} -> ${apksigner?.verified ? 'VERIFIES' : 'FAILED'}` : 'not installed'}`,
     );
     if (schemes.v2OrV3Block && !apksignerBin) {
       console.log('                  NOTE: keytool validates the v1 block only. This APK has a');

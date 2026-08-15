@@ -30,6 +30,7 @@ const TEMPLATE = join(tvDir, 'index.html.template');
 const OUTPUT = join(tvDir, 'index.html');
 const RELEASE = join(tvDir, 'release.json');
 
+/** @param {string} hex */
 function groupHex(hex) {
   // 64 hex chars is unreadable on a TV at 3 metres; group into 4s.
   return (hex.match(/.{4}/g) || []).join(' ');
