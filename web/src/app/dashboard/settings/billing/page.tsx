@@ -23,6 +23,7 @@ export default function BillingPage() {
  const [gstin, setGstin] = useState('');
  const [gstinSaving, setGstinSaving] = useState(false);
  const [orgId, setOrgId] = useState<string | null>(null);
+ const [loadError, setLoadError] = useState<string | null>(null);
 
  useEffect(() => {
  loadBillingData();
@@ -31,6 +32,7 @@ export default function BillingPage() {
  const loadBillingData = async () => {
  try {
  setLoading(true);
+ setLoadError(null);
  const [subData, quotaData, orgData] = await Promise.all([
  apiClient.getSubscriptionStatus(),
  apiClient.getQuotaUsage(),
@@ -43,6 +45,7 @@ export default function BillingPage() {
   setGstin(orgData.gstin);
  }
  } catch (error: any) {
+ setLoadError(error.message || 'Failed to load billing information');
  toast.error(error.message || 'Failed to load billing information');
  } finally {
  setLoading(false);
@@ -117,7 +120,15 @@ export default function BillingPage() {
 
  const isTrialing = subscription?.subscriptionStatus === 'trial';
  const isCanceled = subscription?.cancelAtPeriodEnd;
- const isPaidPlan = subscription?.subscriptionTier !== 'free' && subscription?.subscriptionTier !== 'Free';
+ // Stated positively on purpose: missing subscription data must mean "not paid".
+ // The previous negative form (`tier !== 'free'`) was TRUE for a null subscription,
+ // which gated a real "Cancel Subscription" button onto a failed data load.
+ const isPaidPlan =
+  !!subscription?.subscriptionTier && subscription.subscriptionTier.toLowerCase() !== 'free';
+ // The provider could not be read, so cancelAtPeriodEnd is UNKNOWN rather than
+ // false. Offering "Cancel Subscription" here would show the cancel action to a
+ // customer who has already cancelled.
+ const isPeriodDataDegraded = subscription?.degraded === true;
 
  if (loading) {
  return (
@@ -155,6 +166,22 @@ export default function BillingPage() {
  </Link>
  </div>
 
+ {/* Load failure — never render plan data or subscription actions from a failed
+     read. A missing subscription used to render as "Free" plus a live
+     "Cancel Subscription" button, which really cancels on the provider. */}
+ {loadError ? (
+ <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
+ <p>Unable to load your billing information. Your plan is unchanged — please try again.</p>
+ <p className="mt-1 text-xs opacity-80">{loadError}</p>
+ <button
+ onClick={() => loadBillingData()}
+ className="mt-3 px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition"
+ >
+ Retry
+ </button>
+ </div>
+ ) : (
+ <>
  {/* Current Plan Card */}
  <div className="bg-[var(--surface)] rounded-lg shadow-md overflow-hidden">
  <div className="p-6 border-b border-[var(--border)]">
@@ -165,7 +192,7 @@ export default function BillingPage() {
  Your organization&apos;s subscription details
  </p>
  </div>
- <StatusBadge status={subscription?.subscriptionStatus || 'free'} />
+ <StatusBadge status={subscription?.subscriptionStatus || '—'} />
  </div>
  </div>
 
@@ -173,7 +200,7 @@ export default function BillingPage() {
  <div className="flex items-start justify-between mb-6">
  <div>
  <div className="text-3xl font-bold text-[var(--foreground)] capitalize">
- {subscription?.subscriptionTier || 'Free'}
+ {subscription?.subscriptionTier || '—'}
  </div>
  {isTrialing && subscription?.trialEndsAt && (
  <p className="text-sm text-[#00E5A0] dark:text-[#00E5A0] mt-1">
@@ -222,7 +249,11 @@ export default function BillingPage() {
  </button>
  )}
 
- {isCanceled ? (
+ {isPeriodDataDegraded ? (
+ <p className="text-sm text-[var(--foreground-tertiary)] self-center">
+ Subscription details are temporarily unavailable — plan actions are disabled.
+ </p>
+ ) : isCanceled ? (
  <button
  onClick={handleReactivateSubscription}
  disabled={actionLoading}
@@ -245,7 +276,9 @@ export default function BillingPage() {
  )}
  </div>
 
- {/* Payment Provider Info */}
+ {/* Payment Provider Info — inside the guard: `subscription` is never cleared
+     on failure, so a failed RE-load (after cancel/reactivate) would otherwise
+     render these two from stale state beside the error panel. */}
  {subscription?.paymentProvider && (
  <div className="bg-[var(--background)] rounded-lg p-4">
  <div className="flex items-center gap-3">
@@ -292,6 +325,8 @@ export default function BillingPage() {
    </button>
   </div>
  </div>
+ )}
+ </>
  )}
 
  {/* Quick Links */}

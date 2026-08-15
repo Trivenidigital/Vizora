@@ -135,18 +135,36 @@ export class BillingService implements OnModuleInit {
     // If there's an active subscription, fetch details from the provider
     let currentPeriodEnd: string | null = null;
     let cancelAtPeriodEnd = false;
+    let degraded = false;
 
     const subscriptionId = org.stripeSubscriptionId || org.razorpaySubscriptionId;
     if (subscriptionId && org.paymentProvider) {
-      const provider = this.getProvider(org.paymentProvider);
-      const subscription = await provider.getSubscription(subscriptionId);
-      if (subscription) {
-        currentPeriodEnd = subscription.currentPeriodEnd.toISOString();
-        cancelAtPeriodEnd = subscription.cancelAtPeriodEnd;
+      // Degrade rather than fail. The provider throws before its own error
+      // handling when it is not configured (`ensureConfigured()`), and a 503
+      // here blanks the whole billing page — which then renders the org's
+      // plan from no data at all. The tier below still comes from our own
+      // database, so it stays true; only the provider-owned period fields are
+      // unknown, and `degraded` says so rather than letting their defaults
+      // read as facts (`cancelAtPeriodEnd: false` on an already-cancelled
+      // subscription would offer "Cancel" to a customer who already did).
+      try {
+        const provider = this.getProvider(org.paymentProvider);
+        const subscription = await provider.getSubscription(subscriptionId);
+        if (subscription) {
+          currentPeriodEnd = subscription.currentPeriodEnd.toISOString();
+          cancelAtPeriodEnd = subscription.cancelAtPeriodEnd;
+        }
+      } catch (error) {
+        degraded = true;
+        this.logger.warn(
+          `Unable to read subscription ${subscriptionId} from ${org.paymentProvider} for org ${organizationId}; ` +
+            `returning database tier with period data marked degraded: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
 
     return {
+      ...(degraded ? { degraded: true as const } : {}),
       subscriptionTier: org.subscriptionTier,
       subscriptionStatus: org.subscriptionStatus,
       screenQuota: org.screenQuota,
@@ -171,9 +189,13 @@ export class BillingService implements OnModuleInit {
       select: { subscriptionTier: true, country: true },
     });
 
-    const effectiveCountry = country || org?.country || 'US';
+    if (!org) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    const effectiveCountry = country || org.country || 'US';
     const currency = effectiveCountry === 'IN' ? 'inr' : 'usd';
-    const currentTier = org?.subscriptionTier || 'free';
+    const currentTier = org.subscriptionTier;
 
     return Object.values(PLAN_TIERS).map((plan) => {
       const priceData = plan.prices[currency];

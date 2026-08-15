@@ -225,6 +225,14 @@ export interface SubscriptionStatus {
   currentPeriodEnd: string | null;
   cancelAtPeriodEnd: boolean;
   paymentProvider: string | null;
+  /**
+   * Set only when the payment provider could not be read. Tier/status/quota are
+   * still authoritative (they come from our database); `currentPeriodEnd` and
+   * `cancelAtPeriodEnd` are UNKNOWN, not false. Never offer subscription
+   * actions while this is set — an already-cancelled subscription is
+   * indistinguishable from an active one here.
+   */
+  degraded?: true;
 }
 
 // B3 entitlement ladder banner data (GET /billing/entitlement/banner).
