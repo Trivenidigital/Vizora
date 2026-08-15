@@ -25,7 +25,7 @@
  */
 
 import { decomposePostgresUrl } from './pg-url.js';
-import { makeIncidentId } from './state.js';
+import { makeIncidentId, resolveNotReraisedForTypes } from './state.js';
 import type { Incident, Severity } from './types.js';
 
 export const AGENT = 'db-maintainer';
@@ -300,8 +300,70 @@ export function buildMaintenanceIncidents(
   return incidents;
 }
 
+// ─── Clearing ───────────────────────────────────────────────────────────────
+
+/** Every incident type `buildMaintenanceIncidents` and the agent can raise. */
+const MAINTENANCE_INCIDENT_TYPES = [
+  'vacuum-table-missing',
+  'vacuum-all-failed',
+  'vacuum-failed',
+  'alert-fire-prune-failed',
+  'redis-unobservable',
+  'backup-failed',
+  'log-retention-failed',
+] as const;
+
 /**
- * Counts for `AgentResult`. `issuesFixed` is 0 — this agent repairs nothing.
+ * Resolve prior db-maintainer incidents that this run did not re-raise.
+ *
+ * A BLANKET sweep is right here, unlike the other two agents. This agent runs
+ * every task on every run down a single path with no per-check early exits, and
+ * `buildMaintenanceIncidents` recomputes the entire incident set from that
+ * run's outcomes. So "not re-raised" really does mean "checked and clean".
+ * Partial-run safety is structural rather than flag-based: any throw lands in
+ * the agent's catch BEFORE `recordAgentRun`, so a fatal run writes no state at
+ * all and cannot falsely resolve anything.
+ *
+ * ONE carve-out. When `findMissingTables` could not run — psql unreachable — it
+ * returns `{ missing: [], checked: false }`, and `vacuumAnalyze` then marks
+ * nothing as missing. An empty `missing` list from a check that never executed
+ * is not evidence a table exists, so `vacuum-table-missing` must survive.
+ * Without this, the single most durable configuration defect this agent exists
+ * to surface (a maintained table that does not exist) would be cleared by the
+ * very failure mode that hides it.
+ *
+ * Pure and I/O-free by design: this module's charter is testable failure
+ * semantics without touching PostgreSQL.
+ *
+ * @param prior          Incidents already in ops-state.
+ * @param detectedIds    Incident ids raised by THIS run.
+ * @param tableCheckRan  `findMissingTables().checked` — whether the existence
+ *                       query actually executed.
+ */
+export function resolveClearedMaintenanceIncidents(
+  prior: Incident[],
+  detectedIds: Set<string>,
+  tableCheckRan: boolean,
+  now: string,
+): Incident[] {
+  const covered = new Set<string>(MAINTENANCE_INCIDENT_TYPES);
+  if (!tableCheckRan) covered.delete('vacuum-table-missing');
+  return resolveNotReraisedForTypes(prior, AGENT, detectedIds, covered, now);
+}
+
+/**
+ * Counts for `AgentResult`, computed from the DETECTED incident set.
+ *
+ * `issuesFixed` is 0 — this agent repairs nothing, and that stays correct: the
+ * caller overwrites `AgentResult.issuesFixed` with its count of RESOLVED stale
+ * incidents (ops-watchdog / fleet-manager precedent), which is a different
+ * quantity from repairs and is deliberately not computed here.
+ *
+ * Callers must run this BEFORE resolving stale incidents. `exitCode` is derived
+ * from the incidents passed in, so feeding it the post-resolution set would let
+ * a run that cleared five stale findings exit 0 while a VACUUM it just watched
+ * fail sits open. Detected-set-only is what makes that impossible by
+ * construction rather than by a guard someone can forget.
  *
  * ─── Exit-code rule ─────────────────────────────────────────────────────────
  *

@@ -13,17 +13,24 @@
  */
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import {
+  AGENT,
   VACUUM_TABLES,
   buildMaintenanceIncidents,
   buildPgDumpCandidates,
   buildPsqlCandidates,
+  resolveClearedMaintenanceIncidents,
   summarize,
   type MaintenanceReport,
   type VacuumOutcome,
 } from './db-maintenance.js';
+import { makeIncidentId } from './state.js';
+import type { Incident } from './types.js';
 
 const PG_PW = 'PGPW-do-not-leak-4f7a';
 const DB_URL = `postgresql://vizora_app:${PG_PW}@db.internal:5432/vizora?connection_limit=10`;
@@ -278,6 +285,169 @@ test('no incident claims a repair was attempted', () => {
     AT,
   );
   assert.ok(incidents.every(i => i.attempts === 0 && i.status === 'open'));
+});
+
+// ─── Incident clearing ───────────────────────────────────────────────────────
+//
+// Before this, NONE of this agent's incidents could clear — including the
+// `vacuum-all-failed` prod actually carried, which stayed open long after the
+// psql reachability problem behind it was fixed. A blanket sweep is right here
+// (single path, every task every run, fully recomputed incident set) with one
+// carve-out for the check that can silently not run.
+
+function priorIncident(over: Partial<Incident> = {}): Incident {
+  return {
+    id: makeIncidentId(AGENT, 'vacuum-failed', 'Content'),
+    agent: AGENT,
+    type: 'vacuum-failed',
+    severity: 'warning',
+    target: 'database',
+    targetId: 'Content',
+    detected: '2026-08-11T03:00:00.000Z',
+    message: 'VACUUM ANALYZE "Content" failed: connection refused',
+    remediation: 'Inspect the reported error. autovacuum still covers this table.',
+    status: 'open',
+    attempts: 0,
+    ...over,
+  } as Incident;
+}
+
+function idsOf(incidents: Incident[]): Set<string> {
+  return new Set(incidents.map(i => i.id));
+}
+
+test('a clean report resolves a prior vacuum-failed incident', () => {
+  const detected = buildMaintenanceIncidents(report(), AT);
+  assert.equal(detected.length, 0, 'a fully healthy report raises nothing');
+
+  const resolved = resolveClearedMaintenanceIncidents([priorIncident()], idsOf(detected), true, AT);
+  assert.equal(resolved.length, 1);
+  assert.equal(resolved[0].status, 'resolved');
+  assert.equal(resolved[0].resolvedAt, AT);
+});
+
+test('NEGATIVE: a still-failing VACUUM is re-raised, so it is NOT resolved', () => {
+  // The whole point: an incident the run reproduced must survive the sweep.
+  // Only Content fails — an all-fail report would collapse into the single
+  // `vacuum-all-failed` incident instead, which is a different id.
+  const detected = buildMaintenanceIncidents(
+    report({
+      vacuum: VACUUM_TABLES.map(t =>
+        t === 'Content' ? { table: t, success: false, error: 'connection refused' } : { table: t, success: true },
+      ),
+    }),
+    AT,
+  );
+  assert.ok(detected.some(i => i.type === 'vacuum-failed'));
+
+  const resolved = resolveClearedMaintenanceIncidents([priorIncident()], idsOf(detected), true, AT);
+  assert.equal(resolved.length, 0, 'a still-failing check must not be reported as cleared');
+  assert.equal(summarize(detected).exitCode, 1, 'and the run still exits non-zero');
+});
+
+test('NEGATIVE: an unrun table-existence check keeps vacuum-table-missing OPEN', () => {
+  // `findMissingTables` returns { missing: [], checked: false } when psql is
+  // unreachable, so nothing is marked missing and the incident is not re-raised.
+  // An empty list from a check that never executed is not evidence the table
+  // exists — clearing it here would let the failure mode that HIDES the defect
+  // also erase the record of it.
+  const prior = [priorIncident({
+    id: makeIncidentId(AGENT, 'vacuum-table-missing', 'Display'),
+    type: 'vacuum-table-missing',
+    severity: 'critical',
+    targetId: 'Display',
+    message: 'configured maintenance table "Display" does not exist',
+  })];
+
+  assert.equal(
+    resolveClearedMaintenanceIncidents(prior, new Set(), false, AT).length,
+    0,
+    'tableCheckRan=false must withhold resolution',
+  );
+
+  const resolved = resolveClearedMaintenanceIncidents(prior, new Set(), true, AT);
+  assert.equal(resolved.length, 1, 'a check that DID run and found it present clears it');
+  assert.equal(resolved[0].status, 'resolved');
+});
+
+test('the carve-out is scoped: other types clear even when the table check did not run', () => {
+  const resolved = resolveClearedMaintenanceIncidents([priorIncident()], new Set(), false, AT);
+  assert.equal(resolved.length, 1, 'vacuum-failed does not depend on the existence check');
+});
+
+test('EXIT-CODE PIN: one critical plus five resolutions still exits 1', () => {
+  // `summarize` must run on the DETECTED set. If the agent ever computes it
+  // after merging resolutions in, a run that cleared five stale findings would
+  // report success while a backup it just watched fail sits open.
+  const detected = buildMaintenanceIncidents(
+    report({ backup: { attempted: true, ok: false, error: 'empty dump file' } }),
+    AT,
+  );
+  assert.equal(detected.filter(i => i.severity === 'critical').length, 1);
+
+  const prior = ['Content', 'Schedule', 'Playlist', 'AuditLog', 'users'].map(t =>
+    priorIncident({ id: makeIncidentId(AGENT, 'vacuum-failed', t), targetId: t }),
+  );
+  const resolved = resolveClearedMaintenanceIncidents(prior, idsOf(detected), true, AT);
+  assert.equal(resolved.length, 5);
+
+  assert.equal(
+    summarize(detected).exitCode,
+    1,
+    'resolutions must never green a run that detected a critical',
+  );
+  // And the merged set that reaches ops-state carries both.
+  const merged = [...detected, ...resolved];
+  assert.equal(merged.filter(i => i.status === 'resolved').length, 5);
+  assert.equal(merged.filter(i => i.status === 'open').length, 1);
+});
+
+test('ORDERING: db-maintainer computes summarize() BEFORE resolving stale incidents', () => {
+  // The exit-code contract is enforced BY PLACEMENT, so placement is what has
+  // to be pinned. `summarize` runs on the detected set at one point in the
+  // file; the sweep runs later, inside the locked block. Swap them and
+  // `counts.exitCode` starts seeing resolved incidents — a run that cleared
+  // five stale findings would exit 0 with a failed VACUUM still open.
+  //
+  // A behavioural test cannot reach this: db-maintainer's whole body needs a
+  // live psql/docker. Source order is the observable, so this follows the
+  // source-scan precedent in log-retention.test.ts.
+  const src = readFileSync(
+    join(dirname(fileURLToPath(import.meta.url)), '..', 'db-maintainer.ts'),
+    'utf8',
+  )
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/^\s*\/\/.*$/gm, '');
+
+  const summarizeAt = src.indexOf('summarize(incidents)');
+  const resolveAt = src.indexOf('resolveClearedMaintenanceIncidents(');
+
+  assert.ok(summarizeAt > 0, 'db-maintainer must still call summarize(incidents)');
+  assert.ok(resolveAt > 0, 'db-maintainer must still resolve cleared incidents');
+  assert.ok(
+    summarizeAt < resolveAt,
+    'summarize() must run on the DETECTED set — move it after the sweep and resolutions can green a red run',
+  );
+
+  // And it must summarize the detected array, never the merged one.
+  assert.ok(
+    !/summarize\(\s*result\.incidents/.test(src),
+    'summarize must not be fed the post-resolution incident set',
+  );
+});
+
+test('an agent may not clear another agent incidents', () => {
+  const foreign = priorIncident({
+    id: 'content-lifecycle:storage_high:system',
+    agent: 'content-lifecycle',
+    type: 'storage_high',
+  });
+  assert.equal(resolveClearedMaintenanceIncidents([foreign], new Set(), true, AT).length, 0);
+});
+
+test('an already-resolved incident is not resolved twice', () => {
+  const done = priorIncident({ status: 'resolved', resolvedAt: '2026-08-11T04:00:00.000Z' });
+  assert.equal(resolveClearedMaintenanceIncidents([done], new Set(), true, AT).length, 0);
 });
 
 test('no credential appears in any incident', () => {

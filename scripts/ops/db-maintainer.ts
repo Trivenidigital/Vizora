@@ -14,6 +14,13 @@
  *   1 — maintenance completed but something failed (incidents recorded)
  *   2 — fatal error (agent could not complete)
  *
+ * Incident clearing: none of this agent's incidents could clear before —
+ * including the `vacuum-all-failed` that prod actually carried, which stayed
+ * open after the underlying psql problem was fixed. A run now resolves what it
+ * did not re-raise, EXCEPT `vacuum-table-missing` when the table-existence
+ * check itself could not run. The exit code is computed before the sweep, so
+ * resolutions can never green a red run.
+ *
  * ─── `pm2 flush` is GONE. Do not reintroduce it ──────────────────────────────
  *
  * Called bare, `pm2 flush` truncates the logs of EVERY app PM2 manages.
@@ -66,6 +73,7 @@ import {
   buildPgDumpCandidates,
   buildPsqlCandidates,
   redactUrlCredentials,
+  resolveClearedMaintenanceIncidents,
   summarize,
   type MaintenanceReport,
   type PgCandidate,
@@ -397,6 +405,12 @@ async function main(): Promise<void> {
         attempts: 0,
       });
     }
+    // ORDER IS THE CONTRACT: `summarize` runs on the DETECTED set, and the
+    // resolution sweep below happens after it, inside the locked block. So
+    // `counts.exitCode` cannot see a single resolved incident, and a failed
+    // VACUUM keeps both its incident and its exit 1 no matter how many stale
+    // findings the same run clears. Moving the sweep above this line would let
+    // resolutions green a red run — pinned by a test.
     const counts = summarize(incidents);
     const durationMs = Date.now() - startTime;
 
@@ -412,6 +426,23 @@ async function main(): Promise<void> {
 
     const state = readOpsState();
     try {
+      // Blanket sweep, correct here because every task runs every run down a
+      // single path and the incident set is fully recomputed. A fatal throw
+      // lands in the catch below BEFORE this point, so a run that died partway
+      // writes no state and cannot falsely resolve anything.
+      const resolved = resolveClearedMaintenanceIncidents(
+        state.incidents,
+        new Set(incidents.map(i => i.id)),
+        tableCheck.checked,
+        detectedAt,
+      );
+      for (const r of resolved) {
+        log(AGENT, `Resolving cleared incident: ${r.id}`);
+      }
+      result.incidents = [...incidents, ...resolved];
+      // Resolutions, not repairs — this agent still fixes nothing.
+      result.issuesFixed = resolved.length;
+
       recordAgentRun(state, result);
     } finally {
       writeOpsState(state);
