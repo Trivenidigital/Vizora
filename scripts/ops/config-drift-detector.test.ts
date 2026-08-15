@@ -22,6 +22,16 @@
  * covered by `lib/config-drift.test.ts` cases 10 and 15, which drive every
  * drift shape with planted secrets and assert nothing derived from them
  * escapes. Neither file covers the other's ground.
+ *
+ * ─── Why the WIRING is tested here, in-process ──────────────────────────────
+ *
+ * A pure comparison core with a full unit suite is still dead code if nothing
+ * calls it. Both seams that connect this agent's collection to that core —
+ * `sampleOpsAgentCredentials` and `runDetection` — are exercised directly, with
+ * their I/O injected, so deleting the call site turns tests red instead of
+ * silently removing a control. The spawned-subprocess tests below cannot cover
+ * this: without PM2 they never reach the comparison, which is exactly how a
+ * disconnected feature stays green.
  */
 
 import assert from 'node:assert/strict';
@@ -29,12 +39,35 @@ import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
+import {
+  OPS_AGENT_SCOPE,
+  type DotenvRead,
+  type EnvMap,
+  type OpsAgentCredentialObservation,
+} from './lib/config-drift.js';
+
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const agentPath = join(repoRoot, 'scripts', 'ops', 'config-drift-detector.ts');
+
+// Pinned OFF before the module is ever loaded: importing the agent runs its
+// entry point, and `ENABLED` is read once at module scope. Without this an
+// operator with the flag exported in their shell would kick off a real
+// collection — pm2, psql and all — just by running the test suite. The import
+// is deferred (and lazy) rather than static so this assignment is guaranteed to
+// happen first; the subprocess tests pass their own env to the child, so they
+// are unaffected.
+process.env.CONFIG_DRIFT_DETECTOR_ENABLED = '';
+
+type DetectorModule = typeof import('./config-drift-detector.js');
+let detectorModule: DetectorModule | undefined;
+async function loadDetector(): Promise<DetectorModule> {
+  detectorModule ??= await import('./config-drift-detector.js');
+  return detectorModule;
+}
 
 /**
  * Every file the agent must never modify. Any config file it reads belongs
@@ -238,4 +271,219 @@ test('reports the build-time exclusion rather than staying silent about it', asy
     assert.match(stdout, /NOT checked/);
     assert.match(stdout, /B2/, 'the reason must point at what closes the gap');
   });
+});
+
+// ─── Ops-agent credential control: the wiring, not just the comparison ──────
+
+const OPS_CWD = resolve('/opt/vizora/app');
+
+/** Planted values. Asserted never to reach an incident or the state file. */
+const PLANTED_OPS_EMAIL = 'WIREDEMAIL-do-not-leak@vizora.test';
+const PLANTED_OPS_PW_LIVE = 'WIREDPW-do-not-leak-live';
+const PLANTED_OPS_PW_STALE = 'WIREDPW-do-not-leak-stale';
+
+/** A `pm2 jlist` entry, reduced to the fields the sampler reads. */
+function jlistEntry(name: string, pm2Env: Record<string, unknown> = {}) {
+  return {
+    name,
+    pm_id: 7,
+    pm2_env: { status: 'stopped', pm_cwd: OPS_CWD, ...pm2Env },
+  };
+}
+
+/** A collection with no service observations — isolates the ops assertions. */
+function opsOnlyCollection(sample: { observation: OpsAgentCredentialObservation; notes: string[] }) {
+  return { observations: [], notes: sample.notes, opsCredentials: sample.observation };
+}
+
+function dotenvReader(byCwd: Record<string, EnvMap>): (cwd: string) => DotenvRead {
+  return cwd => (byCwd[cwd] ? { status: 'present', vars: byCwd[cwd] } : { status: 'absent' });
+}
+
+test('wiring: a planted PM2-vs-.env credential drift reaches an incident', async () => {
+  const { runDetection, sampleOpsAgentCredentials } = await loadDetector();
+  const processes = [jlistEntry('ops-fleet-manager', {
+    OPS_EMAIL: PLANTED_OPS_EMAIL,
+    OPS_PASSWORD: PLANTED_OPS_PW_LIVE,
+  })];
+  const sample = sampleOpsAgentCredentials(
+    processes,
+    processes,
+    [{ name: 'ops-fleet-manager' }],
+    OPS_CWD,
+    dotenvReader({ [OPS_CWD]: { OPS_EMAIL: PLANTED_OPS_EMAIL, OPS_PASSWORD: PLANTED_OPS_PW_STALE } }),
+  );
+
+  const { result, incidents, evaluated } = runDetection(opsOnlyCollection(sample), 100);
+
+  const ops = incidents.filter(i => i.targetId.startsWith(`${OPS_AGENT_SCOPE}:`));
+  assert.equal(ops.length, 1, `expected one ops incident, got ${JSON.stringify(incidents, null, 2)}`);
+  assert.equal(ops[0].targetId, `${OPS_AGENT_SCOPE}:credentials`);
+  assert.equal(ops[0].severity, 'warning', 'HIGH maps onto the ops Severity enum as warning');
+  assert.match(ops[0].message, /password: DRIFT/);
+  assert.equal(result.issuesFixed, 0, 'this agent never repairs');
+  assert.ok(evaluated.includes(OPS_AGENT_SCOPE));
+});
+
+test('wiring: a matching pair produces no ops incident but still marks the scope evaluated', async () => {
+  const { runDetection, sampleOpsAgentCredentials } = await loadDetector();
+  const env = { OPS_EMAIL: PLANTED_OPS_EMAIL, OPS_PASSWORD: PLANTED_OPS_PW_LIVE };
+  const processes = [jlistEntry('ops-fleet-manager', env)];
+  const sample = sampleOpsAgentCredentials(
+    processes, processes, [{ name: 'ops-fleet-manager' }], OPS_CWD, dotenvReader({ [OPS_CWD]: { ...env } }),
+  );
+
+  const { incidents, evaluated } = runDetection(opsOnlyCollection(sample), 100);
+
+  assert.deepEqual(incidents.filter(i => i.targetId.startsWith(OPS_AGENT_SCOPE)), []);
+  assert.ok(
+    evaluated.includes(OPS_AGENT_SCOPE),
+    'a clean run must still cover the scope, or a corrected drift could never resolve',
+  );
+});
+
+test('wiring: an unobservable PM2 side reports, and does NOT mark the scope evaluated', async () => {
+  const { runDetection, sampleOpsAgentCredentials } = await loadDetector();
+  const sample = sampleOpsAgentCredentials([], [], [], OPS_CWD, dotenvReader({}));
+
+  const { incidents, evaluated } = runDetection(opsOnlyCollection(sample), 100);
+
+  const ops = incidents.filter(i => i.targetId.startsWith(`${OPS_AGENT_SCOPE}:`));
+  assert.equal(ops.length, 1);
+  assert.equal(ops[0].type, 'ops-credentials-unobservable');
+  assert.equal(ops[0].severity, 'info', 'an unobservable read must not page anyone');
+  assert.ok(
+    !evaluated.includes(OPS_AGENT_SCOPE),
+    'a run that established nothing must not be allowed to clear a prior finding',
+  );
+});
+
+test('wiring: planted credential values never reach an incident', async () => {
+  const { runDetection, sampleOpsAgentCredentials } = await loadDetector();
+  const processes = [jlistEntry('ops-fleet-manager', {
+    OPS_EMAIL: PLANTED_OPS_EMAIL,
+    OPS_PASSWORD: PLANTED_OPS_PW_LIVE,
+  })];
+  const sample = sampleOpsAgentCredentials(
+    processes, processes, [{ name: 'ops-fleet-manager' }], OPS_CWD,
+    dotenvReader({ [OPS_CWD]: { OPS_EMAIL: PLANTED_OPS_EMAIL, OPS_PASSWORD: PLANTED_OPS_PW_STALE } }),
+  );
+
+  const serialized = JSON.stringify(runDetection(opsOnlyCollection(sample), 100).result);
+  for (const planted of [PLANTED_OPS_EMAIL, PLANTED_OPS_PW_LIVE, PLANTED_OPS_PW_STALE]) {
+    assert.ok(!serialized.includes(planted), `credential leaked into the recorded run: ${planted}`);
+  }
+  const hexRun = serialized.match(/\b[0-9a-f]{12,}\b/i);
+  assert.equal(hexRun, null, `derived token found in output: ${hexRun?.[0]}`);
+});
+
+// ─── Sampling rules ─────────────────────────────────────────────────────────
+
+test('sampling: falls through to the next credentialed agent when the first is missing', async () => {
+  const { sampleOpsAgentCredentials } = await loadDetector();
+  // The hardcoded-single-entry version reported `unobservable` every hour
+  // forever the moment that one app was renamed or deleted.
+  const processes = [jlistEntry('ops-content-lifecycle', { OPS_EMAIL: PLANTED_OPS_EMAIL })];
+  const sample = sampleOpsAgentCredentials(processes, processes, [], OPS_CWD, dotenvReader({}));
+
+  assert.equal(sample.observation.sampledAgent, 'ops-content-lifecycle');
+  assert.equal(sample.observation.pm2Env?.OPS_EMAIL, PLANTED_OPS_EMAIL);
+});
+
+test('sampling: an agent whose stored env changed between jlist samples is skipped', async () => {
+  const { sampleOpsAgentCredentials } = await loadDetector();
+  // The detector and these cron agents fire on the same minute every hour, so a
+  // read landing inside a respawn is a real possibility. It must not surface as
+  // a credential incident.
+  const first = [
+    jlistEntry('ops-fleet-manager', { OPS_PASSWORD: PLANTED_OPS_PW_LIVE }),
+    jlistEntry('ops-schedule-doctor', { OPS_PASSWORD: PLANTED_OPS_PW_LIVE }),
+  ];
+  const second = [
+    jlistEntry('ops-fleet-manager', { OPS_PASSWORD: PLANTED_OPS_PW_STALE }),
+    jlistEntry('ops-schedule-doctor', { OPS_PASSWORD: PLANTED_OPS_PW_LIVE }),
+  ];
+  const sample = sampleOpsAgentCredentials(first, second, [], OPS_CWD, dotenvReader({}));
+
+  assert.equal(sample.observation.sampledAgent, 'ops-schedule-doctor', 'the unstable entry is skipped');
+  assert.ok(sample.notes.some(n => /mid-respawn/.test(n)), `expected a note, got ${sample.notes}`);
+});
+
+test('sampling: an entry present in only one jlist sample is skipped', async () => {
+  const { sampleOpsAgentCredentials } = await loadDetector();
+  const first = [jlistEntry('ops-fleet-manager', { OPS_EMAIL: PLANTED_OPS_EMAIL })];
+  const sample = sampleOpsAgentCredentials(first, [], [], OPS_CWD, dotenvReader({}));
+
+  assert.equal(sample.observation.pm2Env, null);
+  assert.ok(sample.notes.some(n => /not present in both/.test(n)));
+});
+
+test('sampling: an empty stored env is unreadable, not "no credentials configured"', async () => {
+  const { sampleOpsAgentCredentials } = await loadDetector();
+  const processes = [{ name: 'ops-fleet-manager', pm_id: 7, pm2_env: {} }];
+  const sample = sampleOpsAgentCredentials(processes, processes, [], OPS_CWD, dotenvReader({}));
+
+  assert.equal(sample.observation.pm2Env, null);
+  assert.ok(sample.notes.some(n => /empty or unavailable/.test(n)));
+});
+
+test('sampling: the runtime side reads .env from pm_cwd, the restart side from the ecosystem cwd', async () => {
+  const { runDetection, sampleOpsAgentCredentials } = await loadDetector();
+  // The false negative this closes: the agents were started somewhere else, so
+  // the file the running process read is NOT the repo-root one. Reading only
+  // the ecosystem cwd would find a matching pair and report all clear.
+  const runningCwd = resolve('/tmp/started-elsewhere');
+  const processes = [jlistEntry('ops-fleet-manager', {
+    pm_cwd: runningCwd,
+    OPS_EMAIL: PLANTED_OPS_EMAIL,
+    OPS_PASSWORD: PLANTED_OPS_PW_LIVE,
+  })];
+  const sample = sampleOpsAgentCredentials(
+    processes, processes, [], OPS_CWD,
+    dotenvReader({ [OPS_CWD]: { OPS_EMAIL: PLANTED_OPS_EMAIL, OPS_PASSWORD: PLANTED_OPS_PW_STALE } }),
+  );
+
+  assert.equal(sample.observation.pm2Cwd, runningCwd);
+  assert.equal(sample.observation.ecosystemCwd, OPS_CWD);
+  assert.equal(sample.observation.runtimeDotenv.status, 'absent', 'nothing to read where it runs');
+  assert.equal(sample.observation.restartDotenv.status, 'present', 'the cold-start file still exists');
+
+  const ops = runDetection(opsOnlyCollection(sample), 100).incidents
+    .filter(i => i.targetId.startsWith(`${OPS_AGENT_SCOPE}:`));
+  assert.ok(ops.some(i => i.targetId.endsWith(':cwd')), `expected a cwd incident, got ${ops.map(i => i.targetId)}`);
+});
+
+test('sampling: a missing pm_cwd is noted rather than guessed', async () => {
+  const { sampleOpsAgentCredentials } = await loadDetector();
+  const processes = [{
+    name: 'ops-fleet-manager',
+    pm_id: 7,
+    pm2_env: { status: 'stopped', OPS_EMAIL: PLANTED_OPS_EMAIL },
+  }];
+  const sample = sampleOpsAgentCredentials(processes, processes, [], OPS_CWD, dotenvReader({}));
+
+  assert.equal(sample.observation.pm2Cwd, undefined);
+  assert.ok(sample.notes.some(n => /pm_cwd unavailable/.test(n)));
+});
+
+test('sampling: only credential variables leave the sampler', async () => {
+  const { sampleOpsAgentCredentials } = await loadDetector();
+  const processes = [jlistEntry('ops-fleet-manager', {
+    OPS_EMAIL: PLANTED_OPS_EMAIL,
+    JWT_SECRET: 'JWT-do-not-leak',
+    DATABASE_URL: 'postgresql://u:PGPW-do-not-leak@h:5432/d',
+  })];
+  const sample = sampleOpsAgentCredentials(processes, processes, [], OPS_CWD, dotenvReader({}));
+
+  assert.deepEqual(Object.keys(sample.observation.pm2Env ?? {}), ['OPS_EMAIL']);
+});
+
+test('sampling: an ops app with an explicit cwd resolves it against the repo root', async () => {
+  const { sampleOpsAgentCredentials } = await loadDetector();
+  const processes = [jlistEntry('ops-fleet-manager', { OPS_EMAIL: PLANTED_OPS_EMAIL })];
+  const sample = sampleOpsAgentCredentials(
+    processes, processes, [{ name: 'ops-fleet-manager', cwd: './ops-home' }], OPS_CWD, dotenvReader({}),
+  );
+
+  assert.equal(sample.observation.ecosystemCwd, resolve(OPS_CWD, './ops-home'));
 });

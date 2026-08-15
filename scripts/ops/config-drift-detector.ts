@@ -15,9 +15,11 @@
  *
  * Beyond the three application services it also runs ONE separate small control:
  * the credentialed ops agents' own login pair, comparing what PM2's stored env
- * resolves against what the persisted `.env` alone would (2026-08-15 incident —
- * a working PM2-injected pair shadowed a `.env` pair that 401s, so a cold start
- * would have FATAL'd all four credentialed ops agents with nothing reporting it).
+ * resolves against what a cold start would (2026-08-15 incident — a working
+ * PM2-injected pair shadowed a `.env` pair that 401s, so a cold start would have
+ * broken every credentialed ops agent with nothing reporting it). Each side is
+ * resolved from its OWN cwd: the running agent's `pm_cwd` vs the ecosystem-derived
+ * one, because that is what decides which `.env` each actually reads.
  *
  * ─── What this agent does NOT do ────────────────────────────────────────────
  *
@@ -57,18 +59,23 @@ import {
   AGENT,
   BUILD_TIME_EXCLUSION,
   OPS_AGENT_SCOPE,
+  OPS_CREDENTIAL_KEYS,
   buildMaxConnectionsCandidates,
   analyzeDrift,
   analyzeOpsAgentCredentialDrift,
   findingsToIncidents,
   assessStability,
   parseProcEnviron,
+  projectOpsCredentialKeys,
   resolveClearedFindings,
+  type DotenvRead,
   type DriftFinding,
   type EnvMap,
+  type OpsAgentCredentialObservation,
   type Pm2Sample,
   type ServiceName,
   type ServiceObservation,
+  readDotenvFile,
   readServiceDotenv,
   serviceCwdFor,
 } from './lib/config-drift.js';
@@ -95,14 +102,23 @@ const PM2_NAME_BY_SERVICE: Record<ServiceName, string> = {
 const SERVICES: ServiceName[] = ['middleware', 'realtime', 'web'];
 
 /**
- * The credentialed ops agent sampled for the credential control.
+ * The credentialed ops agents, in sampling order.
  *
- * All four credentialed agents resolve the identical expression from the
- * identical environment, so one sample answers for all of them. This one is a
- * cron app and is USUALLY `stopped` between firings — `pm2_env` is readable
- * either way, so the sample deliberately does not require a live pid.
+ * All of them resolve the identical credential expression from the identical
+ * environment, so ONE readable sample answers for all of them — but pinning the
+ * control to a single hardcoded entry made a deleted or renamed app produce an
+ * `unobservable` finding every hour forever. Trying each in turn means the
+ * control keeps working as long as any credentialed agent is registered.
+ *
+ * These are cron apps and are USUALLY `stopped` between firings — `pm2_env` is
+ * readable either way, so sampling deliberately does not require a live pid.
  */
-const OPS_CREDENTIALED_PM2_NAME = 'ops-fleet-manager';
+const OPS_CREDENTIALED_PM2_NAMES = [
+  'ops-fleet-manager',
+  'ops-schedule-doctor',
+  'ops-content-lifecycle',
+  'ops-reporter',
+] as const;
 
 const PM2_TIMEOUT_MS = 15_000;
 
@@ -129,6 +145,8 @@ interface Pm2Process {
     status?: string;
     restart_time?: number;
     pm_uptime?: number;
+    /** The cwd PM2 actually started the process in — where its dotenv looked. */
+    pm_cwd?: string;
   };
 }
 
@@ -276,6 +294,113 @@ function queryMaxConnections(databaseUrl: string | undefined): {
   return { value: null, source: 'none', attempts };
 }
 
+// ─── Ops-agent credential sampling ──────────────────────────────────────────
+
+/** Do two samples agree on every credential variable? */
+function sameCredentialProjection(a: EnvMap, b: EnvMap): boolean {
+  return OPS_CREDENTIAL_KEYS.every(key => a[key] === b[key]);
+}
+
+/** `pm_cwd`, normalized so a path-separator difference is not read as drift. */
+function pm2CwdOf(process: Pm2Process | undefined): string | undefined {
+  const raw = process?.pm2_env?.pm_cwd;
+  return typeof raw === 'string' && raw !== '' ? resolve(raw) : undefined;
+}
+
+/**
+ * Choose a credentialed ops agent to sample and assemble its credential
+ * observation.
+ *
+ * Exported and dependency-injected (`readDotenv`) so the selection rules are
+ * unit-testable without PM2 or a filesystem: which agent gets picked, what
+ * happens when one is mid-respawn, and where each side's `.env` is read from are
+ * exactly the decisions that would otherwise only be exercised in production.
+ *
+ * BOTH `pm2 jlist` samples must agree on the credential variables and the cwd
+ * before an agent is used. The detector and these cron agents fire on the same
+ * minute every hour, so a read landing inside a respawn is a real possibility —
+ * and it would surface as a spurious credential incident rather than as the
+ * transient it is. Disagreement skips to the next agent rather than failing.
+ */
+export function sampleOpsAgentCredentials(
+  first: Pm2Process[],
+  second: Pm2Process[],
+  apps: EcosystemApp[],
+  repoRoot: string,
+  readDotenv: (cwd: string) => DotenvRead = readDotenvFile,
+): { observation: OpsAgentCredentialObservation; notes: string[] } {
+  const notes: string[] = [];
+
+  for (const name of OPS_CREDENTIALED_PM2_NAMES) {
+    const before = first.find(p => p.name === name);
+    const after = second.find(p => p.name === name);
+    if (!before || !after) {
+      notes.push(`${name}: not present in both pm2 jlist samples`);
+      continue;
+    }
+
+    // Emptiness is judged on the FULL stored env: an agent whose stored env is
+    // readable but simply carries no credential variable is a real, meaningful
+    // observation, not an unreadable one.
+    const fullAfter = toEnvMap(after.pm2_env);
+    if (Object.keys(fullAfter).length === 0) {
+      notes.push(`${name}: PM2 stored environment empty or unavailable`);
+      continue;
+    }
+
+    const credsBefore = projectOpsCredentialKeys(toEnvMap(before.pm2_env));
+    const credsAfter = projectOpsCredentialKeys(fullAfter);
+    const cwdBefore = pm2CwdOf(before);
+    const cwdAfter = pm2CwdOf(after);
+    if (!sameCredentialProjection(credsBefore, credsAfter) || cwdBefore !== cwdAfter) {
+      notes.push(`${name}: state changed between jlist samples (likely mid-respawn) — not sampled`);
+      continue;
+    }
+
+    const app = apps.find(a => a.name === name);
+    // Both cwds go through `resolve` so the comparison below is about the
+    // DIRECTORY, never about path spelling.
+    const ecosystemCwd = resolve(repoRoot, app?.cwd ?? '.');
+    if (cwdAfter === undefined) {
+      notes.push(
+        `${name}: pm_cwd unavailable — the running agent's .env is located from the ecosystem ` +
+        `entry instead, so a cwd difference would be invisible this cycle`,
+      );
+    }
+
+    // Runtime side reads the file the RUNNING agent read; restart side reads the
+    // one a fresh start would. Identical on prod — read once when so.
+    const runtimeCwd = cwdAfter ?? ecosystemCwd;
+    const runtimeDotenv = readDotenv(runtimeCwd);
+    const restartDotenv = runtimeCwd === ecosystemCwd ? runtimeDotenv : readDotenv(ecosystemCwd);
+
+    return {
+      observation: {
+        sampledAgent: name,
+        pm2Env: projectOpsCredentialKeys(fullAfter),
+        pm2Cwd: cwdAfter,
+        ecosystemCwd,
+        ecosystemEnvProduction: projectOpsCredentialKeys(toEnvMap(app?.env_production)),
+        runtimeDotenv,
+        restartDotenv,
+      },
+      notes,
+    };
+  }
+
+  return {
+    observation: {
+      sampledAgent: 'none',
+      pm2Env: null,
+      ecosystemCwd: resolve(repoRoot),
+      ecosystemEnvProduction: {},
+      runtimeDotenv: { status: 'absent' },
+      restartDotenv: { status: 'absent' },
+    },
+    notes,
+  };
+}
+
 // ─── Observation assembly ───────────────────────────────────────────────────
 
 export interface Collection {
@@ -285,12 +410,10 @@ export interface Collection {
   /** Effective DATABASE_URL used for the max_connections query, if any. */
   databaseUrl?: string;
   /**
-   * PM2's stored env for the sampled credentialed ops agent, or `null` when its
-   * PM2 entry could not be read — which is reported, never read as agreement.
+   * The credentialed ops agents' credential surface. `pm2Env: null` means no
+   * credentialed agent was observable — reported, never read as agreement.
    */
-  opsAgentPm2Env: EnvMap | null;
-  /** Repo-root `.env` — the file the ops cron agents load. `null` when absent. */
-  rootDotenv: EnvMap | null;
+  opsCredentials: OpsAgentCredentialObservation;
 }
 
 function collect(): Collection {
@@ -374,23 +497,15 @@ function collect(): Collection {
     }
   }
 
-  // Ops-agent credential control. The ops cron entries declare no `cwd`, so PM2
-  // runs them from the ecosystem file's directory — the repo root — which is
-  // where their `import 'dotenv/config'` looks. An explicit `cwd` is honoured if
-  // one is ever added, rather than assumed away.
-  const opsApp = apps.find(a => a.name === OPS_CREDENTIALED_PM2_NAME);
-  const opsProcess = processes.find(p => p.name === OPS_CREDENTIALED_PM2_NAME);
-  if (!opsProcess) {
-    notes.push(`ops credentials: no PM2 process named ${OPS_CREDENTIALED_PM2_NAME}`);
+  // Ops-agent credential control — uses BOTH jlist samples so a mid-respawn
+  // read is skipped rather than classified.
+  const ops = sampleOpsAgentCredentials(processes, processes2, apps, REPO_ROOT);
+  for (const note of ops.notes) notes.push(`ops credentials: ${note}`);
+  if (ops.observation.pm2Env !== null) {
+    notes.push(`ops credentials: sampled ${ops.observation.sampledAgent}`);
   }
-  // An EMPTY stored env is unobservable, not "nothing configured" — the same
-  // rule `analyzeDrift` applies to a service's pm2Env.
-  const sampledOpsEnv = toEnvMap(opsProcess?.pm2_env);
-  const opsAgentPm2Env = Object.keys(sampledOpsEnv).length > 0 ? sampledOpsEnv : null;
-  const opsCwd = opsApp?.cwd ? resolve(REPO_ROOT, opsApp.cwd) : REPO_ROOT;
-  const rootDotenv = readServiceDotenv(opsCwd);
 
-  return { observations, notes, databaseUrl, opsAgentPm2Env, rootDotenv };
+  return { observations, notes, databaseUrl, opsCredentials: ops.observation };
 }
 
 // ─── Run ────────────────────────────────────────────────────────────────────
@@ -413,12 +528,12 @@ export function runDetection(collection: Collection, maxConnections: number | nu
 
   // Separate small control, on a surface the three-service scope cannot see:
   // the credentialed ops agents' own login pair (2026-08-15 incident).
-  const opsFindings = analyzeOpsAgentCredentialDrift(collection.opsAgentPm2Env, collection.rootDotenv);
+  const opsFindings = analyzeOpsAgentCredentialDrift(collection.opsCredentials);
   const findings = [...serviceFindings, ...opsFindings];
 
   // The ops scope is evaluated — and so may CLEAR a stale finding — only when
   // the runtime side was actually readable.
-  if (collection.opsAgentPm2Env !== null) evaluated.push(OPS_AGENT_SCOPE);
+  if (collection.opsCredentials.pm2Env !== null) evaluated.push(OPS_AGENT_SCOPE);
 
   const incidents = findingsToIncidents(findings, detectedAt);
 
@@ -503,7 +618,13 @@ async function main(): Promise<void> {
     `0 repaired (by design) in ${result.durationMs}ms`,
   );
 
-  process.exitCode = incidents.length === 0 ? 0 : 1;
+  // `info`-severity findings alone must NOT manufacture a recurring failure.
+  // Same rule db-maintainer learned on 2026-08-12: a permanently-present info
+  // finding (there, the missing host `redis-cli`; here, an `unobservable` ops
+  // entry on a host where one was renamed) turns every single run red, and an
+  // agent that always exits 1 is one whose exit code stops being read.
+  const actionable = incidents.filter(i => i.severity === 'warning' || i.severity === 'critical');
+  process.exitCode = actionable.length === 0 ? 0 : 1;
 }
 
 // ─── Entry Point ────────────────────────────────────────────────────────────

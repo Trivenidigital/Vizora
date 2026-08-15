@@ -11,6 +11,9 @@
  */
 
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import {
@@ -36,9 +39,13 @@ import {
   findingsToIncidents,
   parseDotenvText,
   parseProcEnviron,
+  projectOpsCredentialKeys,
+  readDotenvFile,
   resolvePrecedence,
   validateFreshStart,
+  type DotenvRead,
   type EnvMap,
+  type OpsAgentCredentialObservation,
   type ServiceObservation,
 } from './config-drift.js';
 import type { Incident } from './types.js';
@@ -1124,7 +1131,7 @@ test('detectDrift is pure: it does not mutate the observations it is given', () 
  * The prod incident's exact shape: PM2's stored env carried a WORKING credential
  * pair while `/opt/vizora/app/.env` held one that 401s. dotenv never overwrites
  * an already-set variable, so the running agents authenticated fine and a cold
- * start would have FATAL'd all four credentialed ops agents at once.
+ * start would have broken every credentialed ops agent at once.
  *
  * Canary values, asserted never to reach any finding.
  */
@@ -1135,18 +1142,44 @@ const OPS_PW_STALE = 'OPSPW-do-not-leak-stale-6f7a';
 
 const OPS_CANARIES = [OPS_EMAIL_LIVE, OPS_EMAIL_STALE, OPS_PW_LIVE, OPS_PW_STALE];
 
+/** prod's real shape: one cwd, one `.env`, no credentials in the PM2 block. */
+const PROD_OPS_CWD = '/opt/vizora/app';
+
+function dotenvPresent(vars: EnvMap): DotenvRead {
+  return { status: 'present', vars };
+}
+
+function opsObs(over: Partial<OpsAgentCredentialObservation> = {}): OpsAgentCredentialObservation {
+  return {
+    sampledAgent: 'ops-fleet-manager',
+    pm2Env: {},
+    pm2Cwd: PROD_OPS_CWD,
+    ecosystemCwd: PROD_OPS_CWD,
+    ecosystemEnvProduction: {},
+    runtimeDotenv: { status: 'absent' },
+    restartDotenv: { status: 'absent' },
+    ...over,
+  };
+}
+
+/** The common case: one `.env` shared by both sides, plus a PM2 stored env. */
+function opsSides(pm2: EnvMap | null, dotenv: EnvMap | null): OpsAgentCredentialObservation {
+  const read: DotenvRead = dotenv === null ? { status: 'absent' } : dotenvPresent(dotenv);
+  return opsObs({ pm2Env: pm2, runtimeDotenv: read, restartDotenv: read });
+}
+
 test('ops credentials: both sides resolve the same pair — no finding', () => {
   const env: EnvMap = { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE };
-  assert.deepEqual(analyzeOpsAgentCredentialDrift({ ...env }, { ...env }), []);
+  assert.deepEqual(analyzeOpsAgentCredentialDrift(opsSides({ ...env }, { ...env })), []);
 });
 
 test('ops credentials: password differs between PM2 and .env — HIGH', () => {
   // Expressed through the VALIDATOR_* fallback, which is the pair prod actually
   // had set on 2026-08-15.
-  const findings = analyzeOpsAgentCredentialDrift(
+  const findings = analyzeOpsAgentCredentialDrift(opsSides(
     { VALIDATOR_EMAIL: OPS_EMAIL_LIVE, VALIDATOR_PASSWORD: OPS_PW_LIVE },
     { VALIDATOR_EMAIL: OPS_EMAIL_LIVE, VALIDATOR_PASSWORD: OPS_PW_STALE },
-  );
+  ));
   assert.equal(findings.length, 1, `expected one finding, got ${types(findings)}`);
   assert.equal(findings[0].driftClass, 'HIGH');
   assert.equal(findings[0].type, 'config-shadow');
@@ -1155,10 +1188,10 @@ test('ops credentials: password differs between PM2 and .env — HIGH', () => {
 });
 
 test('ops credentials: email differs between PM2 and .env — HIGH', () => {
-  const findings = analyzeOpsAgentCredentialDrift(
+  const findings = analyzeOpsAgentCredentialDrift(opsSides(
     { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
     { OPS_EMAIL: OPS_EMAIL_STALE, OPS_PASSWORD: OPS_PW_LIVE },
-  );
+  ));
   assert.equal(findings.length, 1, `expected one finding, got ${types(findings)}`);
   assert.equal(findings[0].driftClass, 'HIGH');
   assert.match(findings[0].message, /email: DRIFT/);
@@ -1166,27 +1199,26 @@ test('ops credentials: email differs between PM2 and .env — HIGH', () => {
 });
 
 test('ops credentials: .env resolves no pair while PM2 does — HIGH', () => {
-  // A cold start consuming .env fresh FATALs every credentialed ops agent.
-  const findings = analyzeOpsAgentCredentialDrift(
+  const findings = analyzeOpsAgentCredentialDrift(opsSides(
     { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
     { OPS_EMAIL: OPS_EMAIL_LIVE },
-  );
+  ));
   assert.equal(findings.length, 1, `expected one finding, got ${types(findings)}`);
   assert.equal(findings[0].driftClass, 'HIGH');
   assert.match(findings[0].message, /NO pair at all/);
 });
 
-test('ops credentials: a missing .env entirely is the same HIGH, not silence', () => {
-  const findings = analyzeOpsAgentCredentialDrift(
+test('ops credentials: a genuinely ABSENT .env is the same HIGH, not silence', () => {
+  const findings = analyzeOpsAgentCredentialDrift(opsSides(
     { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
     null,
-  );
+  ));
   assert.equal(findings.length, 1, `expected one finding, got ${types(findings)}`);
   assert.equal(findings[0].driftClass, 'HIGH');
 });
 
 test('ops credentials: neither side resolves a pair — CRITICAL', () => {
-  const findings = analyzeOpsAgentCredentialDrift({ NODE_ENV: 'production' }, { NODE_ENV: 'production' });
+  const findings = analyzeOpsAgentCredentialDrift(opsSides({ NODE_ENV: 'production' }, {}));
   assert.equal(findings.length, 1, `expected one finding, got ${types(findings)}`);
   assert.equal(findings[0].driftClass, 'CRITICAL');
   assert.equal(findings[0].type, 'ops-credentials-absent');
@@ -1195,11 +1227,11 @@ test('ops credentials: neither side resolves a pair — CRITICAL', () => {
 test('ops credentials: PM2 shadowing the .env pair with an empty value — HIGH', () => {
   // The inverse shadow: PM2 injects an EMPTY OPS_EMAIL, which wins over the
   // file. The agents' `|| ''` chain then falls through to an absent
-  // VALIDATOR_EMAIL and they FATAL on every firing while .env looks correct.
-  const findings = analyzeOpsAgentCredentialDrift(
+  // VALIDATOR_EMAIL and they fail on every firing while .env looks correct.
+  const findings = analyzeOpsAgentCredentialDrift(opsSides(
     { OPS_EMAIL: '', OPS_PASSWORD: OPS_PW_LIVE },
     { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
-  );
+  ));
   assert.equal(findings.length, 1, `expected one finding, got ${types(findings)}`);
   assert.equal(findings[0].driftClass, 'HIGH');
   assert.match(findings[0].message, /shadows/);
@@ -1209,22 +1241,21 @@ test('ops credentials: OPS_* beats VALIDATOR_* on the RUNTIME side independently
   // PM2 carries both pairs; the agents read OPS_* first. If the fallback order
   // were inverted here, runtime would resolve the stale pair and this would
   // report drift.
-  const findings = analyzeOpsAgentCredentialDrift(
+  const findings = analyzeOpsAgentCredentialDrift(opsSides(
     {
       OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE,
       VALIDATOR_EMAIL: OPS_EMAIL_STALE, VALIDATOR_PASSWORD: OPS_PW_STALE,
     },
     { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
-  );
+  ));
   assert.deepEqual(findings, [], `expected no finding, got ${JSON.stringify(findings, null, 2)}`);
 });
 
 test('ops credentials: OPS_* beats VALIDATOR_* on the RESTART side independently', () => {
-  // Same proof for the cold-start side, which resolves from .env alone. PM2
-  // carries BOTH names at the LIVE value so the runtime side resolves the same
-  // pair under either fallback order — leaving the restart side as the only
-  // thing this case can be measuring.
-  const findings = analyzeOpsAgentCredentialDrift(
+  // Same proof for the cold-start side. PM2 carries BOTH names at the LIVE value
+  // so the runtime side resolves the same pair under either fallback order —
+  // leaving the restart side as the only thing this case can be measuring.
+  const findings = analyzeOpsAgentCredentialDrift(opsSides(
     {
       OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE,
       VALIDATOR_EMAIL: OPS_EMAIL_LIVE, VALIDATOR_PASSWORD: OPS_PW_LIVE,
@@ -1233,33 +1264,146 @@ test('ops credentials: OPS_* beats VALIDATOR_* on the RESTART side independently
       OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE,
       VALIDATOR_EMAIL: OPS_EMAIL_STALE, VALIDATOR_PASSWORD: OPS_PW_STALE,
     },
-  );
+  ));
   assert.deepEqual(findings, [], `expected no finding, got ${JSON.stringify(findings, null, 2)}`);
 });
 
 test('ops credentials: VALIDATOR_* is used when OPS_* is absent on one side only', () => {
   // .env has only the VALIDATOR_* pair — the exact prod shape. Same values, so
   // the fallback must resolve to a MATCH rather than a phantom drift.
-  const findings = analyzeOpsAgentCredentialDrift(
+  const findings = analyzeOpsAgentCredentialDrift(opsSides(
     { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
     { VALIDATOR_EMAIL: OPS_EMAIL_LIVE, VALIDATOR_PASSWORD: OPS_PW_LIVE },
-  );
+  ));
   assert.deepEqual(findings, [], `expected no finding, got ${JSON.stringify(findings, null, 2)}`);
 });
 
-test('ops credentials: an unreadable PM2 entry is reported, never read as agreement', () => {
-  const findings = analyzeOpsAgentCredentialDrift(null, { OPS_EMAIL: OPS_EMAIL_LIVE });
+// ─── Unobservable inputs are reported, never resolved into an answer ─────────
+
+test('ops credentials: no readable PM2 entry is reported, never read as agreement', () => {
+  const findings = analyzeOpsAgentCredentialDrift(opsSides(null, { OPS_EMAIL: OPS_EMAIL_LIVE }));
   assert.equal(findings.length, 1);
   assert.equal(findings[0].type, 'ops-credentials-unobservable');
   assert.equal(findings[0].driftClass, 'WARNING');
   assert.match(findings[0].message, /NOT established/);
 });
 
+test('ops credentials: an UNREADABLE .env must not manufacture a credential finding', () => {
+  // The distinction that matters: absent means "the persisted config holds no
+  // pair" (a real HIGH); unreadable means we do not know. Collapsing the two
+  // turns a permissions error into a confident, wrong statement.
+  const unreadable: DotenvRead = { status: 'unreadable', reason: 'EACCES: permission denied' };
+  const findings = analyzeOpsAgentCredentialDrift(opsObs({
+    pm2Env: { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
+    runtimeDotenv: unreadable,
+    restartDotenv: unreadable,
+  }));
+  assert.equal(findings.length, 1, `expected one finding, got ${types(findings)}`);
+  assert.equal(findings[0].type, 'ops-credentials-unobservable');
+  assert.equal(findings[0].driftClass, 'WARNING');
+  assert.ok(
+    !findings.some(f => f.type === 'config-shadow' || f.type === 'ops-credentials-absent'),
+    'an I/O error must never be reported as a credential verdict',
+  );
+});
+
+test('ops credentials: an unreadable restart-side .env is unobservable too', () => {
+  const findings = analyzeOpsAgentCredentialDrift(opsObs({
+    pm2Env: { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
+    runtimeDotenv: dotenvPresent({ OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE }),
+    restartDotenv: { status: 'unreadable', reason: 'EISDIR: illegal operation on a directory' },
+  }));
+  assert.equal(findings.length, 1, `expected one finding, got ${types(findings)}`);
+  assert.equal(findings[0].type, 'ops-credentials-unobservable');
+});
+
+// ─── cwd is part of the question (F2) ───────────────────────────────────────
+
+test('ops credentials: a pm_cwd that disagrees with the ecosystem cwd is itself a finding', () => {
+  // The running agent read one .env; a restart would read another. Every
+  // credential comparison is then spanning two files rather than one file over
+  // time, so the disagreement has to be stated in its own right.
+  const shared = dotenvPresent({ OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE });
+  const findings = analyzeOpsAgentCredentialDrift(opsObs({
+    pm2Env: { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
+    pm2Cwd: '/opt/vizora/releases/2026-08-01',
+    ecosystemCwd: PROD_OPS_CWD,
+    runtimeDotenv: shared,
+    restartDotenv: shared,
+  }));
+  const cwd = findings.find(f => f.targetId.endsWith(':cwd'));
+  assert.ok(cwd, `expected a cwd finding, got ${types(findings)}`);
+  assert.equal(cwd.driftClass, 'HIGH');
+  assert.match(cwd.message, /DIFFERENT files/);
+});
+
+test('ops credentials: the false-negative pm_cwd catches — running agent reads no .env', () => {
+  // The scenario the ecosystem-cwd-only version could not see: the agents were
+  // started somewhere with no .env at all, so a cold start from the ecosystem
+  // cwd is genuinely broken — while a repo-root read would have found a matching
+  // pair and reported all clear.
+  const findings = analyzeOpsAgentCredentialDrift(opsObs({
+    pm2Env: { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
+    pm2Cwd: '/tmp/somewhere-else',
+    ecosystemCwd: PROD_OPS_CWD,
+    runtimeDotenv: { status: 'absent' },
+    restartDotenv: dotenvPresent({ OPS_EMAIL: OPS_EMAIL_STALE, OPS_PASSWORD: OPS_PW_STALE }),
+  }));
+  assert.ok(findings.some(f => f.targetId.endsWith(':cwd')), 'the cwd difference must be named');
+  const credential = findings.find(f => f.targetId.endsWith(':credentials'));
+  assert.ok(credential, `expected a credential finding, got ${types(findings)}`);
+  assert.equal(credential.driftClass, 'HIGH');
+});
+
+test('ops credentials: an unknown pm_cwd is not reported as a cwd difference', () => {
+  // `pm_cwd` missing from pm2_env means unknown, not different. The detector
+  // logs the reduced coverage; inventing a finding here would be noise.
+  const shared = dotenvPresent({ OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE });
+  const findings = analyzeOpsAgentCredentialDrift(opsObs({
+    pm2Env: { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
+    pm2Cwd: undefined,
+    runtimeDotenv: shared,
+    restartDotenv: shared,
+  }));
+  assert.deepEqual(findings, [], `expected no finding, got ${JSON.stringify(findings, null, 2)}`);
+});
+
+// ─── The cold-start model matches every other cold-start model (F4) ──────────
+
+test('ops credentials: the ops app\'s ecosystem env_production counts as persisted config', () => {
+  // computeZeroState models a service's cold start as env_production over
+  // dotenv. Modelling the ops agents' cold start as dotenv ALONE would mean an
+  // operator who fixes the drift in the ecosystem block could never clear the
+  // finding — the detector would keep reporting a drift the operator has
+  // already repaired.
+  const findings = analyzeOpsAgentCredentialDrift(opsObs({
+    pm2Env: { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
+    ecosystemEnvProduction: { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
+    runtimeDotenv: { status: 'absent' },
+    restartDotenv: { status: 'absent' },
+  }));
+  assert.deepEqual(findings, [], `expected no finding, got ${JSON.stringify(findings, null, 2)}`);
+});
+
+test('ops credentials: the ecosystem block WINS over .env on the restart side', () => {
+  // Same precedence as computeZeroState: process env over dotenv. A stale .env
+  // value that the ecosystem block overrides is not a drift.
+  const findings = analyzeOpsAgentCredentialDrift(opsObs({
+    pm2Env: { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
+    ecosystemEnvProduction: { OPS_PASSWORD: OPS_PW_LIVE },
+    runtimeDotenv: dotenvPresent({ OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_STALE }),
+    restartDotenv: dotenvPresent({ OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_STALE }),
+  }));
+  assert.deepEqual(findings, [], `expected no finding, got ${JSON.stringify(findings, null, 2)}`);
+});
+
+// ─── Scope, resolution, safety ──────────────────────────────────────────────
+
 test('ops credentials: findings carry their own resolvable scope', () => {
-  const findings = analyzeOpsAgentCredentialDrift(
+  const findings = analyzeOpsAgentCredentialDrift(opsSides(
     { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
     { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_STALE },
-  );
+  ));
   assert.equal(findings[0].service, OPS_AGENT_SCOPE);
   assert.equal(incidentScope(findings[0].targetId), OPS_AGENT_SCOPE);
 
@@ -1277,15 +1421,29 @@ test('ops credentials: findings carry their own resolvable scope', () => {
   );
 });
 
+test('ops credentials: blast radius is stated per agent, not rounded up', () => {
+  // ops-reporter warns and skips the dashboard update (ops-reporter.ts:289); the
+  // other three exit FATAL. Overstating it would misdirect an incident response.
+  const findings = analyzeOpsAgentCredentialDrift(opsSides({ NODE_ENV: 'production' }, {}));
+  assert.match(findings[0].message, /fleet-manager, schedule-doctor and content-lifecycle/);
+  assert.match(findings[0].message, /ops-reporter would skip its dashboard sync/);
+});
+
 test('ops credentials: no credential VALUE appears in any finding', () => {
   const everyShape = [
-    ...analyzeOpsAgentCredentialDrift(
+    ...analyzeOpsAgentCredentialDrift(opsSides(
       { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
       { OPS_EMAIL: OPS_EMAIL_STALE, OPS_PASSWORD: OPS_PW_STALE },
-    ),
-    ...analyzeOpsAgentCredentialDrift({ OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE }, {}),
-    ...analyzeOpsAgentCredentialDrift({}, {}),
-    ...analyzeOpsAgentCredentialDrift(null, { OPS_PASSWORD: OPS_PW_STALE }),
+    )),
+    ...analyzeOpsAgentCredentialDrift(opsSides({ OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE }, {})),
+    ...analyzeOpsAgentCredentialDrift(opsSides({}, {})),
+    ...analyzeOpsAgentCredentialDrift(opsSides(null, { OPS_PASSWORD: OPS_PW_STALE })),
+    ...analyzeOpsAgentCredentialDrift(opsObs({
+      pm2Env: { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
+      pm2Cwd: '/tmp/elsewhere',
+      runtimeDotenv: dotenvPresent({ OPS_PASSWORD: OPS_PW_STALE }),
+      restartDotenv: dotenvPresent({ OPS_EMAIL: OPS_EMAIL_STALE }),
+    })),
   ];
   const serialized = JSON.stringify(findingsToIncidents(everyShape, '2026-08-15T10:00:00.000Z'));
 
@@ -1297,10 +1455,43 @@ test('ops credentials: no credential VALUE appears in any finding', () => {
   assert.equal(hexRun, null, `derived token found in output: ${hexRun?.[0]}`);
 });
 
-test('ops credentials: the analysis does not mutate its inputs', () => {
-  const pm2: EnvMap = { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE };
-  const dotenv: EnvMap = { OPS_EMAIL: OPS_EMAIL_STALE };
-  const before = JSON.stringify([pm2, dotenv]);
-  analyzeOpsAgentCredentialDrift(pm2, dotenv);
-  assert.equal(JSON.stringify([pm2, dotenv]), before);
+test('projectOpsCredentialKeys drops everything that is not a credential variable', () => {
+  // Defence in depth: the analysis never receives the rest of the environment,
+  // so a future formatting mistake has nothing else available to leak.
+  const projected = projectOpsCredentialKeys({
+    OPS_EMAIL: OPS_EMAIL_LIVE,
+    VALIDATOR_PASSWORD: OPS_PW_LIVE,
+    JWT_SECRET,
+    DATABASE_URL: pgUrl(),
+    NODE_ENV: 'production',
+  });
+  assert.deepEqual(Object.keys(projected).sort(), ['OPS_EMAIL', 'VALIDATOR_PASSWORD']);
 });
+
+test('readDotenvFile distinguishes absent from present', () => {
+  // The distinction the credential control depends on. `unreadable` is covered
+  // by the analysis tests above; producing a real unreadable file portably is
+  // not worth a platform-specific fixture.
+  assert.equal(readDotenvFile(join(tmpdir(), 'vizora-no-such-dir-9f3a2b')).status, 'absent');
+
+  const dir = mkdtempSync(join(tmpdir(), 'vizora-dotenv-'));
+  try {
+    writeFileSync(join(dir, '.env'), 'OPS_EMAIL=someone@example.test\n');
+    const read = readDotenvFile(dir);
+    assert.equal(read.status, 'present');
+    assert.equal(read.status === 'present' && read.vars.OPS_EMAIL, 'someone@example.test');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('ops credentials: the analysis does not mutate its input', () => {
+  const obs = opsSides(
+    { OPS_EMAIL: OPS_EMAIL_LIVE, OPS_PASSWORD: OPS_PW_LIVE },
+    { OPS_EMAIL: OPS_EMAIL_STALE },
+  );
+  const before = JSON.stringify(obs);
+  analyzeOpsAgentCredentialDrift(obs);
+  assert.equal(JSON.stringify(obs), before);
+});
+

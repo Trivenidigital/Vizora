@@ -407,14 +407,46 @@ export function serviceCwdFor(
   return appCwd ? resolve(repoRoot, appCwd) : join(repoRoot, service);
 }
 
-export function readServiceDotenv(serviceCwd: string): EnvMap | null {
-  const envPath = join(serviceCwd, '.env');
-  if (!existsSync(envPath)) return null;
+/**
+ * A `.env` read that keeps ABSENT and UNREADABLE apart.
+ *
+ * `readServiceDotenv` collapses both to `null`, which is right for the service
+ * views (web genuinely has no `.env`, and the service checks treat a missing
+ * source as "contributes nothing"). It is WRONG anywhere absence is itself the
+ * finding: an unreadable or unparseable file would then manufacture a confident
+ * "the persisted config holds no credentials" out of an I/O error. Absence of
+ * evidence, reported as evidence of absence — the exact shape this detector
+ * exists to remove.
+ */
+export type DotenvRead =
+  | { status: 'present'; vars: EnvMap }
+  | { status: 'absent' }
+  | { status: 'unreadable'; reason: string };
+
+/**
+ * Read + parse `<cwd>/.env`, distinguishing "no such file" from "could not be
+ * read or parsed".
+ *
+ * `reason` carries the error MESSAGE only (path + errno). No file CONTENT is
+ * ever placed in it, so a `.env` full of secrets cannot reach a finding through
+ * this path.
+ */
+export function readDotenvFile(cwd: string): DotenvRead {
+  const envPath = join(cwd, '.env');
+  if (!existsSync(envPath)) return { status: 'absent' };
   try {
-    return parseDotenvText(readFileSync(envPath, 'utf-8'));
-  } catch {
-    return null;
+    return { status: 'present', vars: parseDotenvText(readFileSync(envPath, 'utf-8')) };
+  } catch (err) {
+    return {
+      status: 'unreadable',
+      reason: err instanceof Error ? err.message.split('\n')[0] : String(err),
+    };
   }
+}
+
+export function readServiceDotenv(serviceCwd: string): EnvMap | null {
+  const read = readDotenvFile(serviceCwd);
+  return read.status === 'present' ? read.vars : null;
 }
 
 /** Parse NUL-separated `/proc/<pid>/environ` content. */
@@ -1332,22 +1364,91 @@ function detectBudgetFindings(
 // ─── Ops-agent credentials (2026-08-15 incident) ────────────────────────────
 
 /**
- * The credential pair the four credentialed ops agents actually resolve, as
- * they resolve it.
+ * The only four variables this control ever looks at.
+ *
+ * Both sides are projected down to these before comparison, so a full
+ * environment snapshot — every other secret the ops agents inherit — never
+ * enters the analysis at all. Defence in depth: the comparison already emits
+ * verdict tokens only, but the narrower input means a future message-formatting
+ * mistake has nothing else to leak.
+ */
+export const OPS_CREDENTIAL_KEYS = [
+  'OPS_EMAIL',
+  'OPS_PASSWORD',
+  'VALIDATOR_EMAIL',
+  'VALIDATOR_PASSWORD',
+] as const;
+
+export function projectOpsCredentialKeys(env: EnvMap): EnvMap {
+  const out: EnvMap = {};
+  for (const key of OPS_CREDENTIAL_KEYS) {
+    if (env[key] !== undefined) out[key] = env[key];
+  }
+  return out;
+}
+
+/**
+ * The credential pair the credentialed ops agents actually resolve, as they
+ * resolve it.
  *
  * `fleet-manager.ts:111`, `schedule-doctor.ts:72`, `content-lifecycle.ts:440`
  * and `ops-reporter.ts:276` all read
  * `process.env.OPS_EMAIL || process.env.VALIDATOR_EMAIL || ''` (and the same for
- * the password) and treat a falsy result as FATAL. The `|| undefined` tail
- * reproduces that exactly: an EMPTY value falls through to the fallback
- * variable, and a pair that is empty on both ends is absent, not present —
- * matching the production predicate rather than a convenient approximation.
+ * the password). The `|| undefined` tail reproduces that exactly: an EMPTY value
+ * falls through to the fallback variable, and a pair that is empty on both ends
+ * is absent, not present — matching the production predicate rather than a
+ * convenient approximation.
  */
 function resolveOpsCredentialPair(env: EnvMap): { email?: string; password?: string } {
   return {
     email: env.OPS_EMAIL || env.VALIDATOR_EMAIL || undefined,
     password: env.OPS_PASSWORD || env.VALIDATOR_PASSWORD || undefined,
   };
+}
+
+/**
+ * What losing the credential pair actually costs, stated per agent rather than
+ * rounded up.
+ *
+ * Three of the four exit non-zero with `FATAL: No credentials` and do nothing
+ * that cycle. `ops-reporter` does NOT — `ops-reporter.ts:289` logs a warning and
+ * skips only the dashboard update, so its alerting still runs while
+ * `/dashboard/ops` silently serves stale data. Overstating it as "all four
+ * FATAL" would misdirect the first minute of an incident response.
+ */
+const OPS_CREDENTIAL_BLAST_RADIUS =
+  'fleet-manager, schedule-doctor and content-lifecycle would exit FATAL with no ' +
+  'credentials, and ops-reporter would skip its dashboard sync (it warns rather than ' +
+  'exiting), leaving /dashboard/ops stale';
+
+/**
+ * Everything this control needs to compare, gathered by the detector.
+ *
+ * `runtimeDotenv` and `restartDotenv` are separate reads because they are
+ * separate QUESTIONS. The running agent loaded its `.env` from the cwd PM2
+ * actually started it in (`pm_cwd`); a cold start would load it from the cwd the
+ * ecosystem entry implies. On prod those are the same path — but assuming they
+ * are is how a detector reports MATCH against a file the running process never
+ * read.
+ */
+export interface OpsAgentCredentialObservation {
+  /** Which credentialed ops agent supplied the runtime sample. */
+  sampledAgent: string;
+  /**
+   * PM2's stored env for that agent, projected to `OPS_CREDENTIAL_KEYS`.
+   * `null` when no credentialed agent had a readable stored env.
+   */
+  pm2Env: EnvMap | null;
+  /** `pm2_env.pm_cwd` — where the RUNNING agent loaded its `.env` from. */
+  pm2Cwd?: string;
+  /** cwd a fresh `pm2 start ecosystem.config.js` would use. */
+  ecosystemCwd: string;
+  /** The ops app's ecosystem `env_production` block, projected. */
+  ecosystemEnvProduction: EnvMap;
+  /** `.env` at `pm2Cwd` — the runtime side's file. */
+  runtimeDotenv: DotenvRead;
+  /** `.env` at `ecosystemCwd` — the cold-start side's file. */
+  restartDotenv: DotenvRead;
 }
 
 /**
@@ -1359,74 +1460,113 @@ function resolveOpsCredentialPair(env: EnvMap): { email?: string; password?: str
  * the running ops agents authenticated fine because PM2's stored env carried a
  * different, working pair. `import 'dotenv/config'` never overwrites a variable
  * already present in `process.env`, so the PM2-injected values shadowed the file
- * on every cron firing. A cold start consuming `.env` fresh would have FATAL'd
- * all four credentialed agents at once — fleet-manager, schedule-doctor,
- * content-lifecycle and ops-reporter — and nothing would have said so, because
- * the hourly detector's scope was the three application services only.
+ * on every cron firing. A cold start consuming `.env` fresh would have broken
+ * every credentialed agent at once, and nothing would have said so — the hourly
+ * detector's scope was the three application services only.
  *
  * Two sides, resolved independently and each with the agents' own fallback
  * order:
  *
- *   runtime  `resolvePrecedence(pm2Stored, dotenv)` — PM2 wins, as it does live.
- *   restart  dotenv alone — the cold-start path that assumes no PM2 stored env.
+ *   runtime  `resolvePrecedence(pm2Stored, .env at pm_cwd)` — PM2 wins, as live.
+ *   restart  `resolvePrecedence(ecosystem env_production, .env at ecosystem cwd)`
+ *            — the same zero-state model `computeZeroState` uses for a service,
+ *            so an operator who fixes the drift by putting credentials in the
+ *            ops app's `env_production` block can actually clear this finding.
  *
- * Sampled from ONE credentialed agent (`ops-fleet-manager`). All four resolve
- * the identical expression from the identical environment, so four findings
- * would be one root cause reported four times.
+ * Sampled from ONE credentialed agent: all of them resolve the identical
+ * expression from the identical environment, so four findings would be one root
+ * cause reported four times.
  *
- * Both components are treated as SECRETS: the email is an account identifier
- * and the password obviously so. They are compared through
- * `compareSecretValues` and only the MATCH/DRIFT verdict tokens — never a value,
- * hash, length or fingerprint — reach the finding.
+ * Both components are treated as SECRETS: the email is an account identifier and
+ * the password obviously so. They are compared through `compareSecretValues` and
+ * only the MATCH/DRIFT verdict tokens — never a value, hash, length or
+ * fingerprint — reach the finding.
  *
- * `pm2StoredEnv === null` means the agent's PM2 entry could not be read at all.
- * That is reported as unobservable rather than silently passed: absence of a
- * finding must never be manufactured from an absence of evidence.
+ * Anything unobservable (no readable PM2 entry, an unreadable or unparseable
+ * `.env`) is REPORTED as unobservable. A confident "the persisted config holds
+ * no credentials" must never be manufactured out of an I/O error.
  */
 export function analyzeOpsAgentCredentialDrift(
-  pm2StoredEnv: EnvMap | null,
-  rootDotenv: EnvMap | null,
+  obs: OpsAgentCredentialObservation,
 ): DriftFinding[] {
-  if (pm2StoredEnv === null) {
-    return [{
-      driftClass: 'WARNING',
-      type: 'ops-credentials-unobservable',
-      service: OPS_AGENT_SCOPE,
-      targetId: `${OPS_AGENT_SCOPE}:observability`,
-      message:
-        'cannot determine ops-agent credential drift — the PM2 stored environment for ' +
-        'ops-fleet-manager could not be read. Absence of drift was NOT established.',
-      remediation:
-        'Check `pm2 jlist` succeeds for the user running this agent and that the ' +
-        'ops-fleet-manager entry exists. ' + NO_REPAIR,
-    }];
+  const unobservable = (detail: string, remediation: string): DriftFinding[] => [{
+    driftClass: 'WARNING',
+    type: 'ops-credentials-unobservable',
+    service: OPS_AGENT_SCOPE,
+    targetId: `${OPS_AGENT_SCOPE}:observability`,
+    message: `cannot determine ops-agent credential drift — ${detail}. Absence of drift was NOT established.`,
+    remediation: `${remediation} ${NO_REPAIR}`,
+  }];
+
+  if (obs.pm2Env === null) {
+    return unobservable(
+      'no credentialed ops agent had a readable PM2 stored environment',
+      'Check `pm2 jlist` succeeds for the user running this agent and that the ops-* entries exist.',
+    );
   }
 
-  // The cron agents run from the repo root, so the repo-root `.env` is the file
-  // their `import 'dotenv/config'` loads — and the one a cold start would use.
-  const runtime = resolveOpsCredentialPair(resolvePrecedence(pm2StoredEnv, rootDotenv));
-  const restart = resolveOpsCredentialPair(rootDotenv ?? {});
+  // An unreadable file is not an absent one. Routing it to the HIGH "persisted
+  // config holds no pair" finding would turn a permissions error into a
+  // confident, wrong statement about the credentials.
+  for (const [label, read] of [
+    ['the running agent\'s', obs.runtimeDotenv],
+    ['the cold-start', obs.restartDotenv],
+  ] as const) {
+    if (read.status === 'unreadable') {
+      return unobservable(
+        `${label} .env could not be read or parsed (${read.reason})`,
+        'Check the file\'s permissions and dotenv syntax.',
+      );
+    }
+  }
+
+  const findings: DriftFinding[] = [];
+
+  // A cwd disagreement is itself this drift class: the running agent read one
+  // file and a restart would read another, so every credential comparison below
+  // is spanning two different files rather than one file over time.
+  if (obs.pm2Cwd !== undefined && obs.pm2Cwd !== obs.ecosystemCwd) {
+    findings.push({
+      driftClass: 'HIGH',
+      type: 'config-shadow',
+      service: OPS_AGENT_SCOPE,
+      targetId: `${OPS_AGENT_SCOPE}:cwd`,
+      message:
+        `${obs.sampledAgent} is running from ${obs.pm2Cwd} but a fresh start from the ecosystem ` +
+        `file would use ${obs.ecosystemCwd}. The ops agents load .env relative to their cwd, so ` +
+        `the running agents and a restart read DIFFERENT files — the persisted configuration ` +
+        `being checked is not the one in force.`,
+      remediation: NO_REPAIR,
+    });
+  }
+
+  const runtime = resolveOpsCredentialPair(
+    resolvePrecedence(obs.pm2Env, dotenvVarsOf(obs.runtimeDotenv)),
+  );
+  const restart = resolveOpsCredentialPair(
+    resolvePrecedence({ ...obs.ecosystemEnvProduction }, dotenvVarsOf(obs.restartDotenv)),
+  );
 
   const runtimeHasPair = runtime.email !== undefined && runtime.password !== undefined;
   const restartHasPair = restart.email !== undefined && restart.password !== undefined;
 
   if (!runtimeHasPair && !restartHasPair) {
-    return [{
+    findings.push({
       driftClass: 'CRITICAL',
       type: 'ops-credentials-absent',
       service: OPS_AGENT_SCOPE,
       targetId: `${OPS_AGENT_SCOPE}:credentials`,
       message:
-        'the credentialed ops agents (fleet-manager, schedule-doctor, content-lifecycle, ' +
-        'ops-reporter) resolve no OPS_EMAIL/OPS_PASSWORD (or VALIDATOR_* fallback) pair on ' +
-        'EITHER path — neither the running PM2 environment nor the persisted .env. They ' +
-        'cannot authenticate at all.',
+        'the credentialed ops agents resolve no OPS_EMAIL/OPS_PASSWORD (or VALIDATOR_* fallback) ' +
+        'pair on EITHER path — neither the running PM2 environment nor the persisted config. ' +
+        `They cannot authenticate at all: ${OPS_CREDENTIAL_BLAST_RADIUS}.`,
       remediation: NO_REPAIR,
-    }];
+    });
+    return findings;
   }
 
   if (!restartHasPair) {
-    return [{
+    findings.push({
       driftClass: 'HIGH',
       type: 'config-shadow',
       service: OPS_AGENT_SCOPE,
@@ -1434,33 +1574,34 @@ export function analyzeOpsAgentCredentialDrift(
       message:
         'the credentialed ops agents authenticate with a credential pair the persisted config ' +
         'cannot reproduce: the running PM2 environment resolves an OPS_EMAIL/OPS_PASSWORD (or ' +
-        'VALIDATOR_* fallback) pair, the persisted .env resolves NO pair at all. A cold start ' +
-        'consuming .env fresh would FATAL every credentialed ops agent — fleet-manager, ' +
-        'schedule-doctor, content-lifecycle and ops-reporter.',
+        'VALIDATOR_* fallback) pair, the persisted config resolves NO pair at all. After a cold ' +
+        `start, ${OPS_CREDENTIAL_BLAST_RADIUS}.`,
       remediation: NO_REPAIR,
-    }];
+    });
+    return findings;
   }
 
   if (!runtimeHasPair) {
-    return [{
+    findings.push({
       driftClass: 'HIGH',
       type: 'config-shadow',
       service: OPS_AGENT_SCOPE,
       targetId: `${OPS_AGENT_SCOPE}:credentials`,
       message:
-        'the persisted .env resolves an OPS_EMAIL/OPS_PASSWORD (or VALIDATOR_* fallback) pair ' +
+        'the persisted config resolves an OPS_EMAIL/OPS_PASSWORD (or VALIDATOR_* fallback) pair ' +
         'but the running PM2 environment resolves NO pair — a PM2-injected empty value shadows ' +
-        'the file, so the credentialed ops agents are FATALing on every firing while the ' +
-        'persisted config looks correct.',
+        'the file, so right now ' + OPS_CREDENTIAL_BLAST_RADIUS + ', while the persisted config ' +
+        'looks correct.',
       remediation: NO_REPAIR,
-    }];
+    });
+    return findings;
   }
 
   const emailVerdict = compareSecretValues(runtime.email, restart.email);
   const passwordVerdict = compareSecretValues(runtime.password, restart.password);
-  if (emailVerdict === 'MATCH' && passwordVerdict === 'MATCH') return [];
+  if (emailVerdict === 'MATCH' && passwordVerdict === 'MATCH') return findings;
 
-  return [{
+  findings.push({
     driftClass: 'HIGH',
     type: 'config-shadow',
     service: OPS_AGENT_SCOPE,
@@ -1468,13 +1609,20 @@ export function analyzeOpsAgentCredentialDrift(
     message:
       'the credentialed ops agents authenticate with a credential the persisted config cannot ' +
       `reproduce — email: ${emailVerdict}, password: ${passwordVerdict} between the running PM2 ` +
-      'environment and the persisted .env. The running values come from a higher-precedence ' +
-      'layer (PM2 stored env; dotenv never overwrites an already-set variable), so a cold start ' +
-      'consuming .env fresh would FATAL every credentialed ops agent — fleet-manager, ' +
-      'schedule-doctor, content-lifecycle and ops-reporter.',
+      'environment and the persisted config. The running values come from a higher-precedence ' +
+      'layer (PM2 stored env; dotenv never overwrites an already-set variable), so after a cold ' +
+      `start, ${OPS_CREDENTIAL_BLAST_RADIUS}.`,
     remediation: NO_REPAIR,
-  }];
+  });
+
+  return findings;
 }
+
+/** The vars a `.env` read contributes — an absent file contributes nothing. */
+function dotenvVarsOf(read: DotenvRead): EnvMap | null {
+  return read.status === 'present' ? read.vars : null;
+}
+
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 

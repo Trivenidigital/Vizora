@@ -521,12 +521,48 @@ being incidental.
    could not see; a cold start would have FATAL'd all four credentialed agents
    (fleet-manager, schedule-doctor, content-lifecycle, ops-reporter) at once.
 
-   The control samples ONE credentialed agent (`ops-fleet-manager`) — a cron app,
-   usually `stopped`, whose `pm2_env` is readable without a live pid — and
-   resolves `OPS_* || VALIDATOR_*` exactly as the agents do, on each side
-   independently. Email and password are BOTH treated as secrets; only MATCH/DRIFT
-   verdict tokens reach a finding. The rest of the ops-agent config surface, and
-   the Hermes runtime, remain out of scope.
+   The control samples ONE credentialed agent — the first of `ops-fleet-manager`,
+   `ops-schedule-doctor`, `ops-content-lifecycle`, `ops-reporter` whose `pm2_env`
+   is readable and agrees across both `pm2 jlist` samples. These are cron apps,
+   usually `stopped`, and `pm2_env` is readable without a live pid; requiring both
+   samples to agree keeps a read that lands inside a respawn from surfacing as a
+   credential incident. Sampling is not pinned to one hardcoded entry, because a
+   deleted or renamed app would then emit an `unobservable` finding every hour
+   forever.
+
+   Both sides are modelled the same way the service views are:
+
+   ```text
+   runtime  PM2 stored env  over  .env at the running agent's pm_cwd
+   restart  ecosystem env_production  over  .env at the ecosystem-derived cwd
+   ```
+
+   `pm_cwd` is load-bearing: the ops agents load `.env` relative to their cwd, so
+   the file the RUNNING agent read is the one `pm_cwd` points at. Using the
+   ecosystem-derived cwd for both sides would report MATCH against a file the
+   running process never opened. A disagreement between the two cwds is itself a
+   finding — the running agents and a restart are reading different files.
+
+   Modelling the restart side as `.env` ALONE would have been the other half of
+   the same mistake: `computeZeroState` includes `env_production` for every
+   service, and an operator who fixed the drift by adding credentials to the ops
+   app's `env_production` block could never clear the finding.
+
+   `analyzeOpsAgentCredentialDrift` receives ONLY the four credential variables
+   (`projectOpsCredentialKeys`), never a full environment snapshot. Email and
+   password are BOTH treated as secrets; only MATCH/DRIFT verdict tokens reach a
+   finding. Anything unobservable — no readable PM2 entry, an unreadable or
+   unparseable `.env` — is reported as `info`-severity `ops-credentials-unobservable`
+   rather than resolved into a credential verdict, and does NOT mark the scope
+   evaluated, so it can never clear a prior finding.
+
+   Blast radius, per agent rather than rounded up: fleet-manager, schedule-doctor
+   and content-lifecycle exit FATAL with no credentials; `ops-reporter` warns and
+   skips only its dashboard update (`ops-reporter.ts:289`), leaving
+   `/dashboard/ops` stale.
+
+   The rest of the ops-agent config surface, and the Hermes runtime, remain out of
+   scope.
 
 5. **Build-artifact grep brittleness.** §5's approach depends on the origin
    appearing as a literal in the bundle. Minification currently preserves it;
