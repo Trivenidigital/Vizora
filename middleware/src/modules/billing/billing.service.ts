@@ -971,6 +971,35 @@ export class BillingService implements OnModuleInit {
   }
 
   /**
+   * Resolve the Razorpay customer id from a MONEY event (B3-P2).
+   *
+   * `payment.captured` / `payment.failed` always deliver `contains: ["payment"]`
+   * — the payload carries a payment entity and NEVER an invoice entity, not even
+   * for a subscription-linked payment (those carry `invoice_id` as a plain
+   * STRING on the payment entity, not a nested invoice object). The previous
+   * `data.invoice?.customer_id` read was therefore dead on every single
+   * Razorpay money event, and both handlers early-returned in silence:
+   * no billing_transactions row, no entitlementService.recover(), no
+   * beginPastDue(), no receipt email.
+   *
+   * Order: invoice (defensive — invoice.* events do carry one) → payment →
+   * subscription. `payment.entity.customer_id` is present for customer-linked
+   * payments and the KEY IS ABSENT (not null) otherwise, hence the
+   * warn-and-return branch at each call site.
+   *
+   * Docs: https://razorpay.com/docs/webhooks/payloads/payments/
+   */
+  private razorpayCustomerIdFromMoneyEvent(data: WebhookData): string | undefined {
+    for (const key of ['invoice', 'payment', 'subscription'] as const) {
+      const entity = data[key];
+      if (!entity || typeof entity !== 'object') continue;
+      const customerId = entity.customer_id;
+      if (typeof customerId === 'string' && customerId) return customerId;
+    }
+    return undefined;
+  }
+
+  /**
    * Handle payment succeeded webhook
    */
   private async handlePaymentSucceeded(provider: string, data: WebhookData, eventId?: string): Promise<void> {
@@ -983,9 +1012,17 @@ export class BillingService implements OnModuleInit {
         ? typeof data.customer === 'string'
           ? data.customer
           : data.customer?.id
-        : data.invoice?.customer_id;
+        : this.razorpayCustomerIdFromMoneyEvent(data);
 
-    if (!customerId) return;
+    if (!customerId) {
+      // A dropped money event must be VISIBLE. Silence here is how the original
+      // bug survived: every payment.captured resolved undefined and returned.
+      this.logger.warn(
+        `payment succeeded webhook (${provider}) carried no resolvable customer id; ` +
+          `no transaction recorded and no entitlement recovery attempted`,
+      );
+      return;
+    }
 
     const org = await this.db.organization.findFirst({
       where:
@@ -1001,7 +1038,12 @@ export class BillingService implements OnModuleInit {
       },
     });
 
-    if (!org) return;
+    if (!org) {
+      this.logger.warn(
+        `payment succeeded webhook (${provider}) for unknown customer ${customerId}; event dropped`,
+      );
+      return;
+    }
 
     // Record the transaction. Fall back to the webhook EVENT id (stable across
     // retries) rather than Date.now() (which changes per delivery and defeats the
@@ -1057,9 +1099,15 @@ export class BillingService implements OnModuleInit {
         ? typeof data.customer === 'string'
           ? data.customer
           : data.customer?.id
-        : data.invoice?.customer_id;
+        : this.razorpayCustomerIdFromMoneyEvent(data);
 
-    if (!customerId) return;
+    if (!customerId) {
+      this.logger.warn(
+        `payment failed webhook (${provider}) carried no resolvable customer id; ` +
+          `dunning was NOT started for this failure`,
+      );
+      return;
+    }
 
     const org = await this.db.organization.findFirst({
       where:
@@ -1075,7 +1123,12 @@ export class BillingService implements OnModuleInit {
       },
     });
 
-    if (!org) return;
+    if (!org) {
+      this.logger.warn(
+        `payment failed webhook (${provider}) for unknown customer ${customerId}; event dropped`,
+      );
+      return;
+    }
 
     // Begin the degradation episode (past_due + episode clock). Idempotent — a
     // repeat payment-failed while already past_due/publish_locked/suspended does
