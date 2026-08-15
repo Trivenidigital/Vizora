@@ -30,46 +30,34 @@ test.describe('Content Management', () => {
     await expect(authenticatedPage.locator('input').first()).toBeVisible();
   });
 
-  test('should create URL-based content', async ({ authenticatedPage, token }) => {
+  test('should create URL-based content', async ({ authenticatedPage }) => {
     await authenticatedPage.goto('/dashboard/content');
     await authenticatedPage.waitForLoadState('networkidle');
-    
-    // Click upload button
+
+    // Creating content through the UI is launch-critical: this must actually
+    // submit and land in the library, not fill the form and cancel.
     const uploadButton = authenticatedPage.locator('button').filter({ hasText: /upload/i }).first();
-    if (!await uploadButton.isVisible({ timeout: 5000 }).catch(() => false)) {
-      // If no upload button, just verify page loaded
-      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Content Library' })).toBeVisible();
-      return;
-    }
-    
+    await expect(uploadButton).toBeVisible({ timeout: 10000 });
     await uploadButton.click();
-    
-    // Wait for modal
+
     const modal = authenticatedPage.locator('[role="dialog"]').first();
-    if (!await modal.isVisible({ timeout: 5000 }).catch(() => false)) {
-      // Modal didn't open, that's OK - just verify page works
-      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Content Library' })).toBeVisible();
-      return;
-    }
-    
-    // Try to fill form if inputs exist
+    await expect(modal).toBeVisible({ timeout: 10000 });
     await authenticatedPage.waitForTimeout(500);
-    
-    const titleInput = authenticatedPage.locator('input').first();
-    if (await titleInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await titleInput.fill(`Test Content ${Date.now()}`);
-    }
-    
-    // Just close the modal
-    const cancelButton = authenticatedPage.locator('button').filter({ hasText: /cancel|close/i }).first();
-    if (await cancelButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await cancelButton.click();
-    } else {
-      // Press Escape to close
-      await authenticatedPage.keyboard.press('Escape');
-    }
-    
-    await authenticatedPage.waitForTimeout(500);
+
+    // The URL field only renders once the type is switched to 'url'.
+    await modal.locator('select').first().selectOption('url');
+
+    const contentName = `Test URL Content ${Date.now()}`;
+    await modal.locator('input[placeholder*="Summer Sale Banner"]').fill(contentName);
+    await modal.locator('input[type="url"]').fill('https://example.com/e2e-gate-page');
+
+    const submitButton = modal.locator('button').filter({ hasText: /upload content/i }).first();
+    await expect(submitButton).toBeEnabled({ timeout: 5000 });
+    await submitButton.click();
+
+    // The new item must actually appear in the library.
+    await expect(modal).toBeHidden({ timeout: 10000 });
+    await expect(authenticatedPage.locator(`text="${contentName}"`).first()).toBeVisible({ timeout: 10000 });
   });
 
   test('should filter content by type', async ({ authenticatedPage, token }) => {
@@ -93,18 +81,19 @@ test.describe('Content Management', () => {
     
     // Look for filter controls (buttons or dropdowns)
     const filterButtons = authenticatedPage.locator('button').filter({ hasText: /all|image|video/i });
-    
-    // If filter controls exist, test them
+
     if (await filterButtons.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-      const count = await filterButtons.count();
-      if (count > 0) {
-        await filterButtons.first().click();
-        await authenticatedPage.waitForTimeout(500);
-      }
+      await filterButtons.first().click();
+      await authenticatedPage.waitForTimeout(500);
+      // The library must survive the filter round-trip.
+      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Content Library' })).toBeVisible();
+    } else {
+      test.info().annotations.push({
+        type: 'skipped-branch',
+        description: 'no type-filter controls rendered — content type filtering not exercised',
+      });
+      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Content Library' })).toBeVisible();
     }
-    
-    // Success if we got here without errors
-    await expect(authenticatedPage.locator('h2')).toBeVisible();
   });
 
   test('should delete content', async ({ authenticatedPage, token }) => {

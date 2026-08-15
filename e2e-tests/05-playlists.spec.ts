@@ -95,7 +95,12 @@ test.describe('Playlist Management', () => {
     await expect(authenticatedPage.locator('h2').filter({ hasText: 'Playlists' })).toBeVisible();
   });
 
-  test('should reorder playlist items', async ({ authenticatedPage, token }) => {
+  /**
+   * Renamed from "should reorder playlist items": it never performed a reorder.
+   * Drag-and-drop reordering lives in the playlist builder and is not covered
+   * here, so the name now matches what is actually asserted.
+   */
+  test('should render a playlist seeded with multiple items', async ({ authenticatedPage, token }) => {
     // Create playlist with multiple items via API
     const playlistRes = await apiPost(authenticatedPage, token, 'http://localhost:3000/api/v1/playlists', {
       name: `Test Playlist ${Date.now()}`,
@@ -127,8 +132,10 @@ test.describe('Playlist Management', () => {
     await authenticatedPage.goto(`/dashboard/playlists`);
     await authenticatedPage.waitForLoadState('networkidle');
 
-    // Verify page loads
-    await expect(authenticatedPage.locator('h2').filter({ hasText: 'Playlists' })).toBeVisible({ timeout: 5000 });
+    // The card must report the two seeded items, not just render the page.
+    const playlistCard = authenticatedPage.locator('.eh-dash-card').filter({ hasText: playlist.name }).first();
+    await expect(playlistCard).toBeVisible({ timeout: 10000 });
+    await expect(playlistCard).toContainText('2 items');
   });
 
   test('should assign playlist to display', async ({ authenticatedPage, token }) => {
@@ -199,6 +206,19 @@ test.describe('Playlist Management', () => {
     // The assignment must be acknowledged, not silently dropped.
     await expect(dialog).toBeHidden({ timeout: 10000 });
     await expect(authenticatedPage.locator('h2').filter({ hasText: 'Playlists' })).toBeVisible();
+
+    // The real oracle: the operator's assignment is persisted on the display.
+    // `currentPlaylistId` is the assignment and nothing more — assigned != delivered
+    // != acknowledged != playing — so this asserts assignment only.
+    await expect(async () => {
+      const check = await authenticatedPage.request.get(
+        `http://localhost:3000/api/v1/displays/${display.id}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      expect(check.ok(), `display fetch failed: ${check.status()}`).toBeTruthy();
+      const fresh = await readData(check);
+      expect(fresh.currentPlaylistId, 'assignment must be persisted on the display').toBe(playlist.id);
+    }).toPass({ timeout: 10000 });
   });
 
   test('should delete playlist', async ({ authenticatedPage, token }) => {
