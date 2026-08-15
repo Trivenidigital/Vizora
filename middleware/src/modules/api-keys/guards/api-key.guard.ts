@@ -1,5 +1,12 @@
-import { Injectable, CanActivate, ExecutionContext, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Logger,
+} from '@nestjs/common';
 import { ApiKeysService } from '../api-keys.service';
+import { hasApiAccess } from '../../billing/constants/plans';
 
 /**
  * The principal an API key authenticates AS.
@@ -42,6 +49,19 @@ export interface ApiKeyPrincipal {
 export class ApiKeyGuard implements CanActivate {
   private readonly logger = new Logger(ApiKeyGuard.name);
 
+  /**
+   * One-shot latch for the "kill switch set to a value that does nothing" warn.
+   *
+   * The switch's whole purpose is emergency restoration under time pressure, so
+   * an operator who types `API_KEY_ENTITLEMENT_GATE_ENABLED=0` and sees nothing
+   * change has no signal to correct with. Warned once per process rather than
+   * per request — this is a config observation, not a per-request event, and at
+   * request rate it would drown the denial lines that matter.
+   *
+   * Only the WARN is latched. The gate decision itself stays call-time.
+   */
+  private killSwitchIgnoredValueWarned = false;
+
   constructor(private readonly apiKeysService: ApiKeysService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -52,6 +72,77 @@ export class ApiKeyGuard implements CanActivate {
 
     const keyRecord = await this.apiKeysService.validateKey(apiKey);
     if (!keyRecord) return false;
+
+    /**
+     * B2 entitlement gate — a stored key is not a standing licence.
+     *
+     * The credential stays valid forever; what is checked here is whether the
+     * org's CURRENT subscription includes API access. Downgrade therefore
+     * denies use without revoking anything, and a re-upgrade restores the same
+     * key. Auto-revoke would have destroyed a customer's integration secret on
+     * a billing event they might reverse the next day.
+     *
+     * This runs BEFORE `request.user` is bound below, so a denied request never
+     * acquires a tenant-scoped principal at all.
+     *
+     * THROWING is load-bearing, not stylistic. Returning `false` would be
+     * converted by JwtAuthGuard's api-key branch (auth/guards/jwt-auth.guard.ts:81-88)
+     * into `401 Invalid API key` — the wrong signal entirely for a perfectly
+     * valid credential whose plan lacks the entitlement, and one that sends
+     * integrators hunting a key-rotation bug. A thrown ForbiddenException
+     * propagates through that branch untouched and renders 403, matching the
+     * ScopesGuard precedent for "authenticated but not permitted".
+     *
+     * Kill switch: enabled by DEFAULT; only the exact string 'false' disables
+     * it (see `killSwitchIgnoredValueWarned` below — any other value leaves the
+     * gate ON and is warned about once).
+     *
+     * It exists because `subscriptionTier` is NOT reliably written on purchase.
+     * On the Razorpay path it is never written AT ALL: `handleCheckoutCompleted`
+     * early-returns for `provider !== 'stripe'` (billing.service.ts:1027),
+     * `handleSubscriptionUpdated` writes only `subscriptionStatus` (:845-850),
+     * and `razorpaySubscriptionId` is never assigned anywhere — only read or
+     * nulled — which also makes the plan-change write at :327 throw. So a
+     * paying Razorpay customer stays on tier 'free' and this gate denies them.
+     * Until that gap closes (backlog B3), granting API access requires a
+     * super-admin tier edit (`PATCH /api/v1/admin/organizations/:id`) or this
+     * kill switch.
+     *
+     * Read at CALL time, not module load, so an env change takes effect on
+     * reload — use the guarded procedure, `npx tsx scripts/ops/pm2-guard.ts
+     * app-reload --env production`, not a bare `pm2 reload --update-env`.
+     */
+    const gateSetting = process.env.API_KEY_ENTITLEMENT_GATE_ENABLED;
+    const gateDisabled = gateSetting === 'false';
+
+    // An empty value is "left at the default", not a typo — `.env.example`
+    // ships the key with no value, and dotenv loads that as ''.
+    const gateSettingProvided = gateSetting !== undefined && gateSetting !== '';
+
+    if (gateSettingProvided && !gateDisabled && !this.killSwitchIgnoredValueWarned) {
+      this.killSwitchIgnoredValueWarned = true;
+      this.logger.warn(
+        `API_KEY_ENTITLEMENT_GATE_ENABLED is set to "${gateSetting}", which is IGNORED — ` +
+          "the entitlement gate remains ACTIVE. Only the exact string 'false' disables it.",
+      );
+    }
+
+    if (!gateDisabled) {
+      // A missing organization relation should be impossible (FK-backed), so
+      // treat it as NOT entitled rather than as "nothing to check".
+      const org = keyRecord.organization;
+      if (!hasApiAccess(org?.subscriptionTier, org?.subscriptionStatus)) {
+        // §12b: a downgrade silently killing a live customer integration must
+        // be traceable. Ids and plan tokens only — never key material.
+        this.logger.warn(
+          `api_key_entitlement_denied org=${keyRecord.organizationId} keyId=${keyRecord.id} ` +
+            `tier=${org?.subscriptionTier ?? 'unknown'} status=${org?.subscriptionStatus ?? 'unknown'}`,
+        );
+        throw new ForbiddenException(
+          "API access is not included in your organization's current plan",
+        );
+      }
+    }
 
     /**
      * Bind the principal to `request.user`, which is the contract every

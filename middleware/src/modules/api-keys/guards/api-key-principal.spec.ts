@@ -31,6 +31,10 @@ describe('ApiKeyGuard — principal binding', () => {
     id: 'key-1',
     organizationId: 'org-A',
     scopes: ['content:read'],
+    // B2: binding only happens for an org whose plan includes API access, so
+    // these principal assertions presuppose an entitled org. The gate itself is
+    // covered in api-key.guard.spec.ts.
+    organization: { subscriptionTier: 'pro', subscriptionStatus: 'active' },
   };
 
   const buildGuard = () => {

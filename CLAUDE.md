@@ -55,7 +55,12 @@ npx nx build @vizora/realtime
 ```bash
 # Middleware unit tests (Jest, mocked DB)
 pnpm --filter @vizora/middleware test
-pnpm --filter @vizora/middleware test -- --testPathPattern=content.service  # single file
+# Filter by path REGEX. Pass the pattern positionally — `-- --testPathPattern=X`
+# does NOT work: everything after `--` is positional to jest, so it silently
+# treats the literal "--testPathPattern=X" as the regex, matches nothing (or the
+# wrong subset via an embedded `|`), and can report a false green.
+pnpm --filter @vizora/middleware test -- "content.service"
+pnpm --filter @vizora/middleware test -- "api-key|plans"   # alternation works
 
 # Middleware E2E tests (Jest, real DB via docker-compose.test.yml)
 pnpm --filter @vizora/middleware test:e2e
@@ -75,6 +80,24 @@ Playwright runs sequentially (1 worker) to avoid DB race conditions. Retries: 2 
 ## Key Architectural Patterns
 
 **Dual JWT authentication**: Separate secrets for users (`JWT_SECRET`) and display devices (`DEVICE_JWT_SECRET`). Devices authenticate via device-specific JWT in WebSocket handshake.
+
+**API-key entitlement is checked at AUTH time, never by revoking keys (B2)**: `ApiKeyGuard` is the
+only api-key authentication path (`JwtAuthGuard` delegates to it), so every current and future
+`@AllowApiKey()` route inherits the gate automatically — there is nothing per-route to wire. A
+downgrade leaves the key row untouched and simply denies USE with **403** (not 401 — the credential
+is valid, the plan is not); re-upgrading restores the same key with no reissue. The predicate is
+`hasApiAccess(tier, status)` in `billing/constants/plans.ts` — `API_ACCESS_TIERS` (pro/enterprise)
+is an allow-list that fails closed, `API_BLOCKED_STATUSES` (suspended/canceled) is a deny-list
+mirroring `SubscriptionActiveGuard`, so `past_due`/`publish_locked` keep working. **Changing
+`API_ACCESS_TIERS` is a product decision** — it silently breaks live customer integrations.
+**Creating a key is deliberately ungated in v1** — a free-tier admin can still mint one that will
+never authenticate (`api-keys.controller.ts` POST has `RolesGuard` only); warning at create time is
+a tracked UX follow-up, not an oversight. **The allow branch is currently unreachable for Razorpay
+customers**: `subscriptionTier` is never written on that purchase path (backlog B3), so they sit on
+tier `free` and are denied — granting access needs a super-admin tier edit
+(`PATCH /api/v1/admin/organizations/:id`) or the kill switch
+`API_KEY_ENTITLEMENT_GATE_ENABLED=false` (only that exact string works; anything else is ignored
+and warned about once).
 
 **WebSocket room architecture**: Realtime gateway uses `device:{deviceId}` and `org:{organizationId}` rooms. Devices join both on connect. Dashboard clients join org rooms for live status updates.
 
@@ -162,6 +185,12 @@ JWT_EXPIRES_IN          # Access-token lifetime, default 30m (short-lived; front
 REFRESH_TOKEN_TTL_DAYS  # Refresh-token session lifetime in days (default 30, clamped [1,365]). Opaque random token, sha256-hashed at rest; no separate secret.
 DEVICE_JWT_SECRET       # Device auth JWT secret (min 32 chars; separate from JWT_SECRET)
 MFA_ENCRYPTION_KEY      # AES-256-GCM key (min 32 chars) for TOTP-secret encryption at rest (auth #2). Fail-closed: MFA ops refuse to run if unset. Non-MFA login unaffected. Keep CONSTANT across deploys (rotating it orphans every stored TOTP secret).
+API_KEY_ENTITLEMENT_GATE_ENABLED  # B2 API-key entitlement gate. ENABLED BY DEFAULT (leave unset).
+                              #   Only the exact string 'false' disables it — 'true'/'0'/anything
+                              #   else is IGNORED and leaves it ON (warned once at startup).
+                              #   Emergency lever only: `subscriptionTier` is NEVER written on the
+                              #   Razorpay purchase path (see B3), so a paying Razorpay customer
+                              #   sits on tier 'free' and gets denied.
 INTERNAL_API_SECRET     # Required in prod — service-to-service auth (middleware ↔ realtime)
 BCRYPT_ROUNDS           # Password hashing rounds (10-15, default 12)
 GOOGLE_CLIENT_ID        # Optional — Google OAuth client ID

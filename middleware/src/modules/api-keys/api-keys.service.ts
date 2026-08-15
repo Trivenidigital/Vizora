@@ -54,7 +54,19 @@ export class ApiKeysService {
   }
 
   /**
-   * Validate an API key and return the key record if valid
+   * Validate an API key and return the key record if valid.
+   *
+   * The owning organization's entitlement fields are fetched here as part of
+   * ONE Prisma client call (B2). Note that `include` is not a SQL join on this
+   * Prisma version — without the `relationJoins` preview feature it issues a
+   * second statement — but that statement is a primary-key lookup selecting two
+   * columns, and it replaces a second round-trip the guard would otherwise have
+   * to make itself. No entitlement path in this codebase caches, so the read
+   * has to happen on each authenticated request either way.
+   *
+   * Fail-closed on infrastructure by construction: a DB error rejects this
+   * promise, the guard never sees a key, and the request is refused. There is
+   * no path where an outage yields an entitled-by-default answer.
    */
   async validateKey(plainKey: string) {
     const prefix = plainKey.slice(0, 8);
@@ -66,6 +78,11 @@ export class ApiKeysService {
         hashedKey,
         revokedAt: null,
         OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      include: {
+        organization: {
+          select: { subscriptionTier: true, subscriptionStatus: true },
+        },
       },
     });
   }
