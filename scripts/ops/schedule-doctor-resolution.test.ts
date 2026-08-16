@@ -12,6 +12,14 @@
  * leave prior incidents open, and it must SAY it is degraded rather than
  * silently entering a permanent no-resolution regime.
  *
+ * K24 adds the per-ITEM axis. Completeness is a per-RUN verdict — it says every
+ * entity was RETRIEVED, never that every retrieved entity was EVALUATED. Two
+ * skips inside the checks reach no verdict at all (an unparseable `endDate`, an
+ * undeterminable playlist item count) and used to clear their own incidents by
+ * simple non-re-raise. The four K24 tests pin BOTH directions: unexamined stays
+ * open, examined-and-fine still resolves. The second half is not optional —
+ * without it the fix degenerates into "nothing ever clears".
+ *
  * Spawn-harness pattern from tv-download-surface.test.ts: the real agent runs
  * as a child process against a fake API and a seeded ops-state.json.
  */
@@ -31,6 +39,13 @@ const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const COVERAGE_GAP_ID = 'schedule-doctor:coverage_gap:display-1';
 const ORPHAN_ID = 'schedule-doctor:orphan_schedule:sched-orphan';
 const TRUNCATED_ID = 'schedule-doctor:scan-truncated:entity-lists';
+
+// ── K24 per-ITEM ids ────────────────────────────────────────────────────────
+const EMPTY_PLAYLIST_ID = 'schedule-doctor:empty_playlist_schedule:sched-empty';
+const PAST_END_ID = 'schedule-doctor:past_end_schedule:sched-bad-date';
+const OK_PAST_END_ID = 'schedule-doctor:past_end_schedule:sched-ok';
+const OK_EMPTY_PLAYLIST_ID = 'schedule-doctor:empty_playlist_schedule:sched-ok';
+const DISABLED_GAP_ID = 'schedule-doctor:coverage_gap:display-disabled';
 
 interface Fixture {
   schedules: Record<string, unknown>[];
@@ -508,6 +523,237 @@ test('a later complete run clears a stale scan-truncated incident', async () => 
       const incident = readState(tmpRoot).incidents.find(i => i.id === TRUNCATED_ID);
       assert.ok(incident);
       assert.equal(incident.status, 'resolved');
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── K24: a schedule the run reached NO VERDICT on cannot clear its own ──────
+//
+// `scanComplete` is per-RUN and says every entity was retrieved. These two
+// skips happen INSIDE a check that ran, on a schedule that WAS retrieved, and
+// still produce no answer about it — so "not re-raised" means "nobody looked",
+// not "recovered". The K25 rule: fold the id into `currentIncidentIds`.
+
+test('K24: an UNKNOWN playlist item count leaves empty_playlist_schedule OPEN', async () => {
+  // `GET /playlists` normally hydrates `items` and derives `itemCount`, so the
+  // unknown branch is unreachable today — but its failure direction is silent
+  // clearing, and the old `?? -1` then `itemCount !== 0` guard treated an
+  // undeterminable count exactly like a playlist full of content. Slimming this
+  // list endpoint (dropping the heavy `items` array) is the obvious future
+  // optimization and is precisely what would arm it.
+  const fixture: Fixture = {
+    schedules: [
+      {
+        id: 'sched-empty',
+        name: 'Foyer Loop',
+        isActive: true,
+        displayId: 'display-1',
+        playlistId: 'pl-unknown',
+      },
+    ],
+    displays: [{ id: 'display-1', name: 'Lobby', currentPlaylistId: 'pl-unknown' }],
+    // Neither `itemCount` nor `items` — the count cannot be determined.
+    playlists: [{ id: 'pl-unknown', name: 'Mystery' }],
+  };
+
+  await withServer(fixture, async baseUrl => {
+    const tmpRoot = setupTmpRoot([
+      seedIncident({
+        id: EMPTY_PLAYLIST_ID,
+        type: 'empty_playlist_schedule',
+        target: 'schedule',
+        targetId: 'sched-empty',
+        message: 'Active schedule "Foyer Loop" references playlist "Mystery" with 0 items',
+      }),
+    ]);
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+
+      const incident = readState(tmpRoot).incidents.find(i => i.id === EMPTY_PLAYLIST_ID);
+      assert.ok(incident, 'the incident must still be tracked');
+      assert.equal(
+        incident.status,
+        'open',
+        `a schedule whose playlist item count could not be read must not clear its own finding\n${result.stdout}`,
+      );
+      assert.equal(incident.resolvedAt, undefined);
+      // Visibility (§12a): a withheld resolution that says nothing is the same
+      // class of invisible failure as the clearing it prevents.
+      assert.match(result.stdout, /skipped WITHOUT EVIDENCE/);
+      assert.match(result.stdout, /unknown playlist item count: 1/);
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+test('K24: a malformed endDate leaves past_end_schedule OPEN', async () => {
+  // The comparison that decides past-end never produced an answer. A bare
+  // `continue` made that ignorance read as recovery to the sweep.
+  const fixture: Fixture = {
+    schedules: [
+      {
+        id: 'sched-bad-date',
+        name: 'Holiday Hours',
+        isActive: true,
+        displayId: 'display-1',
+        endDate: 'not-a-date',
+      },
+    ],
+    displays: [{ id: 'display-1', name: 'Lobby', currentPlaylistId: 'pl-1' }],
+    playlists: [{ id: 'pl-1', name: 'Main', items: [{ contentId: 'c-1' }] }],
+  };
+
+  await withServer(fixture, async baseUrl => {
+    const tmpRoot = setupTmpRoot([
+      seedIncident({
+        id: PAST_END_ID,
+        type: 'past_end_schedule',
+        target: 'schedule',
+        targetId: 'sched-bad-date',
+        message: 'Schedule "Holiday Hours" is active but ended 2026-01-01',
+      }),
+    ]);
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+
+      const incident = readState(tmpRoot).incidents.find(i => i.id === PAST_END_ID);
+      assert.ok(incident, 'the incident must still be tracked');
+      assert.equal(
+        incident.status,
+        'open',
+        `a schedule whose endDate would not parse must not clear its own finding\n${result.stdout}`,
+      );
+      assert.equal(incident.resolvedAt, undefined);
+      assert.match(result.stdout, /unparseable endDate: 1/);
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── K24 OVER-CORRECTION GUARD — the other half of the rule ──────────────────
+
+test('K24: skips that CARRY evidence still resolve their incidents', async () => {
+  // Without this, the fix degenerates into "nothing ever resolves" — which is
+  // the exact defect the resolution sweep was added to remove, reintroduced
+  // from the opposite side. Three evidence-bearing skips in one run:
+  //
+  //   1. `sched-ok` has a VALID endDate in the future — check 1 evaluated it
+  //      and found it fine, so `past_end_schedule:sched-ok` must clear.
+  //   2. `pl-1` reports content — check 3 evaluated it, so
+  //      `empty_playlist_schedule:sched-ok` must clear.
+  //   3. `display-disabled` is operator-disabled and filtered out before check
+  //      4 (#259). That drop is deliberate and evidence-bearing, so
+  //      `coverage_gap:display-disabled` must clear.
+  //
+  // None of these is a blind spot; each is a real answer about the item.
+  const future = new Date(Date.now() + 30 * 86_400_000).toISOString();
+  const fixture: Fixture = {
+    schedules: [
+      {
+        id: 'sched-ok',
+        name: 'Daytime',
+        isActive: true,
+        displayId: 'display-1',
+        playlistId: 'pl-1',
+        endDate: future,
+      },
+    ],
+    displays: [
+      { id: 'display-1', name: 'Lobby', currentPlaylistId: 'pl-1' },
+      { id: 'display-disabled', name: 'Storeroom', isDisabled: true },
+    ],
+    playlists: [{ id: 'pl-1', name: 'Main', items: [{ contentId: 'c-1' }] }],
+  };
+
+  await withServer(fixture, async baseUrl => {
+    const tmpRoot = setupTmpRoot([
+      seedIncident({
+        id: OK_PAST_END_ID,
+        type: 'past_end_schedule',
+        target: 'schedule',
+        targetId: 'sched-ok',
+        message: 'Schedule "Daytime" is active but ended',
+      }),
+      seedIncident({
+        id: OK_EMPTY_PLAYLIST_ID,
+        type: 'empty_playlist_schedule',
+        target: 'schedule',
+        targetId: 'sched-ok',
+        message: 'Active schedule "Daytime" references playlist "Main" with 0 items',
+      }),
+      seedIncident({
+        id: DISABLED_GAP_ID,
+        targetId: 'display-disabled',
+        message: 'Display "Storeroom" has no currentPlaylistId and no active schedule',
+      }),
+    ]);
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+      assert.equal(result.code, 0, `${result.stderr}\n${result.stdout}`);
+
+      const state = readState(tmpRoot);
+      for (const id of [OK_PAST_END_ID, OK_EMPTY_PLAYLIST_ID, DISABLED_GAP_ID]) {
+        const incident = state.incidents.find(i => i.id === id);
+        assert.ok(incident, `${id} must still be tracked`);
+        assert.equal(
+          incident.status,
+          'resolved',
+          `${id} was skipped for a REASON — treating every skip as blind makes this type accumulate forever\n${result.stdout}`,
+        );
+      }
+      assert.doesNotMatch(
+        result.stdout,
+        /skipped WITHOUT EVIDENCE/,
+        'nothing in this run was a blind spot',
+      );
+      assert.equal(state.systemStatus, 'HEALTHY', 'clearing all three must un-pin systemStatus');
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+test('K24: a playlist that now reports content resolves empty_playlist_schedule', async () => {
+  // The direct recovery counterpart to the unknown-count test above: same
+  // schedule, same playlist id, same incident id — the ONLY difference is that
+  // the playlist now carries items. This is the regression guard that keeps the
+  // fix from being "hold everything open".
+  const fixture: Fixture = {
+    schedules: [
+      {
+        id: 'sched-empty',
+        name: 'Foyer Loop',
+        isActive: true,
+        displayId: 'display-1',
+        playlistId: 'pl-unknown',
+      },
+    ],
+    displays: [{ id: 'display-1', name: 'Lobby', currentPlaylistId: 'pl-unknown' }],
+    playlists: [{ id: 'pl-unknown', name: 'Mystery', items: [{ contentId: 'c-1' }] }],
+  };
+
+  await withServer(fixture, async baseUrl => {
+    const tmpRoot = setupTmpRoot([
+      seedIncident({
+        id: EMPTY_PLAYLIST_ID,
+        type: 'empty_playlist_schedule',
+        target: 'schedule',
+        targetId: 'sched-empty',
+        message: 'Active schedule "Foyer Loop" references playlist "Mystery" with 0 items',
+      }),
+    ]);
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+      assert.equal(result.code, 0, `${result.stderr}\n${result.stdout}`);
+
+      const incident = readState(tmpRoot).incidents.find(i => i.id === EMPTY_PLAYLIST_ID);
+      assert.ok(incident);
+      assert.equal(incident.status, 'resolved', 'the operator added content — this must clear');
+      assert.ok(incident.resolvedAt, 'resolvedAt must be stamped');
     } finally {
       rmSync(tmpRoot, { recursive: true, force: true });
     }
