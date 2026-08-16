@@ -44,20 +44,35 @@ function ifBlockBody(code: string, condition: string): string {
 }
 
 test('checkOrphanedContent is called ONCE, and only from inside the completeness gate', () => {
-  const calls = source.match(/^\s*await checkOrphanedContent\(/gm) ?? [];
+  // Deliberately NOT anchored to `^\s*await ` — that shape of guard is satisfied
+  // by an ungated `void checkOrphanedContent(...)`, `return checkOrphanedContent(...)`,
+  // or a call wrapped across lines, all of which leave the destructive path
+  // ungated while the test stays green. Count EVERY invocation instead.
+  const invocations = source.match(/checkOrphanedContent\s*\(/g) ?? [];
   assert.equal(
-    calls.length,
-    1,
-    `expected exactly one call site, found ${calls.length} — every one of them must be gated`,
+    invocations.length,
+    2,
+    `expected exactly 2 occurrences of \`checkOrphanedContent(\` — the declaration and the ` +
+      `single gated call — but found ${invocations.length}. Any additional one is either a ` +
+      `second call site (which must also be gated) or an un-gated rewrite of the existing one.`,
   );
 
   const gated = ifBlockBody(source, 'counters.contentScanComplete');
-  assert.match(
-    gated,
-    /await checkOrphanedContent\(/,
+  assert.equal(
+    (gated.match(/checkOrphanedContent\s*\(/g) ?? []).length,
+    1,
     'the archive check must run INSIDE `if (counters.contentScanComplete)`. ' +
       'Un-gated, it archives customer content against a knowingly-partial reference universe, ' +
       'and archiving stops delivery to screens.',
+  );
+
+  // Pin that the 2 counted above are exactly {declaration, gated call} — without
+  // this, a file with two declarations and zero calls would also total 2.
+  assert.match(source, /^async function checkOrphanedContent\(/m, 'the declaration must exist');
+  assert.equal(
+    (source.match(/^async function checkOrphanedContent\(/gm) ?? []).length,
+    1,
+    'exactly one declaration',
   );
 });
 

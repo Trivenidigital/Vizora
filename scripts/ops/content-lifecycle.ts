@@ -341,7 +341,7 @@ async function checkExpiredContent(
 /**
  * Collect the `contentId`s a layout pins directly into its zones.
  *
- * Shape: `metadata.zones[].contentId`, resolved by `resolveZoneReferences` in
+ * Shape: `metadata.zones[].contentId`, resolved by `resolveLayoutZones` in
  * packages/database/src/lib/effective-content.ts:250-257 and then filtered by
  * `isDeliverable` (:85-93) — so a zone-pinned content that goes `archived`
  * resolves to `null` and BLANKS THAT ZONE on live glass. Tolerant by design:
@@ -512,14 +512,24 @@ async function checkOrphanedContent(
     // Harvested here because it is absent from `CONTENT_LIST_SELECT`.
     //
     // KNOWN RESIDUAL, stated plainly rather than implied covered: this harvests
-    // the replacement pointers of the LAYOUTS and the CANDIDATES only, because
-    // those are the only details this run reads. A referrer that is itself not a
-    // candidate (younger than the cutoff, already archived, or held by a
-    // playlist) still hides its `replacementContentId` from us, and its target
-    // can still be archived. Closing that needs the reverse edge server-side —
-    // `Content.replacedBy` is already a Prisma relation — which is the
-    // `GET /content/orphan-candidates` backlog row, not something the page-walk
-    // can be talked into answering.
+    // the replacement pointers of the LAYOUTS and the CONFIRMED CANDIDATES only,
+    // because those are the only details this run reads. A referrer whose detail
+    // is never read still hides its `replacementContentId` from us, and its
+    // target can still be archived. Four ways to be that referrer:
+    //
+    //   - younger than the cutoff
+    //   - already archived
+    //   - held by a playlist
+    //   - DEFERRED PAST `MAX_ARCHIVE_CANDIDATES_PER_RUN` — pass 1 reads details
+    //     for the first 100 candidates only, so candidate #120 is an ORDINARY
+    //     candidate whose pointer is simply not read this cycle. If it points at
+    //     candidate #5, #5 is archived and #120's expiry swap lands on archived
+    //     content. This one is introduced by the per-run cap added in this
+    //     change, so it is named rather than left for the next reader to find.
+    //
+    // Closing all four needs the reverse edge server-side — `Content.replacedBy`
+    // is already a Prisma relation — which is the `GET /content/orphan-candidates`
+    // backlog row (K21), not something the page-walk can be talked into answering.
     if (typeof detail.replacementContentId === 'string' && detail.replacementContentId) {
       referencedIds.add(detail.replacementContentId);
     }

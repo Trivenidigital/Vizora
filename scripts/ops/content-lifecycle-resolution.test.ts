@@ -713,7 +713,7 @@ test('ARCHIVE 501 content, complete playlists: nothing referenced is archived', 
 test('ARCHIVE GAP-1: content pinned into a layout zone is not archived', async () => {
   // Live-reachable at ANY tenant size — no truncation needed. A `type:'layout'`
   // content pins other content through `metadata.zones[].contentId`, which
-  // `resolveZoneReferences` resolves and `isDeliverable` then drops if it is not
+  // `resolveLayoutZones` resolves and `isDeliverable` then drops if it is not
   // active. Archiving `zone-pinned` therefore BLANKS THAT ZONE on live glass.
   //
   // The agent could not even see this: `CONTENT_LIST_SELECT` omits `metadata`,
@@ -922,7 +922,46 @@ test('ARCHIVE: a playlist edit landing mid-run is seen by the per-item confirm',
   });
 });
 
-// ─── 11. A SKIPPED check resolves nothing ───────────────────────────────────
+// ─── 11. The confirm read itself failing ────────────────────────────────────
+
+test('ARCHIVE: a candidate whose confirm read FAILS is not archived', async () => {
+  // The single question this whole change turns on — does the per-candidate
+  // confirmation fail OPEN or CLOSED? — and until now it was verified only by
+  // reading the code. `OpsApiClient.get` throws on any non-2xx, the catch
+  // `continue`s without pushing to `confirmed`, and the archive loop iterates
+  // `orphans ⊆ confirmed`, so an unconfirmed candidate is structurally
+  // unreachable from the write. This drives that path for real.
+  //
+  // `other` must still be archived: without it the assertion is satisfied by an
+  // agent that gives up on the whole batch after one failure, which is a
+  // different (and worse) behaviour than skipping the one item.
+  //
+  // MUTATION KILLED: change the confirm catch's `continue` to a fall-through and
+  // `the-orphan` is archived on the strength of a read that never answered.
+  const f = fixture({
+    content: [contentItem({ id: 'the-orphan' }), contentItem({ id: 'other' })],
+    playlists: [],
+    failDetail: ['the-orphan'],
+  });
+
+  await withServer(f, async (baseUrl, h) => {
+    const tmpRoot = setupTmpRoot();
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+      assert.deepEqual(
+        h.archived,
+        ['other'],
+        `an unconfirmed candidate must never be archived, and one failure must not ` +
+          `abandon the rest of the batch\n${result.stdout}`,
+      );
+      assert.match(result.stdout, /could not confirm it is unreferenced/);
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── 12. A SKIPPED check resolves nothing ───────────────────────────────────
 
 test('ARCHIVE: an unreadable layout fails closed and clears no orphan finding', async () => {
   // The case the two coverage keys exist to separate, and the ONLY one where
