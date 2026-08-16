@@ -1,0 +1,3664 @@
+[
+  {
+    "route": "/dashboard",
+    "theme": "light",
+    "viewport": 1440,
+    "screenshot": "dashboard__light__1440.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#007e58",
+      "where": "scope",
+      "ratio": 4.35,
+      "passes": true
+    },
+    "docScrollWidth": 1440,
+    "docClientWidth": 1440,
+    "clipped": [],
+    "contrast": [
+      {
+        "el": "p.text-sm.text-success-600.dark:text-success-400.font-medium",
+        "text": "5 online",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "14px",
+        "weight": 500,
+        "ratio": 3.3,
+        "required": 4.5
+      }
+    ],
+    "touch": []
+  },
+  {
+    "route": "/dashboard/devices",
+    "theme": "light",
+    "viewport": 1440,
+    "screenshot": "dashboard-devices__light__1440.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#007e58",
+      "where": "scope",
+      "ratio": 4.35,
+      "passes": true
+    },
+    "docScrollWidth": 1440,
+    "docClientWidth": 1440,
+    "clipped": [],
+    "contrast": [
+      {
+        "el": "div.px-2.py-1.rounded-md.text-xs",
+        "text": "Online",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(220, 252, 231)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 3,
+        "required": 4.5
+      },
+      {
+        "el": "div.px-2.py-1.rounded-md.text-xs",
+        "text": "Error",
+        "color": "rgb(234, 88, 12)",
+        "bg": "rgb(255, 237, 213)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 3.11,
+        "required": 4.5
+      },
+      {
+        "el": "div.px-2.py-1.rounded-md.text-xs",
+        "text": "Offline",
+        "color": "rgb(220, 38, 38)",
+        "bg": "rgb(254, 226, 226)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 3.95,
+        "required": 4.5
+      },
+      {
+        "el": "div.eh-badge.flex.items-center.gap-1",
+        "text": "Live",
+        "color": "rgb(0, 126, 88)",
+        "bg": "rgb(210, 237, 231)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 4.12,
+        "required": 4.5
+      },
+      {
+        "el": "div.px-2.py-1.rounded-md.text-xs",
+        "text": "Pairing",
+        "color": "rgb(37, 99, 235)",
+        "bg": "rgb(219, 234, 254)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 4.24,
+        "required": 4.5
+      }
+    ],
+    "touch": []
+  },
+  {
+    "route": "/dashboard/playlists",
+    "theme": "light",
+    "viewport": 1440,
+    "screenshot": "dashboard-playlists__light__1440.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#007e58",
+      "where": "scope",
+      "ratio": 4.35,
+      "passes": true
+    },
+    "docScrollWidth": 1440,
+    "docClientWidth": 1440,
+    "clipped": [],
+    "contrast": [
+      {
+        "el": "span",
+        "text": "1  device",
+        "color": "rgb(0, 229, 160)",
+        "bg": "rgb(230, 252, 246)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 1.55,
+        "required": 4.5
+      },
+      {
+        "el": "span",
+        "text": "2  devices",
+        "color": "rgb(0, 229, 160)",
+        "bg": "rgb(230, 252, 246)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 1.55,
+        "required": 4.5
+      },
+      {
+        "el": "span",
+        "text": "3  devices",
+        "color": "rgb(0, 229, 160)",
+        "bg": "rgb(230, 252, 246)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 1.55,
+        "required": 4.5
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "text": "Edit",
+        "color": "rgb(0, 229, 160)",
+        "bg": "rgb(242, 254, 250)",
+        "fontSize": "14px",
+        "weight": 500,
+        "ratio": 1.6,
+        "required": 4.5
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "text": "Assign",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(233, 249, 239)",
+        "fontSize": "14px",
+        "weight": 500,
+        "ratio": 3.03,
+        "required": 4.5
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "text": "Delete",
+        "color": "rgb(220, 38, 38)",
+        "bg": "rgb(253, 236, 236)",
+        "fontSize": "14px",
+        "weight": 500,
+        "ratio": 4.24,
+        "required": 4.5
+      }
+    ],
+    "touch": []
+  },
+  {
+    "route": "/dashboard/content",
+    "theme": "light",
+    "viewport": 1440,
+    "screenshot": "dashboard-content__light__1440.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#007e58",
+      "where": "scope",
+      "ratio": 4.35,
+      "passes": true
+    },
+    "docScrollWidth": 1440,
+    "docClientWidth": 1440,
+    "clipped": [],
+    "contrast": [
+      {
+        "el": "button.flex.items-center.gap-1.px-2",
+        "text": "New Folder",
+        "color": "rgb(0, 229, 160)",
+        "bg": "rgb(230, 252, 246)",
+        "fontSize": "12px",
+        "weight": 500,
+        "ratio": 1.55,
+        "required": 4.5
+      },
+      {
+        "el": "span.text-sm.font-medium",
+        "text": "All Content",
+        "color": "rgb(0, 229, 160)",
+        "bg": "rgb(230, 252, 246)",
+        "fontSize": "14px",
+        "weight": 500,
+        "ratio": 1.55,
+        "required": 4.5
+      }
+    ],
+    "touch": []
+  },
+  {
+    "route": "/dashboard/schedules",
+    "theme": "light",
+    "viewport": 1440,
+    "screenshot": "dashboard-schedules__light__1440.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#007e58",
+      "where": "scope",
+      "ratio": 4.35,
+      "passes": true
+    },
+    "docScrollWidth": 1440,
+    "docClientWidth": 1440,
+    "clipped": [],
+    "contrast": [],
+    "touch": []
+  },
+  {
+    "route": "/dashboard/analytics",
+    "theme": "light",
+    "viewport": 1440,
+    "screenshot": "dashboard-analytics__light__1440.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#007e58",
+      "where": "scope",
+      "ratio": 4.35,
+      "passes": true
+    },
+    "docScrollWidth": 1440,
+    "docClientWidth": 1440,
+    "clipped": [],
+    "contrast": [
+      {
+        "el": "button.px-4.py-2.rounded-lg.font-medium",
+        "text": "month",
+        "color": "rgb(255, 255, 255)",
+        "bg": "rgb(0, 204, 142)",
+        "fontSize": "16px",
+        "weight": 500,
+        "ratio": 2.09,
+        "required": 4.5
+      },
+      {
+        "el": "span.recharts-legend-item-text",
+        "text": "Video impressions",
+        "color": "rgb(0, 204, 142)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 2.09,
+        "required": 4.5
+      },
+      {
+        "el": "span.recharts-legend-item-text",
+        "text": "Stored content size (MB)",
+        "color": "rgb(0, 204, 142)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 2.09,
+        "required": 4.5
+      },
+      {
+        "el": "p.text-sm.mt-2.text-[var(--accent-warm)]",
+        "text": "5/9 devices online",
+        "color": "rgb(245, 158, 11)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "14px",
+        "weight": 400,
+        "ratio": 2.15,
+        "required": 4.5
+      },
+      {
+        "el": "tspan",
+        "text": "1%",
+        "color": "rgb(245, 158, 11)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 2.15,
+        "required": 4.5
+      },
+      {
+        "el": "span.recharts-legend-item-text",
+        "text": "Pairing",
+        "color": "rgb(245, 158, 11)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 2.15,
+        "required": 4.5
+      },
+      {
+        "el": "span.recharts-legend-item-text",
+        "text": "HTML impressions",
+        "color": "rgb(245, 158, 11)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 2.15,
+        "required": 4.5
+      },
+      {
+        "el": "tspan",
+        "text": "5%",
+        "color": "rgb(16, 185, 129)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 2.54,
+        "required": 4.5
+      },
+      {
+        "el": "span.recharts-legend-item-text",
+        "text": "Online",
+        "color": "rgb(16, 185, 129)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 2.54,
+        "required": 4.5
+      },
+      {
+        "el": "span.ml-2.inline-flex.items-center.gap-1",
+        "text": "Realtime connection active",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(233, 238, 239)",
+        "fontSize": "12px",
+        "weight": 400,
+        "ratio": 2.82,
+        "required": 4.5
+      },
+      {
+        "el": "div.eh-badge.eh-badge-info.px-2.py-0.5",
+        "text": "Last 30 Days",
+        "color": "rgb(0, 151, 184)",
+        "bg": "rgb(230, 248, 251)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 3.12,
+        "required": 4.5
+      },
+      {
+        "el": "span.recharts-legend-item-text",
+        "text": "Image impressions",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 3.3,
+        "required": 4.5
+      },
+      {
+        "el": "span.recharts-legend-item-text",
+        "text": "Other impressions",
+        "color": "rgb(0, 151, 184)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 3.43,
+        "required": 4.5
+      },
+      {
+        "el": "tspan",
+        "text": "1%",
+        "color": "rgb(239, 68, 68)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 3.76,
+        "required": 4.5
+      },
+      {
+        "el": "span.recharts-legend-item-text",
+        "text": "Error",
+        "color": "rgb(239, 68, 68)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 3.76,
+        "required": 4.5
+      }
+    ],
+    "touch": []
+  },
+  {
+    "route": "/dashboard/settings",
+    "theme": "light",
+    "viewport": 1440,
+    "screenshot": "dashboard-settings__light__1440.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#007e58",
+      "where": "scope",
+      "ratio": 4.35,
+      "passes": true
+    },
+    "docScrollWidth": 1440,
+    "docClientWidth": 1440,
+    "clipped": [],
+    "contrast": [
+      {
+        "el": "span.text-2xl.font-bold",
+        "text": "Northwind Coffee Roasters",
+        "color": "rgb(0, 229, 160)",
+        "bg": "rgb(233, 238, 239)",
+        "fontSize": "24px",
+        "weight": 700,
+        "ratio": 1.41,
+        "required": 3
+      },
+      {
+        "el": "button.w-full.px-4.py-3.text-sm",
+        "text": "Change Password",
+        "color": "rgb(0, 229, 160)",
+        "bg": "rgb(242, 254, 250)",
+        "fontSize": "14px",
+        "weight": 500,
+        "ratio": 1.6,
+        "required": 4.5
+      },
+      {
+        "el": "button.w-full.px-4.py-3.text-sm",
+        "text": "Delete Account",
+        "color": "rgb(220, 38, 38)",
+        "bg": "rgb(254, 242, 242)",
+        "fontSize": "14px",
+        "weight": 500,
+        "ratio": 4.41,
+        "required": 4.5
+      }
+    ],
+    "touch": []
+  },
+  {
+    "route": "/dashboard/settings/team",
+    "theme": "light",
+    "viewport": 1440,
+    "screenshot": "dashboard-settings-team__light__1440.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#007e58",
+      "where": "scope",
+      "ratio": 4.35,
+      "passes": true
+    },
+    "docScrollWidth": 1440,
+    "docClientWidth": 1440,
+    "clipped": [],
+    "contrast": [
+      {
+        "el": "div.w-8.h-8.bg-[#00E5A0]/10.rounded-full",
+        "text": "D W",
+        "color": "rgb(0, 229, 160)",
+        "bg": "rgb(230, 252, 246)",
+        "fontSize": "14px",
+        "weight": 600,
+        "ratio": 1.55,
+        "required": 4.5
+      }
+    ],
+    "touch": []
+  },
+  {
+    "route": "/dashboard/settings/billing",
+    "theme": "light",
+    "viewport": 1440,
+    "screenshot": "dashboard-settings-billing__light__1440.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#007e58",
+      "where": "scope",
+      "ratio": 4.35,
+      "passes": true
+    },
+    "docScrollWidth": 1440,
+    "docClientWidth": 1440,
+    "clipped": [],
+    "contrast": [
+      {
+        "el": "a.text-[#00E5A0].hover:text-[#00E5A0].dark:text-[#00E5A0].dark:hover:text-[#00CC8E]",
+        "text": "View Invoice History",
+        "color": "rgb(0, 229, 160)",
+        "bg": "rgb(233, 238, 239)",
+        "fontSize": "14px",
+        "weight": 500,
+        "ratio": 1.41,
+        "required": 4.5
+      },
+      {
+        "el": "span.inline-flex.items-center.px-2.5.py-0.5",
+        "text": "Active",
+        "color": "rgb(34, 197, 94)",
+        "bg": "rgb(233, 249, 239)",
+        "fontSize": "12px",
+        "weight": 500,
+        "ratio": 2.09,
+        "required": 4.5
+      }
+    ],
+    "touch": []
+  },
+  {
+    "route": "/dashboard",
+    "theme": "light",
+    "viewport": 390,
+    "screenshot": "dashboard__light__390.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#007e58",
+      "where": "scope",
+      "ratio": 4.35,
+      "passes": true
+    },
+    "docScrollWidth": 390,
+    "docClientWidth": 390,
+    "clipped": [
+      {
+        "el": "div.flex.items-center.gap-4",
+        "right": 404,
+        "overBy": 14,
+        "cause": "hidden-by:document"
+      }
+    ],
+    "contrast": [
+      {
+        "el": "p.text-sm.text-success-600.dark:text-success-400.font-medium",
+        "text": "5 online",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "14px",
+        "weight": 500,
+        "ratio": 3.3,
+        "required": 4.5
+      }
+    ],
+    "touch": [
+      {
+        "el": "button.p-2.rounded-md.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.relative.p-2.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      }
+    ]
+  },
+  {
+    "route": "/dashboard/devices",
+    "theme": "light",
+    "viewport": 390,
+    "screenshot": "dashboard-devices__light__390.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {message: rate_limited}"
+    ],
+    "focusRing": {
+      "color": "#007e58",
+      "where": "scope",
+      "ratio": 4.35,
+      "passes": true
+    },
+    "docScrollWidth": 390,
+    "docClientWidth": 390,
+    "clipped": [
+      {
+        "el": "div.flex.items-center.gap-4",
+        "right": 404,
+        "overBy": 14,
+        "cause": "hidden-by:document"
+      },
+      {
+        "el": "div.flex.items-center.gap-3",
+        "right": 646,
+        "overBy": 256,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "button.eh-btn-danger.rounded-xl.px-4.py-3",
+        "right": 501,
+        "overBy": 111,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "svg.lucide.lucide-alert-triangle.text-white",
+        "right": 392,
+        "overBy": 2,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      }
+    ],
+    "contrast": [
+      {
+        "el": "div.px-2.py-1.rounded-md.text-xs",
+        "text": "Online",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(220, 252, 231)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 3,
+        "required": 4.5
+      },
+      {
+        "el": "div.px-2.py-1.rounded-md.text-xs",
+        "text": "Error",
+        "color": "rgb(234, 88, 12)",
+        "bg": "rgb(255, 237, 213)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 3.11,
+        "required": 4.5
+      },
+      {
+        "el": "div.px-2.py-1.rounded-md.text-xs",
+        "text": "Offline",
+        "color": "rgb(220, 38, 38)",
+        "bg": "rgb(254, 226, 226)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 3.95,
+        "required": 4.5
+      },
+      {
+        "el": "div.eh-badge.flex.items-center.gap-1",
+        "text": "Live",
+        "color": "rgb(0, 126, 88)",
+        "bg": "rgb(210, 237, 231)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 4.12,
+        "required": 4.5
+      },
+      {
+        "el": "div.px-2.py-1.rounded-md.text-xs",
+        "text": "Pairing",
+        "color": "rgb(37, 99, 235)",
+        "bg": "rgb(219, 234, 254)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 4.24,
+        "required": 4.5
+      }
+    ],
+    "touch": [
+      {
+        "el": "button.p-2.rounded-md.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.relative.p-2.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "a.inline-flex.items-center.text-[var(--foreground-secondary)].hover:text-[#00E5A0]",
+        "w": 95,
+        "h": 20
+      },
+      {
+        "el": "input.eh-input.!pl-10.!pr-10",
+        "w": 342,
+        "h": 43
+      },
+      {
+        "el": "input.rounded.border-[var(--border)].text-[#00E5A0].focus:ring-[#00E5A0]",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "el": "input.rounded.border-[var(--border)].text-[#00E5A0].focus:ring-[#00E5A0]",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "el": "select.text-sm.border.border-[var(--border)].rounded-lg",
+        "w": 161,
+        "h": 34
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 63,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 38,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 37,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn.eh-icon-btn-danger",
+        "w": 55,
+        "h": 32
+      },
+      {
+        "el": "input.rounded.border-[var(--border)].text-[#00E5A0].focus:ring-[#00E5A0]",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "el": "select.text-sm.border.border-[var(--border)].rounded-lg",
+        "w": 161,
+        "h": 34
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 63,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 38,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 37,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn.eh-icon-btn-danger",
+        "w": 55,
+        "h": 32
+      },
+      {
+        "el": "input.rounded.border-[var(--border)].text-[#00E5A0].focus:ring-[#00E5A0]",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "el": "select.text-sm.border.border-[var(--border)].rounded-lg",
+        "w": 161,
+        "h": 34
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 63,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 38,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 37,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn.eh-icon-btn-danger",
+        "w": 55,
+        "h": 32
+      },
+      {
+        "el": "input.rounded.border-[var(--border)].text-[#00E5A0].focus:ring-[#00E5A0]",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "el": "select.text-sm.border.border-[var(--border)].rounded-lg",
+        "w": 161,
+        "h": 34
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 63,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 38,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 37,
+        "h": 32
+      }
+    ]
+  },
+  {
+    "route": "/dashboard/playlists",
+    "theme": "light",
+    "viewport": 390,
+    "screenshot": "dashboard-playlists__light__390.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {message: rate_limited}"
+    ],
+    "focusRing": {
+      "color": "#007e58",
+      "where": "scope",
+      "ratio": 4.35,
+      "passes": true
+    },
+    "docScrollWidth": 390,
+    "docClientWidth": 390,
+    "clipped": [
+      {
+        "el": "div.flex.items-center.gap-4",
+        "right": 404,
+        "overBy": 14,
+        "cause": "hidden-by:document"
+      },
+      {
+        "el": "div.flex.flex-col.items-end.gap-2",
+        "right": 401,
+        "overBy": 11,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "span.px-3.py-1.text-xs.font-semibold",
+        "right": 401,
+        "overBy": 11,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "div.flex.flex-col.items-end.gap-2",
+        "right": 400,
+        "overBy": 10,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "span.px-3.py-1.text-xs.font-semibold",
+        "right": 400,
+        "overBy": 10,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "div.flex.flex-col.items-end.gap-2",
+        "right": 413,
+        "overBy": 23,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "span.px-3.py-1.text-xs.font-semibold",
+        "right": 413,
+        "overBy": 23,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "span",
+        "right": 401,
+        "overBy": 11,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "div.flex.flex-col.items-end.gap-2",
+        "right": 402,
+        "overBy": 12,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "span.px-3.py-1.text-xs.font-semibold",
+        "right": 402,
+        "overBy": 12,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      }
+    ],
+    "contrast": [
+      {
+        "el": "span",
+        "text": "1  device",
+        "color": "rgb(0, 229, 160)",
+        "bg": "rgb(230, 252, 246)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 1.55,
+        "required": 4.5
+      },
+      {
+        "el": "span",
+        "text": "2  devices",
+        "color": "rgb(0, 229, 160)",
+        "bg": "rgb(230, 252, 246)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 1.55,
+        "required": 4.5
+      },
+      {
+        "el": "span",
+        "text": "3  devices",
+        "color": "rgb(0, 229, 160)",
+        "bg": "rgb(230, 252, 246)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 1.55,
+        "required": 4.5
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "text": "Edit",
+        "color": "rgb(0, 229, 160)",
+        "bg": "rgb(242, 254, 250)",
+        "fontSize": "14px",
+        "weight": 500,
+        "ratio": 1.6,
+        "required": 4.5
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "text": "Assign",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(233, 249, 239)",
+        "fontSize": "14px",
+        "weight": 500,
+        "ratio": 3.03,
+        "required": 4.5
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "text": "Delete",
+        "color": "rgb(220, 38, 38)",
+        "bg": "rgb(253, 236, 236)",
+        "fontSize": "14px",
+        "weight": 500,
+        "ratio": 4.24,
+        "required": 4.5
+      }
+    ],
+    "touch": [
+      {
+        "el": "button.p-2.rounded-md.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.relative.p-2.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "a.inline-flex.items-center.text-[var(--foreground-secondary)].hover:text-[#00E5A0]",
+        "w": 95,
+        "h": 20
+      },
+      {
+        "el": "input.eh-input.!pl-10.!pr-10",
+        "w": 342,
+        "h": 43
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 292,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 292,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 292,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 292,
+        "h": 36
+      }
+    ]
+  },
+  {
+    "route": "/dashboard/content",
+    "theme": "light",
+    "viewport": 390,
+    "screenshot": "dashboard-content__light__390.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {message: rate_limited}"
+    ],
+    "focusRing": {
+      "color": "#007e58",
+      "where": "scope",
+      "ratio": 4.35,
+      "passes": true
+    },
+    "docScrollWidth": 390,
+    "docClientWidth": 390,
+    "clipped": [
+      {
+        "el": "div.flex.items-center.gap-4",
+        "right": 404,
+        "overBy": 14,
+        "cause": "hidden-by:document"
+      }
+    ],
+    "contrast": [],
+    "touch": [
+      {
+        "el": "button.p-2.rounded-md.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.relative.p-2.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "a.inline-flex.items-center.text-[var(--foreground-secondary)].hover:text-[#00E5A0]",
+        "w": 95,
+        "h": 20
+      },
+      {
+        "el": "input.eh-input.!pl-10.!pr-10",
+        "w": 260,
+        "h": 43
+      },
+      {
+        "el": "button.eh-filter-pill.eh-filter-pill-active",
+        "w": 44,
+        "h": 32
+      },
+      {
+        "el": "button.eh-filter-pill",
+        "w": 65,
+        "h": 32
+      },
+      {
+        "el": "button.eh-filter-pill",
+        "w": 64,
+        "h": 32
+      },
+      {
+        "el": "button.eh-filter-pill",
+        "w": 48,
+        "h": 32
+      },
+      {
+        "el": "button.eh-filter-pill",
+        "w": 45,
+        "h": 32
+      },
+      {
+        "el": "button.eh-filter-pill.flex.items-center.gap-1.5",
+        "w": 56,
+        "h": 32
+      },
+      {
+        "el": "button.eh-filter-pill.flex.items-center.gap-1.5",
+        "w": 86,
+        "h": 32
+      },
+      {
+        "el": "button.px-3.5.py-2.text-sm.font-medium",
+        "w": 48,
+        "h": 36
+      },
+      {
+        "el": "button.px-3.5.py-2.text-sm.font-medium",
+        "w": 48,
+        "h": 36
+      },
+      {
+        "el": "button.flex.items-center.gap-1.px-2",
+        "w": 110,
+        "h": 28
+      },
+      {
+        "el": "button.eh-btn-secondary.px-3.py-1.5.text-sm",
+        "w": 79,
+        "h": 32
+      },
+      {
+        "el": "button.eh-btn-secondary.px-3.py-1.5.text-sm",
+        "w": 54,
+        "h": 32
+      },
+      {
+        "el": "input.w-5.h-5.rounded.border-[var(--border)]",
+        "w": 20,
+        "h": 20
+      },
+      {
+        "el": "button.eh-icon-btn.text-sm.py-2.rounded-lg",
+        "w": 120,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn.text-sm.py-2.rounded-lg",
+        "w": 120,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn.text-sm.py-2.rounded-lg",
+        "w": 120,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn.text-sm.py-2.rounded-lg",
+        "w": 120,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn-danger.text-sm.py-2.rounded-lg",
+        "w": 120,
+        "h": 36
+      },
+      {
+        "el": "input.w-5.h-5.rounded.border-[var(--border)]",
+        "w": 20,
+        "h": 20
+      },
+      {
+        "el": "button.eh-icon-btn.text-sm.py-2.rounded-lg",
+        "w": 120,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn.text-sm.py-2.rounded-lg",
+        "w": 120,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn.text-sm.py-2.rounded-lg",
+        "w": 120,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn.text-sm.py-2.rounded-lg",
+        "w": 120,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn-danger.text-sm.py-2.rounded-lg",
+        "w": 120,
+        "h": 36
+      }
+    ]
+  },
+  {
+    "route": "/dashboard/schedules",
+    "theme": "light",
+    "viewport": 390,
+    "screenshot": "dashboard-schedules__light__390.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {message: rate_limited}"
+    ],
+    "focusRing": {
+      "color": "#007e58",
+      "where": "scope",
+      "ratio": 4.35,
+      "passes": true
+    },
+    "docScrollWidth": 390,
+    "docClientWidth": 390,
+    "clipped": [
+      {
+        "el": "div.flex.items-center.gap-4",
+        "right": 404,
+        "overBy": 14,
+        "cause": "hidden-by:document"
+      }
+    ],
+    "contrast": [],
+    "touch": [
+      {
+        "el": "button.p-2.rounded-md.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.relative.p-2.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "a.inline-flex.items-center.text-[var(--foreground-secondary)].hover:text-[#00E5A0]",
+        "w": 95,
+        "h": 20
+      },
+      {
+        "el": "a.inline-block.px-4.py-2.bg-[#00E5A0]",
+        "w": 126,
+        "h": 36
+      }
+    ]
+  },
+  {
+    "route": "/dashboard/analytics",
+    "theme": "light",
+    "viewport": 390,
+    "screenshot": "dashboard-analytics__light__390.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {message: rate_limited}"
+    ],
+    "focusRing": {
+      "color": "#007e58",
+      "where": "scope",
+      "ratio": 4.35,
+      "passes": true
+    },
+    "docScrollWidth": 390,
+    "docClientWidth": 390,
+    "clipped": [
+      {
+        "el": "div.flex.items-center.gap-4",
+        "right": 404,
+        "overBy": 14,
+        "cause": "hidden-by:document"
+      },
+      {
+        "el": "div.flex.items-center.gap-3",
+        "right": 471,
+        "overBy": 81,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "div.flex.gap-3",
+        "right": 471,
+        "overBy": 81,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "button.px-4.py-2.rounded-lg.font-medium",
+        "right": 394,
+        "overBy": 4,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      }
+    ],
+    "contrast": [
+      {
+        "el": "button.px-4.py-2.rounded-lg.font-medium",
+        "text": "month",
+        "color": "rgb(255, 255, 255)",
+        "bg": "rgb(0, 204, 142)",
+        "fontSize": "16px",
+        "weight": 500,
+        "ratio": 2.09,
+        "required": 4.5
+      },
+      {
+        "el": "span.recharts-legend-item-text",
+        "text": "Video impressions",
+        "color": "rgb(0, 204, 142)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 2.09,
+        "required": 4.5
+      },
+      {
+        "el": "span.recharts-legend-item-text",
+        "text": "Stored content size (MB)",
+        "color": "rgb(0, 204, 142)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 2.09,
+        "required": 4.5
+      },
+      {
+        "el": "p.text-sm.mt-2.text-[var(--accent-warm)]",
+        "text": "5/9 devices online",
+        "color": "rgb(245, 158, 11)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "14px",
+        "weight": 400,
+        "ratio": 2.15,
+        "required": 4.5
+      },
+      {
+        "el": "tspan",
+        "text": "1%",
+        "color": "rgb(245, 158, 11)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 2.15,
+        "required": 4.5
+      },
+      {
+        "el": "span.recharts-legend-item-text",
+        "text": "Pairing",
+        "color": "rgb(245, 158, 11)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 2.15,
+        "required": 4.5
+      },
+      {
+        "el": "span.recharts-legend-item-text",
+        "text": "HTML impressions",
+        "color": "rgb(245, 158, 11)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 2.15,
+        "required": 4.5
+      },
+      {
+        "el": "tspan",
+        "text": "5%",
+        "color": "rgb(16, 185, 129)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 2.54,
+        "required": 4.5
+      },
+      {
+        "el": "span.recharts-legend-item-text",
+        "text": "Online",
+        "color": "rgb(16, 185, 129)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 2.54,
+        "required": 4.5
+      },
+      {
+        "el": "div.eh-badge.eh-badge-info.px-2.py-0.5",
+        "text": "Last 30 Days",
+        "color": "rgb(0, 151, 184)",
+        "bg": "rgb(230, 248, 251)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 3.12,
+        "required": 4.5
+      },
+      {
+        "el": "span.recharts-legend-item-text",
+        "text": "Image impressions",
+        "color": "rgb(22, 163, 74)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 3.3,
+        "required": 4.5
+      },
+      {
+        "el": "span.recharts-legend-item-text",
+        "text": "Other impressions",
+        "color": "rgb(0, 151, 184)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 3.43,
+        "required": 4.5
+      },
+      {
+        "el": "tspan",
+        "text": "1%",
+        "color": "rgb(239, 68, 68)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 3.76,
+        "required": 4.5
+      },
+      {
+        "el": "span.recharts-legend-item-text",
+        "text": "Error",
+        "color": "rgb(239, 68, 68)",
+        "bg": "rgb(255, 255, 255)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 3.76,
+        "required": 4.5
+      }
+    ],
+    "touch": [
+      {
+        "el": "button.p-2.rounded-md.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.relative.p-2.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "a.inline-flex.items-center.text-[var(--foreground-secondary)].hover:text-[#00E5A0]",
+        "w": 95,
+        "h": 20
+      },
+      {
+        "el": "button.px-4.py-2.rounded-lg.font-medium",
+        "w": 74,
+        "h": 40
+      },
+      {
+        "el": "button.px-4.py-2.rounded-lg.font-medium",
+        "w": 81,
+        "h": 40
+      },
+      {
+        "el": "button.px-4.py-2.rounded-lg.font-medium",
+        "w": 64,
+        "h": 40
+      }
+    ]
+  },
+  {
+    "route": "/dashboard/settings",
+    "theme": "light",
+    "viewport": 390,
+    "screenshot": "dashboard-settings__light__390.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {message: rate_limited}"
+    ],
+    "focusRing": {
+      "color": "#007e58",
+      "where": "scope",
+      "ratio": 4.35,
+      "passes": true
+    },
+    "docScrollWidth": 390,
+    "docClientWidth": 390,
+    "clipped": [
+      {
+        "el": "div.flex.items-center.gap-4",
+        "right": 404,
+        "overBy": 14,
+        "cause": "hidden-by:document"
+      }
+    ],
+    "contrast": [
+      {
+        "el": "span.text-2xl.font-bold",
+        "text": "Northwind Coffee Roasters",
+        "color": "rgb(0, 229, 160)",
+        "bg": "rgb(233, 238, 239)",
+        "fontSize": "24px",
+        "weight": 700,
+        "ratio": 1.41,
+        "required": 3
+      },
+      {
+        "el": "button.w-full.px-4.py-3.text-sm",
+        "text": "Change Password",
+        "color": "rgb(0, 229, 160)",
+        "bg": "rgb(242, 254, 250)",
+        "fontSize": "14px",
+        "weight": 500,
+        "ratio": 1.6,
+        "required": 4.5
+      },
+      {
+        "el": "button.w-full.px-4.py-3.text-sm",
+        "text": "Delete Account",
+        "color": "rgb(220, 38, 38)",
+        "bg": "rgb(254, 242, 242)",
+        "fontSize": "14px",
+        "weight": 500,
+        "ratio": 4.41,
+        "required": 4.5
+      }
+    ],
+    "touch": [
+      {
+        "el": "button.p-2.rounded-md.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.relative.p-2.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "a.inline-flex.items-center.text-[var(--foreground-secondary)].hover:text-[#00E5A0]",
+        "w": 95,
+        "h": 20
+      },
+      {
+        "el": "button.px-3.py-1.5.text-sm.font-medium",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "el": "input.eh-input.w-full.px-4.py-2",
+        "w": 292,
+        "h": 43
+      },
+      {
+        "el": "input.eh-input.w-full.px-4.py-2",
+        "w": 292,
+        "h": 43
+      },
+      {
+        "el": "button.eh-btn-neon.rounded-xl.px-4.py-2",
+        "w": 127,
+        "h": 36
+      },
+      {
+        "el": "input.eh-input.w-full.px-4.py-2",
+        "w": 292,
+        "h": 43
+      },
+      {
+        "el": "input#settings-account-email.eh-input.w-full.cursor-default.px-4",
+        "w": 292,
+        "h": 43
+      },
+      {
+        "el": "select.eh-select.w-full.px-4.py-2",
+        "w": 292,
+        "h": 43
+      },
+      {
+        "el": "input.w-4.h-4.accent-primary.cursor-pointer",
+        "w": 16,
+        "h": 16
+      },
+      {
+        "el": "input.w-4.h-4.accent-primary.cursor-pointer",
+        "w": 16,
+        "h": 16
+      },
+      {
+        "el": "input.w-4.h-4.accent-primary.cursor-pointer",
+        "w": 16,
+        "h": 16
+      },
+      {
+        "el": "input.eh-input.w-full.px-4.py-2",
+        "w": 292,
+        "h": 43
+      },
+      {
+        "el": "input.w-10.h-10.rounded-lg.border",
+        "w": 12,
+        "h": 40
+      },
+      {
+        "el": "input.eh-input.w-32.px-3.py-2",
+        "w": 58,
+        "h": 42
+      },
+      {
+        "el": "button.w-7.h-7.rounded-md.border-2",
+        "w": 31,
+        "h": 31
+      },
+      {
+        "el": "button.w-7.h-7.rounded-md.border-2",
+        "w": 28,
+        "h": 28
+      },
+      {
+        "el": "button.w-7.h-7.rounded-md.border-2",
+        "w": 28,
+        "h": 28
+      },
+      {
+        "el": "button.w-7.h-7.rounded-md.border-2",
+        "w": 28,
+        "h": 28
+      },
+      {
+        "el": "button.w-7.h-7.rounded-md.border-2",
+        "w": 28,
+        "h": 28
+      },
+      {
+        "el": "button.w-7.h-7.rounded-md.border-2",
+        "w": 28,
+        "h": 28
+      },
+      {
+        "el": "button.px-3.py-1.5.text-sm.font-medium",
+        "w": 107,
+        "h": 34
+      },
+      {
+        "el": "button.eh-btn-neon.rounded-xl.px-4.py-2",
+        "w": 128,
+        "h": 36
+      },
+      {
+        "el": "input.eh-input.w-full.px-4.py-2",
+        "w": 292,
+        "h": 43
+      },
+      {
+        "el": "select.eh-select.w-full.px-4.py-2",
+        "w": 292,
+        "h": 43
+      },
+      {
+        "el": "input.w-5.h-5",
+        "w": 14,
+        "h": 20
+      }
+    ]
+  },
+  {
+    "route": "/dashboard/settings/team",
+    "theme": "light",
+    "viewport": 390,
+    "screenshot": "dashboard-settings-team__light__390.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#007e58",
+      "where": "scope",
+      "ratio": 4.35,
+      "passes": true
+    },
+    "docScrollWidth": 390,
+    "docClientWidth": 390,
+    "clipped": [
+      {
+        "el": "div.flex.items-center.gap-4",
+        "right": 404,
+        "overBy": 14,
+        "cause": "hidden-by:document"
+      },
+      {
+        "el": "table.min-w-full.divide-y.divide-[var(--border)]",
+        "right": 818,
+        "overBy": 428,
+        "cause": "hidden-by:div.bg-[var(--surface)].rounded-lg.shadow.overflow-hidden"
+      },
+      {
+        "el": "thead.bg-[var(--background)]",
+        "right": 818,
+        "overBy": 428,
+        "cause": "hidden-by:div.bg-[var(--surface)].rounded-lg.shadow.overflow-hidden"
+      },
+      {
+        "el": "tr",
+        "right": 818,
+        "overBy": 428,
+        "cause": "hidden-by:div.bg-[var(--surface)].rounded-lg.shadow.overflow-hidden"
+      },
+      {
+        "el": "th.px-4.py-3.text-left.text-xs",
+        "right": 437,
+        "overBy": 47,
+        "cause": "hidden-by:div.bg-[var(--surface)].rounded-lg.shadow.overflow-hidden"
+      },
+      {
+        "el": "tbody.bg-[var(--surface)].divide-y.divide-[var(--border)]",
+        "right": 818,
+        "overBy": 428,
+        "cause": "hidden-by:div.bg-[var(--surface)].rounded-lg.shadow.overflow-hidden"
+      },
+      {
+        "el": "tr.hover:bg-[var(--surface-hover)].transition",
+        "right": 818,
+        "overBy": 428,
+        "cause": "hidden-by:div.bg-[var(--surface)].rounded-lg.shadow.overflow-hidden"
+      },
+      {
+        "el": "td.px-4.py-3.whitespace-nowrap",
+        "right": 437,
+        "overBy": 47,
+        "cause": "hidden-by:div.bg-[var(--surface)].rounded-lg.shadow.overflow-hidden"
+      },
+      {
+        "el": "span.px-2.py-1.text-xs.font-semibold",
+        "right": 421,
+        "overBy": 31,
+        "cause": "hidden-by:div.bg-[var(--surface)].rounded-lg.shadow.overflow-hidden"
+      }
+    ],
+    "contrast": [
+      {
+        "el": "div.w-8.h-8.bg-[#00E5A0]/10.rounded-full",
+        "text": "D W",
+        "color": "rgb(0, 229, 160)",
+        "bg": "rgb(230, 252, 246)",
+        "fontSize": "14px",
+        "weight": 600,
+        "ratio": 1.55,
+        "required": 4.5
+      }
+    ],
+    "touch": [
+      {
+        "el": "button.p-2.rounded-md.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.relative.p-2.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "a.inline-flex.items-center.text-[var(--foreground-secondary)].hover:text-[#00E5A0]",
+        "w": 95,
+        "h": 20
+      },
+      {
+        "el": "a.ml-1.text-[var(--foreground-secondary)].hover:text-[#00E5A0].transition",
+        "w": 53,
+        "h": 20
+      },
+      {
+        "el": "button.text-[#00E5A0].hover:text-[#00E5A0].hover:bg-[#00E5A0]/5.px-2",
+        "w": 36,
+        "h": 28
+      },
+      {
+        "el": "button.text-red-600.dark:text-red-400.hover:text-red-800.dark:hover:text-red-300",
+        "w": 36,
+        "h": 28
+      }
+    ]
+  },
+  {
+    "route": "/dashboard/settings/billing",
+    "theme": "light",
+    "viewport": 390,
+    "screenshot": "dashboard-settings-billing__light__390.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#007e58",
+      "where": "scope",
+      "ratio": 4.35,
+      "passes": true
+    },
+    "docScrollWidth": 390,
+    "docClientWidth": 390,
+    "clipped": [
+      {
+        "el": "div.flex.items-center.gap-4",
+        "right": 404,
+        "overBy": 14,
+        "cause": "hidden-by:document"
+      }
+    ],
+    "contrast": [
+      {
+        "el": "a.text-[#00E5A0].hover:text-[#00E5A0].dark:text-[#00E5A0].dark:hover:text-[#00CC8E]",
+        "text": "View Invoice History",
+        "color": "rgb(0, 229, 160)",
+        "bg": "rgb(233, 238, 239)",
+        "fontSize": "14px",
+        "weight": 500,
+        "ratio": 1.41,
+        "required": 4.5
+      },
+      {
+        "el": "span.inline-flex.items-center.px-2.5.py-0.5",
+        "text": "Active",
+        "color": "rgb(34, 197, 94)",
+        "bg": "rgb(233, 249, 239)",
+        "fontSize": "12px",
+        "weight": 500,
+        "ratio": 2.09,
+        "required": 4.5
+      }
+    ],
+    "touch": [
+      {
+        "el": "button.p-2.rounded-md.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.relative.p-2.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "a.inline-flex.items-center.text-[var(--foreground-secondary)].hover:text-[#00E5A0]",
+        "w": 95,
+        "h": 20
+      },
+      {
+        "el": "a.ml-1.text-[var(--foreground-secondary)].hover:text-[#00E5A0].transition",
+        "w": 53,
+        "h": 20
+      },
+      {
+        "el": "a.text-[#00E5A0].hover:text-[#00E5A0].dark:text-[#00E5A0].dark:hover:text-[#00CC8E]",
+        "w": 110,
+        "h": 40
+      },
+      {
+        "el": "a.px-4.py-2.bg-[#00E5A0].text-[#061A21]",
+        "w": 113,
+        "h": 36
+      },
+      {
+        "el": "button.px-4.py-2.text-sm.font-medium",
+        "w": 167,
+        "h": 38
+      }
+    ]
+  },
+  {
+    "route": "/dashboard",
+    "theme": "dark",
+    "viewport": 1440,
+    "screenshot": "dashboard__dark__1440.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#00E5A0",
+      "where": "scope",
+      "ratio": 10.8,
+      "passes": true
+    },
+    "docScrollWidth": 1440,
+    "docClientWidth": 1440,
+    "clipped": [],
+    "contrast": [
+      {
+        "el": "div.text-xs.text-[var(--foreground-tertiary)]",
+        "text": "demo@vizora.local",
+        "color": "rgb(154, 149, 142)",
+        "bg": "rgb(27, 61, 71)",
+        "fontSize": "12px",
+        "weight": 400,
+        "ratio": 3.91,
+        "required": 4.5
+      }
+    ],
+    "touch": []
+  },
+  {
+    "route": "/dashboard/devices",
+    "theme": "dark",
+    "viewport": 1440,
+    "screenshot": "dashboard-devices__dark__1440.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#00E5A0",
+      "where": "scope",
+      "ratio": 10.8,
+      "passes": true
+    },
+    "docScrollWidth": 1440,
+    "docClientWidth": 1440,
+    "clipped": [],
+    "contrast": [
+      {
+        "el": "div.px-2.py-1.rounded-md.text-xs",
+        "text": "Offline",
+        "color": "rgb(248, 113, 113)",
+        "bg": "rgb(127, 29, 29)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 3.62,
+        "required": 4.5
+      },
+      {
+        "el": "span",
+        "text": "Emergency Override",
+        "color": "rgb(255, 255, 255)",
+        "bg": "rgb(239, 68, 68)",
+        "fontSize": "14px",
+        "weight": 600,
+        "ratio": 3.76,
+        "required": 4.5
+      },
+      {
+        "el": "div.text-xs.text-[var(--foreground-tertiary)]",
+        "text": "demo@vizora.local",
+        "color": "rgb(154, 149, 142)",
+        "bg": "rgb(27, 61, 71)",
+        "fontSize": "12px",
+        "weight": 400,
+        "ratio": 3.91,
+        "required": 4.5
+      },
+      {
+        "el": "div.px-2.py-1.rounded-md.text-xs",
+        "text": "Pairing",
+        "color": "rgb(96, 165, 250)",
+        "bg": "rgb(30, 58, 138)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 4.07,
+        "required": 4.5
+      },
+      {
+        "el": "div.px-2.py-1.rounded-md.text-xs",
+        "text": "Error",
+        "color": "rgb(251, 146, 60)",
+        "bg": "rgb(124, 45, 18)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 4.14,
+        "required": 4.5
+      }
+    ],
+    "touch": []
+  },
+  {
+    "route": "/dashboard/playlists",
+    "theme": "dark",
+    "viewport": 1440,
+    "screenshot": "dashboard-playlists__dark__1440.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#00E5A0",
+      "where": "scope",
+      "ratio": 10.8,
+      "passes": true
+    },
+    "docScrollWidth": 1440,
+    "docClientWidth": 1440,
+    "clipped": [],
+    "contrast": [
+      {
+        "el": "div.text-xs.text-[var(--foreground-tertiary)]",
+        "text": "demo@vizora.local",
+        "color": "rgb(154, 149, 142)",
+        "bg": "rgb(27, 61, 71)",
+        "fontSize": "12px",
+        "weight": 400,
+        "ratio": 3.91,
+        "required": 4.5
+      }
+    ],
+    "touch": []
+  },
+  {
+    "route": "/dashboard/content",
+    "theme": "dark",
+    "viewport": 1440,
+    "screenshot": "dashboard-content__dark__1440.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#00E5A0",
+      "where": "scope",
+      "ratio": 10.8,
+      "passes": true
+    },
+    "docScrollWidth": 1440,
+    "docClientWidth": 1440,
+    "clipped": [],
+    "contrast": [
+      {
+        "el": "div.text-xs.text-[var(--foreground-tertiary)]",
+        "text": "demo@vizora.local",
+        "color": "rgb(154, 149, 142)",
+        "bg": "rgb(27, 61, 71)",
+        "fontSize": "12px",
+        "weight": 400,
+        "ratio": 3.91,
+        "required": 4.5
+      }
+    ],
+    "touch": []
+  },
+  {
+    "route": "/dashboard/schedules",
+    "theme": "dark",
+    "viewport": 1440,
+    "screenshot": "dashboard-schedules__dark__1440.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#00E5A0",
+      "where": "scope",
+      "ratio": 10.8,
+      "passes": true
+    },
+    "docScrollWidth": 1440,
+    "docClientWidth": 1440,
+    "clipped": [],
+    "contrast": [
+      {
+        "el": "div.text-xs.text-[var(--foreground-tertiary)]",
+        "text": "demo@vizora.local",
+        "color": "rgb(154, 149, 142)",
+        "bg": "rgb(27, 61, 71)",
+        "fontSize": "12px",
+        "weight": 400,
+        "ratio": 3.91,
+        "required": 4.5
+      }
+    ],
+    "touch": []
+  },
+  {
+    "route": "/dashboard/analytics",
+    "theme": "dark",
+    "viewport": 1440,
+    "screenshot": "dashboard-analytics__dark__1440.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#00E5A0",
+      "where": "scope",
+      "ratio": 10.8,
+      "passes": true
+    },
+    "docScrollWidth": 1440,
+    "docClientWidth": 1440,
+    "clipped": [],
+    "contrast": [
+      {
+        "el": "button.px-4.py-2.rounded-lg.font-medium",
+        "text": "month",
+        "color": "rgb(255, 255, 255)",
+        "bg": "rgb(52, 211, 153)",
+        "fontSize": "16px",
+        "weight": 500,
+        "ratio": 1.92,
+        "required": 4.5
+      },
+      {
+        "el": "tspan",
+        "text": "2%",
+        "color": "rgb(107, 114, 128)",
+        "bg": "rgb(10, 32, 39)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 3.49,
+        "required": 4.5
+      },
+      {
+        "el": "span.recharts-legend-item-text",
+        "text": "Offline",
+        "color": "rgb(107, 114, 128)",
+        "bg": "rgb(10, 32, 39)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 3.49,
+        "required": 4.5
+      },
+      {
+        "el": "div.text-xs.text-[var(--foreground-tertiary)]",
+        "text": "demo@vizora.local",
+        "color": "rgb(154, 149, 142)",
+        "bg": "rgb(27, 61, 71)",
+        "fontSize": "12px",
+        "weight": 400,
+        "ratio": 3.91,
+        "required": 4.5
+      },
+      {
+        "el": "tspan",
+        "text": "1%",
+        "color": "rgb(239, 68, 68)",
+        "bg": "rgb(10, 32, 39)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 4.48,
+        "required": 4.5
+      },
+      {
+        "el": "span.recharts-legend-item-text",
+        "text": "Error",
+        "color": "rgb(239, 68, 68)",
+        "bg": "rgb(10, 32, 39)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 4.48,
+        "required": 4.5
+      },
+      {
+        "el": "span.recharts-legend-item-text",
+        "text": "URL impressions",
+        "color": "rgb(239, 68, 68)",
+        "bg": "rgb(10, 32, 39)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 4.48,
+        "required": 4.5
+      }
+    ],
+    "touch": []
+  },
+  {
+    "route": "/dashboard/settings",
+    "theme": "dark",
+    "viewport": 1440,
+    "screenshot": "dashboard-settings__dark__1440.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#00E5A0",
+      "where": "scope",
+      "ratio": 10.8,
+      "passes": true
+    },
+    "docScrollWidth": 1440,
+    "docClientWidth": 1440,
+    "clipped": [],
+    "contrast": [
+      {
+        "el": "div.text-xs.text-[var(--foreground-tertiary)]",
+        "text": "demo@vizora.local",
+        "color": "rgb(154, 149, 142)",
+        "bg": "rgb(27, 61, 71)",
+        "fontSize": "12px",
+        "weight": 400,
+        "ratio": 3.91,
+        "required": 4.5
+      }
+    ],
+    "touch": []
+  },
+  {
+    "route": "/dashboard/settings/team",
+    "theme": "dark",
+    "viewport": 1440,
+    "screenshot": "dashboard-settings-team__dark__1440.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#00E5A0",
+      "where": "scope",
+      "ratio": 10.8,
+      "passes": true
+    },
+    "docScrollWidth": 1440,
+    "docClientWidth": 1440,
+    "clipped": [],
+    "contrast": [
+      {
+        "el": "div.text-xs.text-[var(--foreground-tertiary)]",
+        "text": "demo@vizora.local",
+        "color": "rgb(154, 149, 142)",
+        "bg": "rgb(27, 61, 71)",
+        "fontSize": "12px",
+        "weight": 400,
+        "ratio": 3.91,
+        "required": 4.5
+      }
+    ],
+    "touch": []
+  },
+  {
+    "route": "/dashboard/settings/billing",
+    "theme": "dark",
+    "viewport": 1440,
+    "screenshot": "dashboard-settings-billing__dark__1440.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {message: rate_limited}"
+    ],
+    "focusRing": {
+      "color": "#00E5A0",
+      "where": "scope",
+      "ratio": 10.8,
+      "passes": true
+    },
+    "docScrollWidth": 1440,
+    "docClientWidth": 1440,
+    "clipped": [],
+    "contrast": [
+      {
+        "el": "div.text-xs.text-[var(--foreground-tertiary)]",
+        "text": "demo@vizora.local",
+        "color": "rgb(154, 149, 142)",
+        "bg": "rgb(27, 61, 71)",
+        "fontSize": "12px",
+        "weight": 400,
+        "ratio": 3.91,
+        "required": 4.5
+      }
+    ],
+    "touch": []
+  },
+  {
+    "route": "/dashboard",
+    "theme": "dark",
+    "viewport": 390,
+    "screenshot": "dashboard__dark__390.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {message: rate_limited}"
+    ],
+    "focusRing": {
+      "color": "#00E5A0",
+      "where": "scope",
+      "ratio": 10.8,
+      "passes": true
+    },
+    "docScrollWidth": 390,
+    "docClientWidth": 390,
+    "clipped": [
+      {
+        "el": "div.flex.items-center.gap-4",
+        "right": 404,
+        "overBy": 14,
+        "cause": "hidden-by:document"
+      }
+    ],
+    "contrast": [],
+    "touch": [
+      {
+        "el": "button.p-2.rounded-md.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.relative.p-2.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      }
+    ]
+  },
+  {
+    "route": "/dashboard/devices",
+    "theme": "dark",
+    "viewport": 390,
+    "screenshot": "dashboard-devices__dark__390.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {message: rate_limited}"
+    ],
+    "focusRing": {
+      "color": "#00E5A0",
+      "where": "scope",
+      "ratio": 10.8,
+      "passes": true
+    },
+    "docScrollWidth": 390,
+    "docClientWidth": 390,
+    "clipped": [
+      {
+        "el": "div.flex.items-center.gap-4",
+        "right": 404,
+        "overBy": 14,
+        "cause": "hidden-by:document"
+      },
+      {
+        "el": "div.flex.items-center.gap-3",
+        "right": 646,
+        "overBy": 256,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "button.eh-btn-danger.rounded-xl.px-4.py-3",
+        "right": 501,
+        "overBy": 111,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "svg.lucide.lucide-alert-triangle.text-white",
+        "right": 392,
+        "overBy": 2,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      }
+    ],
+    "contrast": [
+      {
+        "el": "div.px-2.py-1.rounded-md.text-xs",
+        "text": "Offline",
+        "color": "rgb(248, 113, 113)",
+        "bg": "rgb(127, 29, 29)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 3.62,
+        "required": 4.5
+      },
+      {
+        "el": "span",
+        "text": "Emergency Override",
+        "color": "rgb(255, 255, 255)",
+        "bg": "rgb(239, 68, 68)",
+        "fontSize": "14px",
+        "weight": 600,
+        "ratio": 3.76,
+        "required": 4.5
+      },
+      {
+        "el": "div.px-2.py-1.rounded-md.text-xs",
+        "text": "Pairing",
+        "color": "rgb(96, 165, 250)",
+        "bg": "rgb(30, 58, 138)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 4.07,
+        "required": 4.5
+      },
+      {
+        "el": "div.px-2.py-1.rounded-md.text-xs",
+        "text": "Error",
+        "color": "rgb(251, 146, 60)",
+        "bg": "rgb(124, 45, 18)",
+        "fontSize": "12px",
+        "weight": 600,
+        "ratio": 4.14,
+        "required": 4.5
+      }
+    ],
+    "touch": [
+      {
+        "el": "button.p-2.rounded-md.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.relative.p-2.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "a.inline-flex.items-center.text-[var(--foreground-secondary)].hover:text-[#00E5A0]",
+        "w": 95,
+        "h": 20
+      },
+      {
+        "el": "input.eh-input.!pl-10.!pr-10",
+        "w": 342,
+        "h": 43
+      },
+      {
+        "el": "input.rounded.border-[var(--border)].text-[#00E5A0].focus:ring-[#00E5A0]",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "el": "input.rounded.border-[var(--border)].text-[#00E5A0].focus:ring-[#00E5A0]",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "el": "select.text-sm.border.border-[var(--border)].rounded-lg",
+        "w": 161,
+        "h": 34
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 63,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 38,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 37,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn.eh-icon-btn-danger",
+        "w": 55,
+        "h": 32
+      },
+      {
+        "el": "input.rounded.border-[var(--border)].text-[#00E5A0].focus:ring-[#00E5A0]",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "el": "select.text-sm.border.border-[var(--border)].rounded-lg",
+        "w": 161,
+        "h": 34
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 63,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 38,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 37,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn.eh-icon-btn-danger",
+        "w": 55,
+        "h": 32
+      },
+      {
+        "el": "input.rounded.border-[var(--border)].text-[#00E5A0].focus:ring-[#00E5A0]",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "el": "select.text-sm.border.border-[var(--border)].rounded-lg",
+        "w": 161,
+        "h": 34
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 63,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 38,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 37,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn.eh-icon-btn-danger",
+        "w": 55,
+        "h": 32
+      },
+      {
+        "el": "input.rounded.border-[var(--border)].text-[#00E5A0].focus:ring-[#00E5A0]",
+        "w": 13,
+        "h": 13
+      },
+      {
+        "el": "select.text-sm.border.border-[var(--border)].rounded-lg",
+        "w": 161,
+        "h": 34
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 63,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 38,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn",
+        "w": 37,
+        "h": 32
+      }
+    ]
+  },
+  {
+    "route": "/dashboard/playlists",
+    "theme": "dark",
+    "viewport": 390,
+    "screenshot": "dashboard-playlists__dark__390.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {message: rate_limited}"
+    ],
+    "focusRing": {
+      "color": "#00E5A0",
+      "where": "scope",
+      "ratio": 10.8,
+      "passes": true
+    },
+    "docScrollWidth": 390,
+    "docClientWidth": 390,
+    "clipped": [
+      {
+        "el": "div.flex.items-center.gap-4",
+        "right": 404,
+        "overBy": 14,
+        "cause": "hidden-by:document"
+      },
+      {
+        "el": "div.flex.flex-col.items-end.gap-2",
+        "right": 401,
+        "overBy": 11,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "span.px-3.py-1.text-xs.font-semibold",
+        "right": 401,
+        "overBy": 11,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "div.flex.flex-col.items-end.gap-2",
+        "right": 400,
+        "overBy": 10,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "span.px-3.py-1.text-xs.font-semibold",
+        "right": 400,
+        "overBy": 10,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "div.flex.flex-col.items-end.gap-2",
+        "right": 413,
+        "overBy": 23,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "span.px-3.py-1.text-xs.font-semibold",
+        "right": 413,
+        "overBy": 23,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "span",
+        "right": 401,
+        "overBy": 11,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "div.flex.flex-col.items-end.gap-2",
+        "right": 402,
+        "overBy": 12,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "span.px-3.py-1.text-xs.font-semibold",
+        "right": 402,
+        "overBy": 12,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      }
+    ],
+    "contrast": [],
+    "touch": [
+      {
+        "el": "button.p-2.rounded-md.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.relative.p-2.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "a.inline-flex.items-center.text-[var(--foreground-secondary)].hover:text-[#00E5A0]",
+        "w": 95,
+        "h": 20
+      },
+      {
+        "el": "input.eh-input.!pl-10.!pr-10",
+        "w": 342,
+        "h": 43
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 292,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 292,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 292,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 142,
+        "h": 36
+      },
+      {
+        "el": "button.flex-1.px-4.py-2.text-sm",
+        "w": 292,
+        "h": 36
+      }
+    ]
+  },
+  {
+    "route": "/dashboard/content",
+    "theme": "dark",
+    "viewport": 390,
+    "screenshot": "dashboard-content__dark__390.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {message: rate_limited}"
+    ],
+    "focusRing": {
+      "color": "#00E5A0",
+      "where": "scope",
+      "ratio": 10.8,
+      "passes": true
+    },
+    "docScrollWidth": 390,
+    "docClientWidth": 390,
+    "clipped": [
+      {
+        "el": "div.flex.items-center.gap-4",
+        "right": 404,
+        "overBy": 14,
+        "cause": "hidden-by:document"
+      }
+    ],
+    "contrast": [],
+    "touch": [
+      {
+        "el": "button.p-2.rounded-md.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.relative.p-2.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "a.inline-flex.items-center.text-[var(--foreground-secondary)].hover:text-[#00E5A0]",
+        "w": 95,
+        "h": 20
+      },
+      {
+        "el": "input.eh-input.!pl-10.!pr-10",
+        "w": 260,
+        "h": 43
+      },
+      {
+        "el": "button.eh-filter-pill.eh-filter-pill-active",
+        "w": 44,
+        "h": 32
+      },
+      {
+        "el": "button.eh-filter-pill",
+        "w": 65,
+        "h": 32
+      },
+      {
+        "el": "button.eh-filter-pill",
+        "w": 64,
+        "h": 32
+      },
+      {
+        "el": "button.eh-filter-pill",
+        "w": 48,
+        "h": 32
+      },
+      {
+        "el": "button.eh-filter-pill",
+        "w": 45,
+        "h": 32
+      },
+      {
+        "el": "button.eh-filter-pill.flex.items-center.gap-1.5",
+        "w": 56,
+        "h": 32
+      },
+      {
+        "el": "button.eh-filter-pill.flex.items-center.gap-1.5",
+        "w": 86,
+        "h": 32
+      },
+      {
+        "el": "button.px-3.5.py-2.text-sm.font-medium",
+        "w": 48,
+        "h": 36
+      },
+      {
+        "el": "button.px-3.5.py-2.text-sm.font-medium",
+        "w": 48,
+        "h": 36
+      },
+      {
+        "el": "button.flex.items-center.gap-1.px-2",
+        "w": 110,
+        "h": 28
+      },
+      {
+        "el": "button.eh-btn-secondary.px-3.py-1.5.text-sm",
+        "w": 79,
+        "h": 32
+      },
+      {
+        "el": "button.eh-btn-secondary.px-3.py-1.5.text-sm",
+        "w": 54,
+        "h": 32
+      },
+      {
+        "el": "input.w-5.h-5.rounded.border-[var(--border)]",
+        "w": 20,
+        "h": 20
+      },
+      {
+        "el": "button.eh-icon-btn.text-sm.py-2.rounded-lg",
+        "w": 120,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn.text-sm.py-2.rounded-lg",
+        "w": 120,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn.text-sm.py-2.rounded-lg",
+        "w": 120,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn.text-sm.py-2.rounded-lg",
+        "w": 120,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn-danger.text-sm.py-2.rounded-lg",
+        "w": 120,
+        "h": 36
+      },
+      {
+        "el": "input.w-5.h-5.rounded.border-[var(--border)]",
+        "w": 20,
+        "h": 20
+      },
+      {
+        "el": "button.eh-icon-btn.text-sm.py-2.rounded-lg",
+        "w": 120,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn.text-sm.py-2.rounded-lg",
+        "w": 120,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn.text-sm.py-2.rounded-lg",
+        "w": 120,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn.text-sm.py-2.rounded-lg",
+        "w": 120,
+        "h": 32
+      },
+      {
+        "el": "button.eh-icon-btn-danger.text-sm.py-2.rounded-lg",
+        "w": 120,
+        "h": 36
+      }
+    ]
+  },
+  {
+    "route": "/dashboard/schedules",
+    "theme": "dark",
+    "viewport": 390,
+    "screenshot": "dashboard-schedules__dark__390.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {message: rate_limited}"
+    ],
+    "focusRing": {
+      "color": "#00E5A0",
+      "where": "scope",
+      "ratio": 10.8,
+      "passes": true
+    },
+    "docScrollWidth": 390,
+    "docClientWidth": 390,
+    "clipped": [
+      {
+        "el": "div.flex.items-center.gap-4",
+        "right": 404,
+        "overBy": 14,
+        "cause": "hidden-by:document"
+      }
+    ],
+    "contrast": [],
+    "touch": [
+      {
+        "el": "button.p-2.rounded-md.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.relative.p-2.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "a.inline-flex.items-center.text-[var(--foreground-secondary)].hover:text-[#00E5A0]",
+        "w": 95,
+        "h": 20
+      },
+      {
+        "el": "a.inline-block.px-4.py-2.bg-[#00E5A0]",
+        "w": 126,
+        "h": 36
+      }
+    ]
+  },
+  {
+    "route": "/dashboard/analytics",
+    "theme": "dark",
+    "viewport": 390,
+    "screenshot": "dashboard-analytics__dark__390.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {message: rate_limited}"
+    ],
+    "focusRing": {
+      "color": "#00E5A0",
+      "where": "scope",
+      "ratio": 10.8,
+      "passes": true
+    },
+    "docScrollWidth": 390,
+    "docClientWidth": 390,
+    "clipped": [
+      {
+        "el": "div.flex.items-center.gap-4",
+        "right": 404,
+        "overBy": 14,
+        "cause": "hidden-by:document"
+      },
+      {
+        "el": "div.flex.items-center.gap-3",
+        "right": 471,
+        "overBy": 81,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "div.flex.gap-3",
+        "right": 471,
+        "overBy": 81,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      },
+      {
+        "el": "button.px-4.py-2.rounded-lg.font-medium",
+        "right": 394,
+        "overBy": 4,
+        "cause": "hidden-by:main#main-content.flex-1.p-6.sm:p-8.lg:p-10"
+      }
+    ],
+    "contrast": [
+      {
+        "el": "button.px-4.py-2.rounded-lg.font-medium",
+        "text": "month",
+        "color": "rgb(255, 255, 255)",
+        "bg": "rgb(52, 211, 153)",
+        "fontSize": "16px",
+        "weight": 500,
+        "ratio": 1.92,
+        "required": 4.5
+      },
+      {
+        "el": "tspan",
+        "text": "2%",
+        "color": "rgb(107, 114, 128)",
+        "bg": "rgb(10, 32, 39)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 3.49,
+        "required": 4.5
+      },
+      {
+        "el": "span.recharts-legend-item-text",
+        "text": "Offline",
+        "color": "rgb(107, 114, 128)",
+        "bg": "rgb(10, 32, 39)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 3.49,
+        "required": 4.5
+      },
+      {
+        "el": "tspan",
+        "text": "1%",
+        "color": "rgb(239, 68, 68)",
+        "bg": "rgb(10, 32, 39)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 4.48,
+        "required": 4.5
+      },
+      {
+        "el": "span.recharts-legend-item-text",
+        "text": "Error",
+        "color": "rgb(239, 68, 68)",
+        "bg": "rgb(10, 32, 39)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 4.48,
+        "required": 4.5
+      },
+      {
+        "el": "span.recharts-legend-item-text",
+        "text": "URL impressions",
+        "color": "rgb(239, 68, 68)",
+        "bg": "rgb(10, 32, 39)",
+        "fontSize": "16px",
+        "weight": 400,
+        "ratio": 4.48,
+        "required": 4.5
+      }
+    ],
+    "touch": [
+      {
+        "el": "button.p-2.rounded-md.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.relative.p-2.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "a.inline-flex.items-center.text-[var(--foreground-secondary)].hover:text-[#00E5A0]",
+        "w": 95,
+        "h": 20
+      },
+      {
+        "el": "button.px-4.py-2.rounded-lg.font-medium",
+        "w": 74,
+        "h": 40
+      },
+      {
+        "el": "button.px-4.py-2.rounded-lg.font-medium",
+        "w": 81,
+        "h": 40
+      },
+      {
+        "el": "button.px-4.py-2.rounded-lg.font-medium",
+        "w": 64,
+        "h": 40
+      }
+    ]
+  },
+  {
+    "route": "/dashboard/settings",
+    "theme": "dark",
+    "viewport": 390,
+    "screenshot": "dashboard-settings__dark__390.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#00E5A0",
+      "where": "scope",
+      "ratio": 10.8,
+      "passes": true
+    },
+    "docScrollWidth": 390,
+    "docClientWidth": 390,
+    "clipped": [
+      {
+        "el": "div.flex.items-center.gap-4",
+        "right": 404,
+        "overBy": 14,
+        "cause": "hidden-by:document"
+      }
+    ],
+    "contrast": [],
+    "touch": [
+      {
+        "el": "button.p-2.rounded-md.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.relative.p-2.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "a.inline-flex.items-center.text-[var(--foreground-secondary)].hover:text-[#00E5A0]",
+        "w": 95,
+        "h": 20
+      },
+      {
+        "el": "button.px-3.py-1.5.text-sm.font-medium",
+        "w": 122,
+        "h": 34
+      },
+      {
+        "el": "input.eh-input.w-full.px-4.py-2",
+        "w": 292,
+        "h": 43
+      },
+      {
+        "el": "input.eh-input.w-full.px-4.py-2",
+        "w": 292,
+        "h": 43
+      },
+      {
+        "el": "button.eh-btn-neon.rounded-xl.px-4.py-2",
+        "w": 127,
+        "h": 36
+      },
+      {
+        "el": "input.eh-input.w-full.px-4.py-2",
+        "w": 292,
+        "h": 43
+      },
+      {
+        "el": "input#settings-account-email.eh-input.w-full.cursor-default.px-4",
+        "w": 292,
+        "h": 43
+      },
+      {
+        "el": "select.eh-select.w-full.px-4.py-2",
+        "w": 292,
+        "h": 43
+      },
+      {
+        "el": "input.w-4.h-4.accent-primary.cursor-pointer",
+        "w": 16,
+        "h": 16
+      },
+      {
+        "el": "input.w-4.h-4.accent-primary.cursor-pointer",
+        "w": 16,
+        "h": 16
+      },
+      {
+        "el": "input.w-4.h-4.accent-primary.cursor-pointer",
+        "w": 16,
+        "h": 16
+      },
+      {
+        "el": "input.eh-input.w-full.px-4.py-2",
+        "w": 292,
+        "h": 43
+      },
+      {
+        "el": "input.w-10.h-10.rounded-lg.border",
+        "w": 12,
+        "h": 40
+      },
+      {
+        "el": "input.eh-input.w-32.px-3.py-2",
+        "w": 58,
+        "h": 42
+      },
+      {
+        "el": "button.w-7.h-7.rounded-md.border-2",
+        "w": 31,
+        "h": 31
+      },
+      {
+        "el": "button.w-7.h-7.rounded-md.border-2",
+        "w": 28,
+        "h": 28
+      },
+      {
+        "el": "button.w-7.h-7.rounded-md.border-2",
+        "w": 28,
+        "h": 28
+      },
+      {
+        "el": "button.w-7.h-7.rounded-md.border-2",
+        "w": 28,
+        "h": 28
+      },
+      {
+        "el": "button.w-7.h-7.rounded-md.border-2",
+        "w": 28,
+        "h": 28
+      },
+      {
+        "el": "button.w-7.h-7.rounded-md.border-2",
+        "w": 28,
+        "h": 28
+      },
+      {
+        "el": "button.px-3.py-1.5.text-sm.font-medium",
+        "w": 107,
+        "h": 34
+      },
+      {
+        "el": "button.eh-btn-neon.rounded-xl.px-4.py-2",
+        "w": 128,
+        "h": 36
+      },
+      {
+        "el": "input.eh-input.w-full.px-4.py-2",
+        "w": 292,
+        "h": 43
+      },
+      {
+        "el": "select.eh-select.w-full.px-4.py-2",
+        "w": 292,
+        "h": 43
+      },
+      {
+        "el": "input.w-5.h-5",
+        "w": 14,
+        "h": 20
+      }
+    ]
+  },
+  {
+    "route": "/dashboard/settings/team",
+    "theme": "dark",
+    "viewport": 390,
+    "screenshot": "dashboard-settings-team__dark__390.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#00E5A0",
+      "where": "scope",
+      "ratio": 10.8,
+      "passes": true
+    },
+    "docScrollWidth": 390,
+    "docClientWidth": 390,
+    "clipped": [
+      {
+        "el": "div.flex.items-center.gap-4",
+        "right": 404,
+        "overBy": 14,
+        "cause": "hidden-by:document"
+      },
+      {
+        "el": "table.min-w-full.divide-y.divide-[var(--border)]",
+        "right": 818,
+        "overBy": 428,
+        "cause": "hidden-by:div.bg-[var(--surface)].rounded-lg.shadow.overflow-hidden"
+      },
+      {
+        "el": "thead.bg-[var(--background)]",
+        "right": 818,
+        "overBy": 428,
+        "cause": "hidden-by:div.bg-[var(--surface)].rounded-lg.shadow.overflow-hidden"
+      },
+      {
+        "el": "tr",
+        "right": 818,
+        "overBy": 428,
+        "cause": "hidden-by:div.bg-[var(--surface)].rounded-lg.shadow.overflow-hidden"
+      },
+      {
+        "el": "th.px-4.py-3.text-left.text-xs",
+        "right": 437,
+        "overBy": 47,
+        "cause": "hidden-by:div.bg-[var(--surface)].rounded-lg.shadow.overflow-hidden"
+      },
+      {
+        "el": "tbody.bg-[var(--surface)].divide-y.divide-[var(--border)]",
+        "right": 818,
+        "overBy": 428,
+        "cause": "hidden-by:div.bg-[var(--surface)].rounded-lg.shadow.overflow-hidden"
+      },
+      {
+        "el": "tr.hover:bg-[var(--surface-hover)].transition",
+        "right": 818,
+        "overBy": 428,
+        "cause": "hidden-by:div.bg-[var(--surface)].rounded-lg.shadow.overflow-hidden"
+      },
+      {
+        "el": "td.px-4.py-3.whitespace-nowrap",
+        "right": 437,
+        "overBy": 47,
+        "cause": "hidden-by:div.bg-[var(--surface)].rounded-lg.shadow.overflow-hidden"
+      },
+      {
+        "el": "span.px-2.py-1.text-xs.font-semibold",
+        "right": 421,
+        "overBy": 31,
+        "cause": "hidden-by:div.bg-[var(--surface)].rounded-lg.shadow.overflow-hidden"
+      }
+    ],
+    "contrast": [],
+    "touch": [
+      {
+        "el": "button.p-2.rounded-md.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.relative.p-2.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "a.inline-flex.items-center.text-[var(--foreground-secondary)].hover:text-[#00E5A0]",
+        "w": 95,
+        "h": 20
+      },
+      {
+        "el": "a.ml-1.text-[var(--foreground-secondary)].hover:text-[#00E5A0].transition",
+        "w": 53,
+        "h": 20
+      },
+      {
+        "el": "button.text-[#00E5A0].hover:text-[#00E5A0].hover:bg-[#00E5A0]/5.px-2",
+        "w": 36,
+        "h": 28
+      },
+      {
+        "el": "button.text-red-600.dark:text-red-400.hover:text-red-800.dark:hover:text-red-300",
+        "w": 36,
+        "h": 28
+      }
+    ]
+  },
+  {
+    "route": "/dashboard/settings/billing",
+    "theme": "dark",
+    "viewport": 390,
+    "screenshot": "dashboard-settings-billing__dark__390.png",
+    "consoleErrors": [
+      "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+      "[Socket] Error: {event: join:organization, message: Not authenticated}"
+    ],
+    "focusRing": {
+      "color": "#00E5A0",
+      "where": "scope",
+      "ratio": 10.8,
+      "passes": true
+    },
+    "docScrollWidth": 390,
+    "docClientWidth": 390,
+    "clipped": [
+      {
+        "el": "div.flex.items-center.gap-4",
+        "right": 404,
+        "overBy": 14,
+        "cause": "hidden-by:document"
+      }
+    ],
+    "contrast": [],
+    "touch": [
+      {
+        "el": "button.p-2.rounded-md.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.relative.p-2.text-[var(--foreground-secondary)].hover:text-[var(--foreground)]",
+        "w": 40,
+        "h": 40
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "button.flex.items-center.gap-2.px-3",
+        "w": 40,
+        "h": 32
+      },
+      {
+        "el": "a.inline-flex.items-center.text-[var(--foreground-secondary)].hover:text-[#00E5A0]",
+        "w": 95,
+        "h": 20
+      },
+      {
+        "el": "a.ml-1.text-[var(--foreground-secondary)].hover:text-[#00E5A0].transition",
+        "w": 53,
+        "h": 20
+      },
+      {
+        "el": "a.text-[#00E5A0].hover:text-[#00E5A0].dark:text-[#00E5A0].dark:hover:text-[#00CC8E]",
+        "w": 110,
+        "h": 40
+      },
+      {
+        "el": "a.px-4.py-2.bg-[#00E5A0].text-[#061A21]",
+        "w": 113,
+        "h": 36
+      },
+      {
+        "el": "button.px-4.py-2.text-sm.font-medium",
+        "w": 167,
+        "h": 38
+      }
+    ]
+  }
+]

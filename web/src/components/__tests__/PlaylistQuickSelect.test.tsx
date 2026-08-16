@@ -51,14 +51,17 @@ describe('PlaylistQuickSelect', () => {
     expect(screen.getByRole('combobox')).toBeInTheDocument();
   });
 
-  it('has proper aria-label', () => {
+  // "Assigned", not "Select": the control writes currentPlaylistId and nothing
+  // observes what the screen renders, so its accessible name now matches the
+  // "Assigned Playlist" column header rather than implying playback.
+  it('names itself as the assignment, not as playback', () => {
     render(
       <PlaylistQuickSelect
         device={mockDevice as any}
         playlists={mockPlaylists as any}
       />
     );
-    expect(screen.getByLabelText('Select playlist for Lobby Display')).toBeInTheDocument();
+    expect(screen.getByLabelText('Assigned playlist for Lobby Display')).toBeInTheDocument();
   });
 
   it('renders "No playlist" option', () => {

@@ -58,16 +58,38 @@ const now = new Date();
 const minsAgo = (m) => new Date(now.getTime() - m * 60_000);
 const daysAgo = (d) => new Date(now.getTime() - d * 86_400_000);
 
+/**
+ * Fleet fixture: nickname, location, resolution, status, minutes since last
+ * heartbeat (null = never), and whether a playlist is assigned.
+ *
+ * The status spread is LOAD-BEARING, not decoration. `scripts/design/audit-surface.mjs`
+ * measures this tenant, and an all-online fleet exercises exactly one status
+ * presentation — so the offline / error / pairing inks, the "Unknown"/dashed
+ * treatment's neighbours, and the fleet-summary strip's chip count all go
+ * unmeasured, and two people running the audit on differently-shaped data would
+ * compare different numbers. Every non-online row below is here because it
+ * makes the harness cover a case an all-online fleet cannot reach:
+ *
+ *   offline (recent + stale)  two ink/fill pairs and two Last Seen shapes
+ *   error                     a third pair, distinct from offline
+ *   pairing                   a fourth, plus the "Never" last-seen branch
+ *   no playlist / no location the em-dash and "No playlist" empty cells
+ *
+ * Changing this changes the audit numbers. If you re-capture the marketing
+ * product shot (capture-product-shots.mjs), it now shows a realistic mixed
+ * fleet rather than 9/9 online — which is also the more honest screenshot.
+ */
 const DISPLAYS = [
-  ['Flagship — Window Wall',      'Seattle · 1st & Pike',      '3840x2160'],
-  ['Flagship — Drive-Thru Menu',  'Seattle · 1st & Pike',      '1920x1080'],
-  ['Ballard — Counter Board',     'Seattle · Ballard',         '1920x1080'],
-  ['Ballard — Pastry Case',       'Seattle · Ballard',         '1080x1920'],
-  ['Fremont — Menu Left',         'Seattle · Fremont',         '1920x1080'],
-  ['Fremont — Menu Right',        'Seattle · Fremont',         '1920x1080'],
-  ['Capitol Hill — Entry',        'Seattle · Capitol Hill',    '1080x1920'],
-  ['Bellevue — Order Ahead',      'Bellevue · Main St',        '1920x1080'],
-  ['Tacoma — Cold Brew Feature',  'Tacoma · Pacific Ave',      '1920x1080'],
+  ['Flagship — Window Wall',      'Seattle · 1st & Pike',      '3840x2160', 'online',   1,          true],
+  ['Flagship — Drive-Thru Menu',  'Seattle · 1st & Pike',      '1920x1080', 'online',   2,          true],
+  ['Ballard — Counter Board',     'Seattle · Ballard',         '1920x1080', 'offline',  60 * 4,     true],
+  ['Ballard — Pastry Case',       'Seattle · Ballard',         '1080x1920', 'online',   1,          true],
+  ['Fremont — Menu Left',         'Seattle · Fremont',         '1920x1080', 'error',    22,         true],
+  ['Fremont — Menu Right',        'Seattle · Fremont',         '1920x1080', 'online',   2,          true],
+  ['Capitol Hill — Entry',        'Seattle · Capitol Hill',    '1080x1920', 'offline',  60 * 24 * 9, false],
+  ['Bellevue — Order Ahead',      'Bellevue · Main St',        '1920x1080', 'pairing',  null,       false],
+  // No location — the only row that exercises the em-dash placeholder.
+  ['Tacoma — Cold Brew Feature',  null,                        '1920x1080', 'online',   1,          true],
 ];
 
 const CONTENT = [
@@ -166,7 +188,7 @@ async function main() {
   }
 
   for (let i = 0; i < DISPLAYS.length; i++) {
-    const [nickname, location, resolution] = DISPLAYS[i];
+    const [nickname, location, resolution, status, heartbeatMinsAgo, hasPlaylist] = DISPLAYS[i];
     await prisma.display.create({
       data: {
         deviceIdentifier: `DEMO-NW-${String(i + 1).padStart(3, '0')}`,
@@ -174,12 +196,14 @@ async function main() {
         location,
         resolution,
         orientation: resolution.startsWith('1080x') ? 'portrait' : 'landscape',
-        status: 'online',
+        status,
         timezone: 'America/Los_Angeles',
-        lastHeartbeat: minsAgo(Math.floor(Math.random() * 3)),
+        // Deterministic, not `Math.random()`: this is an audit fixture, and a
+        // random heartbeat is one more thing that differs between two runs.
+        lastHeartbeat: heartbeatMinsAgo === null ? null : minsAgo(heartbeatMinsAgo),
         pairedAt: daysAgo(40 - i),
         organizationId: org.id,
-        currentPlaylistId: playlists[i % playlists.length].id,
+        currentPlaylistId: hasPlaylist ? playlists[i % playlists.length].id : null,
         metadata: { os: 'Android TV 14', model: 'Vizora Player', appVersion: '1.8.2' },
       },
     });
