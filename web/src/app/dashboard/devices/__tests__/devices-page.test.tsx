@@ -537,7 +537,11 @@ describe('DevicesClient', () => {
   });
 
   it('requires confirmation before bulk deleting selected devices and reports the backend count', async () => {
-    mockBulkDeleteDisplays.mockResolvedValue({ deleted: 1 });
+    // Two selected, two deleted — the COMPLETE case, which stays a success
+    // toast with no banner. (The partial case moved to its own describe below;
+    // this fixture used to return `deleted: 1` for a 2-device request and
+    // asserted that shortfall as a plain success.)
+    mockBulkDeleteDisplays.mockResolvedValue({ deleted: 2 });
 
     render(
       <DevicesClient
@@ -566,11 +570,13 @@ describe('DevicesClient', () => {
     await waitFor(() => {
       expect(mockBulkDeleteDisplays).toHaveBeenCalledWith(['d1', 'd2']);
     });
-    expect(mockToast.success).toHaveBeenCalledWith('Deleted 1 device(s)');
+    expect(mockToast.success).toHaveBeenCalledWith('Deleted 2 device(s)');
+    expect(screen.queryByText(/of 2 selected devices/)).not.toBeInTheDocument();
   });
 
   it('reports backend updated count after bulk playlist assignment', async () => {
-    mockBulkAssignPlaylist.mockResolvedValue({ updated: 1 });
+    // d1 (online) + d2 (offline) selected, both updated — complete.
+    mockBulkAssignPlaylist.mockResolvedValue({ updated: 2 });
 
     render(
       <DevicesClient
@@ -599,7 +605,7 @@ describe('DevicesClient', () => {
     // the offline one updates later rather than being left to infer it from a
     // TV that keeps showing its cached playlist.
     expect(mockToast.success).toHaveBeenCalledWith(
-      'Playlist assigned to 1 device(s). Non-online devices will update when they come online.',
+      'Playlist assigned to 2 device(s). Non-online devices will update when they come online.',
     );
   });
 
@@ -752,6 +758,336 @@ describe('DevicesClient', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
     });
+  });
+});
+
+/**
+ * A bulk action that only PARTLY landed must not read as success.
+ *
+ * Every bulk endpoint answers with a count from the row-matching write it
+ * performed — `deleteMany().count`, `updateMany().count`, `createMany().count`
+ * — so a shortfall is server-reported evidence, not an inference. The page used
+ * to render that count into a success toast: ask to delete ten, get one gone
+ * and a green "Deleted 1 device(s)", with the other nine still listed and no
+ * statement that anything was skipped. Toasts also expire, so the one message
+ * that needed re-reading was the one that disappeared.
+ *
+ * The two families are deliberately NOT reported the same way:
+ *   delete / assign-playlist  -> a shortfall means rows did not match. Warning.
+ *   add-to-group              -> createMany skips duplicates, so a shortfall
+ *                                means ALREADY A MEMBER. Not a failure, and
+ *                                calling it one sends the operator chasing a
+ *                                problem that does not exist.
+ */
+describe('DevicesClient reports partial bulk outcomes honestly', () => {
+  const renderThree = () =>
+    render(
+      <DevicesClient
+        initialDevices={sampleDevices as any}
+        initialPlaylists={samplePlaylists as any}
+        initialDevicesComplete
+        initialPlaylistsComplete
+      />,
+    );
+
+  const selectTwo = () => {
+    const checkboxes = screen.getAllByRole('checkbox');
+    fireEvent.click(checkboxes[1]);
+    fireEvent.click(checkboxes[2]);
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUser = {
+      id: 'u1',
+      email: 'test@test.com',
+      firstName: 'Test',
+      lastName: 'User',
+      organizationId: 'org-1',
+      role: 'admin',
+    };
+    mockGetDisplays.mockResolvedValue({ data: sampleDevices, meta: { total: 3 } });
+    mockGetDisplayGroups.mockResolvedValue({ data: [] });
+  });
+
+  it('warns, and keeps a banner on screen, when fewer devices were deleted than selected', async () => {
+    mockBulkDeleteDisplays.mockResolvedValue({ deleted: 1 });
+
+    renderThree();
+    await waitFor(() => expect(screen.getByText('Lobby Display')).toBeInTheDocument());
+
+    selectTwo();
+    fireEvent.click(screen.getByText('Delete Selected'));
+    fireEvent.click(screen.getByText('Confirm'));
+
+    await waitFor(() => {
+      expect(mockBulkDeleteDisplays).toHaveBeenCalledWith(['d1', 'd2']);
+    });
+
+    // Not a success toast — the operator asked for two and got one.
+    await waitFor(() => {
+      expect(mockToast.warning).toHaveBeenCalledWith('Deleted 1 device(s) of 2 selected');
+    });
+    expect(mockToast.success).not.toHaveBeenCalled();
+
+    // And it survives past the toast: the count is still readable afterwards.
+    expect(screen.getByText('Deleted 1 of 2 selected devices')).toBeInTheDocument();
+    expect(screen.getByText(/1 were not changed/)).toBeInTheDocument();
+  });
+
+  it('lets the operator dismiss the partial-result banner', async () => {
+    mockBulkDeleteDisplays.mockResolvedValue({ deleted: 1 });
+
+    renderThree();
+    await waitFor(() => expect(screen.getByText('Lobby Display')).toBeInTheDocument());
+
+    selectTwo();
+    fireEvent.click(screen.getByText('Delete Selected'));
+    fireEvent.click(screen.getByText('Confirm'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Deleted 1 of 2 selected devices')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByLabelText('Dismiss bulk action result'));
+    expect(screen.queryByText('Deleted 1 of 2 selected devices')).not.toBeInTheDocument();
+  });
+
+  it('warns when fewer devices got the playlist than were selected', async () => {
+    mockBulkAssignPlaylist.mockResolvedValue({ updated: 1 });
+
+    renderThree();
+    await waitFor(() => expect(screen.getByText('Lobby Display')).toBeInTheDocument());
+
+    selectTwo();
+    fireEvent.click(screen.getByText('Assign Playlist'));
+    fireEvent.change(screen.getAllByRole('combobox').at(-1)!, { target: { value: 'p1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Assign' }));
+
+    await waitFor(() => {
+      expect(mockBulkAssignPlaylist).toHaveBeenCalledWith(['d1', 'd2'], 'p1');
+    });
+
+    await waitFor(() => {
+      // The deferred-delivery note still rides along: d2 is offline, and a
+      // deferred assignment is applied on reconnect, not lost.
+      expect(mockToast.warning).toHaveBeenCalledWith(
+        'Playlist assigned to 1 device(s). Non-online devices will update when they come online. of 2 selected',
+      );
+    });
+    expect(
+      screen.getByText('Assigned the playlist to 1 of 2 selected devices'),
+    ).toBeInTheDocument();
+  });
+
+  it('does not call an already-a-member group shortfall a failure', async () => {
+    mockGetDisplayGroups.mockResolvedValue({
+      data: [{ id: 'g1', name: 'Lobby Group', description: '', displays: [] }],
+      meta: { total: 1 },
+    });
+    mockBulkAssignGroup.mockResolvedValue({ added: 1 });
+
+    renderThree();
+    await waitFor(() => expect(screen.getByText('Lobby Display')).toBeInTheDocument());
+
+    selectTwo();
+    fireEvent.click(screen.getByText('Add to Group'));
+    await waitFor(() => expect(screen.getByText('Lobby Group')).toBeInTheDocument());
+    fireEvent.change(screen.getAllByRole('combobox').at(-1)!, { target: { value: 'g1' } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Add to Group' }).at(-1)!);
+
+    await waitFor(() => {
+      expect(mockBulkAssignGroup).toHaveBeenCalledWith(['d1', 'd2'], 'g1');
+    });
+
+    expect(mockToast.success).toHaveBeenCalledWith('Added 1 device(s) to group');
+    expect(mockToast.warning).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByText(/were already in this group/)).toBeInTheDocument();
+    });
+  });
+});
+
+/**
+ * "No devices at all" and "no devices match your filters" are different
+ * situations with different fixes, so they are different screens.
+ *
+ * Showing "No devices yet — pair your first display" while a search box holds
+ * "zzz" tells an operator with 500 screens that the fleet is gone.
+ */
+describe('DevicesClient distinguishes empty from filtered-empty', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUser = {
+      id: 'u1',
+      email: 'test@test.com',
+      firstName: 'Test',
+      lastName: 'User',
+      organizationId: 'org-1',
+      role: 'admin',
+    };
+    mockGetDisplayGroups.mockResolvedValue({ data: [] });
+  });
+
+  it('names the filters, not the fleet, when a search matches nothing', async () => {
+    render(
+      <DevicesClient
+        initialDevices={sampleDevices as any}
+        initialPlaylists={samplePlaylists as any}
+        initialDevicesComplete
+        initialPlaylistsComplete
+      />,
+    );
+    await waitFor(() => expect(screen.getByText('Lobby Display')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'zzz-no-such-screen' } });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('empty-state')).toHaveTextContent(
+        'No devices match these filters',
+      );
+    });
+    expect(screen.queryByText('No devices yet')).not.toBeInTheDocument();
+    // The fleet size is stated so nobody reads this as data loss.
+    expect(screen.getByTestId('empty-state')).toHaveTextContent('3 devices are paired');
+
+    fireEvent.click(screen.getByText('Clear filters'));
+    await waitFor(() => expect(screen.getByText('Lobby Display')).toBeInTheDocument());
+  });
+});
+
+/**
+ * Fleet scannability: at 500 devices nobody reads rows, they read totals and
+ * then narrow. The summary strip is the aggregate AND the filter, counted over
+ * the whole fleet rather than the visible page so the numbers do not move under
+ * pagination.
+ */
+describe('DevicesClient fleet status summary', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUser = {
+      id: 'u1',
+      email: 'test@test.com',
+      firstName: 'Test',
+      lastName: 'User',
+      organizationId: 'org-1',
+      role: 'admin',
+    };
+    mockGetDisplayGroups.mockResolvedValue({ data: [] });
+  });
+
+  it('counts each status over the whole fleet and filters to it on click', async () => {
+    render(
+      <DevicesClient
+        initialDevices={sampleDevices as any}
+        initialPlaylists={samplePlaylists as any}
+        initialDevicesComplete
+        initialPlaylistsComplete
+      />,
+    );
+    await waitFor(() => expect(screen.getByText('Lobby Display')).toBeInTheDocument());
+
+    // sampleDevices: d1 + d3 online, d2 offline.
+    const offlineChip = screen.getByRole('button', { name: '1 Offline' });
+    expect(screen.getByRole('button', { name: '2 Online' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '3 All devices' })).toBeInTheDocument();
+
+    fireEvent.click(offlineChip);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Lobby Display')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('Conference Room')).toBeInTheDocument();
+    expect(offlineChip).toHaveAttribute('aria-pressed', 'true');
+
+    // Clicking the active chip clears it rather than trapping the operator.
+    fireEvent.click(offlineChip);
+    await waitFor(() => expect(screen.getByText('Lobby Display')).toBeInTheDocument());
+  });
+});
+
+/**
+ * Row actions and column sorting must be reachable without a mouse.
+ *
+ * Sorting was a bare `onClick` on the `<th>`: not focusable, not activatable by
+ * keyboard, and announcing no sort state at all. Row actions were four buttons
+ * all named "Delete"/"Edit"/"Pair" — identical accessible names repeated once
+ * per device, so a screen-reader user tabbing a 500-row list heard "Delete
+ * button" 500 times with nothing to tell them apart.
+ */
+describe('DevicesClient keyboard and assistive-tech operability', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUser = {
+      id: 'u1',
+      email: 'test@test.com',
+      firstName: 'Test',
+      lastName: 'User',
+      organizationId: 'org-1',
+      role: 'admin',
+    };
+    mockGetDisplayGroups.mockResolvedValue({ data: [] });
+  });
+
+  const renderThree = () =>
+    render(
+      <DevicesClient
+        initialDevices={sampleDevices as any}
+        initialPlaylists={samplePlaylists as any}
+        initialDevicesComplete
+        initialPlaylistsComplete
+      />,
+    );
+
+  it('sorts from a real button and publishes the sort state on the column header', async () => {
+    renderThree();
+    await waitFor(() => expect(screen.getByText('Lobby Display')).toBeInTheDocument());
+
+    const header = screen.getByRole('columnheader', { name: /^Device/ });
+    expect(header).toHaveAttribute('aria-sort', 'none');
+
+    const sortButton = screen.getByRole('button', {
+      name: /Device.*activate to sort ascending/,
+    });
+    fireEvent.click(sortButton);
+
+    expect(screen.getByRole('columnheader', { name: /^Device/ })).toHaveAttribute(
+      'aria-sort',
+      'ascending',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Device.*activate to sort descending/ }));
+    expect(screen.getByRole('columnheader', { name: /^Device/ })).toHaveAttribute(
+      'aria-sort',
+      'descending',
+    );
+  });
+
+  it('gives every row control an accessible name that identifies its device', async () => {
+    renderThree();
+    await waitFor(() => expect(screen.getByText('Lobby Display')).toBeInTheDocument());
+
+    expect(screen.getByRole('button', { name: 'Delete Lobby Display' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit Conference Room' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Preview Cafeteria Screen' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Select Lobby Display')).toBeInTheDocument();
+
+    // Still operable — the accessible name changed, the behaviour did not.
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Lobby Display' }));
+    expect(screen.getByTestId('confirm-dialog')).toHaveTextContent('Delete Device');
+  });
+
+  it('exposes the group filter disclosure state', async () => {
+    mockGetDisplayGroups.mockResolvedValue({
+      data: [{ id: 'g1', name: 'Lobby Group', description: '', displays: [] }],
+    });
+    renderThree();
+    await waitFor(() => expect(screen.getByText('Lobby Display')).toBeInTheDocument());
+
+    const toggle = await screen.findByRole('button', { name: /Device Groups/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
   });
 });
 

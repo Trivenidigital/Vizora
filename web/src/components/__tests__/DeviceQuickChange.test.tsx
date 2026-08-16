@@ -292,7 +292,8 @@ describe('PlaylistQuickSelect - Dropdown Component', () => {
   it('has proper accessibility label', () => {
     render(<PlaylistQuickSelect device={mockDevice} playlists={mockPlaylists} />);
 
-    const dropdown = screen.getByLabelText('Select playlist for Lobby Display');
+    // Renamed from "Select playlist for …" — see PlaylistQuickSelect.test.tsx.
+    const dropdown = screen.getByLabelText('Assigned playlist for Lobby Display');
     expect(dropdown).toBeInTheDocument();
   });
 });

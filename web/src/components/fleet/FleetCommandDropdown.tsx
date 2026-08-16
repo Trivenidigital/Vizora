@@ -56,8 +56,11 @@ export default function FleetCommandDropdown({ organizationId }: FleetCommandDro
     <div ref={dropdownRef} className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="eh-btn-ghost rounded-xl px-4 py-2 flex items-center gap-2 text-sm font-medium"
+        /* min-h matches the other two controls in the devices header; it
+           rendered 42px, two short of the 44px pointer-target floor. */
+        className="eh-btn-ghost min-h-[44px] rounded-xl px-4 py-2 flex items-center gap-2 text-sm font-medium"
         aria-label="Fleet commands"
+        aria-expanded={isOpen}
       >
         <Icon name="settings" size="lg" />
         <span>Fleet Commands</span>

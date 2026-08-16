@@ -114,6 +114,43 @@
     --error-ink: #b91c1c;
     --info-ink: #0E7490;
 
+    /*
+     * Badge FILLS — the surface a semantic ink is painted on.
+     *
+     * The `-lightest` ramp above cannot serve here: it is a light-substrate
+     * ramp, so under `.dark` `--success-lightest` is #dcfce7 and a badge using
+     * it would be a near-white pill carrying mid-green text. These are declared
+     * per theme instead, and every pair below is computed against its own ink:
+     *
+     *   online   #166534 on #E6F6EC = 6.37:1
+     *   offline  #b91c1c on #FBE9E9 = 5.53:1
+     *   error    #92400e on #FDF0E1 = 6.32:1
+     *   pairing  #0E7490 on #EAF6F9 = 4.86:1
+     *   brand    #00745B on #E3F7EF = 5.16:1   (was 4.12:1 on rgba(0,229,160,.1))
+     *
+     * `--status-neutral-bg` carries idle AND unknown; those two are told apart
+     * by glyph and by the dashed ring on unknown, never by hue (see
+     * DeviceStatusIndicator) — status must survive a greyscale screenshot.
+     */
+    --status-online-bg: #E6F6EC;
+    --status-offline-bg: #FBE9E9;
+    --status-error-bg: #FDF0E1;
+    --status-pairing-bg: #EAF6F9;
+    --status-neutral-bg: #E4EBED;
+    --badge-brand-bg: #E3F7EF;
+
+    /*
+     * Solid danger surface — white sits on THIS, not on `--error`.
+     *
+     * `.eh-btn-danger` painted `var(--error)`, which under `.dark` is #ef4444:
+     * white on it measures 3.76:1, so the most destructive control in the app
+     * failed AA in one theme only. #dc2626 carries white at 4.83:1 and reads as
+     * danger on both substrates, so the token is deliberately theme-invariant;
+     * hover goes DARKER (6.47:1) rather than brighter.
+     */
+    --danger-solid: #dc2626;
+    --danger-solid-hover: #b91c1c;
+
     /* Accent Colors */
     --accent-warm: #F59E0B;
     --accent-warm-light: #FBBF24;
@@ -213,6 +250,22 @@
     --warning-ink: #fbbf24;
     --error-ink: #f87171;
     --info-ink: #00B4D8;
+
+    /*
+     * Badge fills — low-alpha tints, so the composite stays close to
+     * `--surface` and each ink keeps roughly the ratio documented above
+     * (measured on the composite: offline #f87171 = 4.94:1, the tightest).
+     */
+    --status-online-bg: rgba(34, 197, 94, 0.14);
+    --status-offline-bg: rgba(248, 113, 113, 0.14);
+    --status-error-bg: rgba(251, 191, 36, 0.14);
+    --status-pairing-bg: rgba(0, 180, 216, 0.14);
+    --status-neutral-bg: rgba(154, 149, 142, 0.16);
+    --badge-brand-bg: rgba(0, 229, 160, 0.12);
+
+    /* Theme-invariant on purpose — see the :root declaration. */
+    --danger-solid: #dc2626;
+    --danger-solid-hover: #b91c1c;
 
     /* Accent Colors */
     --accent-warm: #F59E0B;
@@ -851,6 +904,10 @@ body:has(.mkt) .consent-bar {
 /* Standardized input styling */
 .eh-input {
   width: 100%;
+  /* 10px padding + 14px text + hairlines rendered 43px, one pixel under the
+     44px pointer-target floor, so every `.eh-input` in the app was a finding.
+     A min-height fixes it without disturbing the padding rhythm. */
+  min-height: 44px;
   padding: 10px 16px;
   background: var(--background-secondary);
   border: 1px solid var(--border);
@@ -911,14 +968,17 @@ body:has(.mkt) .consent-bar {
 
 /* Danger button */
 .eh-btn-danger {
-  background: var(--error);
+  /* `--error` is a FILL for glyphs and hairlines and is brightened under
+     .dark; white on it fell to 3.76:1 there. `--danger-solid` is the
+     white-safe solid. */
+  background: var(--danger-solid);
   color: white;
   font-weight: 600;
   border-radius: 12px;
   transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 .eh-btn-danger:hover {
-  background: var(--error-light);
+  background: var(--danger-solid-hover);
   box-shadow: 0 0 16px rgba(239, 68, 68, 0.25);
   transform: translateY(-1px);
 }
@@ -964,7 +1024,10 @@ body:has(.mkt) .consent-bar {
   line-height: 1;
 }
 .eh-badge-success {
-  background: rgba(0, 229, 160, 0.1);
+  /* rgba(0,229,160,.1) over white composites to #D2EDE7, on which
+     `--primary-ink` is 4.12:1. `--badge-brand-bg` is per-theme and gives
+     5.16:1 on light without changing the dark badge (7.6:1 already). */
+  background: var(--badge-brand-bg);
   color: var(--primary-ink);
 }
 .eh-badge-warning {
@@ -1127,4 +1190,344 @@ body:has(.mkt) .consent-bar {
   border-radius: 9999px;
   background: linear-gradient(90deg, var(--primary), var(--info));
   transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   FLEET DATA TABLE
+   ------------------------------------------------------------------
+   A scannable list primitive for fleets that are long rather than
+   wide. Everything here is namespaced `.eh-fleet-*` / `.eh-datatable`
+   and is opt-in: the shared `.eh-th` / `.eh-td` / `.eh-tr-hover` rules
+   above are consumed by other routes and are deliberately untouched.
+   ══════════════════════════════════════════════════════════════════ */
+
+/*
+ * The scroller is the only thing between a wide table and `<main>`'s
+ * `overflow-x: hidden`. Keep BOTH axes governed here so the sticky header
+ * below has a scrollport to stick to.
+ */
+.eh-datatable-scroll {
+  overflow-x: auto;
+  overflow-y: auto;
+  /* Roughly 12 rows before the header pins — long enough that a fleet reads as
+     a list, short enough that the header is reached without a page scroll. */
+  max-height: min(68vh, 760px);
+}
+
+/*
+ * At 500 rows the column meaning is the first thing lost. Pinning the header
+ * inside the scroller keeps "which column am I reading" answered at every
+ * scroll offset — this is the single highest-leverage scannability change on
+ * the surface, and it costs no extra request.
+ */
+.eh-datatable thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--background-secondary);
+  box-shadow: inset 0 -1px 0 var(--border);
+}
+
+.eh-datatable td {
+  /* 14px, not the shared `.eh-td`'s 24px: seven columns of horizontal padding
+     is ~140px of table width, which is the difference between the row actions
+     fitting at 1440px and needing a horizontal scroll to reach Delete. */
+  padding: 12px 14px;
+  font-size: 14px;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+/* Row separators live here rather than on a `divide-y` utility, because below
+   the breakpoint the rows become blocks and the two idioms would double up. */
+.eh-datatable tbody tr + tr {
+  border-top: 1px solid var(--border);
+}
+.eh-datatable th {
+  padding: 10px 14px;
+  text-align: left;
+}
+
+/* Sort control — a real button, so the column is reachable by keyboard.
+   It used to be a bare `onClick` on the `<th>`: mouse-only. */
+.eh-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 24px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--foreground-tertiary);
+  border-radius: 6px;
+  transition: color 0.15s ease;
+}
+.eh-sort-btn:hover {
+  color: var(--foreground);
+}
+.eh-sort-btn[data-sort='ascending'],
+.eh-sort-btn[data-sort='descending'] {
+  color: var(--primary-ink);
+}
+
+/* Row action — text button inside a dense row. Named, not iconographic:
+   "Delete" next to 499 identical rows has to say which verb it is. */
+.eh-row-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--foreground-secondary);
+  border: 1px solid transparent;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.eh-row-action:hover {
+  background: var(--surface-hover);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+.eh-row-action-danger:hover {
+  background: var(--status-offline-bg);
+  color: var(--error-ink);
+  border-color: var(--error-ink);
+}
+
+/*
+ * Selection checkbox.
+ *
+ * Native checkboxes render 13x13 here, so every one of them was a sub-44px
+ * pointer target on a phone. `appearance: none` lets the ELEMENT carry the
+ * target while `::before` paints a 20px box, so the hit area grows without the
+ * control looking oversized. Colours come from tokens, which a background-image
+ * data-URI could not do.
+ */
+.eh-check {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  display: inline-grid;
+  place-content: center;
+  width: 44px;
+  height: 44px;
+  margin: 0;
+  flex: none;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+}
+.eh-check::before {
+  content: '';
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid var(--border-dark);
+  border-radius: 6px;
+  background: var(--surface);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.eh-check:hover::before {
+  border-color: var(--primary-ink);
+}
+.eh-check:checked::before,
+.eh-check:indeterminate::before {
+  background: var(--primary-ink);
+  border-color: var(--primary-ink);
+}
+.eh-check:checked::after {
+  content: '';
+  position: absolute;
+  width: 5px;
+  height: 10px;
+  border: solid var(--surface);
+  border-width: 0 2px 2px 0;
+  transform: translateY(-1px) rotate(45deg);
+}
+.eh-check:indeterminate::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 2px;
+  background: var(--surface);
+  border-radius: 1px;
+}
+.eh-check:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+/* Pointer-precise input does not need the phone-sized target. */
+@media (pointer: fine) {
+  .eh-check {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+/*
+ * Inline select used inside a row/card (playlist assignment).
+ *
+ * No `background-image` chevron: `.eh-select` bakes `%239A958E` into a data-URI
+ * and no token can reach it, so its arrow is the one part of that control that
+ * cannot follow the theme. The caller renders a real <svg> in `currentColor`
+ * instead, which is why the right padding is reserved here.
+ */
+.eh-select-inline {
+  min-height: 36px;
+  padding: 6px 30px 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background-color: var(--surface);
+  color: var(--foreground);
+  font-size: 13px;
+  appearance: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.eh-select-inline:focus {
+  outline: none;
+  border-color: var(--primary-ink);
+  box-shadow: 0 0 0 3px var(--badge-brand-bg);
+}
+.eh-select-inline:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+@media (max-width: 767px) {
+  .eh-select-inline {
+    min-height: 44px;
+    font-size: 14px;
+  }
+}
+
+/* Fleet summary / status filter chip. */
+.eh-fleet-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--foreground-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.eh-fleet-chip:hover {
+  border-color: var(--border-dark);
+  color: var(--foreground);
+}
+.eh-fleet-chip[aria-pressed='true'] {
+  border-color: var(--primary-ink);
+  background: var(--badge-brand-bg);
+  color: var(--primary-ink);
+}
+.eh-fleet-chip-count {
+  font-family: var(--font-sora), sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+}
+.eh-fleet-chip[aria-pressed='true'] .eh-fleet-chip-count {
+  color: var(--primary-ink);
+}
+
+.eh-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+/*
+ * TABLE -> CARD, without a second copy of the DOM.
+ *
+ * The obvious implementation is `hidden md:block` on a table plus `md:hidden`
+ * on a card list. That ships every control TWICE — two checkboxes per device,
+ * two Delete buttons — which duplicates the accessible names, doubles the tab
+ * order and makes any index-based query ambiguous. So the same rows restyle
+ * instead.
+ *
+ * The header row is dropped rather than made sr-only. Overriding `display` on
+ * `tr`/`td` already removes the table roles from the accessibility tree, so a
+ * retained `<thead>` associates nothing at this width — it just leaves an
+ * off-screen row whose cells measure as clipped. Each cell carries its own
+ * label instead, via `data-label` + generated content, which IS exposed to
+ * assistive tech and is the same string the column header used.
+ */
+@media (max-width: 767px) {
+  .eh-datatable-scroll {
+    overflow: visible;
+    max-height: none;
+  }
+  .eh-datatable,
+  .eh-datatable tbody,
+  .eh-datatable tr,
+  .eh-datatable td {
+    display: block;
+    width: 100%;
+  }
+  .eh-datatable thead {
+    display: none;
+  }
+  .eh-datatable tr {
+    padding: 12px 4px 16px;
+  }
+  .eh-datatable td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 16px;
+    white-space: normal;
+    border: none;
+  }
+  .eh-datatable td[data-label]::before {
+    content: attr(data-label);
+    flex: none;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--foreground-tertiary);
+  }
+  /* The identity cell leads the card and is unmistakable, so its label sits
+     above the name rather than beside it. */
+  .eh-datatable td[data-label='Device'] {
+    display: block;
+  }
+  .eh-datatable td[data-label='Device']::before {
+    display: block;
+    margin-bottom: 6px;
+  }
+  /* Actions wrap onto as many lines as they need. This is what removed the
+     horizontal scroll the row actions used to require at 390px. */
+  .eh-datatable .eh-row-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+  .eh-row-action {
+    min-height: 44px;
+    padding: 10px 16px;
+    border-color: var(--border);
+  }
+}
+
+/* Result banner for a bulk action that only partly succeeded. */
+.eh-partial-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--warning-ink);
+  border-radius: 12px;
+  background: var(--status-error-bg);
+  color: var(--warning-ink);
+  font-size: 14px;
 }

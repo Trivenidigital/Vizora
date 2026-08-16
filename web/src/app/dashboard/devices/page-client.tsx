@@ -31,6 +31,45 @@ interface DevicesClientProps {
  initialPlaylistsComplete?: boolean;
 }
 
+/**
+ * The status buckets a fleet is scanned by, in the order an operator triages
+ * them: the states that need attention first, then the healthy majority last.
+ *
+ * `unknown` is a real bucket, not a synonym for offline - it is what a device
+ * with no reading falls into, and conflating the two sends someone to a screen
+ * that is, as far as anyone knows, fine.
+ */
+const FLEET_STATUSES = ['offline', 'error', 'pairing', 'idle', 'unknown', 'online'] as const;
+type FleetStatus = (typeof FLEET_STATUSES)[number];
+
+const FLEET_STATUS_LABEL: Record<FleetStatus, string> = {
+ offline: 'Offline',
+ error: 'Error',
+ pairing: 'Pairing',
+ idle: 'Idle',
+ unknown: 'Unknown',
+ online: 'Online',
+};
+
+/** Anything the API sends that is not a state we present falls to `unknown`. */
+const toFleetStatus = (status: unknown): FleetStatus =>
+ (FLEET_STATUSES as readonly string[]).includes(String(status))
+ ? (String(status) as FleetStatus)
+ : 'unknown';
+
+/**
+ * The outcome of a bulk action, kept on screen instead of only in a toast.
+ *
+ * A toast that says "Deleted 1 device(s)" after the operator asked for ten is
+ * technically true and reads as success. Partial outcomes are the ones worth
+ * reading twice, so they persist until dismissed.
+ */
+type BulkOutcome = {
+ kind: 'delete' | 'playlist' | 'group';
+ requested: number;
+ changed: number;
+};
+
 export default function DevicesClient({
  initialDevices,
  initialPlaylists,
@@ -47,7 +86,7 @@ export default function DevicesClient({
  const [playlists, setPlaylists] = useState<PlaylistSummary[]>(initialPlaylists);
  const [deviceGroups, setDeviceGroups] = useState<any[]>([]);
  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
- const [loading, setLoading] = useState(!initialDevices.length && initialDevices.length === 0 ? false : false);
+ const [loading, setLoading] = useState(false);
  const [devicesLoadError, setDevicesLoadError] = useState<Error | null>(null);
  const [selectedDevice, setSelectedDevice] = useState<Display | null>(null);
  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -61,6 +100,7 @@ export default function DevicesClient({
  const [actionLoading, setActionLoading] = useState(false);
  const [searchQuery, setSearchQuery] = useState('');
  const debouncedSearch = useDebounce(searchQuery, 300);
+ const [statusFilter, setStatusFilter] = useState<FleetStatus | null>(null);
  const [sortField, setSortField] = useState<keyof Display | null>(null);
  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
  const [currentPage, setCurrentPage] = useState(1);
@@ -71,6 +111,7 @@ export default function DevicesClient({
  const [isBulkGroupModalOpen, setIsBulkGroupModalOpen] = useState(false);
  const [bulkPlaylistId, setBulkPlaylistId] = useState('');
  const [bulkGroupId, setBulkGroupId] = useState('');
+ const [bulkOutcome, setBulkOutcome] = useState<BulkOutcome | null>(null);
  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline' | 'error'>('offline');
  const hasCompleteInitialDevices = initialDevicesComplete ?? initialDevices.length > 0;
  const hasCompleteInitialPlaylists = initialPlaylistsComplete ?? initialPlaylists.length > 0;
@@ -356,7 +397,10 @@ export default function DevicesClient({
  try {
  setActionLoading(true);
  const result = await apiClient.bulkDeleteDisplays(displayIds);
- toast.success(`Deleted ${result.deleted} device(s)`);
+ // `deleted` is deleteMany's matched-row count, scoped to the org. Fewer
+ // than were asked for means those rows were already gone - a partial
+ // outcome that a bare "Deleted 1 device(s)" reads as complete success.
+ reportBulkOutcome('delete', displayIds.length, result.deleted);
  setSelectedDeviceIds(new Set());
  setIsBulkDeleteModalOpen(false);
  await loadDevices(false);
@@ -388,7 +432,7 @@ export default function DevicesClient({
  const delayedSuffix = delayedCount > 0
  ? '. Non-online devices will update when they come online.'
  : '';
- toast.success(`Playlist assigned to ${result.updated} device(s)${delayedSuffix}`);
+ reportBulkOutcome('playlist', displayIds.length, result.updated, delayedSuffix);
  setSelectedDeviceIds(new Set());
  setIsBulkPlaylistModalOpen(false);
  setBulkPlaylistId('');
@@ -406,7 +450,10 @@ export default function DevicesClient({
  try {
  setActionLoading(true);
  const result = await apiClient.bulkAssignGroup(displayIds, bulkGroupId);
- toast.success(`Added ${result.added} device(s) to group`);
+ // `added` comes from createMany({ skipDuplicates: true }), so a shortfall
+ // here means ALREADY A MEMBER - not a failure. Reporting it as one would
+ // send the operator chasing a problem that does not exist.
+ reportBulkOutcome('group', displayIds.length, result.added);
  setSelectedDeviceIds(new Set());
  setIsBulkGroupModalOpen(false);
  setBulkGroupId('');
@@ -417,6 +464,37 @@ export default function DevicesClient({
  } finally {
  setActionLoading(false);
  }
+ };
+
+ /**
+  * One place decides how a bulk result is announced.
+  *
+  * A complete result stays a toast. An INCOMPLETE one also raises a banner that
+  * survives the toast timeout, because "7 of 10" is the case an operator has to
+  * act on and the case a transient success toast hides best.
+  */
+ const reportBulkOutcome = (
+ kind: BulkOutcome['kind'],
+ requested: number,
+ changed: number,
+ suffix = '',
+ ) => {
+ const complete = changed >= requested;
+ setBulkOutcome(complete ? null : { kind, requested, changed });
+
+ if (kind === 'delete') {
+ const message = `Deleted ${changed} device(s)${suffix}`;
+ complete ? toast.success(message) : toast.warning(`${message} of ${requested} selected`);
+ return;
+ }
+ if (kind === 'playlist') {
+ const message = `Playlist assigned to ${changed} device(s)${suffix}`;
+ complete ? toast.success(message) : toast.warning(`${message} of ${requested} selected`);
+ return;
+ }
+ const message = `Added ${changed} device(s) to group${suffix}`;
+ // A group shortfall is informational, so it stays a success toast.
+ toast.success(message);
  };
 
  const handleSort = (field: keyof Display) => {
@@ -432,6 +510,13 @@ export default function DevicesClient({
  }
  };
 
+ /** Live counts for the summary strip; computed over the WHOLE fleet, not the page. */
+ const statusCounts = devices.reduce<Record<FleetStatus, number>>((acc, d) => {
+ const key = toFleetStatus(d.status);
+ acc[key] = (acc[key] ?? 0) + 1;
+ return acc;
+ }, { offline: 0, error: 0, pairing: 0, idle: 0, unknown: 0, online: 0 });
+
  // Filter and sort devices
  const filteredAndSortedDevices = devices
  .filter(d => {
@@ -440,6 +525,7 @@ export default function DevicesClient({
  (d.nickname || '').toLowerCase().includes(debouncedSearch.toLowerCase()) ||
  (d.location && d.location.toLowerCase().includes(debouncedSearch.toLowerCase()));
  if (!matchesSearch) return false;
+ if (statusFilter && toFleetStatus(d.status) !== statusFilter) return false;
  if (selectedGroups.length === 0) return true;
  return deviceGroups
  .filter(group => selectedGroups.includes(group.id))
@@ -463,6 +549,13 @@ export default function DevicesClient({
  const startIndex = (currentPage - 1) * itemsPerPage;
  const endIndex = startIndex + itemsPerPage;
  const displayDevices = filteredAndSortedDevices.slice(startIndex, endIndex);
+
+ const hasActiveFilters = Boolean(debouncedSearch) || Boolean(statusFilter) || selectedGroups.length > 0;
+ const clearAllFilters = () => {
+ setSearchQuery('');
+ setStatusFilter(null);
+ setSelectedGroups([]);
+ };
 
  /**
   * Selection may only ever contain rows the operator can currently see.
@@ -510,64 +603,105 @@ export default function DevicesClient({
  useEffect(() => {
  setCurrentPage(1);
  setSelectedDeviceIds(new Set());
- }, [debouncedSearch, selectedGroups]);
+ }, [debouncedSearch, selectedGroups, statusFilter]);
+
+ const ariaSort = (field: keyof Display): 'ascending' | 'descending' | 'none' =>
+ sortField !== field ? 'none' : sortDirection === 'asc' ? 'ascending' : 'descending';
 
  const getSortIcon = (field: keyof Display) => {
  if (sortField !== field) return null;
- return sortDirection === 'asc' ? ' \u2191' : ' \u2193';
+ return sortDirection === 'asc' ? ' ↑' : ' ↓';
  };
+
+ /**
+  * A sortable column header.
+  *
+  * The header used to be a bare `onClick` on the `<th>`: reachable by mouse
+  * only, announced as a plain cell, and with no sort state exposed at all.
+  * `aria-sort` lives on the cell (where the spec puts it) and the control is a
+  * real button, so the column is operable from the keyboard.
+  */
+ const SortableHeader = ({ field, label }: { field: keyof Display; label: string }) => (
+ <th scope="col" className="eh-th" aria-sort={ariaSort(field)}>
+ <button
+ type="button"
+ onClick={() => handleSort(field)}
+ className="eh-sort-btn"
+ /* `aria-sort` belongs on the header CELL, not on the control inside it;
+    this mirror is a styling hook only. */
+ data-sort={ariaSort(field)}
+ >
+ {label}
+ <span aria-hidden>{getSortIcon(field)}</span>
+ <span className="sr-only">
+ {sortField !== field
+ ? ', not sorted, activate to sort ascending'
+ : sortDirection === 'asc'
+ ? ', sorted ascending, activate to sort descending'
+ : ', sorted descending, activate to clear sorting'}
+ </span>
+ </button>
+ </th>
+ );
 
  return (
  <div className="space-y-6">
  <toast.ToastContainer />
 
- <div className="flex justify-between items-center">
- <div>
- <div className="flex items-center gap-2">
- <h2 className="eh-dash-title text-2xl">Devices</h2>
- <div
- className={`eh-badge flex items-center gap-1 ${
+ {/* Header. `flex-wrap` + a full-width action row below `sm` is what stopped
+     the Fleet/Override/Pair cluster running 256px past a 390px viewport. */}
+ <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+ <div className="min-w-0">
+ <div className="flex flex-wrap items-center gap-3">
+ <h2 className="eh-dash-title text-2xl sm:text-3xl">Devices</h2>
+ {/* This badge is the LIVE-UPDATE CHANNEL, not a device state. It used to
+     read "Offline", the same word the rows use for a screen that is down. */}
+ <span
+ className={`eh-badge ${
  realtimeStatus === 'connected'
  ? 'eh-badge-success'
  : realtimeStatus === 'offline'
- ? 'eh-badge-warning'
+ ? 'eh-badge-neutral'
  : 'eh-badge-error'
  }`}
- >
- <span className={`h-2 w-2 rounded-full ${
+ title={
  realtimeStatus === 'connected'
- ? 'bg-success-500'
+ ? 'Status changes are streaming into this page'
+ : 'This page is not receiving live status changes; reload to refresh'
+ }
+ >
+ <Icon name={realtimeStatus === 'connected' ? 'refresh' : 'close'} size="xs" aria-hidden />
+ {realtimeStatus === 'connected'
+ ? 'Live updates on'
  : realtimeStatus === 'offline'
- ? 'bg-warning-500'
- : 'bg-error-500'
- }`} />
- {realtimeStatus === 'connected' ? 'Live' : realtimeStatus === 'offline' ? 'Offline' : 'Error'}
+ ? 'Live updates off'
+ : 'Live updates failed'}
+ </span>
  </div>
- </div>
- <p className="mt-2 text-[var(--foreground-secondary)]">
+ <p className="mt-2 text-sm text-[var(--foreground-secondary)]">
  Manage your paired display devices ({devices.length} total)
- {hasPendingUpdates() && ' \u2022 Syncing changes...'}
+ {hasPendingUpdates() && ' • Syncing changes...'}
  </p>
  </div>
- <div className="flex items-center gap-3">
+ <div className="flex flex-wrap items-center gap-3">
  {permissions.canUseFleetCommands && user?.organizationId && (
  <FleetCommandDropdown organizationId={user.organizationId} />
  )}
  {permissions.canUseEmergencyOverride && (
  <button
  onClick={() => setIsOverrideModalOpen(true)}
- className="eh-btn-danger rounded-xl px-4 py-3 flex items-center gap-2 text-sm font-medium"
+ className="eh-btn-danger flex min-h-[44px] items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium"
  >
- <Icon name="warning" size="lg" className="text-white" />
+ <Icon name="warning" size="md" aria-hidden />
  <span>Emergency Override</span>
  </button>
  )}
  {permissions.canPairDevices && (
  <button
  onClick={() => router.push('/dashboard/devices/pair')}
- className="eh-btn-neon rounded-xl px-6 py-3 flex items-center gap-2"
+ className="eh-btn-neon flex min-h-[44px] items-center gap-2 rounded-xl px-5 py-3"
  >
- <Icon name="add" size="lg" className="text-white" />
+ <Icon name="add" size="md" aria-hidden />
  <span>Pair New Device</span>
  </button>
  )}
@@ -576,6 +710,43 @@ export default function DevicesClient({
 
  {permissions.canUseFleetCommands && (
  <ActiveOverrideBanner canClearOverride={permissions.canUseEmergencyOverride} />
+ )}
+
+ {/*
+   Fleet summary — the answer to "how do I scan 500 devices".
+   At that size nobody reads rows; they read totals and then narrow. Each chip
+   is both the count and the filter for that bucket, computed over the whole
+   fleet rather than the visible page, so the numbers do not change under
+   pagination.
+ */}
+ {devices.length > 0 && (
+ <div
+ className="flex flex-wrap gap-2"
+ role="group"
+ aria-label="Filter devices by status"
+ >
+ <button
+ type="button"
+ onClick={() => setStatusFilter(null)}
+ aria-pressed={statusFilter === null}
+ className="eh-fleet-chip"
+ >
+ <span className="eh-fleet-chip-count">{devices.length}</span>
+ All devices
+ </button>
+ {FLEET_STATUSES.filter((s) => statusCounts[s] > 0).map((status) => (
+ <button
+ key={status}
+ type="button"
+ onClick={() => setStatusFilter(statusFilter === status ? null : status)}
+ aria-pressed={statusFilter === status}
+ className="eh-fleet-chip"
+ >
+ <span className="eh-fleet-chip-count">{statusCounts[status]}</span>
+ {FLEET_STATUS_LABEL[status]}
+ </button>
+ ))}
+ </div>
  )}
 
  <SearchFilter
@@ -587,15 +758,22 @@ export default function DevicesClient({
  <div className="eh-dash-card">
  <button
  onClick={() => setShowGroupFilter(!showGroupFilter)}
- className="w-full p-4 flex items-center justify-between text-left hover:bg-[var(--surface-hover)] transition rounded-lg"
+ aria-expanded={showGroupFilter}
+ aria-controls="device-group-filter"
+ className="flex min-h-[44px] w-full items-center justify-between rounded-2xl p-4 text-left transition hover:bg-[var(--surface-hover)]"
  >
  <span className="text-sm font-medium text-[var(--foreground-secondary)]">
  Device Groups ({deviceGroups.length})
  </span>
- <span className="text-[var(--foreground-tertiary)]">{showGroupFilter ? '\u25B2' : '\u25BC'}</span>
+ <Icon
+ name={showGroupFilter ? 'chevronUp' : 'chevronDown'}
+ size="sm"
+ className="text-[var(--foreground-tertiary)]"
+ aria-hidden
+ />
  </button>
  {showGroupFilter && (
- <div className="px-6 pb-4">
+ <div id="device-group-filter" className="px-4 pb-4 sm:px-6">
  <DeviceGroupSelector
  groups={deviceGroups}
  selectedGroupIds={selectedGroups}
@@ -615,9 +793,52 @@ export default function DevicesClient({
  )}
  </div>
 
+ {/*
+   A bulk action that only partly landed, stated in full and kept on screen.
+   The toast that reported it has already gone by the time anyone reacts.
+ */}
+ {bulkOutcome && (
+ <div className="eh-partial-banner" role="status">
+ <Icon name="warning" size="md" className="mt-0.5 shrink-0" aria-hidden />
+ <div className="min-w-0 flex-1">
+ <p className="font-semibold">
+ {bulkOutcome.kind === 'delete'
+ ? `Deleted ${bulkOutcome.changed} of ${bulkOutcome.requested} selected devices`
+ : bulkOutcome.kind === 'playlist'
+ ? `Assigned the playlist to ${bulkOutcome.changed} of ${bulkOutcome.requested} selected devices`
+ : `Added ${bulkOutcome.changed} of ${bulkOutcome.requested} selected devices to the group`}
+ </p>
+ <p className="mt-1">
+ {bulkOutcome.kind === 'group'
+ ? `The other ${bulkOutcome.requested - bulkOutcome.changed} were already in this group.`
+ : `${bulkOutcome.requested - bulkOutcome.changed} were not changed — the server matched fewer devices than were selected. The list below has been refreshed; re-select and try again.`}
+ </p>
+ </div>
+ <button
+ type="button"
+ onClick={() => setBulkOutcome(null)}
+ className="eh-row-action shrink-0"
+ aria-label="Dismiss bulk action result"
+ >
+ Dismiss
+ </button>
+ </div>
+ )}
+
  {loading ? (
- <div className="eh-dash-card p-12">
- <LoadingSpinner size="lg" />
+ /* A skeleton in the shape of the table, not a spinner in an empty card:
+    the layout does not jump when the rows arrive. */
+ <div className="eh-dash-card overflow-hidden p-4" aria-busy="true" aria-live="polite">
+ <span className="sr-only">Loading devices</span>
+ <div className="eh-skeleton mb-4 h-9 w-full" />
+ {Array.from({ length: 6 }).map((_, i) => (
+ <div key={i} className="flex items-center gap-4 py-3">
+ <div className="eh-skeleton h-5 w-5 shrink-0 rounded-md" />
+ <div className="eh-skeleton h-5 flex-1" />
+ <div className="eh-skeleton hidden h-5 w-24 sm:block" />
+ <div className="eh-skeleton hidden h-5 w-32 sm:block" />
+ </div>
+ ))}
  </div>
  ) : devicesLoadError ? (
  <DashboardSectionError
@@ -642,8 +863,11 @@ export default function DevicesClient({
  ) : (
  <>
  {debouncedSearch && (
- <div className="bg-info-50 dark:bg-info-900 border border-info-200 dark:border-info-700 rounded-lg p-3 mb-4">
- <p className="text-sm text-info-800 dark:text-info-200">
+ <div
+ className="rounded-xl border border-[var(--info-ink)] bg-[var(--status-pairing-bg)] p-3"
+ role="status"
+ >
+ <p className="text-sm text-[var(--info-ink)]">
  {/* The filtered total, not the page slice - this sat directly above
      "Showing 1 to 10 of 25 devices" and disagreed with it. */}
  {totalItems}{' '}
@@ -652,63 +876,110 @@ export default function DevicesClient({
  </div>
  )}
  {selectedDeviceIds.size > 0 && canSelectDevices && (
- <div className="eh-bulk-bar flex items-center justify-between">
- <span className="text-sm font-medium text-[#00E5A0] dark:text-[#00E5A0]">
+ <div className="eh-bulk-bar flex-wrap">
+ <span className="text-sm font-semibold text-[var(--primary-ink)]">
  {selectedDeviceIds.size} device{selectedDeviceIds.size !== 1 ? 's' : ''} selected
  </span>
- <div className="flex gap-4 items-center">
- {permissions.canManageDevices && <button onClick={() => setIsBulkPlaylistModalOpen(true)} className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium">Assign Playlist</button>}
- {permissions.canManageDevices && <button onClick={() => setIsBulkGroupModalOpen(true)} className="px-4 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium">Add to Group</button>}
- {permissions.canDeleteDevices && <button onClick={() => setIsBulkDeleteModalOpen(true)} disabled={actionLoading} className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium disabled:opacity-50">Delete Selected</button>}
- <button onClick={() => setSelectedDeviceIds(new Set())} className="px-4 py-2 text-sm text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition">Clear</button>
+ <div className="flex flex-wrap items-center gap-2">
+ {permissions.canManageDevices && <button onClick={() => setIsBulkPlaylistModalOpen(true)} className="eh-btn-neon eh-btn-sm min-h-[44px] rounded-xl px-4">Assign Playlist</button>}
+ {permissions.canManageDevices && <button onClick={() => setIsBulkGroupModalOpen(true)} className="eh-btn-ghost eh-btn-sm min-h-[44px] rounded-xl px-4">Add to Group</button>}
+ {permissions.canDeleteDevices && <button onClick={() => setIsBulkDeleteModalOpen(true)} disabled={actionLoading} className="eh-btn-danger min-h-[44px] rounded-xl px-4 py-2 text-sm disabled:opacity-50">Delete Selected</button>}
+ <button onClick={() => setSelectedDeviceIds(new Set())} className="eh-row-action min-h-[44px] px-4">Clear</button>
  </div>
  </div>
  )}
+ {totalItems === 0 ? (
+ /*
+   FILTERED-EMPTY is a different screen from EMPTY.
+   "No devices yet" next to an active search tells the operator the fleet
+   is gone. This one names the filters and offers the way back.
+ */
+ <EmptyState
+ icon="search"
+ title="No devices match these filters"
+ description={`${devices.length} device${devices.length !== 1 ? 's are' : ' is'} paired, but none match the current search, status or group filter.`}
+ action={{ label: 'Clear filters', onClick: clearAllFilters }}
+ />
+ ) : (
  <div className="eh-dash-card overflow-hidden">
  {/* The card clips to keep its rounded corners, and <main> sets
      overflow-x-hidden - so without this scroller the widest columns
      (Last Seen, and the row-action buttons entirely) were cut off with
      no way to reach them, even at 1440px. Measured: 263px beyond the
-     viewport with document scrollWidth === clientWidth. */}
- <div className="overflow-x-auto">
- <table className="min-w-full divide-y divide-[var(--border)]">
- <thead className="bg-[var(--background)]">
+     viewport with document scrollWidth === clientWidth. Below 768px the
+     same rows restyle into cards and this scroller stands down. */}
+ <div className="eh-datatable-scroll">
+ <table className="eh-datatable min-w-full">
+ <caption className="sr-only">
+ Paired display devices. Status is the last observation reported to the
+ server, not a live guarantee; the Assigned Playlist column is the
+ operator&apos;s assignment, not what a screen is currently showing.
+ </caption>
+ <thead>
  <tr>
  {canSelectDevices && (
- <th className="px-4 py-3 text-left">
- <input type="checkbox" aria-label="Select all devices on this page" checked={displayDevices.length > 0 && displayDevices.every(d => selectedDeviceIds.has(d.id))} onChange={toggleSelectAll} className="rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]" />
+ <th scope="col" className="eh-th w-px">
+ <input
+ type="checkbox"
+ aria-label="Select all devices on this page"
+ className="eh-check"
+ checked={displayDevices.length > 0 && displayDevices.every(d => selectedDeviceIds.has(d.id))}
+ onChange={toggleSelectAll}
+ />
  </th>
  )}
- <th className="eh-th cursor-pointer hover:bg-[var(--surface-hover)] select-none" onClick={() => handleSort('nickname')}>Device{getSortIcon('nickname')}</th>
- <th className="eh-th cursor-pointer hover:bg-[var(--surface-hover)] select-none" onClick={() => handleSort('status')}>Status{getSortIcon('status')}</th>
- <th className="eh-th cursor-pointer hover:bg-[var(--surface-hover)] select-none" onClick={() => handleSort('location')}>Location{getSortIcon('location')}</th>
+ <SortableHeader field="nickname" label="Device" />
+ <SortableHeader field="status" label="Status" />
+ <SortableHeader field="location" label="Location" />
  {/* "Assigned", not "Currently Playing". This cell renders
      device.currentPlaylistId - the operator's own assignment, written by
      updateMany before any device is contacted. Nothing in the schema records
      what a screen is actually showing: the delivery ack lives in Redis with a
      TTL and is never persisted or exposed. For an offline device the old header
      asserted a playlist was playing while the screen showed something else. */}
- <th className="eh-th">Assigned Playlist</th>
- <th className="eh-th cursor-pointer hover:bg-[var(--surface-hover)] select-none" onClick={() => handleSort('lastSeen')}>Last Seen{getSortIcon('lastSeen')}</th>
- <th className="eh-th text-right">Actions</th>
+ <th scope="col" className="eh-th">Assigned Playlist</th>
+ <SortableHeader field="lastSeen" label="Last Seen" />
+ <th scope="col" className="eh-th text-right">Actions</th>
  </tr>
  </thead>
- <tbody className="bg-[var(--surface)] divide-y divide-[var(--border)]">
+ <tbody>
  {displayDevices.map((device) => (
  <tr key={device.id} className="eh-tr-hover">
- {canSelectDevices && <td className="eh-td"><input type="checkbox" checked={selectedDeviceIds.has(device.id)} onChange={() => toggleDeviceSelection(device.id)} className="rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]" /></td>}
- <td className="eh-td">
- <div className="flex items-center">
- <Icon name="devices" size="xl" className="mr-3 text-[var(--foreground-secondary)]" />
- <div>
- <div className="text-sm font-semibold text-[var(--foreground)]">{device.nickname}</div>
- <div className="text-xs text-[var(--foreground-tertiary)]">ID: {device.id}</div>
- </div>
+ {canSelectDevices && (
+ <td className="eh-td w-px" data-label="Select">
+ <input
+ type="checkbox"
+ className="eh-check"
+ aria-label={`Select ${device.nickname}`}
+ checked={selectedDeviceIds.has(device.id)}
+ onChange={() => toggleDeviceSelection(device.id)}
+ />
+ </td>
+ )}
+ <td className="eh-td" data-label="Device">
+ <div className="flex items-center gap-3">
+ <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--surface-hover)] text-[var(--foreground-secondary)]">
+ <Icon name="devices" size="md" aria-hidden />
+ </span>
+ <span className="min-w-0">
+ <span className="block max-w-[240px] truncate text-sm font-semibold text-[var(--foreground)]" title={device.nickname}>{device.nickname}</span>
+ {/* The id is provenance, not a scanning target: it must be available
+     but must never compete with the name. A full 36-character UUID per
+     row pushed the action buttons off the right of the table at 1440px
+     and out of the card at 390px, so the prefix is shown, the whole
+     value stays on hover, and assistive tech still reads all of it. */}
+ <span className="block font-mono text-xs text-[var(--foreground-tertiary)]" title={device.id}>
+ <span aria-hidden>ID: {device.id.slice(0, 8)}…</span>
+ <span className="sr-only">Device ID {device.id}</span>
+ </span>
+ </span>
  </div>
  </td>
- <td className="eh-td"><DeviceStatusIndicator deviceId={device.id} status={device.status ?? null} showLabel /></td>
- <td className="eh-td text-sm text-[var(--foreground-secondary)]">{device.location || '\u2014'}</td>
- <td className="eh-td text-sm">
+ <td className="eh-td" data-label="Status">
+ <DeviceStatusIndicator deviceId={device.id} status={device.status ?? null} showLabel />
+ </td>
+ <td className="eh-td text-sm text-[var(--foreground-secondary)]" data-label="Location">{device.location || '—'}</td>
+ <td className="eh-td text-sm" data-label="Assigned Playlist">
  <PlaylistQuickSelect
  device={device}
  playlists={playlists}
@@ -722,7 +993,7 @@ export default function DevicesClient({
      available on hover and to assistive tech via <time dateTime>. "Online" is
      a recent observation, not a live guarantee, so the operator needs to see
      HOW recent without the badge hedging itself into uselessness. */}
- <td className="eh-td text-sm text-[var(--foreground-tertiary)]">
+ <td className="eh-td text-sm tabular-nums text-[var(--foreground-secondary)]" data-label="Last Seen">
  {(device.lastSeen || device.lastHeartbeat) ? (
  <time
  dateTime={new Date(String(device.lastSeen || device.lastHeartbeat)).toISOString()}
@@ -734,17 +1005,17 @@ export default function DevicesClient({
  'Never'
  )}
  </td>
- <td className="eh-td text-right text-sm font-medium">
- <div className="flex justify-end gap-2">
- <button onClick={() => handlePreview(device)} className="eh-icon-btn" title="Preview device screen">Preview</button>
+ <td className="eh-td text-right" data-label="Actions">
+ <div className="eh-row-actions">
+ <button onClick={() => handlePreview(device)} className="eh-row-action" aria-label={`Preview ${device.nickname}`} title="Preview device screen">Preview</button>
  {permissions.canManageDevices && (
- <button onClick={() => handleEdit(device)} className="eh-icon-btn">Edit</button>
+ <button onClick={() => handleEdit(device)} className="eh-row-action" aria-label={`Edit ${device.nickname}`}>Edit</button>
  )}
  {permissions.canPairDevices && (
- <button onClick={() => handleGeneratePairingCode(device)} className="eh-icon-btn">Pair</button>
+ <button onClick={() => handleGeneratePairingCode(device)} className="eh-row-action" aria-label={`Generate a pairing token for ${device.nickname}`}>Pair</button>
  )}
  {permissions.canDeleteDevices && (
- <button onClick={() => handleDelete(device)} className="eh-icon-btn eh-icon-btn-danger">Delete</button>
+ <button onClick={() => handleDelete(device)} className="eh-row-action eh-row-action-danger" aria-label={`Delete ${device.nickname}`}>Delete</button>
  )}
  </div>
  </td>
@@ -754,39 +1025,62 @@ export default function DevicesClient({
  </table>
  </div>
  </div>
+ )}
 
  {totalItems > 0 && (
- <div className="eh-dash-card px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-[var(--border)] sm:px-6 rounded-b-lg">
- <div className="flex-1 flex justify-between sm:hidden">
- <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="relative inline-flex items-center px-4 py-2 border border-[var(--border)] text-sm font-medium rounded-md text-[var(--foreground-secondary)] bg-[var(--surface)] hover:bg-[var(--surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
- <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="ml-3 relative inline-flex items-center px-4 py-2 border border-[var(--border)] text-sm font-medium rounded-md text-[var(--foreground-secondary)] bg-[var(--surface)] hover:bg-[var(--surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed">Next</button>
+ <div className="eh-dash-card flex flex-col items-center justify-between gap-4 rounded-2xl px-4 py-3 sm:flex-row sm:px-6">
+ <div className="flex w-full flex-1 justify-between gap-3 sm:hidden">
+ <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="eh-btn-ghost eh-btn-sm min-h-[44px] flex-1 rounded-xl disabled:cursor-not-allowed disabled:opacity-50">Previous</button>
+ <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="eh-btn-ghost eh-btn-sm min-h-[44px] flex-1 rounded-xl disabled:cursor-not-allowed disabled:opacity-50">Next</button>
  </div>
- <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+ <div className="hidden w-full sm:flex sm:flex-1 sm:items-center sm:justify-between">
  <div className="flex items-center gap-4">
- <p className="text-sm text-[var(--foreground-secondary)]">Showing <span className="font-medium">{startIndex + 1}</span> to <span className="font-medium">{Math.min(endIndex, totalItems)}</span> of <span className="font-medium">{totalItems}</span> devices</p>
- <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="text-sm border-[var(--border)] rounded-md">
+ <p className="text-sm text-[var(--foreground-secondary)]">Showing <span className="font-semibold text-[var(--foreground)]">{startIndex + 1}</span> to <span className="font-semibold text-[var(--foreground)]">{Math.min(endIndex, totalItems)}</span> of <span className="font-semibold text-[var(--foreground)]">{totalItems}</span> devices</p>
+ <div className="relative">
+ <select
+ value={itemsPerPage}
+ onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+ className="eh-select-inline pr-8"
+ aria-label="Devices per page"
+ >
  <option value={10}>10 per page</option>
  <option value={25}>25 per page</option>
  <option value={50}>50 per page</option>
  <option value={100}>100 per page</option>
  </select>
+ <svg aria-hidden className="pointer-events-none absolute right-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--foreground-tertiary)]" viewBox="0 0 16 16" fill="currentColor"><path d="M8 11L3 6h10l-5 5z" /></svg>
  </div>
- <div>
- <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
- <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-[var(--border)] bg-[var(--surface)] text-sm font-medium text-[var(--foreground-tertiary)] hover:bg-[var(--surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed">{'\u2190'} Previous</button>
+ </div>
+ <nav aria-label="Device list pages">
+ <ul className="flex items-center gap-1">
+ <li>
+ <button onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} disabled={currentPage === 1} className="eh-row-action px-3 disabled:cursor-not-allowed disabled:opacity-50">{'←'} Previous</button>
+ </li>
  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
  let pageNum;
  if (totalPages <= 5) { pageNum = i + 1; }
  else if (currentPage <= 3) { pageNum = i + 1; }
  else if (currentPage >= totalPages - 2) { pageNum = totalPages - 4 + i; }
  else { pageNum = currentPage - 2 + i; }
+ const isCurrent = currentPage === pageNum;
  return (
- <button key={pageNum} onClick={() => setCurrentPage(pageNum)} className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${currentPage === pageNum ? 'z-10 bg-[#00E5A0]/5 border-[#00E5A0] text-[#00E5A0]' : 'bg-[var(--surface)] border-[var(--border)] text-[var(--foreground-tertiary)] hover:bg-[var(--surface-hover)]'}`}>{pageNum}</button>
+ <li key={pageNum}>
+ <button
+ onClick={() => setCurrentPage(pageNum)}
+ aria-current={isCurrent ? 'page' : undefined}
+ aria-label={`Page ${pageNum}`}
+ className={`eh-row-action min-w-[40px] tabular-nums ${isCurrent ? 'border-[var(--primary-ink)] bg-[var(--badge-brand-bg)] text-[var(--primary-ink)]' : ''}`}
+ >
+ {pageNum}
+ </button>
+ </li>
  );
  })}
- <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-[var(--border)] bg-[var(--surface)] text-sm font-medium text-[var(--foreground-tertiary)] hover:bg-[var(--surface-hover)] disabled:opacity-50 disabled:cursor-not-allowed">Next {'\u2192'}</button>
+ <li>
+ <button onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} disabled={currentPage === totalPages} className="eh-row-action px-3 disabled:cursor-not-allowed disabled:opacity-50">Next {'→'}</button>
+ </li>
+ </ul>
  </nav>
- </div>
  </div>
  </div>
  )}
@@ -796,28 +1090,29 @@ export default function DevicesClient({
  <Modal isOpen={isEditModalOpen && permissions.canManageDevices} onClose={() => setIsEditModalOpen(false)} title="Edit Device">
  <div className="space-y-5">
  <div>
- <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">Device Nickname</label>
- <input type="text" value={editForm.nickname} onChange={(e) => setEditForm({ ...editForm, nickname: e.target.value })} className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent" placeholder="e.g., Store Front Display" />
+ <label htmlFor="device-nickname" className="mb-2 block text-sm font-medium text-[var(--foreground-secondary)]">Device Nickname</label>
+ <input id="device-nickname" type="text" value={editForm.nickname} onChange={(e) => setEditForm({ ...editForm, nickname: e.target.value })} className="eh-input" placeholder="e.g., Store Front Display" />
  </div>
  <div>
- <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">Location (Optional)</label>
- <input type="text" value={editForm.location} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })} className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent" placeholder="e.g., Main Entrance" />
+ <label htmlFor="device-location" className="mb-2 block text-sm font-medium text-[var(--foreground-secondary)]">Location (Optional)</label>
+ <input id="device-location" type="text" value={editForm.location} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })} className="eh-input" placeholder="e.g., Main Entrance" />
  </div>
  <div className="flex justify-end gap-3 pt-4">
- <button onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition" disabled={actionLoading}>Cancel</button>
- <button onClick={handleSaveEdit} className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-50 flex items-center gap-2" disabled={actionLoading || !editForm.nickname.trim()}>{actionLoading && <LoadingSpinner size="sm" />}Save Changes</button>
+ <button onClick={() => setIsEditModalOpen(false)} className="eh-btn-ghost eh-btn-sm min-h-[44px] rounded-xl px-4" disabled={actionLoading}>Cancel</button>
+ <button onClick={handleSaveEdit} className="eh-btn-neon eh-btn-sm flex min-h-[44px] items-center gap-2 rounded-xl px-4 disabled:opacity-50" disabled={actionLoading || !editForm.nickname.trim()}>{actionLoading && <LoadingSpinner size="sm" />}Save Changes</button>
  </div>
  </div>
  </Modal>
 
  <Modal isOpen={isPairingModalOpen && permissions.canPairDevices} onClose={() => setIsPairingModalOpen(false)} title="Pairing Token">
- <div className="text-center space-y-5">
- <p className="text-[var(--foreground-secondary)]">Use this token on your display device to pair it:</p>
- <div className="bg-[var(--background-secondary)] rounded-lg p-6">
- <div className="break-all text-lg font-bold font-mono text-[#00E5A0] tracking-wide">{pairingCode}</div>
+ <div className="space-y-5 text-center">
+ <p className="text-sm text-[var(--foreground-secondary)]">Use this token on your display device to pair it:</p>
+ <div className="rounded-xl border border-[var(--border)] bg-[var(--background-secondary)] p-6">
+ {/* Ink, not the neon fill: this is a string that has to be transcribed. */}
+ <div className="break-all font-mono text-lg font-bold tracking-wide text-[var(--primary-ink)]">{pairingCode}</div>
  </div>
  <p className="text-sm text-[var(--foreground-tertiary)]">This token expires in {pairingExpiresIn}</p>
- <button onClick={() => setIsPairingModalOpen(false)} className="eh-btn-neon rounded-xl w-full px-4 py-2 text-sm font-medium">Done</button>
+ <button onClick={() => setIsPairingModalOpen(false)} className="eh-btn-neon min-h-[44px] w-full rounded-xl px-4 py-2 text-sm font-medium">Done</button>
  </div>
  </Modal>
 
@@ -836,13 +1131,18 @@ export default function DevicesClient({
  <Modal isOpen={isBulkPlaylistModalOpen && permissions.canManageDevices} onClose={() => { setIsBulkPlaylistModalOpen(false); setBulkPlaylistId(''); }} title="Assign Playlist to Selected Devices">
  <div className="space-y-5">
  <p className="text-sm text-[var(--foreground-secondary)]">Assign a playlist to {selectedDeviceIds.size} selected device{selectedDeviceIds.size !== 1 ? 's' : ''}.</p>
- <select value={bulkPlaylistId} onChange={(e) => setBulkPlaylistId(e.target.value)} className="w-full px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)]">
+ <select value={bulkPlaylistId} onChange={(e) => setBulkPlaylistId(e.target.value)} className="eh-select" aria-label="Playlist to assign">
  <option value="">Select a playlist...</option>
  {playlists.map(p => (<option key={p.id} value={p.id}>{p.name}</option>))}
  </select>
+ {/* Correct and server-backed: the gateway replays a deferred assignment on
+     reconnect, so a non-online device is not a failed assignment. */}
+ <p className="text-sm text-[var(--foreground-tertiary)]">
+ This sets the assignment. Non-online devices will update when they come online.
+ </p>
  <div className="flex justify-end gap-3">
- <button onClick={() => { setIsBulkPlaylistModalOpen(false); setBulkPlaylistId(''); }} className="px-4 py-2 text-[var(--foreground-secondary)] bg-[var(--background-secondary)] rounded-lg hover:bg-[var(--surface-hover)] transition">Cancel</button>
- <button onClick={handleBulkAssignPlaylist} disabled={!bulkPlaylistId || actionLoading} className="eh-btn-neon rounded-xl px-4 py-2 disabled:opacity-50">Assign</button>
+ <button onClick={() => { setIsBulkPlaylistModalOpen(false); setBulkPlaylistId(''); }} className="eh-btn-ghost eh-btn-sm min-h-[44px] rounded-xl px-4">Cancel</button>
+ <button onClick={handleBulkAssignPlaylist} disabled={!bulkPlaylistId || actionLoading} className="eh-btn-neon eh-btn-sm min-h-[44px] rounded-xl px-4 disabled:opacity-50">Assign</button>
  </div>
  </div>
  </Modal>
@@ -850,13 +1150,13 @@ export default function DevicesClient({
  <Modal isOpen={isBulkGroupModalOpen && permissions.canManageDevices} onClose={() => { setIsBulkGroupModalOpen(false); setBulkGroupId(''); }} title="Add Selected Devices to Group">
  <div className="space-y-5">
  <p className="text-sm text-[var(--foreground-secondary)]">Add {selectedDeviceIds.size} selected device{selectedDeviceIds.size !== 1 ? 's' : ''} to a group.</p>
- <select value={bulkGroupId} onChange={(e) => setBulkGroupId(e.target.value)} className="w-full px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)]">
+ <select value={bulkGroupId} onChange={(e) => setBulkGroupId(e.target.value)} className="eh-select" aria-label="Group to add devices to">
  <option value="">Select a group...</option>
  {deviceGroups.map((g: any) => (<option key={g.id} value={g.id}>{g.name}</option>))}
  </select>
  <div className="flex justify-end gap-3">
- <button onClick={() => { setIsBulkGroupModalOpen(false); setBulkGroupId(''); }} className="px-4 py-2 text-[var(--foreground-secondary)] bg-[var(--background-secondary)] rounded-lg hover:bg-[var(--surface-hover)] transition">Cancel</button>
- <button onClick={handleBulkAssignGroup} disabled={!bulkGroupId || actionLoading} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition">Add to Group</button>
+ <button onClick={() => { setIsBulkGroupModalOpen(false); setBulkGroupId(''); }} className="eh-btn-ghost eh-btn-sm min-h-[44px] rounded-xl px-4">Cancel</button>
+ <button onClick={handleBulkAssignGroup} disabled={!bulkGroupId || actionLoading} className="eh-btn-neon eh-btn-sm min-h-[44px] rounded-xl px-4 disabled:opacity-50">Add to Group</button>
  </div>
  </div>
  </Modal>
