@@ -11,6 +11,36 @@
  *   2. Orphaned content — archives content not in any playlist, older than 30 days
  *   3. Storage monitoring — warns at >80%, critical at >90% utilization
  *
+ * THE ARCHIVE INVARIANT (K13). Archiving is a soft `status:'archived'` flip, but
+ * it STOPS DELIVERY: `isDeliverable` in packages/database/src/lib/effective-content.ts
+ * drops non-active content from both playlist items and layout zones. So:
+ *
+ *   content referenced by ANY valid reference must never become archive-eligible
+ *   merely because the reference query was truncated, paginated, or because a
+ *   reference TYPE was never considered at all.
+ *
+ * Three layers enforce it, and none of them is redundant:
+ *
+ *   1. COMPLETENESS GATES THE WRITE, not just incident resolution. `checkOrphanedContent`
+ *      is called only from inside the `contentScanComplete` conditional in `main`.
+ *      Before this, an incomplete scan logged, raised `scan-truncated`, and then
+ *      archived anyway against the partial universe it had just declared unusable.
+ *      `/playlists` is ordered `createdAt: 'desc'`, so truncation drops the OLDEST
+ *      playlists — maximally correlated with the >30d archive-eligible population.
+ *   2. PER-CANDIDATE CONFIRMATION. Every candidate is re-read with `GET /content/:id`
+ *      immediately before its archive, and refused if it carries any `playlistItems`.
+ *      This inverts the question from "reconstruct the universe, then diff" (which is
+ *      truncatable by construction) to "is THIS item referenced" (which is not), and
+ *      shrinks the concurrency window from the whole run to one request.
+ *   3. REFERENCE TYPES BEYOND PLAYLISTS. Layout zones (`metadata.zones[].contentId`)
+ *      pin content directly, and `replacementContentId` pins the expiry swap target.
+ *      Neither is visible in `CONTENT_LIST_SELECT`, so neither could ever be seen from
+ *      the list walk. Both are harvested from `GET /content/:id`, which uses `include`
+ *      and therefore returns every scalar.
+ *
+ * RAISING THE PAGE-WALK CAP IS NOT THE FIX. It re-arms the identical defect at the
+ * new number and leaves types 2 and 3 wide open at any scale.
+ *
  * Incident clearing is PER-CHECK, not per-run. This agent degrades in parts —
  * the content checks and the storage probe fail independently — so it tracks
  * three coverage keys and resolves only the incident types whose check actually
@@ -52,17 +82,60 @@ const ORPHAN_AGE_DAYS = 30;
 const STORAGE_WARN_PCT = 80;
 const STORAGE_CRITICAL_PCT = 90;
 
+/**
+ * Ceiling on how many orphan candidates one run will confirm-and-archive.
+ *
+ * The per-candidate confirmation costs one `GET /content/:id` per candidate and
+ * `OpsApiClient` holds a 100ms rate-limit floor, so an unbounded candidate set
+ * would let a single firing run for minutes and overlap the next one. The
+ * remainder is DEFERRED to the next firing and logged by count — never dropped
+ * silently, because "we archived 100 and forgot the rest" and "there were only
+ * 100" must not look the same in the log.
+ */
+const MAX_ARCHIVE_CANDIDATES_PER_RUN = 100;
+
 // ─── Content & Playlist Types ────────────────────────────────────────────────
 
+/**
+ * A content row as it comes back from the LIST endpoint.
+ *
+ * Deliberately narrow: `GET /content` projects through `CONTENT_LIST_SELECT`
+ * (middleware/src/modules/content/content-list-select.ts), which selects
+ * id/organizationId/name/type/thumbnail/duration/fileSize/status/folderId/
+ * createdAt/updatedAt/tags and NOTHING else. `metadata`, `expiresAt`,
+ * `replacementContentId` and `isGlobal` are all absent from the list — they are
+ * only readable through `GET /content/:id` (`ContentService.findOne`, which uses
+ * `include` and so returns every scalar). A field typed here but never sent reads
+ * `undefined` at runtime and turns a filter into a silent no-op — which is exactly
+ * what `expiresAt` below already is. It is left typed because `checkExpiredContent`
+ * reads it, and REPOINTING that check is out of scope for this change; it is
+ * recorded in backlog.md as a dead no-op rather than quietly repaired here.
+ */
 interface ContentItem {
   id: string;
   name?: string;
   title?: string;
   type: string;
   status?: string;
+  /** NOT in `CONTENT_LIST_SELECT` — always `undefined` off the list walk. */
   expiresAt?: string;
   fileSize?: number;
   createdAt?: string;
+}
+
+/**
+ * A content row as it comes back from `GET /content/:id`.
+ *
+ * This is the only shape that can answer "is this item referenced": it carries
+ * `playlistItems` (the authoritative, untruncatable reverse lookup), `metadata`
+ * (layout zone pins), `replacementContentId` (the expiry swap target) and
+ * `isGlobal`.
+ */
+interface ContentDetail extends ContentItem {
+  metadata?: unknown;
+  replacementContentId?: string | null;
+  isGlobal?: boolean;
+  playlistItems?: unknown[];
 }
 
 interface Playlist {
@@ -89,6 +162,12 @@ type ContentLifecycleCounters = {
 
   /** Content + playlists both fetched, neither at the page-walk cap. */
   contentScanComplete: boolean;
+  /**
+   * Every layout's detail was read, so `metadata.zones[].contentId` pins are
+   * fully harvested. False means the reference universe is knowingly partial and
+   * the archive loop must not run — same safety class as `contentScanComplete`.
+   */
+  referenceHarvestComplete: boolean;
   /** `/health` answered AND a numeric usage percentage was derived from it. */
   storageVerdictReached: boolean;
   /** The `/health` GET did not throw — whatever it then contained. */
@@ -98,9 +177,26 @@ type ContentLifecycleCounters = {
 /** Types covered by `contentScanComplete`. */
 const CONTENT_SCAN_TYPES: ReadonlySet<string> = new Set([
   'expired_content',
-  'orphaned_content',
   // Raised when the scan was NOT complete, so a complete scan must clear it.
   'scan-truncated',
+]);
+
+/**
+ * Types covered by `contentScanComplete` AND `referenceHarvestComplete`.
+ *
+ * The orphan check is the only one that can now be SKIPPED while the run
+ * otherwise succeeds — the completeness gate and the layout-harvest fail-closed
+ * both return without it. A skipped check has looked at nothing, so it cannot
+ * be evidence that an `orphaned_content` finding cleared. This is the same
+ * distinction the storage keys draw, applied to the check this change gated:
+ * splitting it out is not tidiness, it is the difference between "the orphan
+ * check found nothing" and "the orphan check did not run".
+ */
+const ORPHAN_SCAN_TYPES: ReadonlySet<string> = new Set([
+  'orphaned_content',
+  // Raised when a layout detail could not be read. Clearing it needs a run that
+  // both saw the whole tenant and read every layout — exactly this key pair.
+  'reference-scan-incomplete',
 ]);
 
 /**
@@ -243,9 +339,36 @@ async function checkExpiredContent(
 // ─── Check: Orphaned Content ─────────────────────────────────────────────────
 
 /**
+ * Collect the `contentId`s a layout pins directly into its zones.
+ *
+ * Shape: `metadata.zones[].contentId`, resolved by `resolveZoneReferences` in
+ * packages/database/src/lib/effective-content.ts:250-257 and then filtered by
+ * `isDeliverable` (:85-93) — so a zone-pinned content that goes `archived`
+ * resolves to `null` and BLANKS THAT ZONE on live glass. Tolerant by design:
+ * anything that is not a string `contentId` is ignored rather than thrown on,
+ * because a metadata-shape surprise must not abort the harvest that keeps the
+ * archive loop honest.
+ */
+function harvestZoneContentIds(metadata: unknown, into: Set<string>): void {
+  if (!metadata || typeof metadata !== 'object') return;
+  const zones = (metadata as { zones?: unknown }).zones;
+  if (!Array.isArray(zones)) return;
+  for (const zone of zones) {
+    if (!zone || typeof zone !== 'object') continue;
+    const contentId = (zone as { contentId?: unknown }).contentId;
+    if (typeof contentId === 'string' && contentId) into.add(contentId);
+  }
+}
+
+/**
  * Find content that is not referenced by any playlist, is older than
  * ORPHAN_AGE_DAYS, and is not of type "layout" (layouts are structural).
  * Auto-fix: archive each orphaned item via POST /content/:id/archive.
+ *
+ * DESTRUCTIVE. Call this ONLY from inside the `contentScanComplete` conditional
+ * in `main` — a partial reference universe cannot prove anything is orphaned,
+ * and a source-scan test (`content-lifecycle-archive-gate.test.ts`) pins that
+ * call site so the gate cannot be dropped in a refactor.
  */
 async function checkOrphanedContent(
   api: OpsApiClient,
@@ -266,10 +389,59 @@ async function checkOrphanedContent(
     }
   }
 
+  // ── GAP-1: layout zone pins ────────────────────────────────────────────────
+  // A `type:'layout'` content pins other content straight into its zones. The
+  // agent has always skipped layouts THEMSELVES, but never what they point at —
+  // and it structurally could not see them, because `CONTENT_LIST_SELECT` omits
+  // `metadata`. This is live-reachable at ANY tenant size; no truncation needed.
+  const layouts = content.filter(c => c.type === 'layout');
+  if (layouts.length > 0) {
+    log(AGENT, `Harvesting zone references from ${layouts.length} layout(s)`);
+  }
+  for (const layout of layouts) {
+    let detail: ContentDetail;
+    try {
+      detail = await api.get<ContentDetail>(`/content/${layout.id}`);
+    } catch (err) {
+      // FAIL CLOSED. One unreadable layout means the reference universe is
+      // partial in exactly the way that blanks a zone, so no archive may run.
+      state.referenceHarvestComplete = false;
+      const message = err instanceof Error ? err.message : String(err);
+      log(AGENT, `Could not read layout ${layout.id} — ${message}`);
+      incidents.push({
+        id: makeIncidentId(AGENT, 'reference-scan-incomplete', 'layout-zones'),
+        agent: AGENT,
+        type: 'reference-scan-incomplete',
+        severity: 'info',
+        target: 'content',
+        targetId: 'layout-zones',
+        detected: new Date().toISOString(),
+        message:
+          `Layout ${layout.id} could not be read (${message}), so its zone-pinned content is ` +
+          'unknown. No orphan archive will run this cycle — archiving a zone-pinned item blanks ' +
+          'that zone on live screens.',
+        remediation: 'Transient: the next cycle retries. Persistent: check GET /api/v1/content/:id.',
+        status: 'open',
+        attempts: 0,
+      });
+      break;
+    }
+    harvestZoneContentIds(detail.metadata, referencedIds);
+    // Free while we are here: this layout's own expiry replacement target.
+    if (typeof detail.replacementContentId === 'string' && detail.replacementContentId) {
+      referencedIds.add(detail.replacementContentId);
+    }
+  }
+
+  if (!state.referenceHarvestComplete) {
+    log(AGENT, 'SKIP orphan archive: the layout zone-reference harvest did not complete');
+    return;
+  }
+
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - ORPHAN_AGE_DAYS);
 
-  const orphans = content.filter(c => {
+  const candidates = content.filter(c => {
     // Skip non-active content, layout types, and recently created content
     if (c.status !== 'active') return false;
     if (c.type === 'layout') return false;
@@ -281,12 +453,98 @@ async function checkOrphanedContent(
     return created < cutoff;
   });
 
-  if (orphans.length === 0) {
+  if (candidates.length === 0) {
     log(AGENT, 'No orphaned content found');
     return;
   }
 
-  log(AGENT, `Found ${orphans.length} orphaned content item(s) (not in any playlist, older than ${ORPHAN_AGE_DAYS} days)`);
+  // Bound the work per firing. The remainder is deferred, not dropped.
+  const batch = candidates.slice(0, MAX_ARCHIVE_CANDIDATES_PER_RUN);
+  if (candidates.length > batch.length) {
+    log(
+      AGENT,
+      `Deferring ${candidates.length - batch.length} orphan candidate(s) to the next cycle ` +
+        `(per-run cap ${MAX_ARCHIVE_CANDIDATES_PER_RUN}); confirming ${batch.length} this cycle`,
+    );
+  }
+
+  log(AGENT, `Found ${candidates.length} orphan candidate(s) (not in any playlist, older than ${ORPHAN_AGE_DAYS} days)`);
+
+  // ── Pass 1: confirm each candidate INDIVIDUALLY ────────────────────────────
+  // `GET /content/:id` (ContentService.findOne) includes `playlistItems`, which
+  // is the reverse lookup the list walk can never be: it is a per-item question,
+  // so it is untruncatable by construction and its answer is at most one request
+  // old rather than one whole run old.
+  const confirmed: ContentItem[] = [];
+  for (const item of batch) {
+    let detail: ContentDetail;
+    try {
+      detail = await api.get<ContentDetail>(`/content/${item.id}`);
+    } catch (err) {
+      // Unconfirmed is never archived. A 404 here is also not an invitation to
+      // act — it just means this run cannot establish orphanhood.
+      log(
+        AGENT,
+        `Skipping ${item.id}: could not confirm it is unreferenced — ${err instanceof Error ? err.message : err}`,
+      );
+      continue;
+    }
+
+    if (Array.isArray(detail.playlistItems) && detail.playlistItems.length > 0) {
+      log(
+        AGENT,
+        `Skipping ${item.id}: the per-item read found ${detail.playlistItems.length} playlist reference(s) the list walk did not show`,
+      );
+      continue;
+    }
+
+    if (detail.isGlobal === true) {
+      // Template-library content is shared platform-wide; "in no playlist of the
+      // org this agent can see" says nothing about its use elsewhere. `isGlobal`
+      // is not in `CONTENT_LIST_SELECT`, so this could only ever be checked here.
+      log(AGENT, `Skipping ${item.id}: isGlobal template-library content`);
+      continue;
+    }
+
+    // ── GAP-2: this item's expiry replacement target ─────────────────────────
+    // `Content.replacementContentId` (schema.prisma:290-291) is swapped in when
+    // the referrer expires; archiving the target lands the swap on dead content.
+    // Harvested here because it is absent from `CONTENT_LIST_SELECT`.
+    //
+    // KNOWN RESIDUAL, stated plainly rather than implied covered: this harvests
+    // the replacement pointers of the LAYOUTS and the CANDIDATES only, because
+    // those are the only details this run reads. A referrer that is itself not a
+    // candidate (younger than the cutoff, already archived, or held by a
+    // playlist) still hides its `replacementContentId` from us, and its target
+    // can still be archived. Closing that needs the reverse edge server-side —
+    // `Content.replacedBy` is already a Prisma relation — which is the
+    // `GET /content/orphan-candidates` backlog row, not something the page-walk
+    // can be talked into answering.
+    if (typeof detail.replacementContentId === 'string' && detail.replacementContentId) {
+      referencedIds.add(detail.replacementContentId);
+    }
+
+    confirmed.push(item);
+  }
+
+  // ── Pass 2: archive only what survived BOTH filters ────────────────────────
+  // Two passes, not one, so the outcome does not depend on iteration order: a
+  // candidate may be named as ANOTHER candidate's `replacementContentId` and
+  // that is only known once every detail has been read.
+  const orphans = confirmed.filter(item => {
+    if (referencedIds.has(item.id)) {
+      log(AGENT, `Skipping ${item.id}: named as another item's replacement content`);
+      return false;
+    }
+    return true;
+  });
+
+  if (orphans.length === 0) {
+    log(AGENT, 'No orphaned content confirmed after per-item reference checks');
+    return;
+  }
+
+  log(AGENT, `Confirmed ${orphans.length} orphaned content item(s) for archive`);
 
   for (const item of orphans) {
     state.issuesFound++;
@@ -557,6 +815,7 @@ async function main(): Promise<void> {
     issuesEscalated: 0,
     fatalDetected: false,
     contentScanComplete,
+    referenceHarvestComplete: true,
     storageVerdictReached: false,
     storageProbeReached: false,
   };
@@ -573,7 +832,8 @@ async function main(): Promise<void> {
     log(
       AGENT,
       `Content scan was incomplete (content=${content.length}, playlists=${playlists.length}, ` +
-      `cap=${MAX_ENTITIES}) — no content incident will be resolved this run`,
+      `cap=${MAX_ENTITIES}) — the orphan archive is SKIPPED and no content incident ` +
+      'will be resolved this run',
     );
     incidents.push({
       id: makeIncidentId(AGENT, 'scan-truncated', 'entity-lists'),
@@ -585,19 +845,50 @@ async function main(): Promise<void> {
       detected: new Date().toISOString(),
       message:
         `Content lifecycle could not see the whole tenant (content=${content.length}, ` +
-        `playlists=${playlists.length}, page-walk cap ${MAX_ENTITIES}). Findings are still valid, ` +
-        'but no prior content incident can be cleared from a partial scan.',
-      remediation: `Raise the getAll page-walk cap in scripts/ops/lib/api-client.ts, or scope this agent's queries.`,
+        `playlists=${playlists.length}, page-walk cap ${MAX_ENTITIES}). The orphan archive is ` +
+        'SKIPPED this cycle, and no prior content incident can be cleared from a partial scan.',
+      // Deliberately NOT "raise the page-walk cap". That is the fix this change
+      // rejects: it re-arms the identical defect at the new number, and the
+      // truncation drops the OLDEST playlists (`createdAt: 'desc'`) — precisely
+      // the ones most likely to hold the >30d content the archive targets.
+      remediation:
+        'No action needed for correctness — the destructive path is already gated off. ' +
+        'The durable fix is a server-side reference model (GET /content/orphan-candidates), ' +
+        'which removes the pagination surface instead of moving it. Do NOT raise the page-walk cap.',
       status: 'open',
       attempts: 0,
     });
   }
 
-  // 3a. Expired content
+  // 3a. Expired content.
+  // NOT gated: its predicate reads only the item's own fields (status + expiresAt),
+  // so a truncated list yields FEWER expiry findings, never a wrong one. Different
+  // safety class from the orphan check, which asserts a negative about the whole
+  // tenant ("nothing references this").
   await checkExpiredContent(api, content, incidents, counters);
 
-  // 3b. Orphaned content
-  await checkOrphanedContent(api, content, playlists, incidents, counters);
+  // 3b. Orphaned content — DESTRUCTIVE, and gated on a provably complete scan.
+  //
+  // The gate folds BOTH scans into one flag, and that is deliberate. Playlist
+  // truncation is the sharp edge (`/playlists` is `createdAt: 'desc'`, so the
+  // OLDEST playlists are dropped — maximally correlated with >30d candidates).
+  // Content truncation used to be purely safe-direction, but no longer is: since
+  // layouts are now a reference SOURCE, a dropped layout page silently removes
+  // zone pins from the reference universe. Fewer candidates does not compensate
+  // for fewer references.
+  //
+  // A source-scan test pins this call site inside this conditional. #353 gated
+  // incident RESOLUTION on completeness but left the write unconditional; the
+  // test exists so that cannot happen again.
+  if (counters.contentScanComplete) {
+    await checkOrphanedContent(api, content, playlists, incidents, counters);
+  } else {
+    log(
+      AGENT,
+      'SKIP orphan archive: the reference universe is knowingly partial, so nothing can be ' +
+        'proven unreferenced. Archiving stops delivery to screens — it is never done on a guess.',
+    );
+  }
 
   // 3c. Storage monitoring
   await checkStorageUsage(api, incidents, counters);
@@ -631,6 +922,9 @@ async function main(): Promise<void> {
   // their findings while `storage_high` correctly stays open.
   const coveredTypes = new Set<string>([
     ...(counters.contentScanComplete ? CONTENT_SCAN_TYPES : []),
+    ...(counters.contentScanComplete && counters.referenceHarvestComplete
+      ? ORPHAN_SCAN_TYPES
+      : []),
     ...(counters.storageVerdictReached ? STORAGE_VERDICT_TYPES : []),
     ...(counters.storageProbeReached ? STORAGE_PROBE_TYPES : []),
   ]);

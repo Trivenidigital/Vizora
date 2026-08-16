@@ -39,17 +39,81 @@ interface Fixture {
   storagePct: number | null;
   /** 'items' (default) or 'unrecognized' — neither array, { items } nor { data }. */
   shape?: 'items' | 'unrecognized';
+  /**
+   * Fires immediately before a `GET /content/:id` is answered, with the live
+   * fixture. Lets a test land a playlist edit BETWEEN the list walk and the
+   * per-item confirmation — the concurrency window the confirmation closes.
+   */
+  onContentDetail?: (id: string, f: Fixture) => void;
+  /** Content ids whose `GET /content/:id` answers 500. */
+  failDetail?: string[];
+}
+
+/** One request the agent made, as the server saw it. */
+interface Recorded {
+  method: string;
+  path: string;
+  query: Record<string, string>;
+}
+
+interface Harness {
+  server: Server;
+  baseUrl: string;
+  /** Content ids POSTed to `/content/:id/archive`, in the order they were written. */
+  archived: string[];
+  /** Every request the agent issued. */
+  requests: Recorded[];
+}
+
+/**
+ * Exactly the keys `CONTENT_LIST_SELECT` projects, plus the `title` the response
+ * mapper adds (middleware/src/modules/content/content-list-select.ts).
+ *
+ * The harness projects the LIST through this on purpose. `metadata`,
+ * `expiresAt`, `replacementContentId` and `isGlobal` are NOT here, because the
+ * real list endpoint does not send them — and a harness that leaked them would
+ * let the GAP-1 / GAP-2 / global-template cases pass without the agent ever
+ * making the per-item read that is the actual fix.
+ */
+const CONTENT_LIST_KEYS = [
+  'id',
+  'organizationId',
+  'name',
+  'type',
+  'thumbnail',
+  'duration',
+  'fileSize',
+  'status',
+  'folderId',
+  'createdAt',
+  'updatedAt',
+  'tags',
+];
+
+function projectListItem(c: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of CONTENT_LIST_KEYS) if (k in c) out[k] = c[k];
+  out.title = c.name;
+  return out;
 }
 
 function fixture(over: Partial<Fixture> = {}): Fixture {
   return { content: [], playlists: [], storagePct: 40, ...over };
 }
 
-function startServer(f: Fixture): Promise<{ server: Server; baseUrl: string }> {
+function startServer(f: Fixture): Promise<Harness> {
+  const archived: string[] = [];
+  const requests: Recorded[] = [];
+
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
     const path = url.pathname;
     const page = Number(url.searchParams.get('page') ?? '1');
+    requests.push({
+      method: req.method ?? 'GET',
+      path,
+      query: Object.fromEntries(url.searchParams),
+    });
 
     const json = (status: number, body: unknown): void => {
       res.writeHead(status, { 'content-type': 'application/json', connection: 'close' });
@@ -61,7 +125,23 @@ function startServer(f: Fixture): Promise<{ server: Server; baseUrl: string }> {
         // A response-shape drift. This used to yield [] reported as success.
         return json(200, { success: true, data: { results: slice, count: slice.length } });
       }
-      json(200, { success: true, data: { items: slice } });
+      // `meta.total` is what every real `PaginatedResponse` endpoint carries and
+      // it is what makes the completeness verdict EXACT — hence the sharp
+      // 501-entity boundary rather than a fuzzy "somewhere around 500".
+      json(200, { success: true, data: { items: slice, meta: { total: all.length } } });
+    };
+
+    /** `ContentService.findOne` — `include`-based, so every scalar comes back. */
+    const detailFor = (id: string): Record<string, unknown> | null => {
+      f.onContentDetail?.(id, f);
+      const item = f.content.find(c => c.id === id);
+      if (!item) return null;
+      const playlistItems = f.playlists.flatMap(p =>
+        (((p.items as { contentId: string }[] | undefined) ?? []) as { contentId: string }[])
+          .filter(i => i.contentId === id)
+          .map(i => ({ ...i, playlist: { id: p.id, name: p.name } })),
+      );
+      return { ...item, title: item.name, playlistItems };
     };
 
     if (path === '/api/v1/auth/login') {
@@ -69,7 +149,7 @@ function startServer(f: Fixture): Promise<{ server: Server; baseUrl: string }> {
     }
     if (path === '/api/v1/auth/logout') return json(201, { success: true, data: {} });
 
-    if (path === '/api/v1/content') return paged(f.content);
+    if (path === '/api/v1/content') return paged(f.content.map(projectListItem));
     if (path === '/api/v1/playlists') return paged(f.playlists);
 
     if (path === '/api/v1/health') {
@@ -77,9 +157,20 @@ function startServer(f: Fixture): Promise<{ server: Server; baseUrl: string }> {
       return json(200, { success: true, data: { storage: { usedPercent: f.storagePct } } });
     }
 
-    // POST /content/:id/archive
-    if (path.startsWith('/api/v1/content/')) {
-      return json(200, { success: true, data: { id: path.split('/')[4], status: 'archived' } });
+    const archive = /^\/api\/v1\/content\/([^/]+)\/archive$/.exec(path);
+    if (archive && req.method === 'POST') {
+      archived.push(archive[1]);
+      return json(200, { success: true, data: { id: archive[1], status: 'archived' } });
+    }
+
+    const detail = /^\/api\/v1\/content\/([^/]+)$/.exec(path);
+    if (detail && req.method === 'GET') {
+      if (f.failDetail?.includes(detail[1])) {
+        return json(500, { success: false, message: 'detail read failed' });
+      }
+      const body = detailFor(detail[1]);
+      if (!body) return json(404, { success: false, message: 'Content not found' });
+      return json(200, { success: true, data: body });
     }
 
     return json(200, { success: true, data: {} });
@@ -90,7 +181,7 @@ function startServer(f: Fixture): Promise<{ server: Server; baseUrl: string }> {
     server.listen(0, '127.0.0.1', () => {
       const address = server.address();
       assert.ok(address && typeof address === 'object');
-      resolve({ server, baseUrl: `http://127.0.0.1:${address.port}` });
+      resolve({ server, baseUrl: `http://127.0.0.1:${address.port}`, archived, requests });
     });
   });
 }
@@ -188,14 +279,52 @@ function expiredContentIncident(): Incident {
   } as Incident;
 }
 
-async function withServer(f: Fixture, fn: (baseUrl: string) => Promise<void>): Promise<void> {
-  const { server, baseUrl } = await startServer(f);
+async function withServer(
+  f: Fixture,
+  fn: (baseUrl: string, h: Harness) => Promise<void>,
+): Promise<void> {
+  const h = await startServer(f);
   try {
-    await fn(baseUrl);
+    await fn(h.baseUrl, h);
   } finally {
-    server.close();
+    h.server.close();
   }
 }
+
+// ─── Archive-invariant fixtures ─────────────────────────────────────────────
+
+/** Comfortably past ORPHAN_AGE_DAYS (30). */
+const OLD = new Date(Date.now() - 60 * 86_400_000).toISOString();
+
+function contentItem(over: Record<string, unknown>): Record<string, unknown> {
+  return {
+    name: String(over.id ?? 'item'),
+    type: 'image',
+    status: 'active',
+    createdAt: OLD,
+    ...over,
+  };
+}
+
+function playlistWith(id: string, contentIds: string[] = []): Record<string, unknown> {
+  return {
+    id,
+    name: id,
+    items: contentIds.map((contentId, i) => ({
+      id: `${id}-item-${i}`,
+      playlistId: id,
+      contentId,
+      order: i,
+    })),
+  };
+}
+
+/** `n` playlists, oldest LAST — `/playlists` is ordered `createdAt: 'desc'`. */
+function playlists(n: number, tail: Record<string, unknown>[] = []): Record<string, unknown>[] {
+  return [...Array.from({ length: n }, (_, i) => playlistWith(`pl-${i}`)), ...tail];
+}
+
+const SCAN_TRUNCATED_ID = 'content-lifecycle:scan-truncated:entity-lists';
 
 // ─── (a) POSITIVE: a real storage reading clears the stale storage_high ──────
 
@@ -390,9 +519,12 @@ test('NEGATIVE: an unrecognized list shape exits 2 and resolves nothing', async 
 // ─── Truncation: content lists at the cap resolve no content incident ────────
 
 test('NEGATIVE: a truncated content scan resolves nothing and raises scan-truncated', async () => {
+  // 501, not 500. The harness now emits `meta.total` on every list, exactly as
+  // `PaginatedResponse` does, so the completeness verdict is EXACT rather than
+  // the `length < cap` proxy — and the boundary sits one item above the cap.
   const f = fixture({
     storagePct: 40,
-    content: Array.from({ length: 500 }, (_, i) => ({
+    content: Array.from({ length: 501 }, (_, i) => ({
       id: `c-${i}`,
       name: `Item ${i}`,
       type: 'image',
@@ -421,6 +553,436 @@ test('NEGATIVE: a truncated content scan resolves nothing and raises scan-trunca
       // every run forever.
       assert.equal(truncated.severity, 'info');
       assert.match(truncated.message, /page-walk cap/i);
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// THE ARCHIVE INVARIANT (K13)
+//
+// "content referenced by ANY valid playlist must never become archive-eligible
+//  merely because the playlist/reference query was truncated or paginated — and,
+//  by extension, must never be archived because a reference TYPE was not
+//  considered at all."
+//
+// Archiving is a soft `status:'archived'` flip, but `isDeliverable`
+// (packages/database/src/lib/effective-content.ts:85-93) drops non-active
+// content from both playlist items and layout zones — so it STOPS DELIVERY to
+// screens. Every assertion below is on the recorded list of
+// `POST /content/:id/archive` ids, because that list IS the customer-visible
+// consequence. Asserting on incidents or logs instead would have passed against
+// the defective code.
+//
+// Each case names the mutation it kills, so it cannot be "simplified" into a
+// vacuous version.
+// ════════════════════════════════════════════════════════════════════════════
+
+// ─── 1. Below the boundary: a complete scan still archives the real orphan ───
+
+test('ARCHIVE 500 playlists (complete): archives exactly the genuine orphan', async () => {
+  // The positive control. Without it, every negative case below is satisfied by
+  // an agent that archives nothing, ever.
+  const f = fixture({
+    content: [contentItem({ id: 'pinned-a' }), contentItem({ id: 'the-orphan' })],
+    playlists: [playlistWith('pl-ref', ['pinned-a']), ...playlists(499)],
+  });
+
+  await withServer(f, async (baseUrl, h) => {
+    const tmpRoot = setupTmpRoot();
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+      assert.deepEqual(
+        h.archived,
+        ['the-orphan'],
+        `only the unreferenced item may be archived\n${result.stdout}`,
+      );
+      assert.equal(
+        readState(tmpRoot).incidents.find(i => i.id === SCAN_TRUNCATED_ID),
+        undefined,
+        '500 entities with meta.total=500 is COMPLETE — no truncation incident',
+      );
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── 2. Above the boundary: the WRITE is gated, not just the resolution ─────
+
+test('ARCHIVE 501 playlists (truncated): archives NOTHING and says why', async () => {
+  // THE DEFECT. `/playlists` is ordered `createdAt: 'desc'`, so the page-walk cap
+  // drops the OLDEST playlists — maximally correlated with the >30d population
+  // the orphan check targets. Here the dropped 501st playlist is the only thing
+  // referencing `pinned-old`, which is otherwise a perfect candidate.
+  //
+  // Before this change the incomplete branch logged, raised `scan-truncated`,
+  // and then archived anyway. MUTATION KILLED: revert the
+  // `if (counters.contentScanComplete)` gate around `checkOrphanedContent` and
+  // `pinned-old` is archived — delivery stops on every screen showing it.
+  const f = fixture({
+    content: [contentItem({ id: 'pinned-old' }), contentItem({ id: 'the-orphan' })],
+    playlists: [...playlists(500), playlistWith('pl-oldest', ['pinned-old'])],
+  });
+
+  await withServer(f, async (baseUrl, h) => {
+    const tmpRoot = setupTmpRoot();
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+
+      assert.deepEqual(
+        h.archived,
+        [],
+        `a knowingly-partial reference universe must archive NOTHING\n${result.stdout}`,
+      );
+
+      const truncated = readState(tmpRoot).incidents.find(i => i.id === SCAN_TRUNCATED_ID);
+      assert.ok(truncated, `expected a scan-truncated incident\n${result.stdout}`);
+      assert.equal(truncated.severity, 'info');
+      // The remediation must NOT tell the operator to raise the cap — that
+      // re-arms the identical defect at the new number.
+      assert.doesNotMatch(truncated.remediation ?? '', /^Raise the/i);
+      assert.match(truncated.remediation ?? '', /Do NOT raise the page-walk cap/);
+
+      assert.match(result.stdout, /SKIP orphan archive/, 'the skip must be visible in the log');
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── 3. Multi-page traversal: a reference on page 3 still counts ─────────────
+
+test('ARCHIVE 250 playlists: a reference on page 3 protects its content', async () => {
+  // MUTATION KILLED: make `getAllScan` return after page 1. The reference then
+  // lives in the unseen tail — but the run also becomes incomplete, so the gate
+  // stops the archive entirely and `the-orphan` is not archived either. That is
+  // why this asserts the EXACT list rather than only "pinned-p3 survived": the
+  // exact list distinguishes "traversed correctly" from "gave up".
+  const f = fixture({
+    content: [contentItem({ id: 'pinned-p3' }), contentItem({ id: 'the-orphan' })],
+    playlists: [...playlists(249), playlistWith('pl-page3', ['pinned-p3'])],
+  });
+
+  await withServer(f, async (baseUrl, h) => {
+    const tmpRoot = setupTmpRoot();
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+      assert.deepEqual(h.archived, ['the-orphan'], `${result.stdout}`);
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── 4. Content-side truncation ─────────────────────────────────────────────
+
+test('ARCHIVE 501 content, complete playlists: nothing referenced is archived', async () => {
+  // Content truncation drops the OLDEST content, i.e. candidates — so it used to
+  // be purely safe-direction. It is not any more: layouts are now a reference
+  // SOURCE, and a dropped layout page silently removes zone pins. The gate
+  // therefore folds BOTH scans into one flag, which is why this archives nothing
+  // at all rather than "the orphans it could still see".
+  const f = fixture({
+    content: [
+      contentItem({ id: 'pinned-a' }),
+      ...Array.from({ length: 500 }, (_, i) => contentItem({ id: `c-${i}` })),
+    ],
+    playlists: [playlistWith('pl-ref', ['pinned-a'])],
+  });
+
+  await withServer(f, async (baseUrl, h) => {
+    const tmpRoot = setupTmpRoot();
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+      assert.ok(
+        !h.archived.includes('pinned-a'),
+        `a referenced item must never be archived\n${result.stdout}`,
+      );
+      assert.deepEqual(h.archived, [], 'the folded gate stops the whole archive pass');
+      assert.ok(readState(tmpRoot).incidents.find(i => i.id === SCAN_TRUNCATED_ID));
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── 5. GAP-1: layout zone references ───────────────────────────────────────
+
+test('ARCHIVE GAP-1: content pinned into a layout zone is not archived', async () => {
+  // Live-reachable at ANY tenant size — no truncation needed. A `type:'layout'`
+  // content pins other content through `metadata.zones[].contentId`, which
+  // `resolveZoneReferences` resolves and `isDeliverable` then drops if it is not
+  // active. Archiving `zone-pinned` therefore BLANKS THAT ZONE on live glass.
+  //
+  // The agent could not even see this: `CONTENT_LIST_SELECT` omits `metadata`,
+  // and the harness strips it from the list for exactly that reason. The only
+  // way to pass is to read the layout's detail.
+  //
+  // MUTATION KILLED: drop the layout harvest and `zone-pinned` is archived.
+  const f = fixture({
+    content: [
+      contentItem({
+        id: 'the-layout',
+        type: 'layout',
+        metadata: { zones: [{ id: 'z1', contentId: 'zone-pinned' }, { id: 'z2' }] },
+      }),
+      contentItem({ id: 'zone-pinned' }),
+      contentItem({ id: 'the-orphan' }),
+    ],
+    playlists: [],
+  });
+
+  await withServer(f, async (baseUrl, h) => {
+    const tmpRoot = setupTmpRoot();
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+      assert.deepEqual(h.archived, ['the-orphan'], `${result.stdout}`);
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── 6. GAP-2: replacementContentId ─────────────────────────────────────────
+
+test('ARCHIVE GAP-2: an expiry replacement target is not archived', async () => {
+  // `Content.replacementContentId` is swapped in when the referrer expires, so
+  // archiving the target lands the swap on dead content. Absent from
+  // `CONTENT_LIST_SELECT`, so again only the per-item read can see it.
+  //
+  // `replacement-b` deliberately comes FIRST in the list. A one-pass
+  // harvest-while-archiving would already have archived it before reading
+  // `referrer-a`'s detail; the two-pass confirm makes the outcome
+  // order-independent. MUTATION KILLED: collapse pass 1 and pass 2 into one loop.
+  const f = fixture({
+    content: [
+      contentItem({ id: 'replacement-b' }),
+      contentItem({ id: 'referrer-a', replacementContentId: 'replacement-b' }),
+      contentItem({ id: 'the-orphan' }),
+    ],
+    playlists: [],
+  });
+
+  await withServer(f, async (baseUrl, h) => {
+    const tmpRoot = setupTmpRoot();
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+      assert.ok(
+        !h.archived.includes('replacement-b'),
+        `the replacement target must survive\n${result.stdout}`,
+      );
+      // The referrer itself IS a genuine orphan by this agent's model, and the
+      // unrelated orphan must still go — otherwise this passes vacuously.
+      assert.deepEqual([...h.archived].sort(), ['referrer-a', 'the-orphan']);
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── 7. Regression guard: layouts themselves stay skipped ───────────────────
+
+test('ARCHIVE: a layout is never itself archived, even with no zones', async () => {
+  // Pins the pre-existing `if (c.type === 'layout') return false` skip. Layouts
+  // are structural: they are referenced by displays and schedules, which this
+  // agent does not look at at all.
+  const f = fixture({
+    content: [
+      contentItem({ id: 'bare-layout', type: 'layout' }),
+      contentItem({ id: 'the-orphan' }),
+    ],
+    playlists: [],
+  });
+
+  await withServer(f, async (baseUrl, h) => {
+    const tmpRoot = setupTmpRoot();
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+      assert.deepEqual(h.archived, ['the-orphan'], `${result.stdout}`);
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── 8. Tenant isolation ────────────────────────────────────────────────────
+
+test('ARCHIVE: every request stays inside the ops principal own org scope', async () => {
+  // Encodes the CURRENT contract rather than asserting it is the right one: the
+  // agent is scoped to whatever org its own credentials belong to (on prod that
+  // is "E2E Test Org", 8 content items — so content-lifecycle has never managed
+  // customer content). Whether it SHOULD be fleet-wide is a product question
+  // tracked in backlog.md.
+  //
+  // The point of pinning it here is that widening the scope is exactly the
+  // change that turns every defect above into a cross-tenant one. This trips the
+  // moment someone reaches for a platform-scope query.
+  const f = fixture({
+    content: [contentItem({ id: 'the-orphan' })],
+    playlists: [],
+  });
+
+  await withServer(f, async (baseUrl, h) => {
+    const tmpRoot = setupTmpRoot();
+    try {
+      await runAgent(tmpRoot, baseUrl);
+
+      const allowed = [
+        /^\/api\/v1\/auth\/(login|logout)$/,
+        /^\/api\/v1\/content$/,
+        /^\/api\/v1\/content\/[^/]+$/,
+        /^\/api\/v1\/content\/[^/]+\/archive$/,
+        /^\/api\/v1\/playlists$/,
+        /^\/api\/v1\/health$/,
+      ];
+      const unexpected = h.requests.map(r => r.path).filter(p => !allowed.some(re => re.test(p)));
+      assert.deepEqual(unexpected, [], 'the agent reached an endpoint outside its known surface');
+
+      const crossOrg = ['organizationId', 'orgId', 'organization', 'allOrgs', 'platform', 'scope'];
+      for (const r of h.requests) {
+        for (const key of crossOrg) {
+          assert.ok(
+            !(key in r.query),
+            `${r.method} ${r.path} carried a cross-org parameter "${key}"`,
+          );
+        }
+        assert.ok(!r.path.startsWith('/api/v1/admin'), `${r.path} is an admin-scope endpoint`);
+      }
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── 9. Global template-library content ─────────────────────────────────────
+
+test('ARCHIVE: isGlobal template-library content is never archived', async () => {
+  // Belt-and-braces. Prod's ops account is NOT in the Vizora System org (that was
+  // verified), so this is latent — but `isGlobal` content is shared platform-wide
+  // and "in no playlist of the one org this agent can see" says nothing about its
+  // use elsewhere.
+  //
+  // `isGlobal` is absent from `CONTENT_LIST_SELECT`, so this guard can ONLY live
+  // in the per-item confirmation. MUTATION KILLED: move the check to the
+  // list-side filter and it silently reads `undefined` on every item.
+  const f = fixture({
+    content: [
+      contentItem({ id: 'global-tpl', type: 'template', isGlobal: true }),
+      contentItem({ id: 'the-orphan' }),
+    ],
+    playlists: [],
+  });
+
+  await withServer(f, async (baseUrl, h) => {
+    const tmpRoot = setupTmpRoot();
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+      assert.deepEqual(h.archived, ['the-orphan'], `${result.stdout}`);
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── 10. Concurrency: the confirm read is the authority ─────────────────────
+
+test('ARCHIVE: a playlist edit landing mid-run is seen by the per-item confirm', async () => {
+  // Both lists are fetched ONCE, at the top of the run; the archive loop runs
+  // afterwards with no re-read, transaction or lock, so the stale window used to
+  // be the entire run. Here `/playlists` answers empty, and only once the agent
+  // asks `GET /content/late-ref` does the reference exist — the shape of an
+  // operator adding content to a playlist while the cron is mid-cycle.
+  //
+  // MUTATION KILLED: remove the per-candidate `GET /content/:id` confirmation
+  // and `late-ref` is archived out from under the operator who just used it.
+  const f: Fixture = fixture({
+    content: [contentItem({ id: 'late-ref' })],
+    playlists: [],
+    onContentDetail: (id, live) => {
+      if (id !== 'late-ref' || live.playlists.length > 0) return;
+      live.playlists.push(playlistWith('pl-just-created', ['late-ref']));
+    },
+  });
+
+  await withServer(f, async (baseUrl, h) => {
+    const tmpRoot = setupTmpRoot();
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+      assert.deepEqual(
+        h.archived,
+        [],
+        `the per-item read saw the new reference and must refuse\n${result.stdout}`,
+      );
+      assert.match(result.stdout, /playlist reference\(s\) the list walk did not show/);
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── 11. A SKIPPED check resolves nothing ───────────────────────────────────
+
+test('ARCHIVE: an unreadable layout fails closed and clears no orphan finding', async () => {
+  // The case the two coverage keys exist to separate, and the ONLY one where
+  // they differ: the tenant lists are COMPLETE — so `contentScanComplete` is
+  // true and `expired_content` legitimately gets its resolution — but a layout
+  // detail read failed, so the zone-pin universe is partial and the orphan check
+  // returns without looking at anything.
+  //
+  // Fail-closed on that read is not paranoia: a missed zone pin archives content
+  // that a live screen is currently rendering into a zone, which blanks it.
+  //
+  // MUTATION KILLED: put `orphaned_content` back into `CONTENT_SCAN_TYPES`. The
+  // run then reports a false all-clear on the exact finding it was too blind to
+  // re-check. (A truncated-list fixture does NOT kill that mutation — there
+  // `contentScanComplete` is false, so the whole set is uncovered either way.)
+  const orphanIncidentId = 'content-lifecycle:orphaned_content:content-stale';
+  const stale: Incident = {
+    id: orphanIncidentId,
+    agent: 'content-lifecycle',
+    type: 'orphaned_content',
+    severity: 'info',
+    target: 'content',
+    targetId: 'content-stale',
+    detected: new Date(Date.now() - 86_400_000).toISOString(),
+    message: 'Content "Stale" is orphaned - archive failed (transient)',
+    remediation: 'POST /content/content-stale/archive',
+    status: 'open',
+    attempts: 1,
+  } as Incident;
+
+  const f = fixture({
+    content: [
+      contentItem({ id: 'broken-layout', type: 'layout' }),
+      contentItem({ id: 'the-orphan' }),
+    ],
+    playlists: [],
+    failDetail: ['broken-layout'],
+  });
+
+  await withServer(f, async (baseUrl, h) => {
+    const tmpRoot = setupTmpRoot([stale]);
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+      assert.deepEqual(
+        h.archived,
+        [],
+        `an unknown zone-pin universe must archive nothing\n${result.stdout}`,
+      );
+
+      const state = readState(tmpRoot);
+      assert.equal(
+        state.incidents.find(i => i.id === orphanIncidentId)?.status,
+        'open',
+        `a check that did not run cannot clear its own finding\n${result.stdout}`,
+      );
+      const harvest = state.incidents.find(
+        i => i.id === 'content-lifecycle:reference-scan-incomplete:layout-zones',
+      );
+      assert.ok(harvest, `expected a reference-scan-incomplete incident\n${result.stdout}`);
+      assert.equal(harvest.severity, 'info', 'only a retry clears it — it must not pin DEGRADED');
     } finally {
       rmSync(tmpRoot, { recursive: true, force: true });
     }
