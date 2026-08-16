@@ -61,12 +61,22 @@ jest.mock('@/lib/hooks/useDebounce', () => ({
   useDebounce: (value: any) => value,
 }));
 
+/**
+ * Capture the page's own `onConnectionChange` so a test can drive the THREE
+ * states the hook actually emits (`true` / `false` / `null`). A hook mock that
+ * only returns a static object can never exercise the `null` branch, which is
+ * how the collapse it guards against went unnoticed.
+ */
+let connectionChange: ((connected: boolean | null) => void) | undefined;
 jest.mock('@/lib/hooks', () => ({
-  useRealtimeEvents: () => ({
-    isConnected: false,
-    isOffline: true,
-    emitPlaylistUpdate: jest.fn(),
-  }),
+  useRealtimeEvents: (opts: any) => {
+    connectionChange = opts?.onConnectionChange;
+    return {
+      isConnected: false,
+      isOffline: true,
+      emitPlaylistUpdate: jest.fn(),
+    };
+  },
 }));
 
 jest.mock('@/theme/icons', () => ({
@@ -284,6 +294,62 @@ describe('PlaylistsClient', () => {
     expect(screen.queryByText('Not assigned')).not.toBeInTheDocument();
   });
 
+  /**
+   * `useRealtimeEvents` emits `null` on disconnect while the browser is still
+   * online — "reconnecting", not "offline". Collapsing it into the offline claim
+   * tells the operator to reload a page whose socket is already coming back.
+   */
+  it('does not claim live updates are off while the socket is reconnecting', async () => {
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Promo')).toBeInTheDocument();
+    });
+
+    act(() => connectionChange?.(true));
+    await waitFor(() => {
+      expect(screen.getByText('Live updates on')).toBeInTheDocument();
+    });
+
+    // null = WS dropped, browser still online. The claim must not flip.
+    act(() => connectionChange?.(null));
+    expect(screen.getByText('Live updates on')).toBeInTheDocument();
+    expect(screen.queryByText('Live updates off')).not.toBeInTheDocument();
+
+    // false = genuinely offline. Now it may flip.
+    act(() => connectionChange?.(false));
+    await waitFor(() => {
+      expect(screen.getByText('Live updates off')).toBeInTheDocument();
+    });
+  });
+
+  it('qualifies "Not assigned" with the schedules that also use the playlist', async () => {
+    (apiClient.getPlaylists as jest.Mock).mockResolvedValue({
+      data: [{ ...mockPlaylists[0], _count: { schedules: 2 } }],
+    });
+
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Also used by 2 schedules')).toBeInTheDocument();
+    });
+    // Still "Not assigned" — no screen names it — but no longer dead inventory.
+    expect(screen.getByText('Not assigned')).toBeInTheDocument();
+  });
+
+  it('degrades instead of crashing on an unparseable updatedAt', async () => {
+    (apiClient.getPlaylists as jest.Mock).mockResolvedValue({
+      data: [{ ...mockPlaylists[0], updatedAt: 'not-a-date' }],
+    });
+
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Last update time unavailable')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Morning Promo')).toBeInTheDocument();
+  });
+
   it('warns that non-active content will be skipped on screens', async () => {
     (apiClient.getPlaylists as jest.Mock).mockResolvedValue({
       data: [
@@ -302,6 +368,9 @@ describe('PlaylistsClient', () => {
     await waitFor(() => {
       expect(screen.getByText('At least 1 item will be skipped')).toBeInTheDocument();
     });
+    // A label, not the raw API token.
+    expect(screen.getByText('Archived')).toBeInTheDocument();
+    expect(screen.queryByText('archived')).not.toBeInTheDocument();
     // The card still reports the stored item count; the warning is what closes
     // the gap between "listed" and "delivered".
     expect(screen.getByText('2 items')).toBeInTheDocument();

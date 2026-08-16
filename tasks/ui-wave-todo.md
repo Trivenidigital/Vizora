@@ -108,6 +108,19 @@ call site anywhere (`handleEdit` navigates to `/dashboard/playlists/[id]`), plus
 `fetchAllPaginated(getContent)` call that existed only to feed it — a full paginated content fetch
 on every load of the page, discarded.
 
+### Carried into the next route (found during Playlists review, NOT fixed there)
+- **Devices' `realtimeStatus` union has an unreachable `'error'` branch** — nothing sets it, so
+  "Live updates failed" can never render. Same defect class as the `isActive` badge. Playlists
+  shipped a two-state union; Devices should drop the third when that route is next opened.
+- **Content's three-state connection handling is the better pattern** (`content/page-client.tsx:214-228`:
+  a distinct `'reconnecting'` decaying to `'offline'` after 15s). Devices and Playlists both keep the
+  current status on `null` instead, which is correct but says less. Consider promoting Content's
+  treatment to the shared pattern when Content is redesigned.
+- **`_count.schedules` is unfiltered on the list endpoint** while `findOne` filters to
+  `isActive: true`, so list and detail disagree about what "scheduled" means for the same playlist.
+  Playlists says "Also used by N schedules" because of it. Scheduling should settle which is right
+  and make both endpoints agree, rather than each consumer re-deriving the caveat.
+
 ### Then
 Dashboard overview -> Scheduling -> Content/Media -> Analytics -> settings surfaces.
 Then Pool C by semantic family (see "Known traps"), not as a mechanical 1,094-literal replace.

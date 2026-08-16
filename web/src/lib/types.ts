@@ -75,6 +75,16 @@ export interface Playlist {
   /** Sum of `content.fileSize`; content with no recorded size counts as 0. */
   totalSize?: number;
   itemCount?: number;
+  /**
+   * Prisma relation counts, spread onto the row by `PlaylistsService.findAll`.
+   *
+   * `schedules` is **every** schedule referencing this playlist and is NOT
+   * filtered by `isActive` — `findOne` filters, `findAll` does not, so the two
+   * endpoints disagree about the same playlist. It therefore supports
+   * "used by N schedules" and must NOT be used to say a playlist is scheduled
+   * onto screens right now.
+   */
+  _count?: { schedules?: number };
   createdAt: Date | string;
   updatedAt: Date | string;
 }

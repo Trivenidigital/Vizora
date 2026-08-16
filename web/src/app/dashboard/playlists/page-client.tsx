@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { fetchAllPaginated } from '@/lib/api/pagination';
@@ -94,6 +94,31 @@ const formatCycle = (total: number) => {
 const skippedItemCount = (items: PlaylistItemSummary[]) =>
   items.filter((item) => item.content && item.content.status !== 'active').length;
 
+/** Content states a screen refuses, said in words rather than echoed as an API token. */
+const CONTENT_STATUS_LABEL: Record<string, string> = {
+  archived: 'Archived',
+  expired: 'Expired',
+  draft: 'Draft',
+  processing: 'Processing',
+  error: 'Failed',
+};
+
+/**
+ * A date that may not be a date.
+ *
+ * `new Date('nonsense').toISOString()` throws `RangeError`, and a throw inside
+ * render takes the whole route down. The previous card called
+ * `toLocaleDateString()` alone, which degrades to the string "Invalid Date" — so
+ * adding `<time dateTime>` for the machine-readable timestamp would have traded
+ * graceful degradation for a page crash. Returning null lets the caller drop the
+ * attribute and keep rendering.
+ */
+const parseDate = (value: unknown): Date | null => {
+  if (value === null || value === undefined) return null;
+  const d = new Date(String(value));
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
 /**
  * A playlist card.
  *
@@ -132,6 +157,8 @@ function PlaylistCard({
   const items = playlist.items || [];
   const itemCount = playlist.itemCount ?? items.length;
   const skipped = skippedItemCount(items);
+  const updatedAt = parseDate(playlist.updatedAt);
+  const scheduleCount = playlist._count?.schedules ?? 0;
   const thumbs = items
     .slice(0, 4)
     .map((item) => item.content?.thumbnailUrl || '')
@@ -208,15 +235,18 @@ function PlaylistCard({
             ) : null}
           </div>
 
-          {playlist.updatedAt ? (
+          {updatedAt ? (
             <p className="mt-2 text-xs text-[var(--foreground-tertiary)]">
               Updated{' '}
-              <time
-                dateTime={new Date(String(playlist.updatedAt)).toISOString()}
-                title={new Date(String(playlist.updatedAt)).toLocaleString()}
-              >
-                {new Date(String(playlist.updatedAt)).toLocaleDateString()}
+              <time dateTime={updatedAt.toISOString()} title={updatedAt.toLocaleString()}>
+                {updatedAt.toLocaleDateString()}
               </time>
+            </p>
+          ) : playlist.updatedAt ? (
+            /* Unparseable rather than absent. Say so instead of throwing, and
+               instead of printing the literal "Invalid Date". */
+            <p className="mt-2 text-xs text-[var(--foreground-tertiary)]">
+              Last update time unavailable
             </p>
           ) : null}
         </div>
@@ -240,7 +270,14 @@ function PlaylistCard({
               Assigned to {assignedScreens} {assignedScreens === 1 ? 'screen' : 'screens'}
             </span>
           ) : (
-            <span className="eh-badge eh-badge-neutral" title="No screen currently has this playlist as its assigned playlist.">
+            <span
+              className="eh-badge eh-badge-neutral"
+              title={
+                scheduleCount > 0
+                  ? 'No screen has this playlist as its assigned playlist, but schedules reference it — and a schedule takes priority over the assigned playlist, so this is not unused inventory.'
+                  : 'No screen currently has this playlist as its assigned playlist.'
+              }
+            >
               <Icon name="devices" size="xs" aria-hidden />
               Not assigned
             </span>
@@ -254,6 +291,28 @@ function PlaylistCard({
             Screens unknown
           </span>
         )}
+
+        {/*
+          A playlist can reach screens WITHOUT being anyone's assigned playlist:
+          `resolveEffectiveContent` resolves schedules BEFORE `currentPlaylistId`
+          (effective-content.ts:145-177), so a scheduled-only playlist has zero
+          assigned rows, reads "Not assigned", and looks like dead inventory
+          someone might delete.
+
+          "Used by", never "scheduled onto screens right now": the count is
+          `_count.schedules` from the list endpoint, which is NOT filtered by
+          `isActive` — so it includes schedules that are switched off. Same
+          discipline as "at least N items will be skipped".
+        */}
+        {scheduleCount > 0 ? (
+          <span
+            className="eh-badge eh-badge-info"
+            title="Schedules referencing this playlist, active or not — the list endpoint does not filter by isActive. A schedule takes priority over a screen's assigned playlist while its window is open."
+          >
+            <Icon name="schedules" size="xs" aria-hidden />
+            Also used by {scheduleCount} {scheduleCount === 1 ? 'schedule' : 'schedules'}
+          </span>
+        ) : null}
 
         {itemCount === 0 ? (
           <span className="eh-badge eh-badge-neutral">
@@ -290,9 +349,16 @@ function PlaylistCard({
                 >
                   {item.content?.title || `Content ${item.contentId}`}
                 </span>
+                {/* A label, not the raw API token. This rendered a lowercase
+                    `archived` three lines below the comment criticising exactly
+                    that in the assign modal. An unmapped state falls back to the
+                    token rather than to a guess. */}
                 {item.content && item.content.status !== 'active' ? (
-                  <span className="eh-badge eh-badge-warning shrink-0 text-[11px]">
-                    {item.content.status}
+                  <span
+                    className="eh-badge eh-badge-warning shrink-0 text-[11px]"
+                    title="Screens play only content in the active state, so this item is dropped on delivery."
+                  >
+                    {CONTENT_STATUS_LABEL[item.content.status] ?? item.content.status}
                   </span>
                 ) : null}
                 <span className="shrink-0 tabular-nums text-xs text-[var(--foreground-tertiary)]">
@@ -400,8 +466,40 @@ export default function PlaylistsClient() {
   const debouncedSearch = useDebounce(searchQuery, 300);
   const [shapeFilter, setShapeFilter] = useState<ShapeFilter | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>('updated');
-  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline' | 'error'>('offline');
+  /*
+   * Two states, because only two are reachable. The Devices route carries a
+   * third, `'error'`, that nothing ever sets — the same never-rendered branch
+   * this PR removed the "Active" badge for. It is dropped here rather than
+   * copied; flagged for Devices in `tasks/ui-wave-todo.md` rather than changed
+   * from a Playlists PR.
+   */
+  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline'>('offline');
   const [previewPlaylist, setPreviewPlaylist] = useState<PlaylistSummary | null>(null);
+
+  /**
+   * The connection signal is THREE-state, and collapsing it is a claim.
+   *
+   * `useRealtimeEvents` emits `navigator.onLine ? null : false` on disconnect —
+   * `null` means "the socket dropped but the browser still has network", i.e.
+   * reconnecting. `isConnected ? 'connected' : 'offline'` turns that `null` into
+   * "Live updates off", so a two-second WiFi blip told the operator to reload a
+   * page whose socket was already coming back, and it did not self-correct until
+   * the next connect event.
+   *
+   * That is this PR's own thesis inverted: a known-lossy value must not be
+   * promoted into a claim, and `offline` is not `unknown`. Devices handles it
+   * correctly at `devices/page-client.tsx:200-207` and this mirrors it — Content
+   * goes further with a distinct `'reconnecting'` decaying to offline after 15s,
+   * which is the better treatment but a bigger surface than this route needs.
+   */
+  const handleConnectionChange = useCallback((isConnected: boolean | null) => {
+    if (isConnected === true) {
+      setRealtimeStatus('connected');
+    } else if (isConnected === false) {
+      setRealtimeStatus('offline');
+    }
+    // null = reconnecting: keep the current status rather than assert offline.
+  }, []);
 
   // Real-time event handling
   const { emitPlaylistUpdate } = useRealtimeEvents({
@@ -433,9 +531,7 @@ export default function PlaylistsClient() {
           break;
       }
     },
-    onConnectionChange: (isConnected) => {
-      setRealtimeStatus(isConnected ? 'connected' : 'offline');
-    },
+    onConnectionChange: handleConnectionChange,
   });
 
   useEffect(() => {
@@ -673,11 +769,7 @@ export default function PlaylistsClient() {
             */}
             <span
               className={`eh-badge ${
-                realtimeStatus === 'connected'
-                  ? 'eh-badge-success'
-                  : realtimeStatus === 'offline'
-                  ? 'eh-badge-neutral'
-                  : 'eh-badge-error'
+                realtimeStatus === 'connected' ? 'eh-badge-success' : 'eh-badge-neutral'
               }`}
               title={
                 realtimeStatus === 'connected'
@@ -686,11 +778,7 @@ export default function PlaylistsClient() {
               }
             >
               <Icon name={realtimeStatus === 'connected' ? 'refresh' : 'close'} size="xs" aria-hidden />
-              {realtimeStatus === 'connected'
-                ? 'Live updates on'
-                : realtimeStatus === 'offline'
-                ? 'Live updates off'
-                : 'Live updates failed'}
+              {realtimeStatus === 'connected' ? 'Live updates on' : 'Live updates off'}
             </span>
           </div>
           <p className="mt-2 text-sm text-[var(--foreground-secondary)]">
