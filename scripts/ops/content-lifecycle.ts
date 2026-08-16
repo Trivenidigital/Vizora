@@ -48,6 +48,24 @@
  * branch pushes no incident, so a warning raised at 91% survived every
  * subsequent run at 40%, pinning ops-state at CRITICAL forever.
  *
+ * Clearing is ALSO per-ITEM, not just per-check (K25). Coverage keys answer
+ * "did this check run"; they cannot answer "did this check look at THIS item".
+ * The orphan pass skips individual candidates for two reasons that carry NO
+ * evidence — the confirm read threw, or the candidate fell past
+ * `MAX_ARCHIVE_CANDIDATES_PER_RUN` and was never read at all — while the check
+ * as a whole completed and `orphaned_content` stayed covered. A prior
+ * `orphaned_content:X` then resolved because X was not re-raised, when the only
+ * reason it was not re-raised is that nobody looked at X. So those ids are
+ * collected and fed to `resolveNotReraisedForTypes` as if they HAD been
+ * re-raised, which holds their incidents open without fabricating a new one.
+ *
+ * The distinction is exact and load-bearing in both directions: a candidate
+ * skipped because it carries `playlistItems`, is `isGlobal`, or is named as
+ * another item's replacement WAS examined — the run has real evidence it is not
+ * an orphan, so resolving its incident is correct and must keep working.
+ * Over-correcting into "any skip blocks resolution" would mean nothing ever
+ * clears.
+ *
  * Exit codes:
  *   0 — no issues found
  *   1 — issues found (some may have been auto-fixed)
@@ -172,6 +190,25 @@ type ContentLifecycleCounters = {
   storageVerdictReached: boolean;
   /** The `/health` GET did not throw — whatever it then contained. */
   storageProbeReached: boolean;
+
+  // ─── Per-ITEM coverage (K25) ──────────────────────────────────────────────
+  //
+  // Coverage keys are per-CHECK; these two are the item-level residue. Both
+  // hold orphan candidates the run skipped WITHOUT EVIDENCE, and both feed the
+  // same place: `currentIncidentIds`, so a prior `orphaned_content` incident on
+  // one of these ids is treated as re-raised and stays open. They are kept
+  // apart only so the end-of-run log can say WHICH kind of blind spot it was.
+
+  /**
+   * Candidates whose `GET /content/:id` threw. The read that would have decided
+   * orphanhood never answered — that is not evidence of recovery.
+   */
+  confirmReadFailedIds: Set<string>;
+  /**
+   * Candidates past `MAX_ARCHIVE_CANDIDATES_PER_RUN`. Never read at all this
+   * cycle, so this run knows strictly nothing about them.
+   */
+  deferredCandidateIds: Set<string>;
 };
 
 /** Types covered by `contentScanComplete`. */
@@ -461,6 +498,9 @@ async function checkOrphanedContent(
   // Bound the work per firing. The remainder is deferred, not dropped.
   const batch = candidates.slice(0, MAX_ARCHIVE_CANDIDATES_PER_RUN);
   if (candidates.length > batch.length) {
+    // K25: deferred is UNEXAMINED, not "checked and found fine". Record the ids
+    // so their prior incidents cannot resolve off a run that never read them.
+    for (const item of candidates.slice(batch.length)) state.deferredCandidateIds.add(item.id);
     log(
       AGENT,
       `Deferring ${candidates.length - batch.length} orphan candidate(s) to the next cycle ` +
@@ -483,6 +523,12 @@ async function checkOrphanedContent(
     } catch (err) {
       // Unconfirmed is never archived. A 404 here is also not an invitation to
       // act — it just means this run cannot establish orphanhood.
+      //
+      // K25: and "cannot establish orphanhood" cuts BOTH ways. It is equally not
+      // grounds to clear a prior `orphaned_content` finding on this id, which is
+      // what the run silently did before — the skip was invisible to the
+      // resolution sweep, so the incident cleared for want of a re-raise.
+      state.confirmReadFailedIds.add(item.id);
       log(
         AGENT,
         `Skipping ${item.id}: could not confirm it is unreferenced — ${err instanceof Error ? err.message : err}`,
@@ -828,6 +874,8 @@ async function main(): Promise<void> {
     referenceHarvestComplete: true,
     storageVerdictReached: false,
     storageProbeReached: false,
+    confirmReadFailedIds: new Set<string>(),
+    deferredCandidateIds: new Set<string>(),
   };
 
   // Truncation is announced, never silent. Withholding resolution quietly would
@@ -939,6 +987,44 @@ async function main(): Promise<void> {
     ...(counters.storageProbeReached ? STORAGE_PROBE_TYPES : []),
   ]);
 
+  // ── K25: items this run never examined count as re-raised ──────────────────
+  //
+  // `coveredTypes` above is per-CHECK and says `orphaned_content` is covered —
+  // the orphan pass did run. But an individual candidate can still have been
+  // skipped without any evidence about it: its confirm read threw, or it fell
+  // past the per-run cap and was never read. Not-re-raised then means "nobody
+  // looked", not "recovered", and a prior `orphaned_content:X` cleared on it.
+  //
+  // Adding the id to `currentIncidentIds` is the whole fix. That set feeds
+  // exactly one predicate in `resolveNotReraisedForTypes` (`!has(i.id)`), so an
+  // id with no matching prior incident is inert — nothing is fabricated, no new
+  // incident is raised, and the id simply withholds one resolution if one was
+  // pending. Examined-and-skipped candidates (playlistItems / isGlobal / named
+  // as a replacement) are deliberately NOT here: those skips are real evidence
+  // and their incidents must still clear.
+  const unexaminedOrphanIds = new Set<string>([
+    ...counters.confirmReadFailedIds,
+    ...counters.deferredCandidateIds,
+  ]);
+
+  // §12a: a silent skip is a future silent failure. Counted and logged rather
+  // than raised as an incident type of its own — the run is not unhealthy, it
+  // is partially blind, and a per-run incident here would be the alert-fatigue
+  // trap that made `scan-truncated` info-severity.
+  if (unexaminedOrphanIds.size > 0) {
+    log(
+      AGENT,
+      `${unexaminedOrphanIds.size} orphan candidate(s) skipped WITHOUT EVIDENCE ` +
+        `(confirm read failed: ${counters.confirmReadFailedIds.size}, deferred past cap: ` +
+        `${counters.deferredCandidateIds.size}) — their prior orphaned_content incidents stay open`,
+    );
+  }
+
+  const currentIncidentIds = new Set(incidents.map(i => i.id));
+  for (const id of unexaminedOrphanIds) {
+    currentIncidentIds.add(makeIncidentId(AGENT, 'orphaned_content', id));
+  }
+
   // Brief locked read→merge→write. The sweep is pure computation over
   // `opsState.incidents` — no network, no subprocess — and has to be here
   // because prior incidents are only readable under the lock.
@@ -947,7 +1033,7 @@ async function main(): Promise<void> {
     const resolved = resolveNotReraisedForTypes(
       opsState.incidents,
       AGENT,
-      new Set(incidents.map(i => i.id)),
+      currentIncidentIds,
       coveredTypes,
     );
     for (const r of resolved) {
