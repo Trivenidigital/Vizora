@@ -186,14 +186,24 @@ export class BillingLifecycleService {
    * Runs every day at 9:00 AM UTC
    */
   // Deliberately NOT leader-locked: the ladder is already idempotent under a
-  // cluster double-fire. `EntitlementService.advanceRung` writes through
+  // cluster double-fire, and the CAS ALONE carries that.
+  // `EntitlementService.advanceRung` writes through
   // `updateMany({ where: { id, subscriptionStatus: fromStatus } })` and does
   // `if (res.count === 0) continue` — so the second instance's transition is a
   // no-op — and the suspend notifier, the dunning email and the advanced counter
-  // ALL sit downstream of that gate, with the email additionally deduped per
-  // (org, rung) by a SET NX `claimDunningNotice`. Adding a fail-open Redis lock
-  // on top would buy nothing the CAS does not already guarantee, while making a
-  // money-path cron newly dependent on Redis being up.
+  // ALL sit downstream of that gate. Adding a fail-open Redis lock on top would
+  // buy nothing the CAS does not already guarantee, while making a money-path
+  // cron newly dependent on Redis being up.
+  //
+  // CORRECTION (K19): this rationale used to also cite the SET NX
+  // `claimDunningNotice` as part of why the ladder is safe unlocked. It never
+  // was. The email sits DOWNSTREAM of `res.count === 0 → continue`, so only the
+  // CAS winner can ever reach it — the claim is belt-and-suspenders, not a
+  // second guarantee. Worse, until K19 that same unguarded SET was the thing
+  // that ABORTED the run: during a Redis outage its rejection propagated out of
+  // advanceRung and abandoned every remaining tenant AND every later rung. It is
+  // now a timeout-bounded, fail-OPEN claim. The unlocked decision stands; cite
+  // the CAS for it, never the dunning claim.
   @Cron('0 9 * * *')
   async handleGracePeriodExpiry(): Promise<void> {
     // B3: delegate to the entitlement degrade ladder. This advances rungs
@@ -201,12 +211,46 @@ export class BillingLifecycleService {
     // entitlementStateSince in UTC days — NOT the old updatedAt cutoff (B8), and
     // NOT a binary suspend-at-7-days. The ladder writes its own run heartbeat.
     try {
-      const { advanced } = await this.entitlementService.advanceLadder();
-      this.logger.log(`Entitlement ladder run complete (${advanced} advanced)`);
+      const result = await this.entitlementService.advanceLadder();
+      const summary =
+        `${result.advanced} advanced, ${result.casLost} CAS-lost, ` +
+        `${result.failed} failed of ${result.attempted} attempted ` +
+        `(${result.eligible} eligible, ${result.rungFailures} rung failure(s))`;
+
+      if (result.failed > 0 || result.rungFailures > 0) {
+        // A run that isolated a failure still COMPLETED, so neither the throw
+        // below nor the freshness watchdog would ever fire for it. This log is
+        // the only signal that some tenant did not advance — it must be error
+        // level, and it must reach a human (SentryInterceptor is HTTP-only).
+        const err = new Error(`Entitlement ladder run DEGRADED — ${summary}`);
+        this.logger.error(err.message);
+        BillingLifecycleService.captureSentry(err, {
+          failed: result.failed,
+          rungFailures: result.rungFailures,
+        });
+      } else {
+        this.logger.log(`Entitlement ladder run complete (${summary})`);
+      }
     } catch (error) {
       // A dead ladder job must be observable — surface as error-level so alerting
       // fires, and let the next run retry (the ladder is idempotent).
       this.logger.error(`Entitlement ladder run FAILED: ${error}`);
+      BillingLifecycleService.captureSentry(error, { failed: 'wholesale' });
+    }
+  }
+
+  /**
+   * Lazy Sentry capture — middleware boot wires Sentry but tests don't load it,
+   * so an import failure must not poison the cron. `logger.error` on its own
+   * reaches NO human for a cron: `SentryInterceptor` only wraps HTTP requests.
+   */
+  private static captureSentry(err: unknown, tags: Record<string, unknown>): void {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const Sentry = require('@sentry/nestjs');
+      Sentry.captureException(err, { tags: { event: 'entitlement_ladder_failed', ...tags } });
+    } catch {
+      /* Sentry not loaded — silent drop, logger.error already fired */
     }
   }
 

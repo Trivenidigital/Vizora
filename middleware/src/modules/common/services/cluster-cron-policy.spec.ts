@@ -187,6 +187,22 @@ describe('cluster cron policy', () => {
       expect(slice).toContain('advanceRung');
     });
 
+    it('the unlocked rationale credits the CAS ALONE, never the dunning SET NX (K19)', () => {
+      // The verdict is unchanged — the CAS carries it — but the CITED MECHANISM
+      // was wrong, and wrong in a load-bearing way: `claimDunningNotice` sits
+      // DOWNSTREAM of `res.count === 0 → continue`, so it guarantees nothing the
+      // CAS does not, and until K19 that same unguarded SET was what ABORTED the
+      // run mid-fleet during a Redis outage. A future reader must not re-derive
+      // "the ladder is safe unlocked" from a claim that is itself a failure mode.
+      const slice = cronSlice(readModuleSource(FILE), "'0 9 * * *'");
+      expect(slice).toContain('the CAS ALONE');
+      expect(slice).toContain('K19');
+      expect(slice).toContain('claimDunningNotice');
+      expect(slice).toContain('It never');
+      // The retracted phrasing must not come back.
+      expect(slice).not.toContain('additionally deduped per');
+    });
+
     it('checkLadderFreshness is NOT locked — a duplicate log line is the whole harm', () => {
       // A watchdog that goes silent because its lock backend is down is strictly
       // worse than one that shouts twice.
