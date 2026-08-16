@@ -145,7 +145,6 @@ const mockPlaylist: Playlist = {
   name: 'Test Playlist',
   description: 'Test Description',
   items: [mockPlaylistItem],
-  isActive: true,
   createdAt: '2024-01-01',
   updatedAt: '2024-01-01',
 };

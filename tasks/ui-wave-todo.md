@@ -45,6 +45,17 @@ Worked example + the full list of what the oracle does and does not cover:
 `docs/design/audits/2026-08-16-devices-redesign/README.md`, which also carries both runs' raw
 `report.json` so a route's numbers are derivable rather than author-reported.
 
+`scripts/design/measure-nontext-contrast.mjs` closes the first blind spot with a measurement
+rather than a hand-written number. It reads the live computed boundary off the real node, resolves
+the colour behind it by compositing the ancestor chain, and compares BOTH the boundary and the fill
+against the backdrop **outside** the control, taking the better — either alone identifies the
+control. Two traps it cost a cycle to find, both now handled in the script: comparing the border
+against the control's OWN fill scores a solid checked checkbox at 1:1 when it is the most visible
+state there is, and Playwright's `.check()` returns before the `:checked::before` style
+recalculation lands, so measuring immediately reads the UNCHECKED box back (identical numbers for
+both probes is the tell). Probes are declared explicitly per route — a page-wide scanner would have
+to guess which hairline is a control boundary and would report every decorative rule as a failure.
+
 ## PR queue
 
 ### Merged — foundation phase (global surfaces every page inherits)
@@ -65,18 +76,49 @@ Worked example + the full list of what the oracle does and does not cover:
 - #322 one status source per row (badge no longer a second store) + relative Last Seen
       in `<time dateTime>` with exact timestamp on hover.
 
-### Next — Devices visual redesign
-The correctness floor is in place, so the redesign can proceed without inventing meaning.
-Hard invariant: `assigned != delivered != acknowledged != playing`. Keep the deferred-assignment
-copy at `devices/page-client.tsx` ("Non-online devices will update when they come online") - it is
-correct and server-backed.
-Open design questions the redesign must answer: fleet scannability, bulk-action feedback on
-partial failure, responsive table-to-card at 390px (row actions currently need horizontal scroll),
-empty/filtered-empty/error/partial states, keyboard operability of row actions.
+### Merged — Devices visual redesign
+- #360 `.eh-datatable` family, fleet-summary strip, table->card at 390px, states, `.eh-check`.
+      Evidence: `docs/design/audits/2026-08-16-devices-redesign/`.
+
+### Merged — Playlists visual redesign
+Card grid rather than `.eh-datatable` — a playlist's identity is its thumbnail mosaic and its item
+list, and there is no wide-row problem to solve — but every other Devices pattern is reused as-is
+(`.eh-fleet-chip` summary strip that doubles as a filter, `.eh-check`, `.eh-select-inline`,
+`.eh-badge-*`, `.eh-row-action`, skeleton-in-the-shape-of-the-result, filtered-empty distinct from
+empty). Evidence: `docs/design/audits/2026-08-16-playlists-redesign/`.
+
+Correctness floor folded into the same PR, because all three were single-line claims rather than a
+separable body of work:
+- **`Playlist.isActive` does not exist.** No column, no DTO, no serializer — so the "Active" badge
+  was `undefined && ...` and had never rendered in production. It rendered green in the test suite
+  only because the fixture set the field. Badge and field removed; the test that asserted it was
+  pinning a defect and was replaced by its inverse.
+- **"N devices" now reads "Assigned to N screens"**, and "0 screens" is separated from "the device
+  list failed to load" — `devices.filter(...).length` is 0 for both, and the card used to show the
+  same badge either way. Note for whoever does Scheduling: an active `Schedule` OVERRIDES
+  `currentPlaylist` in `resolveEffectiveContent`, so assignment is not even a prediction of what
+  will play; the card's tooltip says so.
+- **Item count overstates delivery.** `isDeliverable` drops content whose status is not `active`,
+  so a card reading "12 items" can deliver 9. The list endpoint selects `content.status` so the
+  status half is answerable client-side; `expiresAt` is NOT in `CONTENT_LIST_SELECT`, which is why
+  the badge says "at least N" and no deliverable TOTAL is ever stated.
+
+Dead code removed with it: a 200-line drag-and-drop builder modal whose `isBuilderModalOpen` had no
+call site anywhere (`handleEdit` navigates to `/dashboard/playlists/[id]`), plus the
+`fetchAllPaginated(getContent)` call that existed only to feed it — a full paginated content fetch
+on every load of the page, discarded.
 
 ### Then
-Playlists -> Dashboard overview -> Scheduling -> Content/Media -> Analytics -> settings surfaces.
+Dashboard overview -> Scheduling -> Content/Media -> Analytics -> settings surfaces.
 Then Pool C by semantic family (see "Known traps"), not as a mechanical 1,094-literal replace.
+
+### Wave-level call for the operator (raised by the Playlists measurement, not created by it)
+`.eh-select-inline` and `.eh-fleet-chip` paint their resting boundary in `--border`, which measures
+**1.20:1 light / 1.53:1 dark** against the page. Neither is a clear SC 1.4.11 failure — both carry a
+text label (text is out of 1.4.11's scope) and the chip's PRESSED state, which the criterion does
+govern, measures 4.35:1 / 10.8:1 — but a control whose resting outline is invisible is still poor
+affordance. Repainting it touches the shipped Devices strip and footer, so it was deliberately not
+done inside a Playlists PR.
 
 ### Confirmed backend follow-ups (NOT UI work, keep separate)
 1. **Cron-detected offline never reaches an open dashboard.** The gateway broadcasts
