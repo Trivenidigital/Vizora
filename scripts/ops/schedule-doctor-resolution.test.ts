@@ -62,6 +62,8 @@ interface Fixture {
   shape?: 'items' | 'paginated' | 'unrecognized';
   /** Override the server-reported total for /schedules under 'paginated'. */
   scheduleTotal?: number;
+  /** Override the server-reported total for /displays under 'paginated'. */
+  displayTotal?: number;
 }
 
 /** A healthy tenant: one display WITH a playlist, so nothing is detected. */
@@ -73,7 +75,24 @@ function healthyFixture(): Fixture {
   };
 }
 
-function startServer(fixture: Fixture): Promise<{ server: Server; baseUrl: string }> {
+/**
+ * A mutation the agent actually sent.
+ *
+ * The fixture answered PATCHes but kept no log of them, so "the agent did not
+ * mutate anything" — the load-bearing assertion for every non-mutating check —
+ * could not be written at all. An incident-only assertion is not a substitute:
+ * it stays green for a rewrite that drops the incident but keeps the write.
+ */
+interface RecordedPatch {
+  path: string;
+  body: unknown;
+}
+
+function startServer(
+  fixture: Fixture,
+): Promise<{ server: Server; baseUrl: string; patches: RecordedPatch[] }> {
+  const patches: RecordedPatch[] = [];
+
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
     const path = url.pathname;
@@ -118,12 +137,25 @@ function startServer(fixture: Fixture): Promise<{ server: Server; baseUrl: strin
       }
       return paged(fixture.schedules, fixture.scheduleTotal);
     }
-    if (path === '/api/v1/displays') return paged(fixture.displays);
+    if (path === '/api/v1/displays') return paged(fixture.displays, fixture.displayTotal);
     if (path === '/api/v1/playlists') return paged(fixture.playlists);
 
-    // PATCH /schedules/:id — auto-fix target.
+    // PATCH /schedules/:id — auto-fix target. RECORDED, not just answered.
     if (path.startsWith('/api/v1/schedules/')) {
-      return json(200, { success: true, data: { id: path.split('/').pop() } });
+      let raw = '';
+      req.setEncoding('utf8');
+      req.on('data', c => (raw += c));
+      req.on('end', () => {
+        let body: unknown = raw;
+        try {
+          body = raw ? JSON.parse(raw) : {};
+        } catch {
+          /* keep the raw text — a malformed body is still a mutation */
+        }
+        patches.push({ path, body });
+        json(200, { success: true, data: { id: path.split('/').pop() } });
+      });
+      return;
     }
 
     return json(200, { success: true, data: {} });
@@ -134,7 +166,7 @@ function startServer(fixture: Fixture): Promise<{ server: Server; baseUrl: strin
     server.listen(0, '127.0.0.1', () => {
       const address = server.address();
       assert.ok(address && typeof address === 'object');
-      resolve({ server, baseUrl: `http://127.0.0.1:${address.port}` });
+      resolve({ server, baseUrl: `http://127.0.0.1:${address.port}`, patches });
     });
   });
 }
@@ -217,10 +249,13 @@ function seedIncident(over: Partial<Incident> = {}): Incident {
   } as Incident;
 }
 
-async function withServer(fixture: Fixture, fn: (baseUrl: string) => Promise<void>): Promise<void> {
-  const { server, baseUrl } = await startServer(fixture);
+async function withServer(
+  fixture: Fixture,
+  fn: (baseUrl: string, patches: RecordedPatch[]) => Promise<void>,
+): Promise<void> {
+  const { server, baseUrl, patches } = await startServer(fixture);
   try {
-    await fn(baseUrl);
+    await fn(baseUrl, patches);
   } finally {
     server.close();
   }
@@ -754,6 +789,196 @@ test('K24: a playlist that now reports content resolves empty_playlist_schedule'
       assert.ok(incident);
       assert.equal(incident.status, 'resolved', 'the operator added content — this must clear');
       assert.ok(incident.resolvedAt, 'resolvedAt must be stamped');
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── K28: the disabled-display filter is not an EXISTENCE oracle ─────────────
+//
+// `displays` was one binding, reassigned to the `isDisabled !== true` subset for
+// #259 (alerting suppression) and then used to build `displayIds` — which check
+// 2 reads as "does this display exist". So a schedule pointing at a display that
+// exists but is merely DISABLED fell through the orphan branch, was PATCHed to
+// `isActive: false`, and fired a critical alert claiming the display "no longer
+// exists". It never could have been a true positive in the other direction:
+// `Schedule.displayId` cascades on delete, so a schedule pointing at a deleted
+// display cannot exist (verified on prod, 0 rows).
+//
+// Every test below asserts on the RECORDED PATCHES, not only on incidents. The
+// incident assertion alone is satisfied by a rewrite that keeps the write and
+// drops the finding — which is the strictly worse half.
+
+test('K28: a schedule targeting a DISABLED display is neither flagged nor deactivated', async () => {
+  // The precondition is armed on prod today: 5 disabled displays live in the ops
+  // principal's own org. It has not fired only because no active schedule
+  // currently targets one — an operator disabling a screen while its schedules
+  // stay active is ordinary, not exotic.
+  const fixture: Fixture = {
+    schedules: [
+      {
+        id: 'sched-on-disabled',
+        name: 'Storeroom Loop',
+        isActive: true,
+        displayId: 'display-disabled',
+        playlistId: 'pl-1',
+      },
+    ],
+    displays: [
+      { id: 'display-1', name: 'Lobby', currentPlaylistId: 'pl-1' },
+      { id: 'display-disabled', name: 'Storeroom', isDisabled: true, currentPlaylistId: 'pl-1' },
+    ],
+    playlists: [{ id: 'pl-1', name: 'Main', items: [{ contentId: 'c-1' }] }],
+  };
+
+  await withServer(fixture, async (baseUrl, patches) => {
+    const tmpRoot = setupTmpRoot();
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+
+      const state = readState(tmpRoot);
+      assert.equal(
+        state.incidents.find(i => i.id === 'schedule-doctor:orphan_schedule:sched-on-disabled'),
+        undefined,
+        `a disabled display EXISTS — calling its schedule an orphan is a false positive\n${result.stdout}`,
+      );
+      assert.deepEqual(
+        patches,
+        [],
+        `the agent must not write ANYTHING here. Recorded: ${JSON.stringify(patches)}\n${result.stdout}`,
+      );
+      assert.equal(result.code, 0, `${result.stderr}\n${result.stdout}`);
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+test('K28: a truncated display walk cannot mass-deactivate schedules', async () => {
+  // The second, worse path. `scanComplete` gated only incident RESOLUTION; the
+  // four checks ran unconditionally. So one org crossing the 500-entity page-walk
+  // cap made EVERY active schedule whose display sits on an unseen page look
+  // orphaned — deactivated in a single run, with a critical alert each.
+  const displays = Array.from({ length: 500 }, (_, i) => ({
+    id: `display-${i}`,
+    name: `Screen ${i}`,
+    currentPlaylistId: 'pl-1',
+  }));
+
+  const fixture: Fixture = {
+    schedules: [
+      {
+        id: 'sched-unseen',
+        name: 'Back Office',
+        isActive: true,
+        // Real, and on the page the walk never reached (server says 600 exist).
+        displayId: 'display-599',
+        playlistId: 'pl-1',
+      },
+    ],
+    displays,
+    playlists: [{ id: 'pl-1', name: 'Main', items: [{ contentId: 'c-1' }] }],
+    shape: 'paginated',
+    displayTotal: 600,
+  };
+
+  await withServer(fixture, async (baseUrl, patches) => {
+    const tmpRoot = setupTmpRoot();
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+
+      const state = readState(tmpRoot);
+      assert.deepEqual(
+        patches,
+        [],
+        `a partial view of the fleet must deactivate NOTHING. Recorded: ${JSON.stringify(patches)}\n${result.stdout}`,
+      );
+      assert.equal(
+        state.incidents.find(i => i.id === 'schedule-doctor:orphan_schedule:sched-unseen'),
+        undefined,
+        'a truncated walk cannot prove a display is gone',
+      );
+      const truncated = state.incidents.find(i => i.id === TRUNCATED_ID);
+      assert.ok(truncated, `the withheld check must be announced\n${result.stdout}`);
+      assert.equal(truncated.severity, 'info');
+      assert.match(result.stdout, /SKIP absent-display check/);
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+test('K28 must not over-block: a disabled display still raises no coverage_gap (#259)', async () => {
+  // The other direction. Keeping `allDisplays` for the existence oracle is only
+  // safe if check 4 keeps iterating the FILTERED list — otherwise this change
+  // reproduces the 2026-08-02 22:30 incident, where a disabled fixture's
+  // coverage_gap went straight back minutes after it was reconciled.
+  const fixture: Fixture = {
+    schedules: [],
+    displays: [
+      { id: 'display-1', name: 'Lobby', currentPlaylistId: 'pl-1' },
+      // No playlist, no schedule — a coverage gap on every axis except the one
+      // that matters: the operator took it out of service on purpose.
+      { id: 'display-disabled', name: 'Storeroom', isDisabled: true },
+    ],
+    playlists: [{ id: 'pl-1', name: 'Main', items: [{ contentId: 'c-1' }] }],
+  };
+
+  await withServer(fixture, async (baseUrl, patches) => {
+    const tmpRoot = setupTmpRoot();
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+
+      const state = readState(tmpRoot);
+      assert.equal(
+        state.incidents.find(i => i.id === DISABLED_GAP_ID),
+        undefined,
+        `an operator-disabled display must not page about a blank screen\n${result.stdout}`,
+      );
+      assert.deepEqual(patches, []);
+      assert.equal(result.code, 0, `${result.stderr}\n${result.stdout}`);
+      assert.match(result.stdout, /Skipping 1 operator-disabled display\(s\)/);
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+test('K28: check 1 still auto-deactivates a past-end schedule', async () => {
+  // Proof the new completeness gate was scoped to check 2 and did not leak onto
+  // check 1, and that removing the orphan PATCH did not remove the legitimate
+  // one. Past-end is evidence-bearing on the schedule's OWN fields — the display
+  // list is not consulted at all — so it needs no completeness gate.
+  const fixture: Fixture = {
+    schedules: [
+      {
+        id: 'sched-expired',
+        name: 'Summer Promo',
+        isActive: true,
+        displayId: 'display-1',
+        endDate: '2020-01-01T00:00:00.000Z',
+      },
+    ],
+    displays: [{ id: 'display-1', name: 'Lobby', currentPlaylistId: 'pl-1' }],
+    playlists: [{ id: 'pl-1', name: 'Main', items: [{ contentId: 'c-1' }] }],
+  };
+
+  await withServer(fixture, async (baseUrl, patches) => {
+    const tmpRoot = setupTmpRoot();
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+
+      assert.deepEqual(
+        patches,
+        [{ path: '/api/v1/schedules/sched-expired', body: { isActive: false } }],
+        `the past-end auto-fix must survive\n${result.stdout}`,
+      );
+      const incident = readState(tmpRoot).incidents.find(
+        i => i.id === 'schedule-doctor:past_end_schedule:sched-expired',
+      );
+      assert.ok(incident);
+      assert.equal(incident.status, 'resolved');
     } finally {
       rmSync(tmpRoot, { recursive: true, force: true });
     }

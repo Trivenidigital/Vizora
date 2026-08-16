@@ -3,14 +3,22 @@
  * Vizora Autonomous Operations — Schedule Doctor Agent
  *
  * Runs every 15 minutes via PM2 cron. Audits schedules for staleness,
- * orphaned references, empty playlists, and coverage gaps. Auto-remediates
- * past-end and orphan schedules by deactivating them.
+ * unresolvable display references, empty playlists, and coverage gaps.
+ * Auto-remediates past-end schedules by deactivating them — and NOTHING else.
  *
  * Checks:
- *   1. Past-end schedules — active schedules whose endDate has passed
- *   2. Orphan schedules — reference a displayId that no longer exists
+ *   1. Past-end schedules — active schedules whose endDate has passed (auto-fix)
+ *   2. Absent-display schedules — reference a displayId this scan did not see
+ *      (report only; see the block comment at the check)
  *   3. Empty playlist schedules — active schedule pointing to an empty playlist
  *   4. Coverage gaps — displays with no playlist and no active schedule
+ *
+ * TWO display bindings, never one. `allDisplays` is the EXISTENCE universe;
+ * `alertableDisplays` is that list minus operator-disabled displays (#259) and
+ * exists only to suppress paging. Check 2 must read the first, check 4 the
+ * second. Merging them is the K28 defect: the orphan check read the alerting-
+ * suppression list as its existence oracle and auto-deactivated live schedules
+ * whose display was merely disabled.
  *
  * Incident clearing: a run that saw the WHOLE tenant resolves any prior
  * incident of this agent's it did not re-raise. `empty_playlist_schedule` and
@@ -104,6 +112,8 @@ interface DisplayItem {
   id: string;
   name?: string;
   currentPlaylistId?: string;
+  /** Operator-disabled. Returned by the list API (display-response.select.ts). */
+  isDisabled?: boolean;
 }
 
 /**
@@ -167,7 +177,12 @@ async function main(): Promise<void> {
   log(AGENT, 'Fetching schedules, displays, and playlists');
 
   let schedules: ScheduleItem[];
-  let displays: DisplayItem[];
+  /**
+   * The EXISTENCE universe — every display the scan retrieved, disabled ones
+   * included. Check 2 asks "does this display exist?", and only this list can
+   * answer that.
+   */
+  let allDisplays: DisplayItem[];
   let playlists: Playlist[];
   let scanComplete: boolean;
 
@@ -183,7 +198,7 @@ async function main(): Promise<void> {
       api.getAllScan<Playlist>('/playlists'),
     ]);
     schedules = scheduleScan.items;
-    displays = displayScan.items;
+    allDisplays = displayScan.items;
     playlists = playlistScan.items;
     // Measured on the RAW scans, before the disabled-display filter below,
     // which only ever shortens the list.
@@ -194,16 +209,28 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Same rule as fleet-manager: an operator-disabled display must not raise
-  // incidents. #259 filtered fleet-manager only, so schedule-doctor kept
-  // re-raising coverage_gap for a disabled fixture — caught by the natural
-  // cycle on 2026-08-02 22:30, which put the incident straight back.
-  const disabledDisplays = displays.filter(d => (d as { isDisabled?: boolean }).isDisabled === true);
+  // ── TWO display bindings, and they must NEVER be merged back into one ──────
+  //
+  // `allDisplays` answers "does this display EXIST?". `alertableDisplays`
+  // answers "may this display raise an incident?". They are different
+  // questions, and #259 only ever answered the second one: an operator-disabled
+  // display must not raise incidents — schedule-doctor kept re-raising
+  // coverage_gap for a disabled fixture, caught by the natural cycle on
+  // 2026-08-02 22:30, which put the incident straight back.
+  //
+  // This used to be ONE binding: `displays` was reassigned to the filtered
+  // subset and `displayIds` was then built from it, so check 2 — whose whole
+  // predicate is "the display this schedule points at is gone" — was reading
+  // the alerting-SUPPRESSION list as its existence oracle (K28). A merely
+  // disabled display therefore read as deleted. Suppression rationale is not
+  // existence evidence; keep the names carrying the distinction so a future
+  // edit has to choose deliberately.
+  const disabledDisplays = allDisplays.filter(d => d.isDisabled === true);
+  const alertableDisplays = allDisplays.filter(d => d.isDisabled !== true);
   if (disabledDisplays.length > 0) {
-    displays = displays.filter(d => (d as { isDisabled?: boolean }).isDisabled !== true);
     log(AGENT, `Skipping ${disabledDisplays.length} operator-disabled display(s)`);
   }
-  log(AGENT, `Fetched ${schedules.length} schedules, ${displays.length} displays, ${playlists.length} playlists`);
+  log(AGENT, `Fetched ${schedules.length} schedules, ${allDisplays.length} displays, ${playlists.length} playlists`);
 
   // State is read at the very END (after all detection I/O), so the file lock
   // is held only for the brief read→merge→write below — not across the
@@ -232,8 +259,11 @@ async function main(): Promise<void> {
   /** Check 3 could not determine the playlist's item count. */
   const unexaminedEmptyPlaylistScheduleIds = new Set<string>();
 
-  // Build lookup sets
-  const displayIds = new Set(displays.map(d => d.id));
+  // Build lookup sets.
+  //
+  // From `allDisplays`, NOT `alertableDisplays`: this set is check 2's
+  // existence oracle and a disabled display still exists.
+  const displayIds = new Set(allDisplays.map(d => d.id));
   const playlistMap = new Map(playlists.map(p => [p.id, p]));
   const now = new Date();
 
@@ -254,7 +284,7 @@ async function main(): Promise<void> {
     log(
       AGENT,
       `Entity scan was incomplete ` +
-      `(schedules=${schedules.length}, displays=${displays.length}, playlists=${playlists.length}, ` +
+      `(schedules=${schedules.length}, displays=${allDisplays.length}, playlists=${playlists.length}, ` +
       `cap=${MAX_ENTITIES}) — no incident will be resolved this run`,
     );
     incidents.push({
@@ -267,7 +297,7 @@ async function main(): Promise<void> {
       detected: new Date().toISOString(),
       message:
         `Schedule audit could not see the whole tenant (schedules=${schedules.length}, ` +
-        `displays=${displays.length}, playlists=${playlists.length}, page-walk cap ${MAX_ENTITIES}). ` +
+        `displays=${allDisplays.length}, playlists=${playlists.length}, page-walk cap ${MAX_ENTITIES}). ` +
         'Findings are still valid, but no prior incident can be cleared from a partial scan.',
       remediation: `Raise the getAll page-walk cap in scripts/ops/lib/api-client.ts, or scope this agent's queries.`,
       status: 'open',
@@ -345,60 +375,69 @@ async function main(): Promise<void> {
     });
   }
 
-  // ─── Check 2: Orphan Schedules ─────────────────────────────────────────────
+  // ─── Check 2: Schedules referencing a display absent from this scan ────────
+  //
+  // NON-MUTATING BY CONSTRUCTION, and deliberately so (K28).
+  //
+  // This check used to claim the display "no longer exists", PATCH the schedule
+  // to `isActive: false` and fire a CRITICAL write-site alert. It could never
+  // be a true positive: `Schedule.displayId` carries `ON DELETE CASCADE` to
+  // `devices(id)` (schema.prisma:222-223, the init migration's FK) and
+  // `DisplaysService.remove()` is a hard `deleteMany`, so a schedule pointing at
+  // a deleted display cannot exist — verified on prod, that row count is 0.
+  // What it COULD do was mistake a disabled display for a deleted one and
+  // deactivate an operator's live schedules off it.
+  //
+  // With the existence oracle fixed, a surviving fire means THIS AGENT'S VIEW is
+  // wrong — response-shape drift, an org-scope mismatch between the schedule
+  // list and the display list, a page walk that returned a display the second
+  // list did not — not that the tenant's data is broken. That is worth telling
+  // the operator about, and worth nothing at all to auto-"fix": deactivating a
+  // schedule on the strength of a view we have just called unreliable is how the
+  // customer-visible damage happens. So the check stays as an invariant monitor
+  // and never writes.
+  //
+  // Gated on `scanComplete` for the same reason the resolution sweep is: a
+  // truncated walk cannot prove NONEXISTENCE. Ungated, one org crossing the
+  // page-walk cap made every active schedule targeting a display beyond the cap
+  // look orphaned — and, before this change, mass-deactivated them in one run.
+  if (scanComplete) {
+    for (const sched of schedules) {
+      if (!sched.isActive) continue;
+      if (!sched.displayId) continue; // group-level schedules don't reference a single display
 
-  for (const sched of schedules) {
-    if (!sched.isActive) continue;
-    if (!sched.displayId) continue; // group-level schedules don't reference a single display
+      if (displayIds.has(sched.displayId)) continue; // display exists
 
-    if (displayIds.has(sched.displayId)) continue; // display exists
+      issuesFound++;
+      const incidentId = makeIncidentId(AGENT, 'orphan_schedule', sched.id);
+      const label = sched.name || sched.id;
+      log(
+        AGENT,
+        `Schedule "${label}" references display ${sched.displayId}, which is absent from this scan`,
+      );
 
-    issuesFound++;
-    const incidentId = makeIncidentId(AGENT, 'orphan_schedule', sched.id);
-    const label = sched.name || sched.id;
-    log(AGENT, `Orphan schedule: "${label}" references missing display ${sched.displayId}`);
-
-    // Auto-fix: deactivate
-    let fixed = false;
-    try {
-      await api.patch(`/schedules/${sched.id}`, { isActive: false }, {
+      incidents.push({
+        id: incidentId,
+        agent: AGENT,
+        type: 'orphan_schedule',
+        severity: 'warning',
         target: 'schedule',
         targetId: sched.id,
-        action: `Deactivate orphan schedule "${label}" (display ${sched.displayId} missing)`,
-        before: { isActive: true, displayId: sched.displayId },
+        detected: new Date().toISOString(),
+        message:
+          `Active schedule "${label}" references display ${sched.displayId}, which is absent ` +
+          'from this complete scan. A deleted display cascades its schedules away, so this ' +
+          "should be impossible — treat it as a fault in this agent's view of the tenant " +
+          '(org scope, response shape, page walk), not as broken tenant data.',
+        remediation:
+          'Manual: confirm the display id against the API before touching the schedule. ' +
+          'Do NOT auto-deactivate — the schedule may be perfectly valid.',
+        status: 'open',
+        attempts: 0,
       });
-      fixed = true;
-      issuesFixed++;
-      log(AGENT, `  -> Deactivated "${label}"`);
-      // §12b: write-site alert. Orphan deactivation is more severe than
-      // past-end because it indicates the operator deleted a device but
-      // left a schedule pointing at it — likely a config inconsistency
-      // they should know about right now, not in 30 min.
-      await sendInlineAlert(
-        AGENT,
-        'critical',
-        `Auto-deactivated orphan schedule "${label}"`,
-        `Schedule id ${sched.id} referenced display ${sched.displayId}, which no longer exists. Deactivated automatically. Investigate whether the schedule should be reassigned or deleted.`,
-      );
-    } catch (err) {
-      log(AGENT, `  -> Failed to deactivate "${label}": ${err instanceof Error ? err.message : err}`);
     }
-
-    incidents.push({
-      id: incidentId,
-      agent: AGENT,
-      type: 'orphan_schedule',
-      severity: 'critical',
-      target: 'schedule',
-      targetId: sched.id,
-      detected: new Date().toISOString(),
-      message: `Schedule "${label}" targets nonexistent display ${sched.displayId}`,
-      remediation: `PATCH /schedules/${sched.id} { isActive: false }`,
-      status: fixed ? 'resolved' : 'open',
-      attempts: 1,
-      ...(fixed ? { resolvedAt: new Date().toISOString() } : {}),
-      ...(!fixed ? { error: 'PATCH failed' } : {}),
-    });
+  } else {
+    log(AGENT, 'SKIP absent-display check — a truncated scan cannot prove a display is gone');
   }
 
   // ─── Check 3: Empty Playlist Schedules ─────────────────────────────────────
@@ -464,7 +503,12 @@ async function main(): Promise<void> {
     }
   }
 
-  for (const display of displays) {
+  // `alertableDisplays`, NOT `allDisplays` — #259. A display an operator has
+  // deliberately taken out of service is not a blank screen anyone is waiting
+  // on, and paging about it is noise by construction. This is the one place the
+  // suppression list is the RIGHT list; check 2 above is the one place it was
+  // catastrophically the wrong one.
+  for (const display of alertableDisplays) {
     // Skip if display has a current playlist assigned
     if (display.currentPlaylistId) continue;
     // Skip if display has an active schedule

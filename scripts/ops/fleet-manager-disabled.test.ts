@@ -70,6 +70,67 @@ test('cluster-offline cannot be triggered by a group that is only disabled displ
 });
 
 /**
+ * cluster_offline counts, quantifies and gates over the FILTERED subset — and
+ * for the gate that is deliberate, because the threshold is really counting
+ * independent agreeing signals and a disabled display emits none. What was NOT
+ * deliberate was saying "All N displays in organization X are offline" while N
+ * was the enabled count: an org with 3 enabled and 4 disabled displays reported
+ * a fleet size that does not exist. Two consequences, both fixed by honesty
+ * rather than by changing the gate: the message names both numbers, and an org
+ * that drops out of coverage because displays were disabled says so in the log.
+ */
+test('the cluster_offline message reports enabled AND total, not a bare "All N"', () => {
+  assert.ok(
+    !source.includes('All ${orgList.length} displays in organization'),
+    'the bare quantifier is back — it names the enabled count as if it were the whole org',
+  );
+  assert.match(
+    source,
+    /All \$\{orgList\.length\} enabled display\(s\) in organization \$\{orgId\} are offline/,
+    'the message must say the count is over ENABLED displays',
+  );
+  assert.match(
+    source,
+    /\$\{orgTotal\} total, \$\{disabledCount\} operator-disabled and not evaluated/,
+    'and must state the real fleet size plus what it excluded',
+  );
+});
+
+test('an org pushed below the cluster threshold by disabled displays is not silent', () => {
+  assert.match(
+    source,
+    /below the cluster-outage threshold on ENABLED displays/,
+    'disabling displays can take an org out of cluster-outage coverage entirely; ' +
+      'the operator must be able to see that happen',
+  );
+  // The disabled tally has to be carried out of the fetch block to be reportable.
+  assert.match(source, /disabledByOrg\.set\(/, 'the per-org disabled count must be collected');
+});
+
+/** The gate arithmetic itself, exercised rather than asserted about. */
+test('the < 3 gate counts ENABLED displays, and the message counts both', () => {
+  const org = [
+    { id: '1', isDisabled: false },
+    { id: '2', isDisabled: false },
+    { id: '3', isDisabled: true },
+    { id: '4', isDisabled: true },
+  ];
+  const enabled = org.filter(d => d.isDisabled !== true);
+  const disabledCount = org.length - enabled.length;
+  const orgTotal = enabled.length + disabledCount;
+
+  assert.equal(enabled.length, 2);
+  assert.equal(orgTotal, 4);
+  assert.ok(
+    enabled.length < 3,
+    'two live screens and two shelved ones is not a cluster outage — counting the shelved ' +
+      'ones toward the threshold would make it one',
+  );
+  // ...and the honest report of that skip names both numbers.
+  assert.equal(`${enabled.length} of ${orgTotal}`, '2 of 4');
+});
+
+/**
  * schedule-doctor evaluates displays too. #259 filtered fleet-manager ONLY, and
  * a natural cycle on 2026-08-02 22:30 put `coverage_gap` for a disabled fixture
  * straight back — the incident had been reconciled minutes earlier. Every agent

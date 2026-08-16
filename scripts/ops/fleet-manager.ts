@@ -170,6 +170,8 @@ async function main(): Promise<void> {
   let displays: DisplayItem[];
   let schedules: ScheduleItem[];
   let scanComplete: boolean;
+  /** organizationId → how many of its displays were dropped as operator-disabled. */
+  const disabledByOrg = new Map<string, number>();
 
   try {
     // getAllScan, not getAll: `getAll` is this same call with `.items` taken and
@@ -201,6 +203,12 @@ async function main(): Promise<void> {
     if (disabled.length > 0) {
       displays = displays.filter(d => d.isDisabled !== true);
       log(AGENT, `Skipping ${disabled.length} operator-disabled display(s)`);
+    }
+    // Kept so check 3 can report "N of M" honestly — see the cluster-offline
+    // block. Counting only what it evaluated made its own message a lie.
+    for (const d of disabled) {
+      if (!d.organizationId) continue;
+      disabledByOrg.set(d.organizationId, (disabledByOrg.get(d.organizationId) ?? 0) + 1);
     }
     log(AGENT, `Fetched ${displays.length} displays, ${schedules.length} schedules`);
   } catch (err) {
@@ -456,9 +464,42 @@ async function main(): Promise<void> {
     orgDisplays.set(orgId, list);
   }
 
+  // Every quantifier here is over the ENABLED subset, and the message says so.
+  //
+  // `orgDisplays` is grouped from `displays`, which has already had the
+  // operator-disabled displays removed (#259). It used to be counted and
+  // quantified as if it were the whole org — "All N displays in organization X
+  // are offline" — so an org with 3 enabled and 4 disabled displays reported
+  // "All 3 displays", naming a fleet size that does not exist.
+  //
+  // The `< 3` threshold DELIBERATELY counts the enabled subset too, and that is
+  // the honest reading rather than an oversight: the threshold exists because
+  // "one screen is dark" is ordinary and "the whole fleet is dark" is
+  // infrastructure, so what it is really counting is INDEPENDENT AGREEING
+  // SIGNALS. A disabled display emits no signal — it is excluded from
+  // `allOffline` as well, so counting it toward the gate would let a fleet of
+  // one live screen and two shelved ones raise a critical cluster outage. This
+  // is the same call #259's own test pins ("cluster-offline cannot be triggered
+  // by a group that is only disabled displays").
+  //
+  // What must NOT happen is that dropping below the threshold is silent —
+  // disabling displays can take an org out of cluster-outage coverage entirely,
+  // and the operator should be able to see that in the log.
   for (const [orgId, orgList] of orgDisplays) {
-    // Only check orgs with 3+ displays
-    if (orgList.length < 3) continue;
+    const disabledCount = disabledByOrg.get(orgId) ?? 0;
+    const orgTotal = orgList.length + disabledCount;
+
+    // Only check orgs with 3+ ENABLED displays
+    if (orgList.length < 3) {
+      if (orgTotal >= 3) {
+        log(
+          AGENT,
+          `Org ${orgId} is below the cluster-outage threshold on ENABLED displays ` +
+            `(${orgList.length} of ${orgTotal}; ${disabledCount} operator-disabled) — not evaluated`,
+        );
+      }
+      continue;
+    }
 
     const allOffline = orgList.every(d => minutesSinceLastSeen(d) >= OFFLINE_THRESHOLD_MIN);
     if (!allOffline) continue;
@@ -468,7 +509,11 @@ async function main(): Promise<void> {
 
     issuesFound++;
     issuesEscalated++;
-    log(AGENT, `Cluster outage: ALL ${orgList.length} displays in org ${orgId} are offline — critical`);
+    log(
+      AGENT,
+      `Cluster outage: all ${orgList.length} of ${orgTotal} display(s) in org ${orgId} that this ` +
+        `agent evaluates are offline — critical`,
+    );
 
     incidents.push({
       id: incidentId,
@@ -478,8 +523,11 @@ async function main(): Promise<void> {
       target: 'organization',
       targetId: orgId,
       detected: existing?.detected ?? new Date().toISOString(),
-      message: `All ${orgList.length} displays in organization ${orgId} are offline — possible network/infrastructure issue`,
-      remediation: 'Manual investigation required — entire org fleet is unreachable',
+      message:
+        `All ${orgList.length} enabled display(s) in organization ${orgId} are offline ` +
+        `(${orgTotal} total, ${disabledCount} operator-disabled and not evaluated) — ` +
+        'possible network/infrastructure issue',
+      remediation: 'Manual investigation required — every enabled display in the org is unreachable',
       status: existing?.status === 'escalated' ? 'escalated' : 'open',
       attempts: (existing?.attempts ?? 0) + 1,
     });
