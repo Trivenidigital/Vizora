@@ -66,8 +66,30 @@ count moved 71 → 70; the distinct message set is unchanged (the three local-de
 doc classifies as local-env only), and the raw count varies because the socket error fires once or
 twice per capture non-deterministically, on untouched routes as well.
 
-The 12-point improvement in all-route contrast is 12 on `/dashboard/playlists` plus a `.eh-badge-warning`
-token fix that also reaches `/dashboard/content`; the remaining routes are byte-identical.
+**All 12 points of the all-route contrast improvement are on `/dashboard/playlists`** (13 → 1); every
+other route is unchanged capture-for-capture. An earlier draft of this file claimed the gain
+"also reaches `/dashboard/content`" because the `.eh-badge-warning` token fix has a consumer there.
+Recomputed from the committed reports, Content is **3 → 3** — its own contrast findings are
+elsewhere, and the seeded tenant does not render that badge on it. In a PR whose thesis is "say only
+what the evidence proves", the plausible mechanism was not the measurement.
+
+### Re-run after the review fixes — and why it did NOT replace the `after` run
+
+The PR review produced seven code fixes (three-state connection signal, schedules qualifier,
+unparseable-date guard, content-status label, unreachable branch removed). The harness was re-run to
+check they moved nothing: `verify-after-review-fixes.report.json`.
+
+**All four `/dashboard/playlists` captures are identical to `after-playlists.report.json`,
+capture-for-capture.** Three captures on routes this PR never touches did move — analytics light
+1440 `15→14` contrast, analytics light 390 `14→2`, settings light 390 `3→0` contrast and `22→4`
+touch — because the re-run happened after the local stack was stopped and restarted, and those pages
+rendered fewer elements against the restarted API.
+
+That is exactly why the re-run is committed as a **verification artifact rather than as the `after`
+run**. The `before`/`after` pair was captured in one session against one running stack, with the
+only variable being the code; swapping in a file captured against a different environment state
+would silently corrupt the comparison on three routes that had nothing to do with this change. The
+headline table above is unchanged and still comes from that pair.
 
 ### What the residual findings are
 
@@ -91,6 +113,9 @@ how `.eh-check` shipped at ~1.8:1 during the Devices redesign under a clean repo
 off the real node, resolves the first opaque colour behind it by compositing the ancestor chain, and
 computes the ratio. It measures the boundary and the fill **against the backdrop outside the
 control** and takes the better of the two, because either alone identifies the control.
+
+Raw stdout of that run is committed as `nontext-contrast.after-playlists.txt`, so these six figures
+are derivable like the rest rather than transcribed by the author.
 
 Measured on `/dashboard/playlists`, 1440, both themes:
 

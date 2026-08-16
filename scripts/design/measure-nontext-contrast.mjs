@@ -91,6 +91,14 @@ const PROBES = [
 
 /* ---------- colour maths (serialised into the browser) ---------- */
 const IN_PAGE = `
+/*
+ * ONLY rgb()/rgba() is understood, which is every colour Chromium currently
+ * resolves computed styles to. If the tokens ever move to \`oklch()\` or
+ * \`color-mix()\` and Chromium starts serialising those verbatim, this returns
+ * null — and a null BORDER silently falls through to reporting the FILL, which
+ * would mask a failing boundary rather than surface it. Add the new syntax here
+ * before adopting it in globals.css.
+ */
 function parseColor(str) {
   const m = String(str).match(/rgba?\\(([^)]+)\\)/);
   if (!m) return null;
@@ -123,6 +131,13 @@ function ratio(a, b) {
  * Walks ancestors compositing every translucent background it meets until it
  * reaches an opaque one, so a badge fill at 10% alpha over a card over the page
  * resolves to the real pixel rather than to the nearest declared colour.
+ *
+ * It starts at \`parentElement\`, so the PROBED element's own background is
+ * excluded by design — that colour is the control's fill, which the caller
+ * measures separately AGAINST this backdrop. Safe for every probe here because
+ * \`.eh-check\` sets \`background: transparent\` on the element and paints the box
+ * on \`::before\`; a probe on an element that paints its own opaque background and
+ * a boundary would need that layer added.
  */
 function backdropOf(el) {
   const layers = [];
