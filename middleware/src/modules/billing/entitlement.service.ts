@@ -31,6 +31,49 @@ export const LADDER = {
 const HEARTBEAT_KEY = 'entitlement:ladder:last-run';
 const HEARTBEAT_STALE_MS = 26 * 60 * 60 * 1000; // > 24h cadence + slack
 
+/**
+ * Hard ceiling on the dunning-claim SET, mirroring `CronLeaderService`'s. A claim
+ * is one round-trip to a local Redis; anything near a second means Redis is not
+ * healthy and the right move is to stop waiting. A bare try/catch is NOT enough:
+ * a rejection costs ~42s (ioredis `maxRetriesPerRequest: 20` + capped backoff)
+ * and a blackholed socket never rejects at all, so 30 orgs would spend ~21
+ * minutes — or forever — inside a job that is supposed to finish in seconds.
+ */
+const DUNNING_CLAIM_TIMEOUT_MS = 2000;
+
+/** Per-rung and aggregate outcome of one ladder run. */
+export interface RungOutcome {
+  /** Candidates whose episode age has reached this rung's threshold. */
+  eligible: number;
+  /** Orgs the loop actually ran a body for. MUST equal `eligible` (K19). */
+  attempted: number;
+  /** Orgs fully processed: CAS won AND every side effect completed. */
+  advanced: number;
+  /** Orgs whose CAS matched 0 rows — a concurrent run got there first. */
+  casLost: number;
+  /** Orgs whose processing threw. Isolated: the next org still runs. */
+  failed: number;
+}
+
+/**
+ * Result of `advanceLadder`: the aggregate outcome, a per-rung breakdown, and a
+ * count of whole steps (a rung's own machinery, or the un-stamped heal) that
+ * threw. `rungFailures` is deliberately NOT folded into `failed` so the per-org
+ * accounting identity `advanced + casLost + failed === attempted` keeps holding.
+ */
+export interface LadderRunResult extends RungOutcome {
+  rungFailures: number;
+  rungs: Record<string, RungOutcome>;
+}
+
+const emptyOutcome = (): RungOutcome => ({
+  eligible: 0,
+  attempted: 0,
+  advanced: 0,
+  casLost: 0,
+  failed: 0,
+});
+
 @Injectable()
 export class EntitlementService {
   private readonly logger = new Logger(EntitlementService.name);
@@ -43,18 +86,119 @@ export class EntitlementService {
   ) {}
 
   /**
+   * Running count of fail-open dunning claims for the life of the process, so a
+   * log grep answers "one-off blip, or has the claim store been down all day?"
+   * without reconstructing the outage from other services' logs (§12b).
+   */
+  private dunningClaimFailOpens = 0;
+
+  /** Fail-open dunning claims recorded so far in this process. */
+  getDunningClaimFailOpenCount(): number {
+    return this.dunningClaimFailOpens;
+  }
+
+  private dunningClaimFailOpen(organizationId: string, key: string, reason: string): void {
+    this.dunningClaimFailOpens += 1;
+    this.logger.warn(
+      `Dunning claim for org ${organizationId} rung ${key} running FAIL-OPEN ` +
+        `(sending without dedup; the rung CAS still caps it at one email) — ${reason}. ` +
+        `Fail-open count this process: ${this.dunningClaimFailOpens}.`,
+    );
+  }
+
+  /**
    * Claim a one-time dunning notice for (org, key). Redis SETNX with a TTL past
-   * the rung window so the daily ladder job can re-run without re-sending the same
-   * escalation email. Returns true only for the first caller. Fail-safe: if Redis
-   * is unavailable we return false (skip the email) rather than risk a spam loop —
-   * the banner remains the always-on channel.
+   * the rung window so the daily ladder job can re-run without re-sending the
+   * same escalation email. Returns true only for the first caller.
+   *
+   * FAIL-OPEN when the claim store is unavailable or unresponsive. This REVERSES
+   * the original fail-closed choice (K19), on the code's own semantics:
+   *
+   *  - The "spam loop" the old comment protected against is ALREADY fully covered
+   *    by the status-guarded CAS in `advanceRung`. The email sits DOWNSTREAM of
+   *    `res.count === 0 → continue`, so a re-run cannot reach it — which is why
+   *    the call site itself concedes the dedup is "belt-and-suspenders".
+   *  - Within one run an org appears once, and across cluster instances the CAS
+   *    `updateMany` on a single row is atomic, so exactly one instance matches.
+   *    Therefore even with Redis 100% down, fail-open yields AT MOST one email
+   *    per (org, rung). There is no spam loop left to protect against.
+   *  - Silently dropping a customer's ONLY escalation notice is the §12b failure
+   *    mode, not a safe default — and the drop is PERMANENT, because the status
+   *    has already flipped and tomorrow's run will not re-attempt the rung.
+   *
+   * Gate on `isAvailable()`, NOT on `getClient()` being null: getClient() returns
+   * the ioredis object, which is non-null from the moment `new Redis()` succeeds
+   * and is only nulled in `disconnect()`. During a real outage the old null-check
+   * never fired and the command entered ioredis's offline queue instead.
    */
   private async claimDunningNotice(organizationId: string, key: string): Promise<boolean> {
     const client = this.redis.getClient();
-    if (!client) return false;
+    if (!client || !this.redis.isAvailable()) {
+      this.dunningClaimFailOpen(organizationId, key, 'Redis unavailable');
+      return true;
+    }
+
     const redisKey = `dunning:${organizationId}:${key}`;
-    const result = await client.set(redisKey, '1', 'EX', 40 * 24 * 60 * 60, 'NX');
-    return result === 'OK';
+    try {
+      // isAvailable() is a snapshot of what ioredis has already NOTICED, so it is
+      // necessary but not sufficient — a blackholed socket or a -LOADING server
+      // leaves it true while the command never settles. Bound it.
+      const result = await this.raceWithTimeout(
+        client.set(redisKey, '1', 'EX', 40 * 24 * 60 * 60, 'NX'),
+        DUNNING_CLAIM_TIMEOUT_MS,
+      );
+      return result === 'OK';
+    } catch (err) {
+      this.dunningClaimFailOpen(
+        organizationId,
+        key,
+        `claim errored (${err instanceof Error ? err.message : String(err)})`,
+      );
+      return true;
+    }
+  }
+
+  /**
+   * Resolve with `promise`, or reject once `ms` elapses. Same shape as
+   * `CronLeaderService.raceWithTimeout` — the timer is ALWAYS cleared so it never
+   * holds the event loop open, and the losing side is left to settle on its own
+   * (a SET that lands late is harmless: it only writes the dedup key it was
+   * always going to write).
+   */
+  private raceWithTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(
+        () =>
+          reject(
+            new Error(
+              `dunning claim SET timed out after ${ms}ms — Redis is reachable but not ` +
+                `responding (LOADING, blackholed socket, or a blocked server)`,
+            ),
+          ),
+        ms,
+      );
+    });
+
+    return Promise.race([promise, timeout]).finally(() => {
+      if (timer) clearTimeout(timer);
+    }) as Promise<T>;
+  }
+
+  /**
+   * Lazy Sentry capture — middleware boot wires Sentry but tests don't load it,
+   * so an import failure must not poison the ladder. Mirrors the ClickHouse
+   * watchdog / onboarding precedent. `logger.error` on its own reaches NO human
+   * here: `SentryInterceptor` only wraps HTTP requests, and this is a cron.
+   */
+  private static captureSentry(err: unknown, tags: Record<string, unknown>): void {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const Sentry = require('@sentry/nestjs');
+      Sentry.captureException(err, { tags: { event: 'entitlement_ladder_failed', ...tags } });
+    } catch {
+      /* Sentry not loaded — silent drop, logger.error already fired */
+    }
   }
 
   private wholeDaysBetween(from: Date, to: Date): number {
@@ -106,13 +250,32 @@ export class EntitlementService {
   }
 
   /**
-   * Daily ladder advancement. Idempotent per run: each org advances at most one
-   * rung based on its episode age, and the where-clauses are keyed on the CURRENT
-   * status so re-running the same day is a no-op. Writes a heartbeat so a dead job
-   * is not silent (see isLadderStale).
+   * Daily ladder advancement. Idempotent per run: the where-clauses are keyed on
+   * the CURRENT status, so re-running the same day is a no-op.
+   *
+   * An org may advance MORE THAN ONE rung in a single run. Iteration is
+   * rung-major and rung 2's `findMany` runs after rung 1's flips have already
+   * committed — there is no wrapping transaction — so an org that is far enough
+   * behind cascades. That cascade is DESIRABLE (it is what makes catch-up work
+   * after a missed day), but do not reason about blast radius on the old,
+   * incorrect "each org advances at most one rung" assumption.
+   *
+   * K19 — ISOLATION. Each rung, and each org within a rung, is independently
+   * processable: every Prisma call is its own transaction and nothing here opens
+   * a `$transaction`, so the DB already commits per org. A failure on one must
+   * therefore never abandon the rest. Both loops are individually guarded, and
+   * the outcome is returned (and heartbeated) so a DEGRADED run is
+   * distinguishable from a clean one.
+   *
+   * Note what is deliberately NOT done: `writeHeartbeat` is not moved into a bare
+   * `finally`. That would launder a failed run into a fresh freshness reading and
+   * destroy the only detection signal `checkLadderFreshness` has. With the
+   * isolation below, the run reaches the heartbeat anyway — carrying the failure
+   * counts with it.
    */
-  async advanceLadder(now = new Date()): Promise<{ advanced: number }> {
-    let advanced = 0;
+  async advanceLadder(now = new Date()): Promise<LadderRunResult> {
+    const rungs: Record<string, RungOutcome> = {};
+    let rungFailures = 0;
 
     // Heal un-stamped dunning orgs. An org can enter a dunning rung via a path
     // that never stamps the episode clock: handleSubscriptionUpdated writes
@@ -125,30 +288,33 @@ export class EntitlementService {
     // org → it holds full (post-#6 SubscriptionActiveGuard) access in the rung
     // FOREVER, and dunning never enforces. Stamp any un-stamped dunning org from
     // first-sight (fail-closed; the grace clock simply starts now).
-    await this.db.organization.updateMany({
-      where: {
-        subscriptionStatus: { in: ['past_due', 'publish_locked', 'suspended'] },
-        entitlementStateSince: null,
-      },
-      data: { entitlementStateSince: now },
-    });
+    try {
+      await this.db.organization.updateMany({
+        where: {
+          subscriptionStatus: { in: ['past_due', 'publish_locked', 'suspended'] },
+          entitlementStateSince: null,
+        },
+        data: { entitlementStateSince: now },
+      });
+    } catch (err) {
+      // Isolated like a rung: the heal only affects orgs that are invisible to
+      // the rungs anyway, so failing it must not cost the orgs that ARE visible.
+      rungFailures += 1;
+      this.logger.error(`Entitlement ladder: un-stamped-org heal FAILED: ${err}`);
+      EntitlementService.captureSentry(err, { step: 'heal_unstamped' });
+    }
 
-    // Rung 1: past_due → publish_locked (screens still play; no device signal)
-    advanced += await this.advanceRung(
-      'past_due',
-      'publish_locked',
-      LADDER.DAYS_TO_PUBLISH_LOCK,
-      now,
-      null,
+    // Every rung runs unconditionally — `runRung` turns a wholesale throw into an
+    // empty outcome plus a counted, logged, Sentry-reported step failure, so the
+    // rungs after a broken one still get their chance (D2).
+    const rung1 = await this.runRung('past_due->publish_locked', () =>
+      // Rung 1: past_due → publish_locked (screens still play; no device signal)
+      this.advanceRung('past_due', 'publish_locked', LADDER.DAYS_TO_PUBLISH_LOCK, now, null),
     );
 
-    // Rung 2: publish_locked → suspended (holding screen; emit tenant:suspended)
-    advanced += await this.advanceRung(
-      'publish_locked',
-      'suspended',
-      LADDER.DAYS_TO_SUSPEND,
-      now,
-      'past_due',
+    const rung2 = await this.runRung('publish_locked->suspended', () =>
+      // Rung 2: publish_locked → suspended (holding screen; emit tenant:suspended)
+      this.advanceRung('publish_locked', 'suspended', LADDER.DAYS_TO_SUSPEND, now, 'past_due'),
     );
 
     // Rung 3: suspended → canceled (downgrade to free; free still serves).
@@ -164,18 +330,55 @@ export class EntitlementService {
     // `billingEventAt` is stamped too: the ladder is an entitlement transition,
     // and without the mark a late-delivered older webhook could sail past the
     // billing ordering guard and undo it (B-M2).
-    advanced += await this.advanceRung(
-      'suspended',
-      'canceled',
-      LADDER.DAYS_TO_CANCEL,
-      now,
-      null,
-      { ...tierEntitlementFields('free'), billingEventAt: now },
+    const rung3 = await this.runRung('suspended->canceled', () =>
+      this.advanceRung('suspended', 'canceled', LADDER.DAYS_TO_CANCEL, now, null, {
+        ...tierEntitlementFields('free'),
+        billingEventAt: now,
+      }),
     );
 
-    await this.writeHeartbeat(now);
-    if (advanced > 0) this.logger.log(`Entitlement ladder advanced ${advanced} org(s)`);
-    return { advanced };
+    for (const step of [rung1, rung2, rung3]) {
+      rungs[step.label] = step.outcome;
+      if (step.stepFailed) rungFailures += 1;
+    }
+
+    const aggregate = Object.values(rungs).reduce<RungOutcome>(
+      (acc, r) => ({
+        eligible: acc.eligible + r.eligible,
+        attempted: acc.attempted + r.attempted,
+        advanced: acc.advanced + r.advanced,
+        casLost: acc.casLost + r.casLost,
+        failed: acc.failed + r.failed,
+      }),
+      emptyOutcome(),
+    );
+
+    const result: LadderRunResult = { ...aggregate, rungFailures, rungs };
+
+    await this.writeHeartbeat(now, result);
+    if (aggregate.advanced > 0) {
+      this.logger.log(`Entitlement ladder advanced ${aggregate.advanced} org(s)`);
+    }
+    return result;
+  }
+
+  /**
+   * D2 — per-rung isolation. A throw in the rung MACHINERY (the candidate
+   * `findMany`, or a CAS that rejects rather than returning a count) must not
+   * kill the rungs after it: iteration is rung-major, so before K19 an abort in
+   * rung 1 took out rung 1's tail AND rungs 2 and 3, on top of the heartbeat.
+   */
+  private async runRung(
+    label: string,
+    run: () => Promise<RungOutcome>,
+  ): Promise<{ label: string; outcome: RungOutcome; stepFailed: boolean }> {
+    try {
+      return { label, outcome: await run(), stepFailed: false };
+    } catch (err) {
+      this.logger.error(`Entitlement ladder rung ${label} FAILED wholesale: ${err}`);
+      EntitlementService.captureSentry(err, { rung: label });
+      return { label, outcome: emptyOutcome(), stepFailed: true };
+    }
   }
 
   private async advanceRung(
@@ -185,7 +388,7 @@ export class EntitlementService {
     now: Date,
     suspendReason: string | null,
     extraData: Record<string, unknown> = {},
-  ): Promise<number> {
+  ): Promise<RungOutcome> {
     const candidates = await this.db.organization.findMany({
       where: { subscriptionStatus: fromStatus, entitlementStateSince: { not: null } },
       select: {
@@ -193,58 +396,128 @@ export class EntitlementService {
         entitlementStateSince: true,
         users: { where: { role: 'admin' }, take: 1, select: { email: true, firstName: true } },
       },
+      // Deterministic order (D6). Heap order is not stable, so without this a
+      // repeated partial outage keeps stranding whichever tail Postgres happens
+      // to return last, and a forensic replay of "which orgs did the run reach?"
+      // is not reproducible.
+      orderBy: { id: 'asc' },
     });
 
-    let count = 0;
+    const outcome = emptyOutcome();
     for (const org of candidates) {
       const age = this.wholeDaysBetween(org.entitlementStateSince as Date, now);
       if (age < daysThreshold) continue;
 
-      // Guard the write on the CURRENT status so two concurrent runs (or a retry)
-      // can't double-advance — only the first flip wins.
-      //
-      // LOAD-BEARING FOR CLUSTER MODE. This is the ONLY thing making the daily
-      // ladder cron safe against PM2 running two middleware instances, each of
-      // which fires every @Cron: `handleGracePeriodExpiry` is deliberately NOT
-      // leader-locked precisely because this CAS makes locking redundant. Every
-      // downstream side effect — the suspend notifier, the dunning email, the
-      // advanced counter — is gated on `res.count === 0 → continue` below. If a
-      // future rung transition writes state BEFORE this guard, or bypasses it,
-      // that safety disappears silently and customers get duplicate dunning mail.
-      // Add a leader lock to the cron in the same change.
-      const res = await this.db.organization.updateMany({
-        where: { id: org.id, subscriptionStatus: fromStatus },
-        data: { subscriptionStatus: toStatus, ...extraData },
-      });
-      if (res.count === 0) continue; // already advanced by a concurrent run
-      count += 1;
+      outcome.eligible += 1;
+      outcome.attempted += 1;
 
-      if (toStatus === 'suspended') {
-        await this.notifier.emit(org.id, 'suspended', suspendReason ?? 'past_due');
-      }
-
-      // Dunning escalation email, deduped per (org, rung) so a job re-run can't
-      // re-send. publish_locked and suspended are the owner-action moments; the
-      // transition guard already prevents a double-flip, and the dedup key is
-      // belt-and-suspenders. Fire-and-forget; the banner is the always-on channel.
-      if (toStatus === 'publish_locked' || toStatus === 'suspended') {
-        const admin = org.users?.[0];
-        if (admin?.email && (await this.claimDunningNotice(org.id, toStatus))) {
-          this.mail
-            .sendPaymentFailedEmail(admin.email, admin.firstName || admin.email.split('@')[0])
-            .catch((err) => this.logger.warn(`Dunning email failed for org ${org.id}: ${err}`));
+      // D1 — per-org isolation. One tenant's failure must not prevent an
+      // independently processable tenant from advancing. There is no
+      // transactionality argument against this: each Prisma call below is its own
+      // transaction, nothing wraps the loop in `$transaction`, and the DB already
+      // commits per org — so the ONLY thing an uncaught rejection here bought was
+      // abandoning every remaining tenant (and, iteration being rung-major, every
+      // remaining rung). `advanced` counts orgs FULLY processed; an org whose CAS
+      // landed but whose side effect then threw is counted `failed`, and the log
+      // line says which.
+      try {
+        // Guard the write on the CURRENT status so two concurrent runs (or a retry)
+        // can't double-advance — only the first flip wins.
+        //
+        // LOAD-BEARING FOR CLUSTER MODE. This is the ONLY thing making the daily
+        // ladder cron safe against PM2 running two middleware instances, each of
+        // which fires every @Cron: `handleGracePeriodExpiry` is deliberately NOT
+        // leader-locked precisely because this CAS makes locking redundant. Every
+        // downstream side effect — the suspend notifier, the dunning email, the
+        // advanced counter — is gated on `res.count === 0 → continue` below. If a
+        // future rung transition writes state BEFORE this guard, or bypasses it,
+        // that safety disappears silently and customers get duplicate dunning mail.
+        // Add a leader lock to the cron in the same change.
+        const res = await this.db.organization.updateMany({
+          where: { id: org.id, subscriptionStatus: fromStatus },
+          data: { subscriptionStatus: toStatus, ...extraData },
+        });
+        if (res.count === 0) {
+          outcome.casLost += 1;
+          continue; // already advanced by a concurrent run
         }
+
+        if (toStatus === 'suspended') {
+          await this.notifier.emit(org.id, 'suspended', suspendReason ?? 'past_due');
+        }
+
+        // Dunning escalation email, deduped per (org, rung) so a job re-run can't
+        // re-send. publish_locked and suspended are the owner-action moments; the
+        // transition guard already prevents a double-flip, and the dedup key is
+        // belt-and-suspenders — which is exactly why `claimDunningNotice` may
+        // safely fail OPEN when its store is down (K19). Fire-and-forget; the
+        // banner is the always-on channel.
+        if (toStatus === 'publish_locked' || toStatus === 'suspended') {
+          const admin = org.users?.[0];
+          if (admin?.email && (await this.claimDunningNotice(org.id, toStatus))) {
+            this.mail
+              .sendPaymentFailedEmail(admin.email, admin.firstName || admin.email.split('@')[0])
+              .catch((err) => this.logger.warn(`Dunning email failed for org ${org.id}: ${err}`));
+          }
+        }
+        outcome.advanced += 1;
+        this.logger.log(`Org ${org.id} ${fromStatus} → ${toStatus} (episode age ${age}d)`);
+      } catch (err) {
+        outcome.failed += 1;
+        this.logger.error(
+          `Entitlement ladder FAILED for org ${org.id} on rung ${fromStatus} → ${toStatus} ` +
+            `(episode age ${age}d); continuing with the remaining orgs: ${err}`,
+        );
+        EntitlementService.captureSentry(err, {
+          orgId: org.id,
+          rung: `${fromStatus}->${toStatus}`,
+        });
+        continue;
       }
-      this.logger.log(`Org ${org.id} ${fromStatus} → ${toStatus} (episode age ${age}d)`);
     }
-    return count;
+    return outcome;
   }
 
-  private async writeHeartbeat(now: Date): Promise<void> {
+  /**
+   * Record that a run completed, and HOW it completed. The payload carries the
+   * run outcome so `checkLadderFreshness` — and a human reading the key — can
+   * tell a clean run from a degraded one (D4). Deliberately written only at the
+   * END of a run that reached this line, never from a `finally`: a heartbeat
+   * written on the failure path would launder a broken run into a fresh
+   * freshness reading and destroy the only detection signal there is.
+   */
+  private async writeHeartbeat(now: Date, result: LadderRunResult): Promise<void> {
+    const payload = JSON.stringify({
+      at: now.getTime(),
+      eligible: result.eligible,
+      attempted: result.attempted,
+      advanced: result.advanced,
+      casLost: result.casLost,
+      failed: result.failed,
+      rungFailures: result.rungFailures,
+      degraded: result.failed > 0 || result.rungFailures > 0,
+    });
     try {
-      await this.redis.set(HEARTBEAT_KEY, String(now.getTime()), 7 * 24 * 60 * 60);
+      await this.redis.set(HEARTBEAT_KEY, payload, 7 * 24 * 60 * 60);
     } catch (err) {
       this.logger.warn(`Failed to write entitlement ladder heartbeat: ${err}`);
+    }
+  }
+
+  /**
+   * Read the run timestamp out of a heartbeat value. Accepts BOTH the current
+   * JSON payload and the bare-millis string written before D4 — a heartbeat from
+   * the previous release survives in Redis for up to its 7-day TTL after the
+   * deploy, and misreading it as absent would fire a false STALE alert for a day.
+   */
+  private parseHeartbeatAt(raw: string): number | null {
+    const legacy = Number(raw);
+    if (Number.isFinite(legacy) && legacy > 0) return legacy;
+    try {
+      const parsed = JSON.parse(raw);
+      return typeof parsed?.at === 'number' ? parsed.at : null;
+    } catch {
+      return null;
     }
   }
 
@@ -252,7 +525,9 @@ export class EntitlementService {
   async isLadderStale(now = new Date()): Promise<boolean> {
     const raw = await this.redis.get(HEARTBEAT_KEY);
     if (!raw) return true;
-    return now.getTime() - Number(raw) > HEARTBEAT_STALE_MS;
+    const at = this.parseHeartbeatAt(raw);
+    if (at === null) return true;
+    return now.getTime() - at > HEARTBEAT_STALE_MS;
   }
 
   /**
