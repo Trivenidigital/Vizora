@@ -1027,3 +1027,217 @@ test('ARCHIVE: an unreadable layout fails closed and clears no orphan finding', 
     }
   });
 });
+
+// ════════════════════════════════════════════════════════════════════════════
+// ITEM-LEVEL CLEARING (K25)
+//
+// Test 12 above is the CHECK-granularity version: the orphan check did not run,
+// so it clears nothing. These four are one level down — the check DID run and
+// `orphaned_content` IS covered, but an individual item was skipped inside it.
+//
+// The distinction the four of them pin, stated once:
+//
+//   SKIPPED WITHOUT EVIDENCE (1, 2) — the confirm read threw, or the candidate
+//     fell past the per-run cap. The run knows nothing about this item, so a
+//     prior incident on it must survive.
+//   SKIPPED WITH EVIDENCE (3) — isGlobal / playlistItems / named as another
+//     item's replacement. The run looked and found a real reason. Its incident
+//     must still clear, or the fix over-corrects into "nothing ever resolves".
+//   GENUINELY GONE (4) — the item is no longer a candidate at all. Unchanged.
+//
+// Cases 1 and 2 assert on incident STATUS rather than on `archived`, because
+// the archive side of both was already correct (test 11 pins it); the defect
+// was that the skip was invisible to the resolution sweep.
+// ════════════════════════════════════════════════════════════════════════════
+
+function orphanIncident(contentId: string): Incident {
+  return {
+    id: `content-lifecycle:orphaned_content:${contentId}`,
+    agent: 'content-lifecycle',
+    type: 'orphaned_content',
+    severity: 'info',
+    target: 'content',
+    targetId: contentId,
+    detected: new Date(Date.now() - 86_400_000).toISOString(),
+    message: `Content "${contentId}" is orphaned - archive failed (transient)`,
+    remediation: `POST /content/${contentId}/archive`,
+    status: 'open',
+    attempts: 1,
+    error: 'API 503',
+  } as Incident;
+}
+
+// ─── 13. Unexamined: the confirm read threw ─────────────────────────────────
+
+test('K25: a candidate whose confirm read FAILS keeps its prior incident open', async () => {
+  // The recorded scenario. Run N tried to archive `flaky`, got a 503, opened
+  // `orphaned_content:flaky`. Run N+1: `flaky`'s confirm read returns 500, so it
+  // is skipped — and every coverage key stays true, because the orphan check
+  // itself completed. `orphaned_content` was therefore in `coveredTypes`, the
+  // incident was not re-raised (nobody looked at `flaky`), and it RESOLVED.
+  // ops-state then read all-clear over an item still sitting there unarchived.
+  //
+  // `other` must still be archived: it proves the orphan check really did run
+  // and `orphaned_content` really was covered this run. Without it the assertion
+  // passes vacuously against an agent that skipped the whole pass.
+  //
+  // MUTATION KILLED: drop `state.confirmReadFailedIds.add(item.id)` from the
+  // confirm catch and this incident resolves again.
+  const f = fixture({
+    content: [contentItem({ id: 'flaky' }), contentItem({ id: 'other' })],
+    playlists: [],
+    failDetail: ['flaky'],
+  });
+
+  await withServer(f, async (baseUrl, h) => {
+    const tmpRoot = setupTmpRoot([orphanIncident('flaky')]);
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+
+      assert.deepEqual(
+        h.archived,
+        ['other'],
+        `the unconfirmed candidate must not be archived, and the rest of the batch ` +
+          `must still run\n${result.stdout}`,
+      );
+
+      const state = readState(tmpRoot);
+      assert.equal(
+        state.incidents.find(i => i.id === 'content-lifecycle:orphaned_content:flaky')?.status,
+        'open',
+        `an item that was never examined cannot clear its own incident\n${result.stdout}`,
+      );
+      assert.match(result.stdout, /skipped WITHOUT EVIDENCE/);
+      assert.match(result.stdout, /confirm read failed: 1/);
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── 14. Unexamined: deferred past the per-run cap ──────────────────────────
+
+test('K25: a candidate deferred past the per-run cap keeps its prior incident open', async () => {
+  // The second evidence-free skip, and the quieter one — no error is raised
+  // anywhere, the item is simply beyond `MAX_ARCHIVE_CANDIDATES_PER_RUN` (100)
+  // and its detail is never requested. The deferral was already logged by count,
+  // but the resolution sweep could not see it, so a deferred item's incident
+  // cleared on a run that had not read one byte about it.
+  //
+  // The 100 items that consume the cap are `isGlobal`, so they are confirmed and
+  // skipped WITH evidence and nothing is archived — which keeps the fixture to
+  // 100 detail reads and makes `archived: []` unambiguous.
+  //
+  // MUTATION KILLED: drop the `deferredCandidateIds` collection and
+  // `orphaned_content:deferred-tail` resolves off a run that never read it.
+  const f = fixture({
+    content: [
+      ...Array.from({ length: 100 }, (_, i) =>
+        contentItem({ id: `cap-filler-${i}`, type: 'template', isGlobal: true }),
+      ),
+      contentItem({ id: 'deferred-tail' }),
+    ],
+    playlists: [],
+  });
+
+  await withServer(f, async (baseUrl, h) => {
+    const tmpRoot = setupTmpRoot([orphanIncident('deferred-tail')]);
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+
+      assert.deepEqual(
+        h.archived,
+        [],
+        `nothing here is archivable — the cap fillers are isGlobal and the tail was ` +
+          `never read\n${result.stdout}`,
+      );
+      assert.match(result.stdout, /Deferring 1 orphan candidate/);
+
+      const state = readState(tmpRoot);
+      assert.equal(
+        state.incidents.find(i => i.id === 'content-lifecycle:orphaned_content:deferred-tail')
+          ?.status,
+        'open',
+        `an item the run never looked at cannot clear its own incident\n${result.stdout}`,
+      );
+      assert.match(result.stdout, /deferred past cap: 1/);
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── 15. Examined: a real skip STILL resolves ───────────────────────────────
+
+test('K25: an item skipped for a REAL reason still resolves its incident', async () => {
+  // The guard that stops the fix from over-correcting. `shared-tpl` is skipped
+  // too — but by the `isGlobal` branch, which fires only AFTER a successful
+  // `GET /content/:id`. The run examined it and holds real evidence it is not an
+  // orphan, so the prior finding is genuinely stale and must clear.
+  //
+  // Without this test, "collect every skipped id" passes tests 13 and 14 just as
+  // well as the correct fix does, and quietly converts `orphaned_content` into a
+  // type that can only ever accumulate.
+  //
+  // MUTATION KILLED: also add the isGlobal / playlistItems / replacement skips to
+  // the unexamined set and this incident stops resolving.
+  const f = fixture({
+    content: [
+      contentItem({ id: 'shared-tpl', type: 'template', isGlobal: true }),
+      contentItem({ id: 'the-orphan' }),
+    ],
+    playlists: [],
+  });
+
+  await withServer(f, async (baseUrl, h) => {
+    const tmpRoot = setupTmpRoot([orphanIncident('shared-tpl')]);
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+      assert.deepEqual(h.archived, ['the-orphan'], `${result.stdout}`);
+
+      const state = readState(tmpRoot);
+      assert.equal(
+        state.incidents.find(i => i.id === 'content-lifecycle:orphaned_content:shared-tpl')?.status,
+        'resolved',
+        `an EXAMINED skip is evidence — its stale finding must still clear\n${result.stdout}`,
+      );
+      assert.doesNotMatch(
+        result.stdout,
+        /skipped WITHOUT EVIDENCE/,
+        'nothing here was skipped blind, so the counter must not fire',
+      );
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── 16. Recovery: an item that is no longer a candidate resolves ───────────
+
+test('K25: a genuinely recovered orphan still resolves', async () => {
+  // The plain regression guard. `was-orphaned` is gone from the tenant entirely
+  // (archived on a previous run), so it is not a candidate, not skipped, and not
+  // in either unexamined set. Resolution here is the whole point of the sweep
+  // and the change must not touch it.
+  const f = fixture({
+    content: [contentItem({ id: 'the-orphan' })],
+    playlists: [],
+  });
+
+  await withServer(f, async (baseUrl, h) => {
+    const tmpRoot = setupTmpRoot([orphanIncident('was-orphaned')]);
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+      assert.deepEqual(h.archived, ['the-orphan'], `${result.stdout}`);
+
+      const state = readState(tmpRoot);
+      const recovered = state.incidents.find(
+        i => i.id === 'content-lifecycle:orphaned_content:was-orphaned',
+      );
+      assert.equal(recovered?.status, 'resolved', `${result.stdout}`);
+      assert.ok(recovered?.resolvedAt, 'resolvedAt must be stamped');
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
