@@ -1,3 +1,5 @@
+import { BillingInterval } from '../constants/plans';
+
 export interface Customer {
   id: string;
   email: string;
@@ -8,6 +10,15 @@ export interface Customer {
 export interface CheckoutParams {
   customerId: string;
   priceId: string;
+  /**
+   * The billing cadence the customer chose. REQUIRED, and it must be the SAME
+   * value that resolved `priceId` — `RazorpayProvider` derives the subscription's
+   * `total_count` from it, so an interval that disagrees with the plan id would
+   * bound a yearly subscription with a monthly cycle count (or vice versa).
+   * Required rather than optional so the compiler, not a reviewer, enforces that
+   * both are read from one variable.
+   */
+  interval: BillingInterval;
   successUrl: string;
   cancelUrl: string;
   metadata?: Record<string, string>;

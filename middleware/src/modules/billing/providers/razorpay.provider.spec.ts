@@ -1,7 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
-import { RazorpayProvider } from '../providers/razorpay.provider';
+import {
+  RazorpayProvider,
+  razorpaySubscriptionTotalCount,
+} from '../providers/razorpay.provider';
 
 // Mock the Razorpay module
 jest.mock('razorpay', () => {
@@ -147,6 +150,7 @@ describe('RazorpayProvider', () => {
       const params = {
         customerId: 'cust_123',
         priceId: 'plan_123',
+        interval: 'monthly' as const,
         successUrl: 'https://example.com/success',
         cancelUrl: 'https://example.com/cancel',
         metadata: { source: 'dashboard' },
@@ -157,7 +161,7 @@ describe('RazorpayProvider', () => {
       expect(mockRazorpay.subscriptions.create).toHaveBeenCalledWith({
         plan_id: 'plan_123',
         customer_id: 'cust_123',
-        total_count: 12,
+        total_count: 360,
         notes: { source: 'dashboard' },
       });
       expect(result).toEqual({
@@ -176,6 +180,7 @@ describe('RazorpayProvider', () => {
       const params = {
         customerId: 'cust_123',
         priceId: 'plan_123',
+        interval: 'monthly' as const,
         successUrl: 'https://example.com/success',
         cancelUrl: 'https://example.com/cancel',
       };
@@ -185,9 +190,71 @@ describe('RazorpayProvider', () => {
       expect(mockRazorpay.subscriptions.create).toHaveBeenCalledWith({
         plan_id: 'plan_123',
         customer_id: 'cust_123',
-        total_count: 12,
+        total_count: 360,
         notes: {},
       });
+    });
+
+    it('B3b creates a MONTHLY subscription with 360 cycles (30y), not 12', async () => {
+      // Vizora sells recurring-until-cancelled ("no long-term contracts. You can
+      // cancel at any time." — plans/page.tsx:181-184). The bare `total_count:
+      // 12` bought exactly ONE YEAR: Razorpay would move the subscription to the
+      // TERMINAL `completed` state after the 12th charge and stop billing a
+      // customer who is still using the product. Razorpay offers no perpetual
+      // option, so the bound is 30 years in monthly cycles — 12 × 30 = 360, which
+      // is what Razorpay's own formula computes and is valid whether their real
+      // ceiling is 30 or 100 years. Deliberately NOT the 1200 they print.
+      mockRazorpay.subscriptions.create.mockResolvedValue({
+        id: 'sub_m',
+        short_url: 'https://rzp.io/i/m',
+      });
+
+      await provider.createCheckoutSession({
+        customerId: 'cust_123',
+        priceId: 'plan_monthly',
+        interval: 'monthly',
+        successUrl: 'https://example.com/success',
+        cancelUrl: 'https://example.com/cancel',
+      });
+
+      expect(mockRazorpay.subscriptions.create).toHaveBeenCalledWith(
+        expect.objectContaining({ plan_id: 'plan_monthly', total_count: 360 }),
+      );
+    });
+
+    it('B3b creates a YEARLY subscription with 30 cycles', async () => {
+      // 30 yearly cycles = the same 30 years the monthly bound buys. A yearly
+      // plan must NOT get the monthly count: 360 yearly cycles is 360 years, far
+      // past either half of Razorpay's 30-vs-100-year contradiction, and an
+      // over-large count fails CLOSED — the create call is rejected and nobody
+      // can subscribe.
+      mockRazorpay.subscriptions.create.mockResolvedValue({
+        id: 'sub_y',
+        short_url: 'https://rzp.io/i/y',
+      });
+
+      await provider.createCheckoutSession({
+        customerId: 'cust_123',
+        priceId: 'plan_yearly',
+        interval: 'yearly',
+        successUrl: 'https://example.com/success',
+        cancelUrl: 'https://example.com/cancel',
+      });
+
+      expect(mockRazorpay.subscriptions.create).toHaveBeenCalledWith(
+        expect.objectContaining({ plan_id: 'plan_yearly', total_count: 30 }),
+      );
+    });
+  });
+
+  describe('razorpaySubscriptionTotalCount', () => {
+    it('buys exactly 30 years of service on every interval', () => {
+      // Guards the derivation, not the literals: both bounds are ONE figure —
+      // 30 years — expressed in each interval's own cycles. A floor alone would
+      // not catch an over-large count, and over-large is the dangerous
+      // direction: Razorpay rejects the create call and nobody can subscribe.
+      expect(razorpaySubscriptionTotalCount('monthly')).toBe(12 * 30);
+      expect(razorpaySubscriptionTotalCount('yearly')).toBe(1 * 30);
     });
   });
 

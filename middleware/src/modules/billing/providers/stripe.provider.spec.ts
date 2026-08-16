@@ -171,6 +171,9 @@ describe('StripeProvider', () => {
       const params = {
         customerId: 'cus_123',
         priceId: 'price_123',
+        // Stripe encodes the cadence in the price object itself, so the provider
+        // ignores this — it is required by CheckoutParams because Razorpay needs it.
+        interval: 'monthly' as const,
         successUrl: 'https://example.com/success',
         cancelUrl: 'https://example.com/cancel',
         metadata: { plan: 'pro' },
