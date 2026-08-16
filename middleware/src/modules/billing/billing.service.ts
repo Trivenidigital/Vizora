@@ -398,6 +398,11 @@ export class BillingService implements OnModuleInit {
     const result = await provider.createCheckoutSession({
       customerId,
       priceId,
+      // Same `dto.interval` that resolved `priceId` two statements above — the
+      // Razorpay provider derives the subscription's total_count from it, and a
+      // yearly plan id bounded by a monthly cycle count (or vice versa) would be
+      // wrong in exactly the way B3-E1 was (B3b).
+      interval: dto.interval,
       successUrl,
       cancelUrl,
       metadata: {

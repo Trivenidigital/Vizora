@@ -4,7 +4,10 @@ import { NotFoundException, BadRequestException, ServiceUnavailableException } f
 import { BillingService } from './billing.service';
 import { DatabaseService } from '../database/database.service';
 import { StripeProvider } from './providers/stripe.provider';
-import { RazorpayProvider } from './providers/razorpay.provider';
+import {
+  RazorpayProvider,
+  razorpaySubscriptionTotalCount,
+} from './providers/razorpay.provider';
 import { MailService } from '../mail/mail.service';
 import { RedisService } from '../redis/redis.service';
 import { EntitlementService } from './entitlement.service';
@@ -531,6 +534,50 @@ describe('BillingService', () => {
       } finally {
         delete process.env.RAZORPAY_PRO_YEARLY_PLAN_ID;
       }
+    });
+
+    it('B3b a YEARLY checkout carries the yearly plan id AND the yearly cycle count', async () => {
+      // Coupling guard. The plan id and the subscription's total_count are two
+      // reads of ONE interval: the id decides the cadence the customer is
+      // charged at, the count decides how many of those cadences are bought.
+      // If they ever disagree, a yearly subscriber gets a monthly subscription's
+      // bound (or vice versa) — 1200 years on one side, 30 months on the other.
+      process.env.RAZORPAY_PRO_YEARLY_PLAN_ID = 'plan_pro_inr_yearly';
+      try {
+        mockDatabaseService.organization.findUnique.mockResolvedValue(razorpayCheckoutOrg());
+        mockRazorpayProvider.createCheckoutSession.mockResolvedValue({
+          url: 'https://rzp.io/i/abc',
+          sessionId: 'sub_rzp_y2',
+        });
+        mockDatabaseService.organization.update.mockResolvedValue({});
+
+        await service.createCheckoutSession('org-123', { planId: 'pro', interval: 'yearly' });
+
+        const params = mockRazorpayProvider.createCheckoutSession.mock.calls[0][0];
+        expect(params.priceId).toBe('plan_pro_inr_yearly');
+        expect(params.interval).toBe('yearly');
+        // Same interval the provider feeds to the helper, so this asserts the
+        // count the real provider WOULD send for this checkout.
+        expect(razorpaySubscriptionTotalCount(params.interval)).toBe(30);
+      } finally {
+        delete process.env.RAZORPAY_PRO_YEARLY_PLAN_ID;
+      }
+    });
+
+    it('B3b a MONTHLY checkout carries the monthly plan id AND the monthly cycle count', async () => {
+      mockDatabaseService.organization.findUnique.mockResolvedValue(razorpayCheckoutOrg());
+      mockRazorpayProvider.createCheckoutSession.mockResolvedValue({
+        url: 'https://rzp.io/i/abc',
+        sessionId: 'sub_rzp_m2',
+      });
+      mockDatabaseService.organization.update.mockResolvedValue({});
+
+      await service.createCheckoutSession('org-123', { planId: 'pro', interval: 'monthly' });
+
+      const params = mockRazorpayProvider.createCheckoutSession.mock.calls[0][0];
+      expect(params.priceId).toBe('plan_pro_inr');
+      expect(params.interval).toBe('monthly');
+      expect(razorpaySubscriptionTotalCount(params.interval)).toBe(1200);
     });
 
     it('B3-E1 refuses a yearly checkout when no yearly plan id is configured', async () => {

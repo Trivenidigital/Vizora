@@ -1,7 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
-import { RazorpayProvider } from '../providers/razorpay.provider';
+import {
+  RazorpayProvider,
+  razorpaySubscriptionTotalCount,
+} from '../providers/razorpay.provider';
 
 // Mock the Razorpay module
 jest.mock('razorpay', () => {
@@ -147,6 +150,7 @@ describe('RazorpayProvider', () => {
       const params = {
         customerId: 'cust_123',
         priceId: 'plan_123',
+        interval: 'monthly' as const,
         successUrl: 'https://example.com/success',
         cancelUrl: 'https://example.com/cancel',
         metadata: { source: 'dashboard' },
@@ -157,7 +161,7 @@ describe('RazorpayProvider', () => {
       expect(mockRazorpay.subscriptions.create).toHaveBeenCalledWith({
         plan_id: 'plan_123',
         customer_id: 'cust_123',
-        total_count: 12,
+        total_count: 1200,
         notes: { source: 'dashboard' },
       });
       expect(result).toEqual({
@@ -176,6 +180,7 @@ describe('RazorpayProvider', () => {
       const params = {
         customerId: 'cust_123',
         priceId: 'plan_123',
+        interval: 'monthly' as const,
         successUrl: 'https://example.com/success',
         cancelUrl: 'https://example.com/cancel',
       };
@@ -185,9 +190,67 @@ describe('RazorpayProvider', () => {
       expect(mockRazorpay.subscriptions.create).toHaveBeenCalledWith({
         plan_id: 'plan_123',
         customer_id: 'cust_123',
-        total_count: 12,
+        total_count: 1200,
         notes: {},
       });
+    });
+
+    it('B3b creates a MONTHLY subscription with 1200 cycles, not 12', async () => {
+      // Vizora sells recurring-until-cancelled ("no long-term contracts. You can
+      // cancel at any time." — plans/page.tsx:181-184). The bare `total_count:
+      // 12` bought exactly ONE YEAR: Razorpay would move the subscription to the
+      // TERMINAL `completed` state after the 12th charge and stop billing a
+      // customer who is still using the product. Razorpay offers no perpetual
+      // option, so the bound is set to their own computed monthly maximum.
+      mockRazorpay.subscriptions.create.mockResolvedValue({
+        id: 'sub_m',
+        short_url: 'https://rzp.io/i/m',
+      });
+
+      await provider.createCheckoutSession({
+        customerId: 'cust_123',
+        priceId: 'plan_monthly',
+        interval: 'monthly',
+        successUrl: 'https://example.com/success',
+        cancelUrl: 'https://example.com/cancel',
+      });
+
+      expect(mockRazorpay.subscriptions.create).toHaveBeenCalledWith(
+        expect.objectContaining({ plan_id: 'plan_monthly', total_count: 1200 }),
+      );
+    });
+
+    it('B3b creates a YEARLY subscription with 30 cycles', async () => {
+      // 30 yearly cycles = 30 years, the conservative side of Razorpay's own
+      // 30-vs-100-year contradiction. A yearly plan must NOT get the monthly
+      // count: 1200 yearly cycles is far past any documented ceiling and would
+      // be rejected at creation.
+      mockRazorpay.subscriptions.create.mockResolvedValue({
+        id: 'sub_y',
+        short_url: 'https://rzp.io/i/y',
+      });
+
+      await provider.createCheckoutSession({
+        customerId: 'cust_123',
+        priceId: 'plan_yearly',
+        interval: 'yearly',
+        successUrl: 'https://example.com/success',
+        cancelUrl: 'https://example.com/cancel',
+      });
+
+      expect(mockRazorpay.subscriptions.create).toHaveBeenCalledWith(
+        expect.objectContaining({ plan_id: 'plan_yearly', total_count: 30 }),
+      );
+    });
+  });
+
+  describe('razorpaySubscriptionTotalCount', () => {
+    it('bounds every interval well beyond any real customer lifetime', () => {
+      // Guards the contract, not the literals: whatever the numbers become, a
+      // subscription must never approach its terminal `completed` state while a
+      // customer is still paying. 30 years is the floor.
+      expect(razorpaySubscriptionTotalCount('monthly')).toBeGreaterThanOrEqual(12 * 30);
+      expect(razorpaySubscriptionTotalCount('yearly')).toBeGreaterThanOrEqual(30);
     });
   });
 
