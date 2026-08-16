@@ -30,6 +30,21 @@ DEMO_TENANT_PASSWORD=… node scripts/design/audit-surface.mjs --tag before
 Baseline on `main` (36 captures, 9 routes × {1440,390} × {dark,light}):
 **166 clipped · 109 contrast failures · 420 touch targets < 44px · 72 console errors.**
 
+**The harness measures TEXT contrast only — a clean report is not a clean route.** Any control
+that replaces a native element with `appearance: none` (checkbox, radio, select, switch) draws its
+own boundary, and that boundary is subject to WCAG 1.4.11 (3:1 for UI component boundaries), which
+the harness cannot see and will score as 0 failures. The Devices redesign hit this exactly: the
+custom `.eh-check` shipped at ~1.8:1 light / 1.7:1 dark — a REGRESSION from the native checkbox it
+replaced — with a clean harness report. **When a route in this wave replaces a native control,
+measure that control's boundary by hand.** Two smaller blind spots, same shape: nothing here
+observes `document.activeElement`, so a focus bug survives a green report (that one belongs in
+Jest/RTL), and the per-capture arrays are capped at 30 `touch` / 40 `contrast`, so large "before"
+numbers are floors rather than counts.
+
+Worked example + the full list of what the oracle does and does not cover:
+`docs/design/audits/2026-08-16-devices-redesign/README.md`, which also carries both runs' raw
+`report.json` so a route's numbers are derivable rather than author-reported.
+
 ## PR queue
 
 ### Merged — foundation phase (global surfaces every page inherits)
