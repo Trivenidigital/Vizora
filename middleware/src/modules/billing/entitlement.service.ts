@@ -32,14 +32,35 @@ const HEARTBEAT_KEY = 'entitlement:ladder:last-run';
 const HEARTBEAT_STALE_MS = 26 * 60 * 60 * 1000; // > 24h cadence + slack
 
 /**
- * Hard ceiling on the dunning-claim SET, mirroring `CronLeaderService`'s. A claim
- * is one round-trip to a local Redis; anything near a second means Redis is not
- * healthy and the right move is to stop waiting. A bare try/catch is NOT enough:
- * a rejection costs ~42s (ioredis `maxRetriesPerRequest: 20` + capped backoff)
- * and a blackholed socket never rejects at all, so 30 orgs would spend ~21
- * minutes — or forever — inside a job that is supposed to finish in seconds.
+ * Hard ceiling on EVERY Redis command this service issues, mirroring
+ * `CronLeaderService`'s. Each is one round-trip to a local Redis; anything near a
+ * second means Redis is not healthy and the right move is to stop waiting.
+ *
+ * A bare try/catch is NOT enough anywhere here: a rejection costs ~42s (ioredis
+ * `maxRetriesPerRequest: 20` + capped backoff) and a blackholed socket never
+ * rejects at all. That applies verbatim to `RedisService.set`/`get` — they
+ * try/catch a REJECTION but have no timeout — so the heartbeat write and read are
+ * bounded too. An unbounded heartbeat write is not a stranded tenant (it is the
+ * last thing the run does), but it hangs `advanceLadder` forever, which means
+ * `handleGracePeriodExpiry` never reaches its summary/DEGRADED log or its Sentry
+ * capture — i.e. it takes out exactly the observability channel the payload
+ * exists to feed — and leaks a dangling promise per day.
  */
-const DUNNING_CLAIM_TIMEOUT_MS = 2000;
+const REDIS_COMMAND_TIMEOUT_MS = 2000;
+
+/**
+ * The last-run heartbeat, parsed. `degraded` is what lets the hourly watchdog
+ * distinguish "ran recently and cleanly" from "ran recently and stranded
+ * tenants" — without it a run that isolates failures writes a fresh `at` and the
+ * watchdog reports FRESH, which is the §12a silent-failure shape the payload was
+ * added to close.
+ */
+export interface LadderHeartbeat {
+  at: number;
+  degraded: boolean;
+  failed: number;
+  rungFailures: number;
+}
 
 /** Per-rung and aggregate outcome of one ladder run. */
 export interface RungOutcome {
@@ -121,7 +142,11 @@ export class EntitlementService {
    *  - Within one run an org appears once, and across cluster instances the CAS
    *    `updateMany` on a single row is atomic, so exactly one instance matches.
    *    Therefore even with Redis 100% down, fail-open yields AT MOST one email
-   *    per (org, rung). There is no spam loop left to protect against.
+   *    per (org, rung) PER EPISODE. There is no spam loop left to protect
+   *    against. (Across episodes it can send more than one — but a customer who
+   *    recovered and re-entered dunning has EARNED a second notice. The claim key
+   *    carries no episode discriminator under a 40-day TTL, so the fail-CLOSED
+   *    path actively suppresses that legitimate second email: backlog K21.)
    *  - Silently dropping a customer's ONLY escalation notice is the §12b failure
    *    mode, not a safe default — and the drop is PERMANENT, because the status
    *    has already flipped and tomorrow's run will not re-attempt the rung.
@@ -145,7 +170,7 @@ export class EntitlementService {
       // leaves it true while the command never settles. Bound it.
       const result = await this.raceWithTimeout(
         client.set(redisKey, '1', 'EX', 40 * 24 * 60 * 60, 'NX'),
-        DUNNING_CLAIM_TIMEOUT_MS,
+        REDIS_COMMAND_TIMEOUT_MS,
       );
       return result === 'OK';
     } catch (err) {
@@ -172,8 +197,8 @@ export class EntitlementService {
         () =>
           reject(
             new Error(
-              `dunning claim SET timed out after ${ms}ms — Redis is reachable but not ` +
-                `responding (LOADING, blackholed socket, or a blocked server)`,
+              `Redis command timed out after ${ms}ms — reachable but not responding ` +
+                `(LOADING, blackholed socket, or a blocked server)`,
             ),
           ),
         ms,
@@ -405,12 +430,6 @@ export class EntitlementService {
 
     const outcome = emptyOutcome();
     for (const org of candidates) {
-      const age = this.wholeDaysBetween(org.entitlementStateSince as Date, now);
-      if (age < daysThreshold) continue;
-
-      outcome.eligible += 1;
-      outcome.attempted += 1;
-
       // D1 — per-org isolation. One tenant's failure must not prevent an
       // independently processable tenant from advancing. There is no
       // transactionality argument against this: each Prisma call below is its own
@@ -420,7 +439,25 @@ export class EntitlementService {
       // remaining rung). `advanced` counts orgs FULLY processed; an org whose CAS
       // landed but whose side effect then threw is counted `failed`, and the log
       // line says which.
+      //
+      // The try opens ABOVE the age computation deliberately. `entitlementStateSince`
+      // is cast `as Date`, so a value that is not one — Prisma handing back a
+      // string, or a future `select` dropping the field — throws inside
+      // `wholeDaysBetween`. Outside the try that throw would escape to `runRung`
+      // and abandon every remaining org in the rung: the exact invariant K19
+      // exists to enforce, reintroduced by a cast. Unreachable today given the
+      // `not: null` filter; this is defense in depth, and it makes the docblock's
+      // claim to cover the loop body literally true.
+      let age = -1;
+      let counted = false;
       try {
+        age = this.wholeDaysBetween(org.entitlementStateSince as Date, now);
+        if (age < daysThreshold) continue;
+
+        outcome.eligible += 1;
+        outcome.attempted += 1;
+        counted = true;
+
         // Guard the write on the CURRENT status so two concurrent runs (or a retry)
         // can't double-advance — only the first flip wins.
         //
@@ -463,10 +500,19 @@ export class EntitlementService {
         outcome.advanced += 1;
         this.logger.log(`Org ${org.id} ${fromStatus} → ${toStatus} (episode age ${age}d)`);
       } catch (err) {
+        // A throw before the eligibility check leaves the org uncounted. Count it
+        // as an eligible attempt that failed: it keeps `attempted === eligible`
+        // and `advanced + casLost + failed === attempted` exact, and "we could not
+        // determine it" is a failure, not a skip.
+        if (!counted) {
+          outcome.eligible += 1;
+          outcome.attempted += 1;
+        }
         outcome.failed += 1;
         this.logger.error(
           `Entitlement ladder FAILED for org ${org.id} on rung ${fromStatus} → ${toStatus} ` +
-            `(episode age ${age}d); continuing with the remaining orgs: ${err}`,
+            `(episode age ${age >= 0 ? `${age}d` : 'unknown'}); ` +
+            `continuing with the remaining orgs: ${err}`,
         );
         EntitlementService.captureSentry(err, {
           orgId: org.id,
@@ -498,36 +544,77 @@ export class EntitlementService {
       degraded: result.failed > 0 || result.rungFailures > 0,
     });
     try {
-      await this.redis.set(HEARTBEAT_KEY, payload, 7 * 24 * 60 * 60);
+      // Bounded: RedisService.set swallows a rejection but never times out (F7).
+      await this.raceWithTimeout(
+        this.redis.set(HEARTBEAT_KEY, payload, 7 * 24 * 60 * 60),
+        REDIS_COMMAND_TIMEOUT_MS,
+      );
     } catch (err) {
       this.logger.warn(`Failed to write entitlement ladder heartbeat: ${err}`);
     }
   }
 
   /**
-   * Read the run timestamp out of a heartbeat value. Accepts BOTH the current
-   * JSON payload and the bare-millis string written before D4 — a heartbeat from
-   * the previous release survives in Redis for up to its 7-day TTL after the
-   * deploy, and misreading it as absent would fire a false STALE alert for a day.
+   * The last-run heartbeat, or null when it is absent, unreadable, or the read
+   * itself failed. Null is deliberately indistinguishable from "never ran": every
+   * unreadable state must resolve toward STALE, never toward a reassuring FRESH.
+   *
+   * This is what makes the D4 payload actually reachable. `isLadderStale` only
+   * ever consumed `at`; without a reader for `degraded`, a run that stranded
+   * three tenants and finished still wrote a recent `at` and the hourly watchdog
+   * reported FRESH — the §12a shape the payload was added to close (F1).
    */
-  private parseHeartbeatAt(raw: string): number | null {
+  async readHeartbeat(): Promise<LadderHeartbeat | null> {
+    let raw: string | null;
+    try {
+      // Bounded for the same reason as the write: RedisService.get try/catches a
+      // rejection but has no timeout, and a hung GET would hang the hourly
+      // watchdog itself (F7).
+      raw = await this.raceWithTimeout(this.redis.get(HEARTBEAT_KEY), REDIS_COMMAND_TIMEOUT_MS);
+    } catch (err) {
+      this.logger.warn(`Failed to read entitlement ladder heartbeat: ${err}`);
+      return null;
+    }
+    if (!raw) return null;
+    return this.parseHeartbeat(raw);
+  }
+
+  /**
+   * Parse a heartbeat value. Accepts BOTH the current JSON payload and the
+   * bare-millis string written before D4 — a heartbeat from the previous release
+   * survives in Redis for up to its 7-day TTL after the deploy, and misreading it
+   * as absent would fire a false STALE alert for a day. A legacy value carries no
+   * outcome, so it reports `degraded: false`: the outcome is genuinely unknown,
+   * and inventing `true` would fire a false DEGRADED alert for that same day.
+   */
+  private parseHeartbeat(raw: string): LadderHeartbeat | null {
     const legacy = Number(raw);
-    if (Number.isFinite(legacy) && legacy > 0) return legacy;
+    if (Number.isFinite(legacy) && legacy > 0) {
+      return { at: legacy, degraded: false, failed: 0, rungFailures: 0 };
+    }
     try {
       const parsed = JSON.parse(raw);
-      return typeof parsed?.at === 'number' ? parsed.at : null;
+      if (typeof parsed?.at !== 'number' || !Number.isFinite(parsed.at)) return null;
+      return {
+        at: parsed.at,
+        degraded: parsed.degraded === true,
+        failed: typeof parsed.failed === 'number' ? parsed.failed : 0,
+        rungFailures: typeof parsed.rungFailures === 'number' ? parsed.rungFailures : 0,
+      };
     } catch {
       return null;
     }
   }
 
+  /** True if `heartbeat` is missing or older than the staleness window. */
+  isHeartbeatStale(heartbeat: LadderHeartbeat | null, now = new Date()): boolean {
+    if (!heartbeat) return true;
+    return now.getTime() - heartbeat.at > HEARTBEAT_STALE_MS;
+  }
+
   /** True if the ladder job has not run within the staleness window (or never). */
   async isLadderStale(now = new Date()): Promise<boolean> {
-    const raw = await this.redis.get(HEARTBEAT_KEY);
-    if (!raw) return true;
-    const at = this.parseHeartbeatAt(raw);
-    if (at === null) return true;
-    return now.getTime() - at > HEARTBEAT_STALE_MS;
+    return this.isHeartbeatStale(await this.readHeartbeat(), now);
   }
 
   /**

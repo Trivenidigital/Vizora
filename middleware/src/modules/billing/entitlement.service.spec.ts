@@ -258,6 +258,57 @@ describe('EntitlementService (B3 ladder)', () => {
     expect(payload.rungFailures).toBe(1);
   });
 
+  it('T7: a HUNG heartbeat WRITE still lets the run resolve (F7)', async () => {
+    // RedisService.set try/catches a rejection but has NO timeout, so the
+    // blackholed-socket case applies to it verbatim. No tenant is stranded (the
+    // heartbeat is last), but advanceLadder never resolves — so
+    // handleGracePeriodExpiry never reaches its summary/DEGRADED log or Sentry,
+    // taking out exactly the channel the payload exists to feed — and the cron
+    // leaks a dangling promise every day.
+    jest.useFakeTimers();
+    try {
+      redis.set.mockReturnValue(new Promise(() => {})); // never settles
+      db.organization.findMany.mockImplementation(({ where }: any) =>
+        where.subscriptionStatus === 'past_due' ? threeAtPublishLock() : [],
+      );
+
+      const run = service.advanceLadder(NOW);
+      await jest.advanceTimersByTimeAsync(10_000);
+      const result = await run;
+
+      expect(result.advanced).toBe(3);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('T8: a HUNG heartbeat READ resolves toward STALE, it does not hang the watchdog (F7)', async () => {
+    jest.useFakeTimers();
+    try {
+      redis.get.mockReturnValue(new Promise(() => {})); // never settles
+
+      const read = service.isLadderStale(NOW);
+      await jest.advanceTimersByTimeAsync(10_000);
+
+      // Unreadable must resolve toward STALE — never toward a reassuring FRESH.
+      expect(await read).toBe(true);
+      expect(await (async () => {
+        const p = service.readHeartbeat();
+        await jest.advanceTimersByTimeAsync(10_000);
+        return p;
+      })()).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('every malformed heartbeat resolves toward STALE', async () => {
+    for (const raw of ['', 'not-a-heartbeat', '{}', '{"at":"nope"}', '{"at":null}', '[1,2]', '{bad']) {
+      redis.get.mockResolvedValue(raw);
+      expect(await service.isLadderStale(NOW)).toBe(true);
+    }
+  });
+
   it('isLadderStale is true when never run and false when run recently', async () => {
     redis.get.mockResolvedValue(null);
     expect(await service.isLadderStale(NOW)).toBe(true);
@@ -430,6 +481,38 @@ describe('EntitlementService (B3 ladder)', () => {
     }
   });
 
+  it('T1c: a throw BEFORE the eligibility check is isolated too (F3)', async () => {
+    // `entitlementStateSince` is cast `as Date`. A value that is not one — Prisma
+    // handing back a string, or a future `select` dropping the field — throws
+    // inside wholeDaysBetween. Computed OUTSIDE the per-org try, that throw
+    // escapes to runRung and abandons every remaining org in the rung: the K19
+    // invariant reintroduced by a cast. Unreachable today via the `not: null`
+    // filter, so this pins defense in depth — and pins the accounting, which is
+    // the subtle part: an org that threw before eligibility was decided must
+    // still be counted, or `attempted === eligible` silently stops holding.
+    db.organization.findMany.mockImplementation(({ where }: any) =>
+      where.subscriptionStatus === 'past_due'
+        ? [
+            { id: 'o1', entitlementStateSince: daysAgo(LADDER.DAYS_TO_PUBLISH_LOCK) },
+            { id: 'o2', entitlementStateSince: '2026-06-25T00:00:00.000Z' as unknown as Date },
+            { id: 'o3', entitlementStateSince: daysAgo(LADDER.DAYS_TO_PUBLISH_LOCK) },
+          ]
+        : [],
+    );
+
+    const result = await service.advanceLadder(NOW);
+
+    // o3 — after the bad row — still advanced.
+    expect(db.organization.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'o3', subscriptionStatus: 'past_due' } }),
+    );
+    expect(findManyStatuses()).toContain('suspended');
+    expect(redis.set).toHaveBeenCalled(); // heartbeat still written
+    expect(result).toMatchObject({ eligible: 3, attempted: 3, advanced: 2, failed: 1 });
+    expect(result.advanced + result.casLost + result.failed).toBe(result.attempted);
+    expect(result.rungFailures).toBe(0); // isolated per-org, NOT escalated to the rung
+  });
+
   it('D6: candidates are read in a deterministic order', async () => {
     // Heap order is not stable. Without an explicit order a repeated partial
     // outage systematically strands whichever tail Postgres happens to return
@@ -592,8 +675,61 @@ describe('EntitlementService (B3 ladder)', () => {
 describe('raw-Redis-command guard (K19 source scan)', () => {
   const FILES = ['entitlement.service.ts', 'billing.service.ts'];
 
-  /** Commands issued straight on the ioredis client, bypassing RedisService. */
-  const RAW_COMMAND = /\bclient\.(set|get|del|expire|incr|decr|hset|hget|sadd|eval|ttl)\s*\(/;
+  /**
+   * An ioredis command call, on ANY receiver — `client.set(...)`,
+   * `redisClient.get(...)`, `this.redis.getClient()!.del(...)`. Hard-coding the
+   * receiver name `client` let that last form evade the scan entirely (F5), so
+   * match the METHOD and decide about the receiver separately.
+   */
+  const COMMAND = /\.(set|get|del|expire|incr|decr|hset|hget|sadd|eval|ttl)\s*\(/g;
+
+  /**
+   * `RedisService.set/get/del` are the safe wrappers — they try/catch internally
+   * and are not the K19 shape. Everything else reaching a command is raw.
+   */
+  const WRAPPER_RECEIVER = /this\.(redis|redisService)$/;
+
+  /** Start of the next class member — bounds a scan window to ONE method. */
+  const MEMBER_START = /\n {2}(?:\/\*\*|private |public |protected |static |async |get |set |[A-Za-z_$][\w$]*\()/g;
+
+  /**
+   * True if `preamble` leaves an OPEN `try {` at its end. Counting `try {`
+   * occurrences is not enough — a try block that already closed above the command
+   * satisfies a naive `/try\s*\{/` test while the command itself sits bare (F5).
+   * Brace-count from each `try {` to the end; the command is guarded only if some
+   * try's depth never returns to zero.
+   */
+  function hasOpenTry(preamble: string): boolean {
+    for (const m of preamble.matchAll(/try\s*\{/g)) {
+      let depth = 0;
+      for (let i = (m.index as number) + m[0].length - 1; i < preamble.length; i += 1) {
+        if (preamble[i] === '{') depth += 1;
+        else if (preamble[i] === '}') depth -= 1;
+        if (depth === 0 && i > (m.index as number)) break; // this try closed
+      }
+      if (depth > 0) return true; // still open where the command sits
+    }
+    return false;
+  }
+
+  /** Every RAW (non-wrapper) command in `window`, with its offset. */
+  function rawCommands(window: string): Array<{ text: string; index: number }> {
+    const out: Array<{ text: string; index: number }> = [];
+    for (const m of window.matchAll(COMMAND)) {
+      const index = m.index as number;
+      if (WRAPPER_RECEIVER.test(window.slice(0, index))) continue;
+      out.push({ text: m[0], index });
+    }
+    return out;
+  }
+
+  /** The single method a `getClient()` at `start` belongs to. */
+  function methodWindow(src: string, start: number, nextAnchor: number): string {
+    MEMBER_START.lastIndex = start;
+    const next = MEMBER_START.exec(src);
+    const end = Math.min(nextAnchor, next ? next.index : src.length);
+    return src.slice(start, end);
+  }
 
   it.each(FILES)('%s never issues a raw client command outside a try/catch', (file) => {
     const src = fs.readFileSync(path.join(__dirname, file), 'utf-8');
@@ -601,23 +737,46 @@ describe('raw-Redis-command guard (K19 source scan)', () => {
     const anchors = [...src.matchAll(/getClient\(\)/g)].map((m) => m.index as number);
     expect(anchors.length).toBeGreaterThan(0);
 
+    let checked = 0;
     for (const [i, start] of anchors.entries()) {
-      const end = anchors[i + 1] ?? src.length;
-      const window = src.slice(start, end);
-      const cmd = RAW_COMMAND.exec(window);
-      if (!cmd) continue; // this getClient() issues no raw command
+      const window = methodWindow(src, start, anchors[i + 1] ?? src.length);
 
-      const preamble = window.slice(0, cmd.index);
-      const line = src.slice(0, start).split('\n').length;
-      if (!/try\s*\{/.test(preamble)) {
-        throw new Error(
-          `${file}:~${line} issues \`${cmd[0]}\` with no try/catch between it and getClient(). ` +
-            `getClient() is non-null during a Redis outage, so this rejects (after ~42s of ` +
-            `ioredis retries) and the rejection escapes into the caller — the K19 defect.`,
-        );
+      // EVERY raw command in the window, not just the first — a second unguarded
+      // command after a guarded one used to slip through (F5).
+      for (const cmd of rawCommands(window)) {
+        checked += 1;
+        const line = src.slice(0, start).split('\n').length;
+        if (!hasOpenTry(window.slice(0, cmd.index))) {
+          throw new Error(
+            `${file}:~${line} issues \`${cmd.text}\` with no OPEN try/catch around it. ` +
+              `getClient() is non-null during a Redis outage, so this rejects (after ~42s of ` +
+              `ioredis retries) and the rejection escapes into the caller — the K19 defect.`,
+          );
+        }
       }
-      expect(preamble).toMatch(/try\s*\{/);
     }
+    // The scan is worthless if the pattern silently stops matching anything.
+    expect(checked).toBeGreaterThan(0);
+  });
+
+  it('the scan itself detects an unguarded command (meta-test)', () => {
+    // A source-scan test that cannot fail is decoration. Prove both predicates on
+    // synthetic sources rather than trusting them because the real files pass.
+    expect(hasOpenTry('const client = x.getClient();\n')).toBe(false);
+    expect(hasOpenTry('const client = x.getClient();\n try {\n')).toBe(true);
+    // The evasion F5 named: an ALREADY-CLOSED try above the command.
+    expect(hasOpenTry('try { a(); } catch {}\n')).toBe(false);
+    expect(hasOpenTry('try { a(); } catch {}\n try {\n')).toBe(true);
+
+    // The receiver-name evasion: a non-`client` receiver must still be caught.
+    expect(rawCommands('this.redis.getClient()!.set(k, v);')).toHaveLength(1);
+    expect(rawCommands('redisClient.del(k);')).toHaveLength(1);
+    // ...while the RedisService wrappers (which try/catch internally) are not.
+    expect(rawCommands('await this.redis.set(k, v, 1);')).toHaveLength(0);
+    expect(rawCommands('await this.redisService.get(k);')).toHaveLength(0);
+
+    // And the "only the first command is checked" evasion: both are reported.
+    expect(rawCommands('client.set(a); client.del(b);')).toHaveLength(2);
   });
 
   it('entitlement.service.ts gates the dunning claim on isAvailable(), not on a null client', () => {

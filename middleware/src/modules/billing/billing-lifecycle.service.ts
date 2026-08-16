@@ -258,6 +258,13 @@ export class BillingLifecycleService {
    * Watchdog (hourly): if the ladder job hasn't run within its staleness window,
    * a rung is silently not advancing — customers who paid aren't being restored,
    * or unpaid tenants aren't degrading. Surface loudly so ops notices a dead job.
+   *
+   * It also has to notice a job that RAN and stranded tenants. A run that isolates
+   * a per-org or per-rung failure still completes and still writes a recent
+   * heartbeat, so freshness alone reports FRESH while some tenant did not advance
+   * — the §12a silent-failure shape (F1). The heartbeat payload carries the run
+   * outcome precisely so this watchdog can tell the two apart; reading only `at`
+   * would throw that away.
    */
   // Deliberately NOT leader-locked: the only effect of a double-fire is the same
   // log line twice. It performs no write, sends nothing, and emits no event — so
@@ -266,11 +273,30 @@ export class BillingLifecycleService {
   // lock backend is down is strictly worse than one that shouts twice.
   @Cron(CronExpression.EVERY_HOUR)
   async checkLadderFreshness(): Promise<void> {
-    if (await this.entitlementService.isLadderStale()) {
+    const heartbeat = await this.entitlementService.readHeartbeat();
+
+    if (this.entitlementService.isHeartbeatStale(heartbeat)) {
       this.logger.error(
         'ENTITLEMENT LADDER STALE: the daily rung-advancement job has not run within its ' +
           'staleness window. Rungs are not advancing — investigate the billing cron.',
       );
+      // STALE is the louder alarm and subsumes it: a stale run's outcome flags are
+      // old news, and shouting both every hour buries the one that matters.
+      return;
+    }
+
+    if (heartbeat?.degraded) {
+      const err = new Error(
+        `ENTITLEMENT LADDER DEGRADED: the last run completed but did not advance every ` +
+          `eligible tenant — ${heartbeat.failed} org failure(s), ${heartbeat.rungFailures} ` +
+          `rung failure(s). Freshness alone would report this run as healthy.`,
+      );
+      this.logger.error(err.message);
+      BillingLifecycleService.captureSentry(err, {
+        failed: heartbeat.failed,
+        rungFailures: heartbeat.rungFailures,
+        source: 'freshness_watchdog',
+      });
     }
   }
 }
