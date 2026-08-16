@@ -831,28 +831,64 @@ export class BillingService implements OnModuleInit {
         'Idempotency store unavailable; webhook will be retried',
       );
     }
-    const result = await client.set(
-      idempotencyKey,
-      'pending',
-      'EX',
-      BillingService.WEBHOOK_PENDING_TTL_S,
-      'NX',
-    );
+    let result: string | null;
+    try {
+      result = await client.set(
+        idempotencyKey,
+        'pending',
+        'EX',
+        BillingService.WEBHOOK_PENDING_TTL_S,
+        'NX',
+      );
+    } catch (err) {
+      // Same fail-CLOSED verdict as the null client above, and deliberately the
+      // SAME exception. `getClient()` returning null and the SET rejecting are
+      // the same condition — an unusable idempotency store — so PSP-retry
+      // semantics must be identical for both; otherwise an outage produces a
+      // raw ioredis error, a generic 500 and a different retry profile than the
+      // one this handler is reasoned about under.
+      this.logger.error(`Webhook idempotency claim failed for ${idempotencyKey}: ${err}`);
+      throw new ServiceUnavailableException(
+        'Idempotency store unavailable; webhook will be retried',
+      );
+    }
     if (result === 'OK') return 'claimed';
     // Key exists: completed → real duplicate; pending → concurrent/crashed worker.
     // Either way we skip THIS delivery; a crashed pending self-heals via TTL.
     return 'duplicate';
   }
 
+  /**
+   * Mark a claimed webhook as fully processed. Best-effort by design, and the
+   * SET must be guarded (K19) — this runs AFTER the DB work has committed.
+   *
+   * An unguarded rejection here escapes a webhook that was ACTUALLY PROCESSED:
+   * the PSP sees a 5xx and retries, while the 'pending' key it wrote on claim
+   * survives, so the retry is classified as a duplicate and dropped until the
+   * TTL expires. A money event then looks failed to the provider and processed
+   * to us. Swallowing it is strictly better: the stuck 'pending' expires on its
+   * short TTL and a later retry re-enters cleanly, and the DB work is already
+   * safe under its own compare-and-set.
+   *
+   * Matches the neighbouring `releaseWebhookClaim` / `getWebhookEventState`,
+   * which were already try/caught.
+   */
   private async completeWebhookEvent(idempotencyKey: string): Promise<void> {
     const client = this.redisService.getClient();
     if (!client) return; // best-effort; a stuck 'pending' expires and allows re-process
-    await client.set(
-      idempotencyKey,
-      'completed',
-      'EX',
-      BillingService.WEBHOOK_COMPLETED_TTL_S,
-    );
+    try {
+      await client.set(
+        idempotencyKey,
+        'completed',
+        'EX',
+        BillingService.WEBHOOK_COMPLETED_TTL_S,
+      );
+    } catch (err) {
+      this.logger.warn(
+        `Failed to mark webhook ${idempotencyKey} completed (event WAS processed; ` +
+          `the pending key will expire and a retry can re-enter): ${err}`,
+      );
+    }
   }
 
   private async releaseWebhookClaim(idempotencyKey: string): Promise<void> {
