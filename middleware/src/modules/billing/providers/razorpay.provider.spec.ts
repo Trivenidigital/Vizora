@@ -161,7 +161,7 @@ describe('RazorpayProvider', () => {
       expect(mockRazorpay.subscriptions.create).toHaveBeenCalledWith({
         plan_id: 'plan_123',
         customer_id: 'cust_123',
-        total_count: 1200,
+        total_count: 360,
         notes: { source: 'dashboard' },
       });
       expect(result).toEqual({
@@ -190,18 +190,20 @@ describe('RazorpayProvider', () => {
       expect(mockRazorpay.subscriptions.create).toHaveBeenCalledWith({
         plan_id: 'plan_123',
         customer_id: 'cust_123',
-        total_count: 1200,
+        total_count: 360,
         notes: {},
       });
     });
 
-    it('B3b creates a MONTHLY subscription with 1200 cycles, not 12', async () => {
+    it('B3b creates a MONTHLY subscription with 360 cycles (30y), not 12', async () => {
       // Vizora sells recurring-until-cancelled ("no long-term contracts. You can
       // cancel at any time." — plans/page.tsx:181-184). The bare `total_count:
       // 12` bought exactly ONE YEAR: Razorpay would move the subscription to the
       // TERMINAL `completed` state after the 12th charge and stop billing a
       // customer who is still using the product. Razorpay offers no perpetual
-      // option, so the bound is set to their own computed monthly maximum.
+      // option, so the bound is 30 years in monthly cycles — 12 × 30 = 360, which
+      // is what Razorpay's own formula computes and is valid whether their real
+      // ceiling is 30 or 100 years. Deliberately NOT the 1200 they print.
       mockRazorpay.subscriptions.create.mockResolvedValue({
         id: 'sub_m',
         short_url: 'https://rzp.io/i/m',
@@ -216,15 +218,16 @@ describe('RazorpayProvider', () => {
       });
 
       expect(mockRazorpay.subscriptions.create).toHaveBeenCalledWith(
-        expect.objectContaining({ plan_id: 'plan_monthly', total_count: 1200 }),
+        expect.objectContaining({ plan_id: 'plan_monthly', total_count: 360 }),
       );
     });
 
     it('B3b creates a YEARLY subscription with 30 cycles', async () => {
-      // 30 yearly cycles = 30 years, the conservative side of Razorpay's own
-      // 30-vs-100-year contradiction. A yearly plan must NOT get the monthly
-      // count: 1200 yearly cycles is far past any documented ceiling and would
-      // be rejected at creation.
+      // 30 yearly cycles = the same 30 years the monthly bound buys. A yearly
+      // plan must NOT get the monthly count: 360 yearly cycles is 360 years, far
+      // past either half of Razorpay's 30-vs-100-year contradiction, and an
+      // over-large count fails CLOSED — the create call is rejected and nobody
+      // can subscribe.
       mockRazorpay.subscriptions.create.mockResolvedValue({
         id: 'sub_y',
         short_url: 'https://rzp.io/i/y',
@@ -245,12 +248,13 @@ describe('RazorpayProvider', () => {
   });
 
   describe('razorpaySubscriptionTotalCount', () => {
-    it('bounds every interval well beyond any real customer lifetime', () => {
-      // Guards the contract, not the literals: whatever the numbers become, a
-      // subscription must never approach its terminal `completed` state while a
-      // customer is still paying. 30 years is the floor.
-      expect(razorpaySubscriptionTotalCount('monthly')).toBeGreaterThanOrEqual(12 * 30);
-      expect(razorpaySubscriptionTotalCount('yearly')).toBeGreaterThanOrEqual(30);
+    it('buys exactly 30 years of service on every interval', () => {
+      // Guards the derivation, not the literals: both bounds are ONE figure —
+      // 30 years — expressed in each interval's own cycles. A floor alone would
+      // not catch an over-large count, and over-large is the dangerous
+      // direction: Razorpay rejects the create call and nobody can subscribe.
+      expect(razorpaySubscriptionTotalCount('monthly')).toBe(12 * 30);
+      expect(razorpaySubscriptionTotalCount('yearly')).toBe(1 * 30);
     });
   });
 

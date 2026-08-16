@@ -38,16 +38,33 @@ const RAZORPAY_CIRCUIT_CONFIG = {
  * WHY A COMPUTED BOUND RATHER THAN A NUMBER WE PICK:
  * Razorpay has NO perpetual/until-cancelled primitive — every subscription is
  * bounded, and the API requires exactly one of `total_count` or `end_at`. So the
- * contract cannot be expressed exactly; the closest honest encoding is a bound
- * far beyond any real customer lifetime, taken from Razorpay's own published
- * figures rather than invented. Their documented maximum is self-contradictory
- * (one page says 30 years, another 100), so:
- *   - monthly: 1200 — the only ceiling Razorpay's docs actually COMPUTE, in
- *     their own monthly worked example.
- *   - yearly:  30 — no yearly example is computed anywhere, so this takes the
- *     CONSERVATIVE side of the 30-vs-100-year contradiction: 30 cycles = 30
- *     years.
- * Both bounds are ≥ 30 years of continuous service.
+ * contract cannot be expressed exactly. The closest honest encoding is a bound
+ * far beyond any real customer lifetime, derived rather than invented:
+ *
+ *   30 years of service, expressed in each interval's own cycles:
+ *     - monthly: 12 cycles/year × 30 years = 360
+ *     - yearly:   1 cycle/year  × 30 years =  30
+ *
+ * RAZORPAY'S OWN WORKED EXAMPLE IS SELF-INCONSISTENT, which is why we do NOT
+ * simply copy the number it prints. Its formula text reads
+ * `(months per year (12) × years supported (30)) / interval` — that evaluates to
+ * 360 — while the result it prints is 1200, which is 12 × 100. So the formula
+ * says 30 years and the printed figure implies 100, matching the same 30-vs-100
+ * contradiction that runs across their documentation pages. We cannot tell which
+ * one the server actually enforces.
+ *
+ * So we take the INTERSECTION — the value that is valid under BOTH readings:
+ *   - if the real cap is 30 years:  360 works, 1200 is rejected.
+ *   - if the real cap is 100 years: 360 still works.
+ * This is deliberately conservative because an over-large count fails CLOSED in
+ * the worst possible way: Razorpay rejects the create call, and NOBODY CAN
+ * SUBSCRIBE AT ALL. With money behaviour, no sandbox and no way to verify, the
+ * correct choice is the value that cannot fail — not the larger one that is only
+ * safe if we guessed the right half of a contradiction.
+ *
+ * 30 years comfortably exceeds any real customer lifetime, and the durable answer
+ * to longevity is the B3f watchdog (raise `remaining_count` before exhaustion),
+ * NOT a bigger number here.
  *
  * THE BOUND MUST NEVER BE REACHED. Razorpay's `completed` state is TERMINAL and
  * unrecoverable: `PATCH /v1/subscriptions/:id` refuses with "Can't update
@@ -57,17 +74,17 @@ const RAZORPAY_CIRCUIT_CONFIG = {
  *
  * Creation time is also the ONLY lever for some customers: `remaining_count`
  * PATCH is refused outright for UPI/eMandate payment modes ("Subscriptions
- * cannot be updated when payment mode is UPI/emandate"), which is the second
- * reason to set the bound high here rather than plan on raising it later.
+ * cannot be updated when payment mode is UPI/emandate"), so for them this value
+ * is the whole story and B3f will never apply.
  *
  * NOT YET VERIFIED AGAINST A LIVE RAZORPAY ACCOUNT — no Razorpay credentials
  * exist in any Vizora environment today, so nothing on this path has ever run.
  * The pre-launch test-mode checklist (which webhooks fire at exhaustion, whether
- * a count above 12 is accepted for every interval, where the real ceiling is) is
- * in the PR that introduced this and in `backlog.md`.
+ * a count above 12 is accepted for every interval, where the real per-interval
+ * ceiling is) is in the PR that introduced this and in `backlog.md`.
  */
 const RAZORPAY_TOTAL_COUNT_BY_INTERVAL: Record<BillingInterval, number> = {
-  monthly: 1200,
+  monthly: 360,
   yearly: 30,
 };
 

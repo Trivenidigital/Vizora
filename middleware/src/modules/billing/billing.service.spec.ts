@@ -541,7 +541,7 @@ describe('BillingService', () => {
       // reads of ONE interval: the id decides the cadence the customer is
       // charged at, the count decides how many of those cadences are bought.
       // If they ever disagree, a yearly subscriber gets a monthly subscription's
-      // bound (or vice versa) — 1200 years on one side, 30 months on the other.
+      // bound (or vice versa) — 360 YEARS on one side, 30 months on the other.
       process.env.RAZORPAY_PRO_YEARLY_PLAN_ID = 'plan_pro_inr_yearly';
       try {
         mockDatabaseService.organization.findUnique.mockResolvedValue(razorpayCheckoutOrg());
@@ -577,7 +577,7 @@ describe('BillingService', () => {
       const params = mockRazorpayProvider.createCheckoutSession.mock.calls[0][0];
       expect(params.priceId).toBe('plan_pro_inr');
       expect(params.interval).toBe('monthly');
-      expect(razorpaySubscriptionTotalCount(params.interval)).toBe(1200);
+      expect(razorpaySubscriptionTotalCount(params.interval)).toBe(360);
     });
 
     it('B3-E1 refuses a yearly checkout when no yearly plan id is configured', async () => {
