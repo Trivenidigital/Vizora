@@ -12,6 +12,17 @@
  *   3. Cluster offline — all displays in an org (3+) are offline → critical
  *   4. No content — online displays with no playlist and no schedule
  *
+ * Incident clearing is EARNED, never assumed. A run that saw the whole tenant
+ * resolves any prior incident of this agent's it did not re-raise; a run that
+ * did NOT resolves nothing and says so via `scan-truncated`. The agent used to
+ * fetch through `api.getAll`, which is `getAllScan(...).items` with the
+ * `complete` verdict discarded, and then sweep with the non-coverage-aware
+ * `resolveNotReraised`. Past the 500-entity page-walk cap that meant the
+ * displays the walk never retrieved were never examined — yet every prior
+ * incident held against them was resolved on the strength of not being
+ * re-raised, `display_offline_persistent` and `cluster_offline` included. A
+ * screen dark for a week read as recovered because the list stopped short of it.
+ *
  * Exit codes:
  *   0 — all displays healthy
  *   1 — issues found (some may have been auto-fixed)
@@ -20,7 +31,7 @@
 
 import 'dotenv/config';
 import type { Incident, AgentResult, RemediationAction } from './lib/types.js';
-import { login, releaseSessions, OpsApiClient } from './lib/api-client.js';
+import { login, releaseSessions, OpsApiClient, MAX_ENTITIES } from './lib/api-client.js';
 import {
   readOpsState,
   readOpsStateSnapshot,
@@ -28,13 +39,38 @@ import {
   recordAgentRun,
   addRemediation,
   makeIncidentId,
-  resolveNotReraised,
+  resolveNotReraisedForTypes,
 } from './lib/state.js';
 import { log } from './lib/alerting.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const AGENT = 'fleet-manager';
+
+/**
+ * Every incident type this agent can raise — i.e. what a COMPLETE sweep is
+ * entitled to resolve.
+ *
+ * ONE set, not a per-type table, for the same reason schedule-doctor uses one:
+ * the four checks are not independently degradable. They read two lists fetched
+ * by a single all-or-nothing `Promise.all`, and every per-display predicate
+ * below (`minutesSinceLastSeen`, `isErrorState`, `isOnline`, playlist/schedule
+ * membership) reads fields already in hand. So there is exactly one
+ * completeness question — did this run see the whole tenant — and per-check
+ * keys would be ceremony over a single boolean.
+ *
+ * `scan-truncated` is in the set on purpose. It is raised when the sweep could
+ * NOT see everything, so a later complete sweep must be able to clear it;
+ * leaving it out would recreate the never-clearing incident this change fixes.
+ */
+const RESOLVABLE_TYPES: ReadonlySet<string> = new Set([
+  'display_offline',
+  'display_offline_persistent',
+  'display_error',
+  'cluster_offline',
+  'no_content',
+  'scan-truncated',
+]);
 
 /** Minutes of silence before a display is considered offline */
 const OFFLINE_THRESHOLD_MIN = 15;
@@ -133,12 +169,23 @@ async function main(): Promise<void> {
 
   let displays: DisplayItem[];
   let schedules: ScheduleItem[];
+  let scanComplete: boolean;
 
   try {
-    [displays, schedules] = await Promise.all([
-      api.getAll<DisplayItem>('/displays'),
-      api.getAll<ScheduleItem>('/schedules'),
+    // getAllScan, not getAll: `getAll` is this same call with `.items` taken and
+    // the `complete` verdict thrown away, and that verdict is exactly what gates
+    // incident resolution below. It has to come from the fetch layer that
+    // actually knows (server-reported `meta.total` where present) rather than
+    // from a length comparison here.
+    const [displayScan, scheduleScan] = await Promise.all([
+      api.getAllScan<DisplayItem>('/displays'),
+      api.getAllScan<ScheduleItem>('/schedules'),
     ]);
+    displays = displayScan.items;
+    schedules = scheduleScan.items;
+    // Measured on the RAW scans, before the disabled-display filter below,
+    // which only ever shortens the list.
+    scanComplete = displayScan.complete && scheduleScan.complete;
     // Drop operator-disabled displays before ANY check runs.
     //
     // A disabled display is one an operator has deliberately taken out of
@@ -193,6 +240,50 @@ async function main(): Promise<void> {
   let issuesFound = 0;
   let issuesFixed = 0;
   let issuesEscalated = 0;
+
+  // ─── Check 0: Scan Completeness ────────────────────────────────────────
+
+  // Truncation is announced, never silent. Withholding resolution quietly would
+  // drop a legitimately-large tenant into a permanent no-resolution regime with
+  // no signal saying why — the same shape of invisible failure this change
+  // exists to remove.
+  //
+  // INFO, and deliberately NOT counted in `issuesFound`. Only a code change can
+  // clear it, so counting it would pin a large tenant at exit 1 / DEGRADED on
+  // every run forever — the alert-fatigue pattern the db-maintenance exit-code
+  // rule exists to prevent. The finding is still recorded and still visible; it
+  // just stops masquerading as a failed run.
+  if (!scanComplete) {
+    log(
+      AGENT,
+      `Display scan was incomplete (displays=${displays.length}, ` +
+      `schedules=${schedules.length}, cap=${MAX_ENTITIES}) — no incident will be ` +
+      'resolved this run',
+    );
+    incidents.push({
+      id: makeIncidentId(AGENT, 'scan-truncated', 'entity-lists'),
+      agent: AGENT,
+      type: 'scan-truncated',
+      severity: 'info',
+      target: 'display',
+      targetId: 'entity-lists',
+      detected: new Date().toISOString(),
+      message:
+        `Fleet check could not see the whole tenant (displays=${displays.length}, ` +
+        `schedules=${schedules.length}, page-walk cap ${MAX_ENTITIES}). No prior incident ` +
+        'can be cleared from a partial scan. Note that `cluster_offline` asserts a negative ' +
+        'about a whole org, so a finding of that type from this run rests on a partial view.',
+      // Deliberately NOT "raise the page-walk cap" — that fix re-arms the
+      // identical defect at the new number and is the instruction the
+      // content-lifecycle truncation work explicitly rejected.
+      remediation:
+        'No action needed for correctness — resolution is already withheld. The durable fix ' +
+        'is a server-side fleet-health query that removes the pagination surface instead of ' +
+        'moving it. Do NOT raise the page-walk cap.',
+      status: 'open',
+      attempts: 0,
+    });
+  }
 
   // ─── Check 1: Offline displays ─────────────────────────────────────────
 
@@ -430,17 +521,40 @@ async function main(): Promise<void> {
 
   // ─── Resolve stale incidents ───────────────────────────────────────────
 
-  // If a display was previously offline but is now back, resolve the incident
-  const currentIncidentIds = new Set(incidents.map(i => i.id));
+  // If a display was previously offline but is now back, resolve the incident.
+  //
+  // A partial scan resolves NOTHING: a display the walk never retrieved was
+  // never examined, so it cannot be evidence that its own incident cleared.
+  // The complementary partial-run case — a failed fetch — early-returns above
+  // without writing state or stamping `lastRun` at all, so ops-watchdog's SLA
+  // sees the gap. Truncation is the case that guard does not cover: the fetch
+  // SUCCEEDS and simply stops short.
+  //
+  // There is deliberately no per-ITEM unexamined set here, unlike
+  // content-lifecycle: every predicate this agent tests reads fields already
+  // present on the fetched display, so no display can be skipped mid-run
+  // without a verdict. A failed ping or a failed error-state PATCH is a failed
+  // REMEDIATION — the incident is still raised, so the id is in
+  // `currentIncidentIds` and nothing can clear it. The one display the run
+  // drops on purpose, `isDisabled`, is an evidence-BEARING skip: the operator
+  // took it out of service, and its incidents SHOULD clear (#259).
+  if (scanComplete) {
+    const currentIncidentIds = new Set(incidents.map(i => i.id));
 
-  for (const resolved of resolveNotReraised(priorState.incidents, AGENT, currentIncidentIds)) {
-    // Not re-raised this run — the issue is gone. This must sweep `escalated`
-    // as well as `open`: display_offline_persistent is RAISED as escalated, so
-    // an `open`-only guard could never clear the very incident this agent
-    // escalates, and systemStatus stayed CRITICAL after the screen came back.
-    log(AGENT, `Resolving stale incident: ${resolved.id}`);
-    incidents.push(resolved);
-    issuesFixed++;
+    for (const resolved of resolveNotReraisedForTypes(
+      priorState.incidents,
+      AGENT,
+      currentIncidentIds,
+      RESOLVABLE_TYPES,
+    )) {
+      // Not re-raised this run — the issue is gone. This must sweep `escalated`
+      // as well as `open`: display_offline_persistent is RAISED as escalated, so
+      // an `open`-only guard could never clear the very incident this agent
+      // escalates, and systemStatus stayed CRITICAL after the screen came back.
+      log(AGENT, `Resolving stale incident: ${resolved.id}`);
+      incidents.push(resolved);
+      issuesFixed++;
+    }
   }
 
   // ─── Record Results & Write State ──────────────────────────────────────

@@ -408,8 +408,14 @@ export function resolveNotReraised(
  * and is correct only for an agent that recomputes its whole incident set on
  * every run through a single path.
  *
- * `resolveNotReraised` above is deliberately left untouched — fleet-manager
- * recomputes its full set every run and is correct as-is.
+ * `resolveNotReraised` above is deliberately left untouched, but note what that
+ * costs: it was justified by "fleet-manager recomputes its full set every run
+ * and is correct as-is", which was FALSE. fleet-manager recomputed its set from
+ * `api.getAll` — this same page walk with the `complete` verdict discarded — so
+ * past the cap it resolved incidents for displays it had never retrieved. It
+ * now uses the coverage-aware variant too (K27), leaving `resolveNotReraised`
+ * with no agent callers — only its own unit test. Prefer this function; a
+ * caller that genuinely recomputes everything can pass all of its types.
  */
 export function resolveNotReraisedForTypes(
   priorIncidents: Incident[],
