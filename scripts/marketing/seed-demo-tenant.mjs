@@ -60,7 +60,14 @@ const daysAgo = (d) => new Date(now.getTime() - d * 86_400_000);
 
 /**
  * Fleet fixture: nickname, location, resolution, status, minutes since last
- * heartbeat (null = never), and whether a playlist is assigned.
+ * heartbeat (null = never), and the NAME of the assigned playlist (null = none).
+ *
+ * The assignment is by name rather than by `playlists[i % playlists.length]`,
+ * which is what it used to be. That expression coupled the device fixture to the
+ * LENGTH of PLAYLISTS, so adding a playlist for the playlists-page audit silently
+ * re-dealt every device's assignment and moved the devices-page numbers with it.
+ * Naming the target makes the two fixtures independent; the mapping below is
+ * byte-for-byte the one the modulo produced.
  *
  * The status spread is LOAD-BEARING, not decoration. `scripts/design/audit-surface.mjs`
  * measures this tenant, and an all-online fleet exercises exactly one status
@@ -80,38 +87,63 @@ const daysAgo = (d) => new Date(now.getTime() - d * 86_400_000);
  * fleet rather than 9/9 online — which is also the more honest screenshot.
  */
 const DISPLAYS = [
-  ['Flagship — Window Wall',      'Seattle · 1st & Pike',      '3840x2160', 'online',   1,          true],
-  ['Flagship — Drive-Thru Menu',  'Seattle · 1st & Pike',      '1920x1080', 'online',   2,          true],
-  ['Ballard — Counter Board',     'Seattle · Ballard',         '1920x1080', 'offline',  60 * 4,     true],
-  ['Ballard — Pastry Case',       'Seattle · Ballard',         '1080x1920', 'online',   1,          true],
-  ['Fremont — Menu Left',         'Seattle · Fremont',         '1920x1080', 'error',    22,         true],
-  ['Fremont — Menu Right',        'Seattle · Fremont',         '1920x1080', 'online',   2,          true],
-  ['Capitol Hill — Entry',        'Seattle · Capitol Hill',    '1080x1920', 'offline',  60 * 24 * 9, false],
-  ['Bellevue — Order Ahead',      'Bellevue · Main St',        '1920x1080', 'pairing',  null,       false],
+  ['Flagship — Window Wall',      'Seattle · 1st & Pike',      '3840x2160', 'online',   1,          'Morning Rotation'],
+  ['Flagship — Drive-Thru Menu',  'Seattle · 1st & Pike',      '1920x1080', 'online',   2,          'Afternoon Rotation'],
+  ['Ballard — Counter Board',     'Seattle · Ballard',         '1920x1080', 'offline',  60 * 4,     'Drive-Thru Loop'],
+  ['Ballard — Pastry Case',       'Seattle · Ballard',         '1080x1920', 'online',   1,          'Community Board'],
+  ['Fremont — Menu Left',         'Seattle · Fremont',         '1920x1080', 'error',    22,         'Morning Rotation'],
+  ['Fremont — Menu Right',        'Seattle · Fremont',         '1920x1080', 'online',   2,          'Afternoon Rotation'],
+  ['Capitol Hill — Entry',        'Seattle · Capitol Hill',    '1080x1920', 'offline',  60 * 24 * 9, null],
+  ['Bellevue — Order Ahead',      'Bellevue · Main St',        '1920x1080', 'pairing',  null,       null],
   // No location — the only row that exercises the em-dash placeholder.
-  ['Tacoma — Cold Brew Feature',  null,                        '1920x1080', 'online',   1,          true],
+  ['Tacoma — Cold Brew Feature',  null,                        '1920x1080', 'online',   1,          'Morning Rotation'],
 ];
 
+/**
+ * Content fixture: name, type, extension, byte size, nominal duration, status.
+ *
+ * The one `archived` row is load-bearing for the playlists audit. `isDeliverable`
+ * (packages/database/src/lib/effective-content.ts) drops any playlist item whose
+ * content is not `active`, so a playlist can list more items than a screen will
+ * ever receive. Without a non-active row in the fixture that divergence is
+ * unreachable and the playlist card's "will be skipped" branch goes unmeasured.
+ */
 const CONTENT = [
-  ['Autumn Roast — Hero Loop',        'video', 'mp4',  48_234_112, 12],
-  ['Cold Brew Tonic — Feature',       'video', 'mp4',  31_882_240, 10],
-  ['Core Menu Board — Morning',       'html',  'html',      12_480, 20],
-  ['Core Menu Board — Afternoon',     'html',  'html',      12_910, 20],
-  ['Pastry Case — Daily',             'html',  'html',       8_640, 15],
-  ['Loyalty — Double Stars',          'image', 'png',   2_106_368, 8],
-  ['Order Ahead — How It Works',      'image', 'png',   1_884_160, 8],
-  ['Single Origin — Ethiopia',        'image', 'jpeg',  3_215_360, 8],
-  ['Single Origin — Colombia',        'image', 'jpeg',  3_098_624, 8],
-  ['Seasonal Cups — Reveal',          'video', 'mp4',  22_413_312, 10],
-  ['Store Hours — Holiday',           'html',  'html',       6_220, 12],
-  ['Wifi & Community Board',          'html',  'html',       7_450, 15],
+  ['Autumn Roast — Hero Loop',        'video', 'mp4',  48_234_112, 12, 'active'],
+  ['Cold Brew Tonic — Feature',       'video', 'mp4',  31_882_240, 10, 'active'],
+  ['Core Menu Board — Morning',       'html',  'html',      12_480, 20, 'active'],
+  ['Core Menu Board — Afternoon',     'html',  'html',      12_910, 20, 'active'],
+  ['Pastry Case — Daily',             'html',  'html',       8_640, 15, 'active'],
+  ['Loyalty — Double Stars',          'image', 'png',   2_106_368, 8,  'active'],
+  ['Order Ahead — How It Works',      'image', 'png',   1_884_160, 8,  'active'],
+  ['Single Origin — Ethiopia',        'image', 'jpeg',  3_215_360, 8,  'active'],
+  ['Single Origin — Colombia',        'image', 'jpeg',  3_098_624, 8,  'active'],
+  ['Seasonal Cups — Reveal',          'video', 'mp4',  22_413_312, 10, 'active'],
+  ['Store Hours — Holiday',           'html',  'html',       6_220, 12, 'active'],
+  ['Wifi & Community Board',          'html',  'html',       7_450, 15, 'archived'],
 ];
 
+/**
+ * Playlist fixture: name, description, content indices.
+ *
+ * The shape spread is load-bearing for `scripts/design/audit-surface.mjs` in the
+ * same way the fleet's status spread is. The first four are the ones the fleet
+ * assigns; the last two exist only to reach presentations the first four cannot:
+ *
+ *   empty (no items)      the "no content yet" card + the blocked-assign path
+ *   single item           the 1-thumbnail mosaic, distinct from the 2x2 case
+ *   no description        the missing-description branch
+ *   unassigned            the "Not on any screen" card, and a non-zero count
+ *                         in the summary strip's unassigned chip
+ *   archived item         "1 of 2 items will be skipped" on Community Board
+ */
 const PLAYLISTS = [
   ['Morning Rotation',      'Open through 11am — menu, pastry, loyalty.',        [2, 4, 5, 7]],
   ['Afternoon Rotation',    'Cold brew, single origin, seasonal.',               [3, 1, 7, 8, 9]],
   ['Drive-Thru Loop',       'Short-dwell loop tuned for the drive-thru lane.',   [2, 5, 6]],
   ['Community Board',       'Store hours, wifi, neighbourhood notices.',         [10, 11]],
+  ['Holiday Takeover',      'Built for December — no content added yet.',        []],
+  ['Order Ahead — Single Card', null,                                            [6]],
 ];
 
 async function main() {
@@ -152,7 +184,7 @@ async function main() {
 
   const content = [];
   for (let i = 0; i < CONTENT.length; i++) {
-    const [name, type, ext, fileSize, duration] = CONTENT[i];
+    const [name, type, ext, fileSize, duration, status] = CONTENT[i];
     content.push(
       await prisma.content.create({
         data: {
@@ -162,7 +194,7 @@ async function main() {
           mimeType: type === 'html' ? 'text/html' : `${type}/${ext}`,
           fileSize,
           duration,
-          status: 'active',
+          status,
           organizationId: org.id,
           createdAt: daysAgo(CONTENT.length - i),
         },
@@ -170,9 +202,10 @@ async function main() {
     );
   }
 
-  const playlists = [];
+  const playlistsByName = new Map();
   for (const [name, description, idxs] of PLAYLISTS) {
-    playlists.push(
+    playlistsByName.set(
+      name,
       await prisma.playlist.create({
         data: {
           name,
@@ -188,7 +221,10 @@ async function main() {
   }
 
   for (let i = 0; i < DISPLAYS.length; i++) {
-    const [nickname, location, resolution, status, heartbeatMinsAgo, hasPlaylist] = DISPLAYS[i];
+    const [nickname, location, resolution, status, heartbeatMinsAgo, playlistName] = DISPLAYS[i];
+    if (playlistName && !playlistsByName.has(playlistName)) {
+      throw new Error(`Display "${nickname}" references unknown playlist "${playlistName}"`);
+    }
     await prisma.display.create({
       data: {
         deviceIdentifier: `DEMO-NW-${String(i + 1).padStart(3, '0')}`,
@@ -203,7 +239,7 @@ async function main() {
         lastHeartbeat: heartbeatMinsAgo === null ? null : minsAgo(heartbeatMinsAgo),
         pairedAt: daysAgo(40 - i),
         organizationId: org.id,
-        currentPlaylistId: hasPlaylist ? playlists[i % playlists.length].id : null,
+        currentPlaylistId: playlistName ? playlistsByName.get(playlistName).id : null,
         metadata: { os: 'Android TV 14', model: 'Vizora Player', appVersion: '1.8.2' },
       },
     });

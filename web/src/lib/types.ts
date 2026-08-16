@@ -63,10 +63,18 @@ export interface Playlist {
   description?: string;
   loop?: boolean;
   items: PlaylistItem[];
+  /**
+   * One pass through the items, in seconds — NOT a runtime.
+   *
+   * Server-computed (`playlists.service.ts`) as
+   * `item.duration || item.content.duration || 10`, where the content duration
+   * is nominal metadata rather than a measured length, and `loop` defaults true.
+   * Treat it as an estimate of a cycle.
+   */
   totalDuration?: number;
+  /** Sum of `content.fileSize`; content with no recorded size counts as 0. */
   totalSize?: number;
   itemCount?: number;
-  isActive: boolean;
   createdAt: Date | string;
   updatedAt: Date | string;
 }
