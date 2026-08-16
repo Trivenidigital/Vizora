@@ -1,4 +1,4 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within, act } from '@testing-library/react';
 import DevicesClient from '../page-client';
 
 const mockPush = jest.fn();
@@ -79,14 +79,25 @@ jest.mock('@/lib/hooks/useDebounce', () => ({
   useDebounce: (val: any) => val,
 }));
 
+/**
+ * Captured so a test can fire a realtime status update the way the gateway
+ * does. Without this the only way to re-render the page is a user action, and
+ * the focus-stability case that matters most — focus surviving a re-render the
+ * user did NOT cause — would be untestable.
+ */
+let mockRealtimeOptions: any = null;
+
 jest.mock('@/lib/hooks', () => ({
   // emitDeviceUpdate is part of the real hook's contract and the edit flow calls
   // it; omitting it made the success path throw into the retry error branch.
-  useRealtimeEvents: jest.fn(() => ({
-    isConnected: false,
-    isOffline: true,
-    emitDeviceUpdate: jest.fn(),
-  })),
+  useRealtimeEvents: jest.fn((options: any) => {
+    mockRealtimeOptions = options;
+    return {
+      isConnected: false,
+      isOffline: true,
+      emitDeviceUpdate: jest.fn(),
+    };
+  }),
   useOptimisticState: jest.fn((initialState: any) => ({
     updateOptimistic: jest.fn(),
     commitOptimistic: jest.fn(),
@@ -869,12 +880,16 @@ describe('DevicesClient reports partial bulk outcomes honestly', () => {
     });
 
     await waitFor(() => {
-      // The deferred-delivery note still rides along: d2 is offline, and a
-      // deferred assignment is applied on reconnect, not lost.
+      // The scope clause qualifies the COUNT, so it sits against the count and
+      // BEFORE the trailing sentence. Appending it last produced "...come
+      // online. of 2 selected" — a fragment after a full stop. The deferred-
+      // delivery note still rides along: d2 is offline, and a deferred
+      // assignment is applied on reconnect, not lost.
       expect(mockToast.warning).toHaveBeenCalledWith(
-        'Playlist assigned to 1 device(s). Non-online devices will update when they come online. of 2 selected',
+        'Playlist assigned to 1 device(s) of 2 selected. Non-online devices will update when they come online.',
       );
     });
+    expect(mockToast.warning.mock.calls.every(([m]: [string]) => !/\.\s+of \d+ selected/.test(m))).toBe(true);
     expect(
       screen.getByText('Assigned the playlist to 1 of 2 selected devices'),
     ).toBeInTheDocument();
@@ -905,6 +920,28 @@ describe('DevicesClient reports partial bulk outcomes honestly', () => {
     await waitFor(() => {
       expect(screen.getByText(/were already in this group/)).toBeInTheDocument();
     });
+
+    // ...and the banner must be painted to MATCH that reading. A success toast
+    // over a warning-inked banner is the same contradiction, one layer down.
+    const banner = screen.getByText(/were already in this group/).closest('.eh-partial-banner');
+    expect(banner).toHaveClass('eh-partial-banner-info');
+  });
+
+  it('paints a genuine partial delete as a warning, not as information', async () => {
+    mockBulkDeleteDisplays.mockResolvedValue({ deleted: 1 });
+
+    renderThree();
+    await waitFor(() => expect(screen.getByText('Lobby Display')).toBeInTheDocument());
+
+    selectTwo();
+    fireEvent.click(screen.getByText('Delete Selected'));
+    fireEvent.click(screen.getByText('Confirm'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Deleted 1 of 2 selected devices')).toBeInTheDocument();
+    });
+    const banner = screen.getByText('Deleted 1 of 2 selected devices').closest('.eh-partial-banner');
+    expect(banner).not.toHaveClass('eh-partial-banner-info');
   });
 });
 
@@ -1038,6 +1075,80 @@ describe('DevicesClient keyboard and assistive-tech operability', () => {
         initialPlaylistsComplete
       />,
     );
+
+  /**
+   * Activating a sort must not throw focus away.
+   *
+   * `SortableHeader` lives at module scope. Declared inside the page component
+   * its identity changes every render, so React sees a different element TYPE
+   * and unmounts/remounts each `<th>` subtree instead of updating it — which
+   * destroys the very button the user just pressed. `document.activeElement`
+   * falls back to `<body>`, the next Tab restarts at the top of the page, and
+   * the screen reader never hears the `aria-sort` it was waiting for.
+   *
+   * Asserting on the SAME node reference is what makes this mutation-sensitive:
+   * a re-query would find the replacement button and pass either way, which is
+   * exactly why the original keyboard test could not see the defect.
+   */
+  it('keeps focus on the sort button it just activated', async () => {
+    renderThree();
+    await waitFor(() => expect(screen.getByText('Lobby Display')).toBeInTheDocument());
+
+    const button = within(screen.getByRole('columnheader', { name: /^Device/ })).getByRole('button');
+    button.focus();
+    expect(document.activeElement).toBe(button);
+
+    fireEvent.click(button);
+
+    // Same DOM node, still focused, and now carrying the new sort state.
+    expect(document.activeElement).toBe(button);
+    expect(screen.getByRole('columnheader', { name: /^Device/ })).toHaveAttribute(
+      'aria-sort',
+      'ascending',
+    );
+  });
+
+  /**
+   * The same remount also fires on re-renders the user did not cause. A single
+   * realtime `device:status` event is enough to yank focus out of whatever the
+   * operator was on — including mid-Tab through the row actions.
+   */
+  it('keeps focus through a realtime status update the user did not trigger', async () => {
+    renderThree();
+    await waitFor(() => expect(screen.getByText('Lobby Display')).toBeInTheDocument());
+
+    const button = within(screen.getByRole('columnheader', { name: /^Status/ })).getByRole('button');
+    button.focus();
+    expect(document.activeElement).toBe(button);
+
+    act(() => {
+      mockRealtimeOptions.onDeviceStatusChange({
+        deviceId: 'd1',
+        status: 'offline',
+        lastSeen: '2026-08-16T00:00:00.000Z',
+      });
+    });
+
+    expect(document.activeElement).toBe(button);
+  });
+
+  it('shows the select-all box as indeterminate when only some rows are selected', async () => {
+    renderThree();
+    await waitFor(() => expect(screen.getByText('Lobby Display')).toBeInTheDocument());
+
+    const selectAll = screen.getByLabelText('Select all devices on this page') as HTMLInputElement;
+    expect(selectAll.indeterminate).toBe(false);
+
+    // One of three — the header box must not read as plain "nothing selected"
+    // while a row is armed for Delete Selected.
+    fireEvent.click(screen.getAllByRole('checkbox')[1]);
+    await waitFor(() => expect(selectAll.indeterminate).toBe(true));
+    expect(selectAll.checked).toBe(false);
+
+    fireEvent.click(selectAll);
+    await waitFor(() => expect(selectAll.checked).toBe(true));
+    expect(selectAll.indeterminate).toBe(false);
+  });
 
   it('sorts from a real button and publishes the sort state on the column header', async () => {
     renderThree();

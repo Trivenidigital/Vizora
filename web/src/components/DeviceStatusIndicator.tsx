@@ -58,12 +58,21 @@ const statusConfig: Record<
     icon: 'close',
     description: 'Has not reported in past the offline threshold',
   },
+  /**
+   * Unreachable today — `idle` is a client-side extension of the status union
+   * and the gateway only ever emits online/offline/pairing/error. It is
+   * described the day someone adds it server-side, so the copy has to be safe
+   * NOW: "connected but not currently playing" is a playback assertion in
+   * negative form, and nothing in the schema can back a claim about what a
+   * screen is or is not showing. All this bucket actually knows is that the
+   * server sent the string.
+   */
   idle: {
     ink: 'var(--foreground-secondary)',
     fill: 'var(--status-neutral-bg)',
     label: 'Idle',
     icon: 'clock',
-    description: 'Connected but not currently playing',
+    description: 'Reported as idle by the device',
   },
   pairing: {
     ink: 'var(--info-ink)',

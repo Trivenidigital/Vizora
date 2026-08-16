@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { fetchAllPaginated } from '@/lib/api/pagination';
@@ -69,6 +69,69 @@ type BulkOutcome = {
  requested: number;
  changed: number;
 };
+
+type SortState = { field: keyof Display | null; direction: 'asc' | 'desc' };
+
+const ariaSortFor = (
+ sort: SortState,
+ field: keyof Display,
+): 'ascending' | 'descending' | 'none' =>
+ sort.field !== field ? 'none' : sort.direction === 'asc' ? 'ascending' : 'descending';
+
+/**
+ * A sortable column header.
+ *
+ * MUST stay at module scope. Declared inside the page component, its identity is
+ * a new function on every render, so React treats each `<th>` as a different
+ * element TYPE and unmounts/remounts the subtree instead of updating it. That
+ * destroys the button the user just activated: `document.activeElement` falls
+ * back to `<body>`, the next Tab restarts at the top of the page, and the screen
+ * reader never hears the `aria-sort` it was waiting for. It is not limited to
+ * sorting either — every realtime `device:status` event and every debounced
+ * keystroke re-renders this component, so focus could be yanked with no user
+ * action at all. `devices-page.test.tsx` pins `document.activeElement` across
+ * both paths; moving this back inside the render body turns those red.
+ *
+ * The header itself was a bare `onClick` on the `<th>` before this redesign:
+ * reachable by mouse only, announced as a plain cell, exposing no sort state.
+ * `aria-sort` lives on the cell (where the spec puts it) and the control is a
+ * real button, so the column is operable from the keyboard.
+ */
+function SortableHeader({
+ field,
+ label,
+ sort,
+ onSort,
+}: {
+ field: keyof Display;
+ label: string;
+ sort: SortState;
+ onSort: (field: keyof Display) => void;
+}) {
+ const state = ariaSortFor(sort, field);
+ return (
+ <th scope="col" className="eh-th" aria-sort={state}>
+ <button
+ type="button"
+ onClick={() => onSort(field)}
+ className="eh-sort-btn"
+ /* `aria-sort` belongs on the header CELL, not on the control inside it;
+    this mirror is a styling hook only. */
+ data-sort={state}
+ >
+ {label}
+ <span aria-hidden>{state === 'none' ? null : state === 'ascending' ? ' ↑' : ' ↓'}</span>
+ <span className="sr-only">
+ {state === 'none'
+ ? ', not sorted, activate to sort ascending'
+ : state === 'ascending'
+ ? ', sorted ascending, activate to sort descending'
+ : ', sorted descending, activate to clear sorting'}
+ </span>
+ </button>
+ </th>
+ );
+}
 
 export default function DevicesClient({
  initialDevices,
@@ -482,14 +545,23 @@ export default function DevicesClient({
  const complete = changed >= requested;
  setBulkOutcome(complete ? null : { kind, requested, changed });
 
+ /*
+  * Order matters. The scope clause qualifies the COUNT, so it has to sit
+  * against the count and before any trailing sentence; appending it last
+  * produced "...device(s). Non-online devices will update when they come
+  * online. of 2 selected" - a fragment after a full stop, on exactly the path
+  * this redesign exists to make clearer.
+  */
+ const scope = complete ? '' : ` of ${requested} selected`;
+
  if (kind === 'delete') {
- const message = `Deleted ${changed} device(s)${suffix}`;
- complete ? toast.success(message) : toast.warning(`${message} of ${requested} selected`);
+ const message = `Deleted ${changed} device(s)${scope}${suffix}`;
+ complete ? toast.success(message) : toast.warning(message);
  return;
  }
  if (kind === 'playlist') {
- const message = `Playlist assigned to ${changed} device(s)${suffix}`;
- complete ? toast.success(message) : toast.warning(`${message} of ${requested} selected`);
+ const message = `Playlist assigned to ${changed} device(s)${scope}${suffix}`;
+ complete ? toast.success(message) : toast.warning(message);
  return;
  }
  const message = `Added ${changed} device(s) to group${suffix}`;
@@ -605,44 +677,22 @@ export default function DevicesClient({
  setSelectedDeviceIds(new Set());
  }, [debouncedSearch, selectedGroups, statusFilter]);
 
- const ariaSort = (field: keyof Display): 'ascending' | 'descending' | 'none' =>
- sortField !== field ? 'none' : sortDirection === 'asc' ? 'ascending' : 'descending';
-
- const getSortIcon = (field: keyof Display) => {
- if (sortField !== field) return null;
- return sortDirection === 'asc' ? ' ↑' : ' ↓';
- };
+ const sortState: SortState = { field: sortField, direction: sortDirection };
 
  /**
-  * A sortable column header.
+  * A partly-selected page must not look like an unselected one.
   *
-  * The header used to be a bare `onClick` on the `<th>`: reachable by mouse
-  * only, announced as a plain cell, and with no sort state exposed at all.
-  * `aria-sort` lives on the cell (where the spec puts it) and the control is a
-  * real button, so the column is operable from the keyboard.
+  * `indeterminate` is a DOM property with no HTML attribute and no React prop,
+  * so it can only be set imperatively. Without this the header checkbox read
+  * plain unchecked while three of ten rows were armed for "Delete Selected".
   */
- const SortableHeader = ({ field, label }: { field: keyof Display; label: string }) => (
- <th scope="col" className="eh-th" aria-sort={ariaSort(field)}>
- <button
- type="button"
- onClick={() => handleSort(field)}
- className="eh-sort-btn"
- /* `aria-sort` belongs on the header CELL, not on the control inside it;
-    this mirror is a styling hook only. */
- data-sort={ariaSort(field)}
- >
- {label}
- <span aria-hidden>{getSortIcon(field)}</span>
- <span className="sr-only">
- {sortField !== field
- ? ', not sorted, activate to sort ascending'
- : sortDirection === 'asc'
- ? ', sorted ascending, activate to sort descending'
- : ', sorted descending, activate to clear sorting'}
- </span>
- </button>
- </th>
- );
+ const visibleSelectedCount = displayDevices.filter(d => selectedDeviceIds.has(d.id)).length;
+ const allVisibleSelected = displayDevices.length > 0 && visibleSelectedCount === displayDevices.length;
+ const someVisibleSelected = visibleSelectedCount > 0 && !allVisibleSelected;
+ const selectAllRef = useRef<HTMLInputElement>(null);
+ useEffect(() => {
+ if (selectAllRef.current) selectAllRef.current.indeterminate = someVisibleSelected;
+ }, [someVisibleSelected]);
 
  return (
  <div className="space-y-6">
@@ -720,10 +770,16 @@ export default function DevicesClient({
    pagination.
  */}
  {devices.length > 0 && (
+ <div className="space-y-2">
  <div
  className="flex flex-wrap gap-2"
  role="group"
- aria-label="Filter devices by status"
+ /* The counts are fleet-wide while the table below also honours search and
+    group filters, so "1 Offline" can legitimately sit above a table with no
+    offline rows. That is deliberate — a triage total that shrank as you
+    typed would be useless — but it has to be stated, not left to be
+    discovered. */
+ aria-label="Filter devices by status. Counts are across the whole fleet, not the filtered table below."
  >
  <button
  type="button"
@@ -746,6 +802,10 @@ export default function DevicesClient({
  {FLEET_STATUS_LABEL[status]}
  </button>
  ))}
+ </div>
+ <p className="text-xs text-[var(--foreground-tertiary)]">
+ Counts are across the whole fleet; the table below also honours the search and group filters.
+ </p>
  </div>
  )}
 
@@ -796,10 +856,23 @@ export default function DevicesClient({
  {/*
    A bulk action that only partly landed, stated in full and kept on screen.
    The toast that reported it has already gone by the time anyone reacts.
+
+   The group case takes the INFO variant, not the warning one. Its shortfall
+   means "already a member", which is not a problem — painting it in warning
+   ink while the toast says success would produce exactly the chase-a-
+   non-problem outcome the split reporting exists to avoid.
  */}
  {bulkOutcome && (
- <div className="eh-partial-banner" role="status">
- <Icon name="warning" size="md" className="mt-0.5 shrink-0" aria-hidden />
+ <div
+ className={`eh-partial-banner${bulkOutcome.kind === 'group' ? ' eh-partial-banner-info' : ''}`}
+ role="status"
+ >
+ <Icon
+ name={bulkOutcome.kind === 'group' ? 'info' : 'warning'}
+ size="md"
+ className="mt-0.5 shrink-0"
+ aria-hidden
+ />
  <div className="min-w-0 flex-1">
  <p className="font-semibold">
  {bulkOutcome.kind === 'delete'
@@ -920,17 +993,18 @@ export default function DevicesClient({
  {canSelectDevices && (
  <th scope="col" className="eh-th w-px">
  <input
+ ref={selectAllRef}
  type="checkbox"
  aria-label="Select all devices on this page"
  className="eh-check"
- checked={displayDevices.length > 0 && displayDevices.every(d => selectedDeviceIds.has(d.id))}
+ checked={allVisibleSelected}
  onChange={toggleSelectAll}
  />
  </th>
  )}
- <SortableHeader field="nickname" label="Device" />
- <SortableHeader field="status" label="Status" />
- <SortableHeader field="location" label="Location" />
+ <SortableHeader field="nickname" label="Device" sort={sortState} onSort={handleSort} />
+ <SortableHeader field="status" label="Status" sort={sortState} onSort={handleSort} />
+ <SortableHeader field="location" label="Location" sort={sortState} onSort={handleSort} />
  {/* "Assigned", not "Currently Playing". This cell renders
      device.currentPlaylistId - the operator's own assignment, written by
      updateMany before any device is contacted. Nothing in the schema records
@@ -938,7 +1012,7 @@ export default function DevicesClient({
      TTL and is never persisted or exposed. For an offline device the old header
      asserted a playlist was playing while the screen showed something else. */}
  <th scope="col" className="eh-th">Assigned Playlist</th>
- <SortableHeader field="lastSeen" label="Last Seen" />
+ <SortableHeader field="lastSeen" label="Last Seen" sort={sortState} onSort={handleSort} />
  <th scope="col" className="eh-th text-right">Actions</th>
  </tr>
  </thead>
@@ -975,10 +1049,20 @@ export default function DevicesClient({
  </span>
  </div>
  </td>
+ {/* Below the breakpoint the table roles are gone, so these three cells
+     become bare values in the reading order. `data-label` restores the
+     label VISUALLY via generated content, which is not universally
+     announced; `.eh-cell-label` restores it to assistive tech from real
+     DOM. It is `display: none` at table widths, where the column header
+     already does the job, so nothing is announced twice. */}
  <td className="eh-td" data-label="Status">
+ <span className="eh-cell-label">Status: </span>
  <DeviceStatusIndicator deviceId={device.id} status={device.status ?? null} showLabel />
  </td>
- <td className="eh-td text-sm text-[var(--foreground-secondary)]" data-label="Location">{device.location || '—'}</td>
+ <td className="eh-td text-sm text-[var(--foreground-secondary)]" data-label="Location">
+ <span className="eh-cell-label">Location: </span>
+ {device.location || '—'}
+ </td>
  <td className="eh-td text-sm" data-label="Assigned Playlist">
  <PlaylistQuickSelect
  device={device}
@@ -994,6 +1078,7 @@ export default function DevicesClient({
      a recent observation, not a live guarantee, so the operator needs to see
      HOW recent without the badge hedging itself into uselessness. */}
  <td className="eh-td text-sm tabular-nums text-[var(--foreground-secondary)]" data-label="Last Seen">
+ <span className="eh-cell-label">Last seen: </span>
  {(device.lastSeen || device.lastHeartbeat) ? (
  <time
  dateTime={new Date(String(device.lastSeen || device.lastHeartbeat)).toISOString()}
