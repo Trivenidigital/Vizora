@@ -1,0 +1,39 @@
+  tenant verified: Northwind Coffee Roasters
+  light sort select (.eh-select-inline) border, on the page background
+        on rgb(233, 238, 239): border rgb(211, 219, 221) -> 1.2:1, fill rgb(255, 255, 255) -> 1.17:1
+        best carrier = border at 1.2:1  FAIL (SC 1.4.11 wants >= 3:1)
+  light sort select chevron glyph, on the page background
+        on rgb(233, 238, 239): fill rgb(78, 101, 108) -> 5.27:1
+        best carrier = glyph at 5.27:1  PASS (SC 1.4.11 wants >= 3:1)
+  light summary chip (.eh-fleet-chip) border, unpressed
+        on rgb(233, 238, 239): border rgb(211, 219, 221) -> 1.2:1, fill rgb(255, 255, 255) -> 1.17:1
+        best carrier = border at 1.2:1  FAIL (SC 1.4.11 wants >= 3:1)
+  light summary chip (.eh-fleet-chip) border, pressed
+        on rgb(233, 238, 239): border rgb(0, 126, 88) -> 4.35:1, fill rgb(227, 247, 239) -> 1.05:1
+        best carrier = border at 4.35:1  PASS (SC 1.4.11 wants >= 3:1)
+  light assign-modal checkbox (.eh-check) box border, unchecked [unchecked]
+        on rgb(226, 234, 236): border rgb(78, 101, 108) -> 5.06:1, fill rgb(255, 255, 255) -> 1.22:1
+        best carrier = border at 5.06:1  PASS (SC 1.4.11 wants >= 3:1)
+  light assign-modal checkbox (.eh-check) box border, checked [checked]
+        on rgb(227, 247, 239): border rgb(0, 126, 88) -> 4.56:1, fill rgb(0, 126, 88) -> 4.56:1
+        best carrier = border at 4.56:1  PASS (SC 1.4.11 wants >= 3:1)
+  dark  sort select (.eh-select-inline) border, on the page background
+        on rgb(6, 26, 33): border rgb(27, 61, 71) -> 1.53:1, fill rgb(12, 34, 41) -> 1.08:1
+        best carrier = border at 1.53:1  FAIL (SC 1.4.11 wants >= 3:1)
+  dark  sort select chevron glyph, on the page background
+        on rgb(6, 26, 33): fill rgb(154, 149, 142) -> 6:1
+        best carrier = glyph at 6:1  PASS (SC 1.4.11 wants >= 3:1)
+  dark  summary chip (.eh-fleet-chip) border, unpressed
+        on rgb(6, 26, 33): border rgb(27, 61, 71) -> 1.53:1, fill rgb(12, 34, 41) -> 1.08:1
+        best carrier = border at 1.53:1  FAIL (SC 1.4.11 wants >= 3:1)
+  dark  summary chip (.eh-fleet-chip) border, pressed
+        on rgb(6, 26, 33): border rgb(0, 229, 160) -> 10.8:1, fill rgba(0, 229, 160, 0.12) -> 1.28:1
+        best carrier = border at 10.8:1  PASS (SC 1.4.11 wants >= 3:1)
+  dark  assign-modal checkbox (.eh-check) box border, unchecked [unchecked]
+        on rgb(8, 30, 40): border rgb(154, 149, 142) -> 5.76:1, fill rgb(12, 34, 41) -> 1.04:1
+        best carrier = border at 5.76:1  PASS (SC 1.4.11 wants >= 3:1)
+  dark  assign-modal checkbox (.eh-check) box border, checked [checked]
+        on rgb(9, 55, 53): border rgb(0, 229, 160) -> 7.87:1, fill rgb(0, 229, 160) -> 7.87:1
+        best carrier = border at 7.87:1  PASS (SC 1.4.11 wants >= 3:1)
+
+12 probes, 4 below 3:1

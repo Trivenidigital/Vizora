@@ -61,12 +61,22 @@ jest.mock('@/lib/hooks/useDebounce', () => ({
   useDebounce: (value: any) => value,
 }));
 
+/**
+ * Capture the page's own `onConnectionChange` so a test can drive the THREE
+ * states the hook actually emits (`true` / `false` / `null`). A hook mock that
+ * only returns a static object can never exercise the `null` branch, which is
+ * how the collapse it guards against went unnoticed.
+ */
+let connectionChange: ((connected: boolean | null) => void) | undefined;
 jest.mock('@/lib/hooks', () => ({
-  useRealtimeEvents: () => ({
-    isConnected: false,
-    isOffline: true,
-    emitPlaylistUpdate: jest.fn(),
-  }),
+  useRealtimeEvents: (opts: any) => {
+    connectionChange = opts?.onConnectionChange;
+    return {
+      isConnected: false,
+      isOffline: true,
+      emitPlaylistUpdate: jest.fn(),
+    };
+  },
 }));
 
 jest.mock('@/theme/icons', () => ({
@@ -125,48 +135,35 @@ jest.mock('@/components/PlaylistPreview', () => {
   };
 });
 
-// Mock @dnd-kit modules
-jest.mock('@dnd-kit/core', () => ({
-  DndContext: ({ children }: any) => <div>{children}</div>,
-  closestCenter: jest.fn(),
-  KeyboardSensor: jest.fn(),
-  PointerSensor: jest.fn(),
-  useSensor: jest.fn(),
-  useSensors: () => [],
-}));
-
-jest.mock('@dnd-kit/sortable', () => ({
-  arrayMove: jest.fn((arr, from, to) => arr),
-  SortableContext: ({ children }: any) => <div>{children}</div>,
-  sortableKeyboardCoordinates: jest.fn(),
-  useSortable: () => ({
-    attributes: {},
-    listeners: {},
-    setNodeRef: jest.fn(),
-    transform: null,
-    transition: null,
-    isDragging: false,
-  }),
-  verticalListSortingStrategy: jest.fn(),
-}));
-
-jest.mock('@dnd-kit/utilities', () => ({
-  CSS: { Transform: { toString: () => '' } },
-}));
+// The real indicator calls `useDeviceStatus()` unconditionally, which throws
+// outside DeviceStatusProvider. The dashboard layout supplies it in the app.
+jest.mock('@/components/DeviceStatusIndicator', () => {
+  return function MockIndicator({ status }: any) {
+    return <span data-testid="device-status">{status || 'Unknown'}</span>;
+  };
+});
 
 import PlaylistsClient from '../page-client';
 import { apiClient } from '@/lib/api';
 
+/**
+ * `isActive` is deliberately absent from these fixtures.
+ *
+ * `Playlist` has no such column (packages/database/prisma/schema.prisma), no DTO
+ * accepts one and no serializer emits one, so the API can never send it. The
+ * fixtures used to set it and the page rendered an "Active" badge off it, which
+ * meant the badge was green in the test suite and permanently invisible in
+ * production. The test that asserted it therefore pinned a defect.
+ */
 const mockPlaylists = [
   {
     id: 'playlist-1',
     name: 'Morning Promo',
     description: 'Morning promotions',
     items: [
-      { id: 'item-1', contentId: 'c-1', duration: 30, content: { title: 'Banner 1', thumbnailUrl: '' } },
-      { id: 'item-2', contentId: 'c-2', duration: 15, content: { title: 'Banner 2', thumbnailUrl: '' } },
+      { id: 'item-1', contentId: 'c-1', duration: 30, content: { title: 'Banner 1', thumbnailUrl: '', status: 'active' } },
+      { id: 'item-2', contentId: 'c-2', duration: 15, content: { title: 'Banner 2', thumbnailUrl: '', status: 'active' } },
     ],
-    isActive: true,
     totalSize: 1024000,
     updatedAt: '2024-06-01',
     createdAt: '2024-01-01',
@@ -176,7 +173,6 @@ const mockPlaylists = [
     name: 'Evening Loop',
     description: null,
     items: [],
-    isActive: false,
     totalSize: 0,
     updatedAt: '2024-05-01',
     createdAt: '2024-01-01',
@@ -260,12 +256,190 @@ describe('PlaylistsClient', () => {
     });
   });
 
-  it('renders active badge for active playlists', async () => {
+  it('does not claim a playlist is "Active" — no column backs that word', async () => {
     render(<PlaylistsClient />);
 
     await waitFor(() => {
-      expect(screen.getByText('Active')).toBeInTheDocument();
+      expect(screen.getByText('Morning Promo')).toBeInTheDocument();
     });
+
+    expect(screen.queryByText('Active')).not.toBeInTheDocument();
+  });
+
+  it('separates "no screens assigned" from "screen assignments unknown"', async () => {
+    (apiClient.getDisplays as jest.Mock).mockResolvedValue({ data: mockDevices });
+
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Promo')).toBeInTheDocument();
+    });
+
+    // display-2 is assigned playlist-2, nothing is assigned playlist-1.
+    await waitFor(() => {
+      expect(screen.getByText('Assigned to 1 screen')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Not assigned')).toBeInTheDocument();
+    expect(screen.queryByText('Screens unknown')).not.toBeInTheDocument();
+  });
+
+  it('says screens are unknown rather than unassigned when the device fetch fails', async () => {
+    (apiClient.getDisplays as jest.Mock).mockRejectedValue(new Error('failed'));
+
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Screens unknown')).toHaveLength(2);
+    });
+    expect(screen.queryByText('Not assigned')).not.toBeInTheDocument();
+  });
+
+  /**
+   * `useRealtimeEvents` emits `null` on disconnect while the browser is still
+   * online — "reconnecting", not "offline". Collapsing it into the offline claim
+   * tells the operator to reload a page whose socket is already coming back.
+   */
+  it('does not claim live updates are off while the socket is reconnecting', async () => {
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Promo')).toBeInTheDocument();
+    });
+
+    act(() => connectionChange?.(true));
+    await waitFor(() => {
+      expect(screen.getByText('Live updates on')).toBeInTheDocument();
+    });
+
+    // null = WS dropped, browser still online. The claim must not flip.
+    act(() => connectionChange?.(null));
+    expect(screen.getByText('Live updates on')).toBeInTheDocument();
+    expect(screen.queryByText('Live updates off')).not.toBeInTheDocument();
+
+    // false = genuinely offline. Now it may flip.
+    act(() => connectionChange?.(false));
+    await waitFor(() => {
+      expect(screen.getByText('Live updates off')).toBeInTheDocument();
+    });
+  });
+
+  it('qualifies "Not assigned" with the schedules that also use the playlist', async () => {
+    (apiClient.getPlaylists as jest.Mock).mockResolvedValue({
+      data: [{ ...mockPlaylists[0], _count: { schedules: 2 } }],
+    });
+
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Also used by 2 schedules')).toBeInTheDocument();
+    });
+    // Still "Not assigned" — no screen names it — but no longer dead inventory.
+    expect(screen.getByText('Not assigned')).toBeInTheDocument();
+  });
+
+  it('degrades instead of crashing on an unparseable updatedAt', async () => {
+    (apiClient.getPlaylists as jest.Mock).mockResolvedValue({
+      data: [{ ...mockPlaylists[0], updatedAt: 'not-a-date' }],
+    });
+
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Last update time unavailable')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Morning Promo')).toBeInTheDocument();
+  });
+
+  it('warns that non-active content will be skipped on screens', async () => {
+    (apiClient.getPlaylists as jest.Mock).mockResolvedValue({
+      data: [
+        {
+          ...mockPlaylists[0],
+          items: [
+            mockPlaylists[0].items[0],
+            { ...mockPlaylists[0].items[1], content: { title: 'Banner 2', thumbnailUrl: '', status: 'archived' } },
+          ],
+        },
+      ],
+    });
+
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('At least 1 item will be skipped')).toBeInTheDocument();
+    });
+    // A label, not the raw API token.
+    expect(screen.getByText('Archived')).toBeInTheDocument();
+    expect(screen.queryByText('archived')).not.toBeInTheDocument();
+    // The card still reports the stored item count; the warning is what closes
+    // the gap between "listed" and "delivered".
+    expect(screen.getByText('2 items')).toBeInTheDocument();
+  });
+
+  it('offers a way back from a filtered-empty list instead of an empty grid', async () => {
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Promo')).toBeInTheDocument();
+    });
+
+    fireEvent.change(screen.getByTestId('search-filter'), { target: { value: 'zzz' } });
+
+    await waitFor(() => {
+      expect(screen.getByText('No playlists match these filters')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('No playlists yet')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Clear filters'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Promo')).toBeInTheDocument();
+    });
+  });
+
+  it('filters the library from the summary chips', async () => {
+    (apiClient.getDisplays as jest.Mock).mockResolvedValue({ data: mockDevices });
+
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Promo')).toBeInTheDocument();
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: /Assigned/ }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Morning Promo')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('Evening Loop')).toBeInTheDocument();
+  });
+
+  /**
+   * Focus survival across a re-render.
+   *
+   * The assertion holds the ORIGINAL node. Re-querying the button after the
+   * re-render would pass whether or not React remounted the card, because the
+   * query simply finds the replacement — which is exactly how a remount-on-render
+   * bug survives a green suite. `PlaylistCard` is declared at module scope to make
+   * this true; moving it into the render body turns this red.
+   */
+  it('keeps focus on the same button across a re-render', async () => {
+    render(<PlaylistsClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Morning Promo')).toBeInTheDocument();
+    });
+
+    const editButton = screen.getByRole('button', { name: 'Edit Morning Promo' });
+    editButton.focus();
+    expect(document.activeElement).toBe(editButton);
+
+    fireEvent.change(screen.getByTestId('search-filter'), { target: { value: 'Morning' } });
+
+    await waitFor(() => {
+      expect(screen.getByText('1 result found')).toBeInTheDocument();
+    });
+    expect(document.activeElement).toBe(editButton);
   });
 
   it('opens a device assignment modal instead of fake-updating the playlist name', async () => {

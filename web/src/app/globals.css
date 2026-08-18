@@ -1031,8 +1031,15 @@ body:has(.mkt) .consent-bar {
   color: var(--primary-ink);
 }
 .eh-badge-warning {
+  /* Same split as `.eh-badge-success` above, for the same reason. `--warning` is
+     a FILL for glyphs and hairlines; as badge TEXT on light it measured 3.02:1
+     over its own composited fill and 2.52:1 where the badge sits on
+     `--background-secondary`. `--warning-ink` is the text-safe pair and is
+     ALREADY `#fbbf24` under `.dark` — identical to `--warning` there — so the
+     dark badge is unchanged by construction and only the failing light case
+     moves. `.eh-partial-banner` already paints its text with this token. */
   background: rgba(251, 191, 36, 0.1);
-  color: var(--warning);
+  color: var(--warning-ink);
 }
 .eh-badge-error {
   background: rgba(239, 68, 68, 0.1);
