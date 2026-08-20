@@ -49,6 +49,7 @@ import * as Sentry from '@sentry/nestjs';
 import { createHash } from 'node:crypto';
 import { WsAllExceptionsFilter } from './filters/ws-exception.filter';
 import { WsAuthGuard, WsDeviceGuard } from './guards/ws-auth.guard';
+import { createRealtimeCorsDelegate, isNullOrigin } from '../common/cors/cors-policy';
 import { redactSensitiveTokens } from '../utils/redact-sensitive-url';
 import {
   hashDeviceToken,
@@ -144,10 +145,16 @@ const DEVICE_TOKEN_TTL = '90d';
 const DEVICE_TOKEN_REFRESH_COOLDOWN_SECONDS = 60 * 60; // 1 hour
 
 @WebSocketGateway({
-  cors: {
-    origin: process.env.CORS_ORIGIN?.split(',').map(s => s.trim()) || ['http://localhost:3001'],
-    credentials: true,
-  },
+  // Request-aware delegate: engine.io hands `cors` straight to the cors
+  // package, which treats a function as a per-request options callback. That
+  // is what lets `credentials` vary by origin — a static object cannot.
+  // Browser origins keep credentials (dashboard sockets authenticate by
+  // httpOnly cookie); a null origin is never credentialed.
+  //
+  // NOTE: this governs only the polling transport's HTTP responses. The
+  // WebSocket handshake is not subject to CORS at all — the actual boundary
+  // for null-origin connections is the auth rule in device-handshake-auth.ts.
+  cors: createRealtimeCorsDelegate(),
   transports: ['websocket', 'polling'],
   pingInterval: 25000,
   pingTimeout: 20000,
@@ -185,6 +192,8 @@ export class DeviceGateway
         databaseService: this.databaseService,
         deviceSecret: process.env.DEVICE_JWT_SECRET,
         userSecret: process.env.JWT_SECRET,
+        // Available on both transports; selects the device-only auth path.
+        origin: socket.handshake.headers?.origin,
         // PR-8: lets the handshake accept a device that reconnected on its old
         // token during an in-flight 90d refresh rotation (grace record).
         redis: this.redisService,
@@ -918,6 +927,15 @@ export class DeviceGateway
       return client.handshake.auth.token;
     }
 
+    // Defence in depth. The handshake middleware already rejects every
+    // null-origin connection that is not a verified device, so this branch
+    // should be unreachable for a null origin — but if a future refactor ever
+    // let one through as 'pass', the cookie fallback below would authenticate
+    // a hostile null-origin page AS THE VICTIM USER. Never read cookies there.
+    if (isNullOrigin(client.handshake.headers?.origin)) {
+      return null;
+    }
+
     // Fall back to httpOnly cookie (dashboard clients)
     const cookies = client.handshake.headers?.cookie;
     if (cookies) {
@@ -1043,7 +1061,16 @@ export class DeviceGateway
       // Device JWT verification failed — try user JWT below
     }
 
-    // Try user JWT
+    // Try user JWT — never for a null origin. A dashboard/user token presented
+    // from a packaged-app (or sandboxed-iframe) origin is a rejection, not a
+    // fallback. Defence in depth: the handshake middleware already rejects
+    // these before the connection is established.
+    if (isNullOrigin(client.handshake.headers?.origin)) {
+      this.logger.warn('Connection rejected: user-token path refused for null origin');
+      client.disconnect();
+      return null;
+    }
+
     try {
       const userPayload = this.jwtService.verify<UserPayload>(token, {
         secret: process.env.JWT_SECRET,

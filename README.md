@@ -192,6 +192,7 @@ API documentation is available at `http://localhost:3000/api/docs` when running 
 | REDIS_URL | Redis connection URL | Yes |
 | BCRYPT_ROUNDS | Password hashing rounds (default: 14) | No |
 | CORS_ORIGIN | Allowed CORS origins | No |
+| DEVICE_NULL_ORIGIN_CORS | Allow `Origin: null` (packaged Tizen/webOS TV apps) on device endpoints only. `enabled` \| `disabled`. **Default: disabled** | No |
 
 ### Realtime
 
@@ -200,6 +201,7 @@ API documentation is available at `http://localhost:3000/api/docs` when running 
 | REDIS_URL | Redis connection URL | Yes |
 | DEVICE_JWT_SECRET | Secret for device JWT tokens | Yes |
 | CORS_ORIGIN | Allowed CORS origins | No |
+| DEVICE_NULL_ORIGIN_CORS | Allow `Origin: null` (packaged Tizen/webOS TV apps) on device endpoints only. `enabled` \| `disabled`. **Default: disabled** | No |
 
 ### Web
 

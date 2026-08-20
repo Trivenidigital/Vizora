@@ -1,8 +1,20 @@
 # Design: device pulls authoritative content on connect (push becomes an optimization)
 
-**Status:** DESIGN ONLY. Cross-repo (backend + TV app). No implementation in this session.
-**Closes structurally:** Finding-2 residual 1 (connected-flaky-no-reconnect), Finding-2 residual 2 /
-C-7 (schedule-only content delivered by no path), and the review's client-idempotency requirement.
+**Status:** DESIGN ONLY on the backend. Cross-repo (backend + TV app).
+**Would close structurally (once implemented):** Finding-2 residual 1
+(connected-flaky-no-reconnect), Finding-2 residual 2 / C-7 (schedule-only content delivered by no
+path), and the review's client-idempotency requirement.
+
+> **⚠️ Current reality (2026-08-01): the client ships, the server does not.**
+> The TV app (`vizora-tv`) already calls `GET /api/v1/devices/me/content` on every reconnect and on
+> heartbeat reconcile, but **no such route exists in the middleware** — the only `devices/*`
+> controllers are `devices/pairing` and `devices/auth`. The call 404s on every device, and the
+> client's fail-safe keeps last-known-good content.
+>
+> Consequence: **pull-on-connect does not work today.** Playback is unaffected (the client degrades
+> safely), but none of the root causes below are actually closed, and nothing should be documented
+> or reported as if they were. Tracked separately; deliberately out of scope for the device
+> null-origin CORS change (see `docs/device-null-origin-cors.md`).
 
 ## The one root cause behind all three
 

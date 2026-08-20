@@ -31,6 +31,11 @@ import { LoggingInterceptor } from './modules/common/interceptors/logging.interc
 import { ResponseEnvelopeInterceptor } from './modules/common/interceptors/response-envelope.interceptor';
 import { SentryInterceptor } from './interceptors/sentry.interceptor';
 import { AllExceptionsFilter } from './modules/common/filters/all-exceptions.filter';
+import {
+  createCorsDelegate,
+  isDeviceContentPath,
+  isNullOriginCorsEnabled,
+} from './common/cors/cors-policy';
 
 async function bootstrap() {
   // Validate required production environment variables
@@ -105,17 +110,40 @@ async function bootstrap() {
     crossOriginEmbedderPolicy: false, // Allow embedding for display clients
   }));
 
-  // CORS configuration - staging mirrors production restrictions
-  const corsOrigins = process.env.CORS_ORIGIN?.split(',').map(o => o.trim()) || [];
-  const isRestrictedEnv = process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging';
-  app.enableCors({
-    origin: isRestrictedEnv
-      ? corsOrigins
-      : true, // Allow all in development
-    credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token'],
-  });
+  // Cross-Origin-Resource-Policy relaxation, scoped to the device-content route
+  // ONLY. helmet's default `same-origin` stays in force everywhere else.
+  //
+  // Packaged Tizen/webOS apps render media from a file:// document, so their
+  // <img>/<video> loads are cross-origin *no-cors* requests — CORS does not
+  // apply to those, CORP does, and a same-origin CORP would block them. (The
+  // offline cache's fetch() is the opposite case: CORS applies, CORP does not.
+  // Both mechanisms are needed, for different request modes.)
+  //
+  // Gated by the same fail-closed flag as the CORS exception. Runs AFTER
+  // helmet so setHeader overrides the default it just set.
+  if (isNullOriginCorsEnabled()) {
+    app.use((req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) => {
+      if (isDeviceContentPath(req.originalUrl || req.url)) {
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      }
+      next();
+    });
+  }
+
+  // CORS configuration — ONE request-aware delegate (see common/cors/cors-policy.ts).
+  //
+  // ExpressAdapter.enableCors(options) does `this.use(cors(options))`, and the
+  // cors package treats a function as a per-request options callback, so this
+  // is a single middleware making a single decision. It must NOT be layered
+  // with a second cors() call: a null-origin response that passed through a
+  // static `credentials: true` cors() would carry
+  // Access-Control-Allow-Credentials, which is the precise grant this design
+  // exists to withhold.
+  app.enableCors(createCorsDelegate());
+
+  Logger.log(
+    `Device null-origin CORS: ${isNullOriginCorsEnabled() ? 'ENABLED' : 'disabled (default)'}`,
+  );
 
   // Global exception filter — catches all unhandled exceptions
   app.useGlobalFilters(new AllExceptionsFilter());
