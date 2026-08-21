@@ -914,11 +914,28 @@ export class DisplaysService {
    * Contract v1.1 item 3: emit device:revoked to the realtime gateway. Separate
    * from sendDeviceCommand because revocation is a distinct internal route that
    * broadcasts to the device room and force-disconnects, rather than a queued
-   * command. Fire-and-forget; the device's auth/check 410 probe is the backstop.
+   * command.
+   *
+   * Still fire-and-forget, but no longer SILENT. Every drop here leaves a screen
+   * the operator believes they revoked still rendering tenant content until the
+   * device's next reconnect or its heartbeat-ack backstop fires, so each failure
+   * path logs at error with that consequence spelled out. The dispatched/
+   * delivered pair exists so "no logs about this revocation" is unambiguous:
+   * previously a success was logged but a missing INTERNAL_API_SECRET returned
+   * before logging anything revocation-specific, which made a never-attempted
+   * delivery indistinguishable from one that was never requested.
    */
   private async sendDeviceRevoked(displayId: string, reason: string): Promise<void> {
+    this.logger.log(`device_revoked_dispatched device=${displayId} reason=${reason}`);
+
     const headers = this.getInternalApiHeaders();
-    if (!headers) return;
+    if (!headers) {
+      this.logger.error(
+        `device_revoked_dropped device=${displayId} reason=${reason} cause=internal_api_secret_unset — ` +
+          `the device was NOT told it is revoked and may keep rendering tenant content until it reconnects`,
+      );
+      return;
+    }
 
     const url = `${this.realtimeUrl}/api/internal/device-revoked`;
 
@@ -932,14 +949,14 @@ export class DisplaysService {
             { headers, timeout: REALTIME_HTTP_TIMEOUT_MS },
           ),
         );
-        this.logger.log(`device:revoked (${reason}) sent for device ${displayId}`);
+        this.logger.log(`device_revoked_delivered device=${displayId} reason=${reason}`);
       },
       (error) => {
-        if (error) {
-          this.logger.warn(`Failed to send device:revoked for device ${displayId}: ${error.message}`);
-        } else {
-          this.logger.warn(`Realtime circuit open, cannot send device:revoked for device ${displayId}`);
-        }
+        const cause = error ? `request_failed: ${error.message}` : 'realtime_circuit_open';
+        this.logger.error(
+          `device_revoked_dropped device=${displayId} reason=${reason} cause=${cause} — ` +
+            `the device was NOT told it is revoked and may keep rendering tenant content until it reconnects`,
+        );
       },
       REALTIME_CIRCUIT_CONFIG,
     );

@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { HttpService } from '@nestjs/axios';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { createHash } from 'node:crypto';
 import { DEVICE_OFFLINE_THRESHOLD_MS } from '@vizora/database';
 import { DisplaysService } from './displays.service';
@@ -10,6 +10,7 @@ import { DatabaseService } from '../database/database.service';
 import { CircuitBreakerService, CircuitState } from '../common/services/circuit-breaker.service';
 import { StorageService } from '../storage/storage.service';
 import {
+  Logger,
   NotFoundException,
   ConflictException,
   ServiceUnavailableException,
@@ -730,6 +731,62 @@ describe('DisplaysService', () => {
           timeout: 15000,
         }),
       );
+    });
+
+    describe('a revocation that does NOT reach the device is loud', () => {
+      // The push is fire-and-forget by design, but a drop leaves a screen the operator
+      // believes they revoked still rendering tenant content until the device reconnects
+      // or its heartbeat-ack backstop fires. Silence here is what made that invisible.
+      const deleteDisplay = async () => {
+        databaseService.display.findFirst.mockResolvedValue({
+          id: mockDisplayId,
+          organizationId: mockOrganizationId,
+        } as any);
+        databaseService.display.deleteMany.mockResolvedValue({ count: 1 } as any);
+        await service.remove(mockOrganizationId, mockDisplayId);
+      };
+
+      it('logs an error naming the device when the POST fails', async () => {
+        const logged = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+        httpService.post.mockReturnValue(throwError(() => new Error('ECONNREFUSED')) as any);
+
+        await deleteDisplay();
+
+        expect(logged).toHaveBeenCalledWith(
+          expect.stringContaining(`device_revoked_dropped device=${mockDisplayId}`),
+        );
+        logged.mockRestore();
+      });
+
+      it('logs an error — not a bare skip — when INTERNAL_API_SECRET is unset', async () => {
+        // Previously this returned before logging anything revocation-specific, so a
+        // never-attempted delivery was indistinguishable from one never requested.
+        const previous = process.env.INTERNAL_API_SECRET;
+        delete process.env.INTERNAL_API_SECRET;
+        const logged = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+
+        try {
+          await deleteDisplay();
+          expect(logged).toHaveBeenCalledWith(
+            expect.stringContaining('cause=internal_api_secret_unset'),
+          );
+          expect(httpService.post).not.toHaveBeenCalled();
+        } finally {
+          logged.mockRestore();
+          if (previous !== undefined) process.env.INTERNAL_API_SECRET = previous;
+        }
+      });
+
+      it('logs delivered on the success path, so silence is never ambiguous', async () => {
+        const logged = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+
+        await deleteDisplay();
+
+        expect(logged).toHaveBeenCalledWith(
+          expect.stringContaining(`device_revoked_delivered device=${mockDisplayId}`),
+        );
+        logged.mockRestore();
+      });
     });
 
     it('should send enable commands using realtime internal command DTO shape', async () => {

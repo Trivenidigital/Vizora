@@ -84,7 +84,14 @@ describe('heartbeat ack — wire contract with the TV client', () => {
   };
 
   const mockDatabaseService = {
-    display: { findFirst: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+    display: {
+      findFirst: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      // Revocation backstop reads through findUnique. Absent, every call would
+      // throw on undefined, get swallowed by the fail-open catch, and the
+      // 'not revoked' assertions below would pass without exercising anything.
+      findUnique: jest.fn(),
+    },
     schedule: { findMany: jest.fn().mockResolvedValue([]) },
     playlist: { findFirst: jest.fn().mockResolvedValue(null) },
   };
@@ -175,6 +182,16 @@ describe('heartbeat ack — wire contract with the TV client', () => {
     );
     (gateway as unknown as { reconcileResolvedAt: Map<string, number> }).reconcileResolvedAt.clear();
     (gateway as unknown as { reconcileSignalledAt: Map<string, number> }).reconcileSignalledAt.clear();
+
+    // Default the revocation backstop's lookup to a LIVE device, so every test that is
+    // not about revocation exercises the healthy path. Left as a bare jest.fn() it would
+    // resolve undefined, which the predicate correctly reads as "row deleted" — and every
+    // unrelated test would silently assert the revoked shape.
+    mockDatabaseService.display.findUnique.mockResolvedValue({
+      organizationId: 'org-1',
+      isDisabled: false,
+      jwtToken: null,
+    });
   });
 
   afterEach(() => {
@@ -205,6 +222,7 @@ describe('heartbeat ack — wire contract with the TV client', () => {
       expect(d.reconcileContent).toBe(true);
       expect(d.nextHeartbeatIn).toBe(15000);
       expect(d.commands).toEqual([]);
+      expect(d.revoked).toBe(false);
     });
 
     it('carries the reconcile signal the device actually converges on — BOTH values', async () => {
@@ -229,12 +247,61 @@ describe('heartbeat ack — wire contract with the TV client', () => {
       expect(mockDatabaseService.display.findFirst.mock.calls.length).toBeGreaterThan(resolvesBefore);
     });
 
-    it('does NOT emit `revoked` — revocation rides the separate device:revoked event', async () => {
-      // The client acts on ack.revoked (main.ts:1020) and the design contract permits it
-      // (revocation-contract.md §3.2 "MAY"), but the current server never sends it. The
-      // superseded fixture asserted revoked:true as the server's promise; it is not one.
-      serverHasContent();
-      expect((await beat(socket(), '')).data).not.toHaveProperty('revoked');
+    describe('`revoked` — the heartbeat revocation backstop', () => {
+      // Why this is a server promise now: the `device:revoked` push is fire-and-forget
+      // and drops silently when INTERNAL_API_SECRET is unset or the realtime circuit is
+      // open, the heartbeat's own DB write is an updateMany that no-ops on a deleted row,
+      // and the live revocation predicate ran only at DELIVERY time. A device deleted
+      // while connected, with nothing being pushed to it, therefore never learned. The
+      // flag is a TRIGGER: the client answers it by probing auth/check and purges only on
+      // 410 (revocation-contract §1.5/§3.4, permitted by §3.2/§6.3).
+      const liveDevice = { organizationId: 'org-1', isDisabled: false, jwtToken: null };
+
+      it('emits revoked:false for a healthy device', async () => {
+        serverHasContent();
+        mockDatabaseService.display.findUnique.mockResolvedValue(liveDevice);
+        const d = (await beat(socket(), '')).data!;
+        expect(d).toHaveProperty('revoked', false);
+        // Prove the false came from a real lookup, not a throttle/short-circuit.
+        expect(mockDatabaseService.display.findUnique).toHaveBeenCalled();
+      });
+
+      it('emits revoked:true when the display row is gone (deleted while connected)', async () => {
+        serverHasContent();
+        mockDatabaseService.display.findUnique.mockResolvedValue(null);
+        expect((await beat(socket(), '')).data).toHaveProperty('revoked', true);
+      });
+
+      it('emits revoked:true when the device is operator-disabled', async () => {
+        serverHasContent();
+        mockDatabaseService.display.findUnique.mockResolvedValue({ ...liveDevice, isDisabled: true });
+        expect((await beat(socket(), '')).data).toHaveProperty('revoked', true);
+      });
+
+      it('emits revoked:true when the device was reassigned to another org', async () => {
+        serverHasContent();
+        mockDatabaseService.display.findUnique.mockResolvedValue({ ...liveDevice, organizationId: 'org-2' });
+        expect((await beat(socket(), '')).data).toHaveProperty('revoked', true);
+      });
+
+      it('fails OPEN — a database error is transient, never a revocation signal (§1.5a)', async () => {
+        serverHasContent();
+        mockDatabaseService.display.findUnique.mockRejectedValue(new Error('db down'));
+        expect((await beat(socket(), '')).data).toHaveProperty('revoked', false);
+      });
+
+      it('does not treat a socket with no recorded token hash as revoked', async () => {
+        // isCurrentDeviceToken(stored, undefined) is false, so an un-guarded hash
+        // comparison would report every such socket revoked on every beat.
+        serverHasContent();
+        mockDatabaseService.display.findUnique.mockResolvedValue({
+          ...liveDevice,
+          jwtToken: 'a'.repeat(64),
+        });
+        const s = socket();
+        expect(s.data).not.toHaveProperty('deviceTokenHash');
+        expect((await beat(s, '')).data).toHaveProperty('revoked', false);
+      });
     });
 
     it('emits `commands` as a key that is always empty here', async () => {
