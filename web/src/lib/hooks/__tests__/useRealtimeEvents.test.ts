@@ -375,6 +375,44 @@ describe('useRealtimeEvents', () => {
         expect(onConnectionChange).toHaveBeenCalledWith(null);
       });
     });
+
+    // Regression: production, 2026-08-18. The Playlists page rendered
+    // "Live updates off" indefinitely while the socket was connected, because
+    // `onConnectionChange(true)` only fired from the `connect` EVENT and a page
+    // mounting onto an already-established socket never receives one. Devices
+    // masked the same bug by also setting 'connected' from its heartbeat handler.
+    it('reports the current connection state to a subscriber that mounts on an already-connected socket', async () => {
+      const onConnectionChange = jest.fn();
+      mockIsConnected = true;
+
+      renderHook(() =>
+        useRealtimeEvents({
+          onConnectionChange,
+        })
+      );
+
+      // No 'connect' event is simulated: the socket was ALREADY connected.
+      await waitFor(() => {
+        expect(onConnectionChange).toHaveBeenCalledWith(true);
+      });
+    });
+
+    it('does not assert offline for a socket that is merely not yet connected', async () => {
+      const onConnectionChange = jest.fn();
+      mockIsConnected = false;
+
+      renderHook(() =>
+        useRealtimeEvents({
+          onConnectionChange,
+        })
+      );
+
+      // Promotion is one-directional. "Not connected yet" is not the claim
+      // "the socket dropped" — only the disconnect handler may author false/null.
+      await new Promise((r) => setTimeout(r, 20));
+      expect(onConnectionChange).not.toHaveBeenCalledWith(false);
+      expect(onConnectionChange).not.toHaveBeenCalledWith(null);
+    });
   });
 
   describe('Custom Event Emission', () => {
