@@ -295,6 +295,35 @@ export function useRealtimeEvents(options: UseRealtimeEventsOptions = {}) {
     syncOfflineQueue,
   ]);
 
+  /**
+   * Report the CURRENT connection state, not only the transition into it.
+   *
+   * `onConnectionChange?.(true)` above fires from the `connect` EVENT. A page that
+   * mounts onto a socket that is already established never sees that event, so the
+   * callback never fires and the consumer sits on whatever it initialised to —
+   * forever. Playlists initialises to `'offline'` and therefore rendered
+   * "Live updates off" indefinitely on production while the socket was connected
+   * and events were flowing (measured 2026-08-18: still "off" after 20s, while
+   * Devices showed "on" in the same session).
+   *
+   * Devices only looked correct by accident: its `device:status` handler also sets
+   * `'connected'`, and heartbeats arrive constantly, so the data path masked the
+   * missing signal. Routes whose events are rare — playlists, content — have no
+   * such mask, which is why this surfaced there first.
+   *
+   * Deliberately one-directional: this promotes to connected ONLY. It never asserts
+   * offline, because "not currently connected" is not the same claim as "the socket
+   * dropped" — that distinction (`null` = reconnecting vs `false` = truly offline)
+   * belongs to the `disconnect` handler above and must stay its sole author.
+   * `true` is idempotent for every consumer, so a duplicate with `connect` is inert.
+   */
+  useEffect(() => {
+    if (!enabled) return;
+    if (isConnected) {
+      onConnectionChange?.(true);
+    }
+  }, [enabled, isConnected, onConnectionChange]);
+
   // Monitor offline/online status
   useEffect(() => {
     const handleOnline = () => {
