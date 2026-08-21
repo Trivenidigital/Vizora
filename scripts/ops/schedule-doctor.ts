@@ -198,12 +198,18 @@ async function main(): Promise<void> {
   // incidents. #259 filtered fleet-manager only, so schedule-doctor kept
   // re-raising coverage_gap for a disabled fixture — caught by the natural
   // cycle on 2026-08-02 22:30, which put the incident straight back.
+  //
+  // K28 FIX: build displayIds BEFORE filtering, so that Check 2 (orphan
+  // schedules) can distinguish between "display deleted" (truly orphaned) and
+  // "display disabled by operator" (not an orphan, don't auto-deactivate).
+  const displayIds = new Set(displays.map(d => d.id));
+
   const disabledDisplays = displays.filter(d => (d as { isDisabled?: boolean }).isDisabled === true);
   if (disabledDisplays.length > 0) {
     displays = displays.filter(d => (d as { isDisabled?: boolean }).isDisabled !== true);
     log(AGENT, `Skipping ${disabledDisplays.length} operator-disabled display(s)`);
   }
-  log(AGENT, `Fetched ${schedules.length} schedules, ${displays.length} displays, ${playlists.length} playlists`);
+  log(AGENT, `Fetched ${schedules.length} schedules, ${displays.length} displays (${displayIds.size} total), ${playlists.length} playlists`);
 
   // State is read at the very END (after all detection I/O), so the file lock
   // is held only for the brief read→merge→write below — not across the
@@ -231,9 +237,6 @@ async function main(): Promise<void> {
   const unexaminedPastEndScheduleIds = new Set<string>();
   /** Check 3 could not determine the playlist's item count. */
   const unexaminedEmptyPlaylistScheduleIds = new Set<string>();
-
-  // Build lookup sets
-  const displayIds = new Set(displays.map(d => d.id));
   const playlistMap = new Map(playlists.map(p => [p.id, p]));
   const now = new Date();
 
