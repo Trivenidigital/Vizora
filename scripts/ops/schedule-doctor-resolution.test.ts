@@ -760,6 +760,65 @@ test('K24: a playlist that now reports content resolves empty_playlist_schedule'
   });
 });
 
+// ─── K28: Disabled displays must not trigger false orphan-schedule incidents ───
+
+test('K28: a schedule targeting a disabled display is NOT treated as orphaned', async () => {
+  // K28 discovered when displayIds was built from the FILTERED display list
+  // (excluding disabled displays). This made Check 2 (orphan schedules) treat
+  // schedules targeting disabled displays as if the display didn't exist, and
+  // auto-deactivate them as orphans. But operator-disabled displays still exist
+  // in the database — they're just operator-marked as disabled, not deleted.
+  //
+  // The fix: build displayIds from ALL displays (before filtering for
+  // coverage-gap check 4), so that Check 2 can distinguish between:
+  //   - "display deleted" (truly orphaned)
+  //   - "display disabled by operator" (not orphaned, don't auto-deactivate)
+  const fixture: Fixture = {
+    schedules: [
+      {
+        id: 'sched-disabled-target',
+        name: 'Storeroom Loop',
+        isActive: true,
+        displayId: 'display-disabled',
+        playlistId: 'pl-1',
+      },
+    ],
+    displays: [
+      { id: 'display-1', name: 'Lobby', currentPlaylistId: 'pl-1' },
+      { id: 'display-disabled', name: 'Storeroom', isDisabled: true },
+    ],
+    playlists: [{ id: 'pl-1', name: 'Main', items: [{ contentId: 'c-1' }] }],
+  };
+
+  await withServer(fixture, async baseUrl => {
+    const tmpRoot = setupTmpRoot([]);
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+      // The schedule targeting a disabled display should NOT be flagged as
+      // orphaned — exit 0, no issues found
+      assert.equal(result.code, 0, `expected clean exit; got:\n${result.stderr}\n${result.stdout}`);
+
+      const state = readState(tmpRoot);
+      const orphanIncident = state.incidents.find(
+        i => i.type === 'orphan_schedule' && i.targetId === 'sched-disabled-target',
+      );
+      assert.equal(
+        orphanIncident,
+        undefined,
+        'schedule targeting a disabled display must NOT be auto-deactivated as orphan',
+      );
+
+      assert.doesNotMatch(
+        result.stdout,
+        /orphan.*disabled/i,
+        'log must not report the disabled-display schedule as orphaned',
+      );
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
 // ─── An agent must not clear another agent's incidents ───────────────────────
 
 test('a healthy run leaves another agent incidents untouched', async () => {
