@@ -10,6 +10,7 @@ import { NotificationService } from '../services/notification.service';
 import { MetricsService } from '../metrics/metrics.service';
 import { DatabaseService } from '../database/database.service';
 import { StorageService } from '../storage/storage.service';
+import { WsDeviceGuard } from './guards/ws-auth.guard';
 
 jest.mock('@sentry/nestjs', () => ({
   captureException: jest.fn(),
@@ -84,14 +85,7 @@ describe('heartbeat ack — wire contract with the TV client', () => {
   };
 
   const mockDatabaseService = {
-    display: {
-      findFirst: jest.fn(),
-      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-      // Revocation backstop reads through findUnique. Absent, every call would
-      // throw on undefined, get swallowed by the fail-open catch, and the
-      // 'not revoked' assertions below would pass without exercising anything.
-      findUnique: jest.fn(),
-    },
+    display: { findFirst: jest.fn(), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     schedule: { findMany: jest.fn().mockResolvedValue([]) },
     playlist: { findFirst: jest.fn().mockResolvedValue(null) },
   };
@@ -182,16 +176,6 @@ describe('heartbeat ack — wire contract with the TV client', () => {
     );
     (gateway as unknown as { reconcileResolvedAt: Map<string, number> }).reconcileResolvedAt.clear();
     (gateway as unknown as { reconcileSignalledAt: Map<string, number> }).reconcileSignalledAt.clear();
-
-    // Default the revocation backstop's lookup to a LIVE device, so every test that is
-    // not about revocation exercises the healthy path. Left as a bare jest.fn() it would
-    // resolve undefined, which the predicate correctly reads as "row deleted" — and every
-    // unrelated test would silently assert the revoked shape.
-    mockDatabaseService.display.findUnique.mockResolvedValue({
-      organizationId: 'org-1',
-      isDisabled: false,
-      jwtToken: null,
-    });
   });
 
   afterEach(() => {
@@ -222,7 +206,6 @@ describe('heartbeat ack — wire contract with the TV client', () => {
       expect(d.reconcileContent).toBe(true);
       expect(d.nextHeartbeatIn).toBe(15000);
       expect(d.commands).toEqual([]);
-      expect(d.revoked).toBe(false);
     });
 
     it('carries the reconcile signal the device actually converges on — BOTH values', async () => {
@@ -247,61 +230,27 @@ describe('heartbeat ack — wire contract with the TV client', () => {
       expect(mockDatabaseService.display.findFirst.mock.calls.length).toBeGreaterThan(resolvesBefore);
     });
 
-    describe('`revoked` — the heartbeat revocation backstop', () => {
-      // Why this is a server promise now: the `device:revoked` push is fire-and-forget
-      // and drops silently when INTERNAL_API_SECRET is unset or the realtime circuit is
-      // open, the heartbeat's own DB write is an updateMany that no-ops on a deleted row,
-      // and the live revocation predicate ran only at DELIVERY time. A device deleted
-      // while connected, with nothing being pushed to it, therefore never learned. The
-      // flag is a TRIGGER: the client answers it by probing auth/check and purges only on
-      // 410 (revocation-contract §1.5/§3.4, permitted by §3.2/§6.3).
-      const liveDevice = { organizationId: 'org-1', isDisabled: false, jwtToken: null };
-
-      it('emits revoked:false for a healthy device', async () => {
-        serverHasContent();
-        mockDatabaseService.display.findUnique.mockResolvedValue(liveDevice);
-        const d = (await beat(socket(), '')).data!;
-        expect(d).toHaveProperty('revoked', false);
-        // Prove the false came from a real lookup, not a throttle/short-circuit.
-        expect(mockDatabaseService.display.findUnique).toHaveBeenCalled();
-      });
-
-      it('emits revoked:true when the display row is gone (deleted while connected)', async () => {
-        serverHasContent();
-        mockDatabaseService.display.findUnique.mockResolvedValue(null);
-        expect((await beat(socket(), '')).data).toHaveProperty('revoked', true);
-      });
-
-      it('emits revoked:true when the device is operator-disabled', async () => {
-        serverHasContent();
-        mockDatabaseService.display.findUnique.mockResolvedValue({ ...liveDevice, isDisabled: true });
-        expect((await beat(socket(), '')).data).toHaveProperty('revoked', true);
-      });
-
-      it('emits revoked:true when the device was reassigned to another org', async () => {
-        serverHasContent();
-        mockDatabaseService.display.findUnique.mockResolvedValue({ ...liveDevice, organizationId: 'org-2' });
-        expect((await beat(socket(), '')).data).toHaveProperty('revoked', true);
-      });
-
-      it('fails OPEN — a database error is transient, never a revocation signal (§1.5a)', async () => {
-        serverHasContent();
-        mockDatabaseService.display.findUnique.mockRejectedValue(new Error('db down'));
-        expect((await beat(socket(), '')).data).toHaveProperty('revoked', false);
-      });
-
-      it('does not treat a socket with no recorded token hash as revoked', async () => {
-        // isCurrentDeviceToken(stored, undefined) is false, so an un-guarded hash
-        // comparison would report every such socket revoked on every beat.
-        serverHasContent();
-        mockDatabaseService.display.findUnique.mockResolvedValue({
-          ...liveDevice,
-          jwtToken: 'a'.repeat(64),
-        });
-        const s = socket();
-        expect(s.data).not.toHaveProperty('deviceTokenHash');
-        expect((await beat(s, '')).data).toHaveProperty('revoked', false);
-      });
+    it('does NOT emit `revoked` — revocation rides the separate device:revoked event', async () => {
+      // The client acts on ack.revoked (main.ts:1020) and the design contract permits it
+      // (revocation-contract.md §3.2 "MAY"), but the server never sends it. The superseded
+      // fixture asserted revoked:true as the server's promise; it is not one.
+      //
+      // DO NOT "FIX" THIS BY ADDING THE FIELD. #370 did exactly that, shipped it, and it
+      // was removed again as unreachable dead code. handleHeartbeat carries
+      // @UseGuards(WsDeviceGuard), and the guard re-reads the display on EVERY device
+      // message and rejects on the same four conditions a revocation check would test
+      // (missing row / org mismatch / isDisabled / stale token hash), disconnecting the
+      // socket before the handler body runs. A revocation branch inside the handler is
+      // therefore reachable only when nothing is revoked — it can only ever emit `false`.
+      //
+      // The reason that survived unit testing is this suite's own scoping note above:
+      // driving handleHeartbeat directly bypasses its decorators, so the guard that makes
+      // the branch dead is absent here. Negative controls proved the tests were sensitive
+      // to the new code; they could not prove production could reach it. If you need the
+      // guard's behaviour asserted, it is in guards/ws-auth.guard.spec.ts — including the
+      // test that the guard is actually bound to this handler.
+      serverHasContent();
+      expect((await beat(socket(), '')).data).not.toHaveProperty('revoked');
     });
 
     it('emits `commands` as a key that is always empty here', async () => {
@@ -311,6 +260,42 @@ describe('heartbeat ack — wire contract with the TV client', () => {
       const d = (await beat(socket(), '')).data!;
       expect(d).toHaveProperty('commands');
       expect(d.commands).toEqual([]);
+    });
+  });
+
+  // ------------------------------------------------------------------------------
+  // The mitigation for this suite's own scoping caveat.
+  //
+  // Everything above drives handleHeartbeat DIRECTLY, which bypasses its decorators.
+  // That bypass is what let #370 add a handler-side `revoked` branch, pass a fully
+  // negative-controlled suite, ship, and only then be found unreachable in production.
+  // These two assertions together close that hole: the guard IS bound to this handler,
+  // and the guard rejects a deleted device. Any future handler-side revocation branch is
+  // therefore provably dead, and this file says so before anyone writes it.
+  // ------------------------------------------------------------------------------
+  describe('WsDeviceGuard runs before handleHeartbeat', () => {
+    it('is actually bound to handleHeartbeat — the decorator this suite bypasses', () => {
+      const guards = Reflect.getMetadata('__guards__', DeviceGateway.prototype.handleHeartbeat);
+      // Not just "some guard": this specific one. If Nest ever changes the metadata key
+      // this reads undefined and fails loudly rather than passing vacuously.
+      expect(guards).toBeDefined();
+      expect(guards).toContain(WsDeviceGuard);
+    });
+
+    it('rejects a deleted device at the guard, so the handler body cannot run', async () => {
+      const db = { display: { findUnique: jest.fn().mockResolvedValue(null) } } as any;
+      const client = {
+        id: 'socket-1',
+        data: { deviceId: 'device-1', organizationId: 'org-1', deviceTokenHash: 'a'.repeat(64) },
+        emit: jest.fn(),
+        disconnect: jest.fn(),
+      };
+      const ctx = { switchToWs: () => ({ getClient: () => client }) } as any;
+
+      await expect(new WsDeviceGuard(db).canActivate(ctx)).rejects.toThrow();
+      expect(client.emit).toHaveBeenCalledWith('error', { message: 'device_token_stale' });
+      expect(client.disconnect).toHaveBeenCalledWith(true);
+      expect(db.display.findUnique).toHaveBeenCalled();
     });
   });
 

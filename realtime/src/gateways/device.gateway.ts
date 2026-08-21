@@ -126,26 +126,6 @@ const HEARTBEAT_DB_REFRESH_INTERVAL_MS = 60_000;
 // a genuinely new drift by at most this window; it never suppresses one indefinitely.
 const RECONCILE_RESOLVE_INTERVAL_MS = 60_000;
 const RECONCILE_SIGNAL_COOLDOWN_MS = 60_000;
-
-// Heartbeat revocation backstop. A device deleted/disabled WHILE CONNECTED was
-// previously invisible to itself: the `device:revoked` push is fire-and-forget
-// (middleware silently no-ops when INTERNAL_API_SECRET is unset or the realtime
-// circuit is open), the heartbeat's own DB write is an `updateMany` that no-ops
-// on a deleted row, and the only live revocation predicate we had
-// (isCurrentDeliveryDeviceSocket) runs at DELIVERY time — so a revoked device
-// with nothing being pushed to it never re-handshakes and never learns. It keeps
-// rendering tenant content until something happens to drop the socket.
-//
-// The ack flag closes that hole: it is a TRIGGER, not an authority. The client
-// answers it by probing auth/check and purges only on 410 (revocation-contract
-// §1.5/§3.4), so a false positive here costs one extra probe, never a wipe.
-// Permitted by contract §3.2 ("the ack MAY carry it") and §6.3.
-//
-// Bounds COST, not CORRECTNESS: at 60s a 10k fleet costs ~166 lookups/s instead
-// of ~660 at every 15s beat, and detection latency is <= this window + one beat.
-// The client's own confirm probe is rate-limited to one per 5 min, so checking
-// faster than this could not make a purge happen any sooner.
-const REVOCATION_CHECK_INTERVAL_MS = 60_000;
 const SENT_CONTENT_VERSION_TTL_S = 3600;
 
 // PR-8 — server-side device-JWT 90d refresh. Device tokens are signed 90d and
@@ -247,8 +227,6 @@ export class DeviceGateway
   // socket on one process, so per-process state is the right scope).
   private readonly reconcileResolvedAt: Map<string, number> = new Map();
   private readonly reconcileSignalledAt: Map<string, number> = new Map();
-  // Heartbeat revocation backstop throttle (per device, per process).
-  private readonly revocationCheckedAt: Map<string, number> = new Map();
 
   // 2.4: Connection rate limiting per IP
   private readonly connectionAttempts: Map<string, { count: number; resetAt: number }> = new Map();
@@ -741,7 +719,6 @@ export class DeviceGateway
         // the maps track live devices rather than every device seen since boot.
         this.reconcileResolvedAt.delete(deviceId);
         this.reconcileSignalledAt.delete(deviceId);
-        this.revocationCheckedAt.delete(deviceId);
         this.heartbeatService.forgetDevice(deviceId);
         cleaned++;
       }
@@ -1197,79 +1174,6 @@ export class DeviceGateway
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.logger.warn(`Failed to cache sent content version for ${deviceId}: ${message}`);
     }
-  }
-
-  /**
-   * Heartbeat revocation backstop (Device Revocation Contract §3.2). Answers
-   * "is this live socket's device revoked?" for the ack's `revoked` flag.
-   *
-   * Same predicate as isCurrentDeliveryDeviceSocket — deleted row, org
-   * reassignment, operator disable, or a token hash that is no longer the
-   * stored one — but READ-ONLY: it does not emit, disconnect, or mutate socket
-   * state. The device drives its own teardown through the confirmed path
-   * (ack.revoked -> auth/check -> 410 -> purge), and a socket we killed here
-   * could not carry the ack that tells it to.
-   *
-   * Fails OPEN. A DB error is a transient server condition and must never reach
-   * a device as a revocation signal (contract §1.5a, mirroring the handshake's
-   * `catch -> pass`). The cost of failing open is that revocation waits for the
-   * next beat; the cost of failing closed would be telling a healthy fleet it
-   * was revoked during a database blip.
-   */
-  private async isDeviceRevoked(
-    client: { data?: Record<string, any> },
-    deviceId: string,
-  ): Promise<boolean> {
-    const now = Date.now();
-    const lastChecked = this.revocationCheckedAt.get(deviceId) ?? 0;
-    if (now - lastChecked < REVOCATION_CHECK_INTERVAL_MS) return false;
-
-    let display: { organizationId: string; isDisabled: boolean; jwtToken: string | null } | null;
-    try {
-      display = await this.databaseService.display.findUnique({
-        where: { id: deviceId },
-        select: { organizationId: true, isDisabled: true, jwtToken: true },
-      });
-    } catch (error: unknown) {
-      // Not stamped: a failed lookup must not burn the window, or one blip would
-      // delay detection by a further REVOCATION_CHECK_INTERVAL_MS.
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.warn(`Revocation check failed for device ${deviceId}, failing open: ${message}`);
-      return false;
-    }
-
-    this.revocationCheckedAt.set(deviceId, now);
-
-    // Identity revocation — needs no credential, so it is evaluated for every
-    // socket. This is the case the backstop exists for: an operator deleting or
-    // disabling a connected device.
-    let reason: string | null = null;
-    if (!display) {
-      reason = 'deleted';
-    } else if (display.organizationId !== client.data?.organizationId) {
-      reason = 'org_reassigned';
-    } else if (display.isDisabled) {
-      reason = 'disabled';
-    } else {
-      // Credential staleness is only DECIDABLE when this socket recorded the hash
-      // it authenticated with. Both connect paths set it (device.gateway.ts:961,
-      // 1037), so a missing hash means an unrecognised socket shape rather than a
-      // stale credential — and isCurrentDeviceToken(x, undefined) is false, which
-      // would turn "cannot evaluate" into "revoked" for every beat of every such
-      // socket. Unclassified is transient (contract §1.5a): skip the comparison.
-      // Nothing is lost by doing so — a genuinely rotated-away token is rejected
-      // DEVICE_REVOKED at the next handshake and by the delivery-time check.
-      const presentedHash = client.data?.deviceTokenHash as string | undefined;
-      if (presentedHash && !isCurrentDeviceToken(display.jwtToken, presentedHash)) {
-        reason = 'token_stale';
-      }
-    }
-
-    if (reason) {
-      this.logger.warn(`Revocation signalled in heartbeat ack to device ${deviceId} (${reason})`);
-    }
-
-    return reason !== null;
   }
 
   /**
@@ -1800,7 +1704,6 @@ export class DeviceGateway
         // the maps track live devices rather than every device seen since boot.
         this.reconcileResolvedAt.delete(deviceId);
         this.reconcileSignalledAt.delete(deviceId);
-        this.revocationCheckedAt.delete(deviceId);
         // Drop the app-version dedup entry too, so that map tracks connected
         // devices rather than everything seen since boot. Costs one redundant
         // UPDATE when the device returns, which is the correct trade.
@@ -1996,14 +1899,8 @@ export class DeviceGateway
         data.contentVersion,
       );
 
-      // Revocation backstop: the only path by which a device revoked WHILE
-      // CONNECTED learns about it when the `device:revoked` push never lands.
-      // Trigger only — the device confirms via auth/check 410 before purging.
-      const revoked = await this.isDeviceRevoked(client, deviceId);
-
       return createSuccessResponse({
         reconcileContent,
-        revoked,
         nextHeartbeatIn: 15000,
         commands: [],
       });
