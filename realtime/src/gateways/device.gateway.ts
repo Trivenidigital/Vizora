@@ -8,6 +8,7 @@ import {
   ConnectedSocket,
   MessageBody,
 } from '@nestjs/websockets';
+import { randomUUID } from 'node:crypto';
 import { Server, Socket } from 'socket.io';
 import { Logger, UseFilters, UseGuards, UsePipes } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -191,6 +192,19 @@ export class DeviceGateway
       });
 
       if (result.action === 'reject') {
+        // Until now the whole revoke->purge chain was log-silent: a DEVICE_REVOKED
+        // handshake rejection produced no realtime log, and the 410 that follows it is
+        // the one response that makes a player discard its pairing. An operator could
+        // not see an unpair happen. Codes only — never token or hash material.
+        // AUTH_EXPIRED / AUTH_INVALID are ordinary churn on a fleet with rotating
+        // credentials; only the two terminal codes lead to a purge, so only those are
+        // worth an operator's attention. Codes and the opaque display id only.
+        const line = `handshake_reject device=${result.deviceId ?? 'unverified'} code=${result.code}`;
+        if (result.code === 'DEVICE_REVOKED' || result.code === 'TENANT_SUSPENDED') {
+          this.logger.warn(line);
+        } else {
+          this.logger.debug(line);
+        }
         // err.message carries the legacy string (Electron client reads
         // connect_error.message); err.data.code carries the contract code
         // (the Android TV app reads connect_error.data.code).
@@ -204,6 +218,8 @@ export class DeviceGateway
         socket.data = socket.data || {};
         socket.data.deviceAuthPayload = result.payload;
         socket.data.deviceAuthTokenHash = result.tokenHash;
+        socket.data.deviceAuthPresentedHash = result.presentedTokenHash;
+        socket.data.deviceAuthViaGrace = result.authenticatedViaGrace;
       }
       // 'pass' and 'accept' both continue; handleConnection finishes setup.
       next();
@@ -959,7 +975,21 @@ export class DeviceGateway
       client.data.capabilities = client.handshake.auth?.capabilities;
       client.data.deliveryAckCapable = this.supportsDeliveryAck(client);
       client.data.deviceTokenHash = client.data.deviceAuthTokenHash;
-      client.data.deviceTokenExp = preVerified.exp; // PR-8 refresh trigger
+      // Recovery evidence, deliberately NOT authority. `deviceTokenHash` above stays
+      // the authoritative generation that WsDeviceGuard validates; these two describe
+      // the credential the device actually proved it holds, and that credential's own
+      // expiry. They differ only when the device authenticated through the grace bridge.
+      client.data.presentedDeviceTokenHash =
+        client.data.deviceAuthPresentedHash ?? client.data.deviceAuthTokenHash;
+      client.data.authenticatedViaGrace = client.data.deviceAuthViaGrace === true;
+      if (client.data.authenticatedViaGrace) {
+        // This device is alive only because of a Redis bridge record: it authenticated
+        // on a credential the DB no longer considers authoritative, which means an
+        // earlier handoff did not land. Unobservable until now, and it is exactly the
+        // population that a Redis loss would strand.
+        this.logger.warn(`device_authenticated_via_grace device=${deviceId}`);
+      }
+      client.data.deviceTokenExp = preVerified.exp; // the PRESENTED credential's expiry
 
       return { kind: 'device', payload: preVerified as DevicePayload };
     }
@@ -1540,10 +1570,32 @@ export class DeviceGateway
           deviceIdentifier,
           organizationId: orgId,
           type: 'device',
+          // Without a unique claim, two rotations for one device inside the same wall
+          // clock second mint byte-identical tokens, so the loser's ownership-checked
+          // grace cleanup matches the winner's live record and deletes it. Verified
+          // unreachable today because the 1h cooldown serialises rotations — but that
+          // safety rests on a Redis key with no persistence guarantee, so make the
+          // tokens distinguishable rather than depend on it.
+          jti: randomUUID(),
         },
         { secret: deviceSecret, algorithm: 'HS256', expiresIn: DEVICE_TOKEN_TTL },
       );
       const newHash = hashDeviceToken(newToken);
+
+      // Fence before touching the grace slot. A superseded socket (dedup disconnects it
+      // but does not cancel this in-flight promise) must not overwrite a live bridge and
+      // then delete it on abort — that would destroy a recovery path the device still
+      // needs. Release the cooldown we claimed but did not use, so the socket that
+      // actually replaced us is not blocked for the full hour.
+      if (!this.isActiveDeviceSocket(client, deviceId)) {
+        this.logger.warn(
+          `refresh_aborted_stale_socket device=${deviceId} — superseded connection, not rotating`,
+        );
+        await this.redisService
+          .delete(`device:token:refresh-cooldown:${deviceId}`)
+          .catch(() => undefined);
+        return;
+      }
 
       // 1) Grace FIRST — the old token stays valid across the rotation.
       // F1 — TTL equals the OLD token's remaining validity (`oldTokenExp - now`)
@@ -1559,7 +1611,17 @@ export class DeviceGateway
         Math.max(DEVICE_TOKEN_GRACE_MIN_TTL_SECONDS, exp - nowSeconds),
       );
       const graceKey = deviceTokenGraceKey(deviceId);
-      const grace: DeviceTokenGrace = { prev: currentHash, next: newHash };
+      // Bridge from the credential the device PROVED it holds by authenticating with
+      // it — not from whatever generation the DB happens to hold. Identical on a normal
+      // accept, so this is a no-op there. On a grace accept the DB has already moved to
+      // a generation the device may never have installed; bridging from that one throws
+      // away the only recovery path, which is what turned two failed handoffs into an
+      // unpair. The TTL below derives from `exp`, the PRESENTED credential's own expiry,
+      // so the bridge can never outlive what it points at — and an expired JWT is
+      // rejected AUTH_EXPIRED before the handshake ever consults grace.
+      const bridgeHash =
+        (client.data?.presentedDeviceTokenHash as string | undefined) ?? currentHash;
+      const grace: DeviceTokenGrace = { prev: bridgeHash, next: newHash };
       try {
         await this.redisService.set(
           graceKey,
@@ -1576,6 +1638,19 @@ export class DeviceGateway
         return;
       }
 
+      // Fence to the socket that is still this device's active one. A superseded socket
+      // (dedup disconnects it at the top of authenticateConnection) keeps running this
+      // method to completion — `disconnect` does not cancel an in-flight promise — and
+      // would advance the fleet's authoritative hash to a token it then emits into a
+      // closed socket that nothing receives. That is a manufactured failed handoff.
+      if (!this.isActiveDeviceSocket(client, deviceId)) {
+        this.logger.warn(
+          `refresh_aborted_stale_socket device=${deviceId} — superseded connection, not rotating`,
+        );
+        await this.deleteOwnedGraceRecord(graceKey, grace);
+        return;
+      }
+
       // 2) Rotate the stored hash, guarded so a concurrent re-pair/revoke aborts.
       let rotatedCount = 0;
       try {
@@ -1585,9 +1660,18 @@ export class DeviceGateway
         });
         rotatedCount = rotated?.count ?? 0;
       } catch (err) {
+        // A throw does NOT mean the write did not land — a commit whose acknowledgement
+        // was lost looks identical here. Deleting the bridge assumes it did not, and if
+        // that assumption is wrong the device holds a credential that is neither stored
+        // nor bridged: a permanent lockout with no attacker and no client involvement.
+        // Keeping the record is safe either way. If the write really did not land the
+        // record is inert (grace requires `next === stored`, which is false) and expires
+        // on its own TTL; if it did land, the record is exactly what lets the device
+        // recover. So: log, keep, and let the next attempt converge.
         const msg = err instanceof Error ? err.message : 'Unknown error';
-        this.logger.warn(`Token refresh DB rotation failed for device ${deviceId}: ${msg}`);
-        await this.deleteOwnedGraceRecord(graceKey, grace);
+        this.logger.warn(
+          `Token refresh DB rotation failed for device ${deviceId} (bridge retained — commit uncertain): ${msg}`,
+        );
         return;
       }
       if (rotatedCount === 0) {

@@ -52,6 +52,10 @@ describe('authenticateDeviceHandshake', () => {
       action: 'accept',
       payload: devicePayload,
       tokenHash: hashDeviceToken(TOKEN),
+      // A normal accept: the credential presented IS the authoritative one, so the
+      // recovery-evidence fields mirror it and no grace bridge was involved.
+      presentedTokenHash: hashDeviceToken(TOKEN),
+      authenticatedViaGrace: false,
     });
   });
 
@@ -115,7 +119,11 @@ describe('authenticateDeviceHandshake', () => {
     const verify = jest.fn().mockReturnValue(devicePayload);
     const findUnique = jest.fn().mockResolvedValue(null);
     const r = await authenticateDeviceHandshake(TOKEN, makeDeps({ verify, findUnique }));
-    expect(r).toEqual({ action: 'reject', message: 'device_token_stale', code: 'DEVICE_REVOKED' });
+    // deviceId rides along on terminal rejects so an unpair can be attributed to a
+    // device in logs. Opaque display id, never credential material.
+    expect(r).toEqual({
+      action: 'reject', message: 'device_token_stale', code: 'DEVICE_REVOKED', deviceId: 'display-1',
+    });
   });
 
   it('rejects a disabled device with DEVICE_REVOKED', async () => {
@@ -140,7 +148,9 @@ describe('authenticateDeviceHandshake', () => {
       currentDisplay({ organization: { subscriptionStatus: 'suspended' } }),
     );
     const r = await authenticateDeviceHandshake(TOKEN, makeDeps({ verify, findUnique }));
-    expect(r).toEqual({ action: 'reject', message: 'tenant_suspended', code: 'TENANT_SUSPENDED' });
+    expect(r).toEqual({
+      action: 'reject', message: 'tenant_suspended', code: 'TENANT_SUSPENDED', deviceId: 'display-1',
+    });
   });
 
   it('does NOT suspend active/free/canceled tenants (accept)', async () => {
@@ -182,6 +192,8 @@ describe('authenticateDeviceHandshake', () => {
         action: 'accept',
         payload: devicePayload,
         tokenHash: hashDeviceToken(NEW_TOKEN),
+        presentedTokenHash: hashDeviceToken(NEW_TOKEN),
+        authenticatedViaGrace: false,
       });
     });
 
@@ -199,6 +211,11 @@ describe('authenticateDeviceHandshake', () => {
         action: 'accept',
         payload: devicePayload,
         tokenHash: hashDeviceToken(NEW_TOKEN),
+        // …but the recovery evidence records the OLD token the device actually proved it
+        // holds, which is what a later rotation must bridge from. Conflating the two is
+        // what let a second failed handoff unpair a healthy device.
+        presentedTokenHash: hashDeviceToken(OLD_TOKEN),
+        authenticatedViaGrace: true,
       });
       expect(redisGet).toHaveBeenCalledWith(deviceTokenGraceKey('display-1'));
     });
