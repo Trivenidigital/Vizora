@@ -579,8 +579,8 @@ Available at `http://localhost:3000/api/v1/docs` in development mode only.
 
 > Numbers below were re-validated 2026-08-03 (middleware + web + ops). **Verify with a fresh run before relying on a specific number** — the codebase is actively gaining tests. See `docs/plans/2026-05-09-test-results.md` for the full report.
 
-- **Middleware**: **3350 / 3350 tests pass** across **167 / 167 suites**, 0 fail (verified 2026-08-03).
-- **Realtime**: **212 / 212 tests pass** across **10 / 10 suites**. 10 spec files. The historical Prisma-generate-in-test-env issue NO LONGER REPRODUCES.
+- **Middleware**: **3760 / 3760 tests pass** across **179 / 179 suites**, 1 snapshot, 0 fail (re-measured 2026-08-22 on `d2dbaf1e`).
+- **Realtime**: **554 / 554 tests pass** across **19 / 19 suites** (re-measured 2026-08-22 on `d2dbaf1e`). The historical Prisma-generate-in-test-env issue NO LONGER REPRODUCES.
 - **Web**: **1167 / 1167 tests pass** across **113 / 113 suites**, 0 skipped (verified 2026-08-03).
 - **Ops scripts**: **154 / 154 tests pass** via `pnpm test:ops` (node:test + tsx) — verified 2026-08-12.
   Note `pnpm test:ops` runs under tsx, which strips types without checking them, and CI's
@@ -602,7 +602,16 @@ Available at `http://localhost:3000/api/v1/docs` in development mode only.
   **Locally you must run `prisma generate` + `nx build @vizora/database` first** — `packages/database/dist`
   is gitignored, so a fresh clone reports module-resolution errors rather than real ones.
 - **Aggregate**: 4517+ unit/integration tests passing, **ZERO failures**.
-- **TypeScript**: middleware `tsc --noEmit` exit 0; realtime + web pass via ts-jest (no separate type-check needed).
+- **TypeScript**: **`npx tsc --noEmit` in `middleware/` is a NO-OP — do not use it as a gate.**
+  `middleware/tsconfig.json` is a solution-style config (`files: []`, `include: []`, one project
+  reference), so it type-checks **zero source files** and exits 0 unconditionally. Verified with
+  `tsc --noEmit --listFiles | grep -c middleware/src` → `0` (2026-08-22). This was cited as a
+  passing gate for a long time; every such claim was a vacuous green.
+  The checks that DO cover middleware types: `npx nx build @vizora/middleware` (webpack + ts-loader)
+  and ts-jest on the unit specs. Use those. `tsconfig.app.json` is the config with real `include`,
+  so `npx tsc --noEmit -p middleware/tsconfig.app.json` is a genuine check — but note it reports
+  pre-existing repo-wide errors, so it is not currently a clean gate either.
+  Realtime + web are covered via ts-jest.
 - **Playwright (E2E)**: 24 spec files in `e2e-tests/`. Post-2026-05-09 fix (mass `/api/` → `/api/v1/` + h1 copy regex updates), estimated >90% pass rate. ~26 remaining failures concentrated in 9 specs (heaviest: 16-billing); see `docs/plans/2026-05-09-playwright-results.md`. Critical-path flows verified.
 - **Display**: Jest unit coverage exists for Electron main/preload/device/cache/renderer helpers and is CI-gated via `pnpm --filter @vizora/display test:ci`; display typecheck/build are gated via `pnpm --filter @vizora/display typecheck` and `pnpm --filter @vizora/display build`. Real-device walkthrough is still required per release.
 - **Builds**: All 3 services compile via `npx nx build @vizora/{middleware,web,realtime}`; Electron display compiles via `pnpm --filter @vizora/display build`. `web` may need `NODE_OPTIONS="--max-old-space-size=4096"` on memory-constrained dev machines.
