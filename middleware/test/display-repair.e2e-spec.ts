@@ -242,19 +242,60 @@ describe('Display repair — rebind an existing display (e2e)', () => {
     // `location` is set directly: the CREATE branch of completePairing derives
     // it from the device's own metadata hostname and ignores the dto, so the
     // operator value has to be written afterwards to be preserved later.
+    //
+    // `socketId` is seeded NON-null on purpose — it defaults to null, so
+    // asserting it is null after the rebind would otherwise pass even if the
+    // `socketId: null` write were deleted, leaving a repaired screen pointing
+    // at the dead client's connection.
     await db.display.update({
       where: { id: paired.display.id },
       data: {
         currentPlaylistId: playlist.id,
         orientation: 'portrait',
         location: 'Lobby',
+        socketId: `socket-of-the-dead-client-${suffix}`,
+        unpairedAt: new Date('2026-03-03T00:00:00.000Z'),
       },
+    });
+
+    // Relations that hang off the display row. Nothing in the current write
+    // touches them — it is an `updateMany` naming only scalar columns — but
+    // "schedules, groups and tags survive" is a property the operator was
+    // promised, and safe-by-construction is not the same as asserted. A future
+    // refactor to a nested `update` with `set: []` would silently break it.
+    const schedule = await db.schedule.create({
+      data: {
+        name: `Repair ${suffix} Schedule`,
+        organizationId: account.organizationId,
+        playlistId: playlist.id,
+        displayId: paired.display.id,
+        startDate: new Date('2026-01-01T00:00:00.000Z'),
+        daysOfWeek: [1, 2, 3, 4, 5],
+      },
+    });
+    const tag = await db.tag.create({
+      data: { name: `repair-${suffix}-tag`, organizationId: account.organizationId },
+    });
+    await db.displayTag.create({
+      data: { displayId: paired.display.id, tagId: tag.id },
+    });
+    const group = await db.displayGroup.create({
+      data: {
+        name: `Repair ${suffix} Group`,
+        organizationId: account.organizationId,
+      },
+    });
+    await db.displayGroupMember.create({
+      data: { displayId: paired.display.id, displayGroupId: group.id },
     });
 
     return {
       displayId: paired.display.id,
       deviceIdentifier,
       playlistId: playlist.id,
+      scheduleId: schedule.id,
+      tagId: tag.id,
+      groupId: group.id,
       deviceToken: status.deviceToken,
     };
   };
@@ -285,7 +326,27 @@ describe('Display repair — rebind an existing display (e2e)', () => {
     expect(row.location).toBe('Lobby');
     expect(row.orientation).toBe('portrait');
     expect(row.status).toBe('pairing');
+    // Stale session state from the dead client, both seeded non-null above.
+    // `unpairedAt` reaches the dashboard through display-response.select.ts, so
+    // a leftover value makes a repaired screen report itself as unpaired.
     expect(row.socketId).toBeNull();
+    expect(row.unpairedAt).toBeNull();
+
+    // Relations hanging off the display row are untouched by the rebind.
+    const schedule = await db.schedule.findUnique({
+      where: { id: original.scheduleId },
+    });
+    expect(schedule?.displayId).toBe(original.displayId);
+    expect(
+      await db.displayTag.count({
+        where: { displayId: original.displayId, tagId: original.tagId },
+      }),
+    ).toBe(1);
+    expect(
+      await db.displayGroupMember.count({
+        where: { displayId: original.displayId, displayGroupId: original.groupId },
+      }),
+    ).toBe(1);
 
     // No second row was created for this org.
     const orgDisplays = await db.display.count({
@@ -323,43 +384,51 @@ describe('Display repair — rebind an existing display (e2e)', () => {
     expect(serialized).not.toContain(code);
   }, 60000);
 
-  it('takes the identifier over from a same-org ghost against the real unique index', async () => {
+  it('refuses when another same-org row holds the identifier, and touches neither row', async () => {
     const account = await registerAccount('ghost');
     const original = await seedConfiguredDisplay(account, 'ghost');
 
-    // The clear-and-pair that created the problem: a second row for the same box.
+    // A second row for the same box, then freed so a pairing session can exist
+    // at all (`requestPairingCode` refuses outright while the holder is paired).
     const sharedIdentifier = `repair-ghost-shared-${timestamp}`;
     const ghostCode = await requestPairingCode(sharedIdentifier);
     const ghostRes = await completePairing(account.authCookie, { code: ghostCode }, 201);
     const ghostId = (ghostRes.body as PairingCompleteBody).display.id;
     await pollForToken(ghostCode);
+    await db.display.update({ where: { id: ghostId }, data: { jwtToken: null } });
 
-    // The box is reset again and comes back on the SAME identifier. Free it
-    // first, exactly as a real second reset would (a paired row blocks the
-    // request endpoint outright).
-    await db.display.update({
-      where: { id: ghostId },
-      data: { jwtToken: null },
-    });
-    const code = await requestPairingCode(sharedIdentifier);
-
-    await completePairing(
-      account.authCookie,
-      { code, targetDisplayId: original.displayId },
-      201,
-    );
-
-    const target = await db.display.findUniqueOrThrow({
+    const ghostBefore = await db.display.findUniqueOrThrow({ where: { id: ghostId } });
+    const targetBefore = await db.display.findUniqueOrThrow({
       where: { id: original.displayId },
     });
-    expect(target.deviceIdentifier).toBe(sharedIdentifier);
-    expect(target.currentPlaylistId).toBe(original.playlistId);
 
-    const ghost = await db.display.findUniqueOrThrow({ where: { id: ghostId } });
-    expect(ghost.deviceIdentifier).toBe(`retired:${ghostId}`);
-    expect(ghost.jwtToken).toBeNull();
-    expect(ghost.isDisabled).toBe(true);
-    expect(ghost.unpairedAt).toBeTruthy();
+    const code = await requestPairingCode(sharedIdentifier);
+    const res = await completePairing(
+      account.authCookie,
+      { code, targetDisplayId: original.displayId },
+      409,
+    );
+    // Names the row so the operator can act on it.
+    expect(JSON.stringify(res.body)).toContain(ghostId);
+
+    // Nothing moved. In particular the holder was NOT renamed or disabled —
+    // `POST /displays/:id/disable` is admin-only, and pairing/complete is also
+    // reachable by a manager, so a takeover here would cross a role boundary.
+    expect(await db.display.findUniqueOrThrow({ where: { id: ghostId } })).toEqual(
+      ghostBefore,
+    );
+    expect(
+      await db.display.findUniqueOrThrow({ where: { id: original.displayId } }),
+    ).toEqual(targetBefore);
+    expect(
+      await db.auditLog.count({
+        where: { organizationId: account.organizationId, action: 'display_repaired' },
+      }),
+    ).toBe(0);
+
+    // The session is still unconsumed — free the row and the same code works.
+    const status = await pollForToken(code);
+    expect(status.status).toBe('pending');
   }, 60000);
 
   it('a rebind consumes no quota slot, but a genuinely new screen at the limit is still refused', async () => {

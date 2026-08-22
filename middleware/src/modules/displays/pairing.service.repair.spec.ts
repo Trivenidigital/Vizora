@@ -110,6 +110,14 @@ describe('PairingService — repair an existing display', () => {
 
   /** Hook that lets a test make the very next display write blow up. */
   let failNextDisplayWrite: string | null;
+  /**
+   * Every create/update/updateMany against the display table bumps this. It is
+   * what makes "the refusal writes to NOTHING" a real assertion instead of a
+   * vacuous one — the control test below proves the counter does move on a
+   * successful rebind, so a zero here means no write was attempted, not that
+   * the probe is broken.
+   */
+  let displayWrites: number;
 
   const ORG = 'org-1';
   const OTHER_ORG = 'org-2';
@@ -175,6 +183,7 @@ describe('PairingService — repair an existing display', () => {
       data: Record<string, unknown>;
       select?: Record<string, boolean>;
     }) => {
+      displayWrites++;
       if (failNextDisplayWrite) {
         const code = failNextDisplayWrite;
         failNextDisplayWrite = null;
@@ -199,6 +208,7 @@ describe('PairingService — repair an existing display', () => {
       data: Record<string, unknown>;
       select?: Record<string, boolean>;
     }) => {
+      displayWrites++;
       if (failNextDisplayWrite) {
         const code = failNextDisplayWrite;
         failNextDisplayWrite = null;
@@ -224,6 +234,7 @@ describe('PairingService — repair an existing display', () => {
       where: Record<string, unknown>;
       data: Record<string, unknown>;
     }) => {
+      displayWrites++;
       if (failNextDisplayWrite) {
         const code = failNextDisplayWrite;
         failNextDisplayWrite = null;
@@ -292,6 +303,7 @@ describe('PairingService — repair an existing display', () => {
     redisStore = new Map();
     sortedSets = new Map();
     failNextDisplayWrite = null;
+    displayWrites = 0;
 
     const txClient = {
       display: displayDelegate(),
@@ -399,6 +411,11 @@ describe('PairingService — repair an existing display', () => {
     return code;
   };
 
+  /** Timestamps/session state left behind by the client that just died. */
+  const STALE_PAIRED_AT = new Date('2026-01-01T00:00:00.000Z');
+  const STALE_HEARTBEAT = new Date('2026-02-02T00:00:00.000Z');
+  const STALE_UNPAIRED_AT = new Date('2026-03-03T00:00:00.000Z');
+
   const seedBrokenDisplay = (overrides: Partial<DisplayRow> = {}) => {
     const row = displayRow({
       id: 'display-lobby',
@@ -412,6 +429,15 @@ describe('PairingService — repair an existing display', () => {
       timezone: 'Asia/Kolkata',
       jwtToken: null,
       status: 'offline',
+      // Seeded NON-null on purpose. These are the fields the rebind is
+      // documented to REPLACE, and every one of them defaults to null/absent
+      // in the fixture — so asserting "it is null afterwards" against a
+      // default proves nothing and the write could be deleted unnoticed.
+      socketId: 'socket-of-the-dead-client',
+      metadata: { os: 'the-old-box', appVersion: '0.9.0' },
+      pairedAt: STALE_PAIRED_AT,
+      lastHeartbeat: STALE_HEARTBEAT,
+      unpairedAt: STALE_UNPAIRED_AT,
       ...overrides,
     });
     displays.set(row.id, row);
@@ -488,7 +514,59 @@ describe('PairingService — repair an existing display', () => {
         'fresh-identifier-1755000000000',
       );
       expect(displays.get(target.id)!.status).toBe('pairing');
-      expect(displays.get(target.id)!.socketId).toBeNull();
+    });
+
+    it('REPLACES every field that describes the physical client', async () => {
+      const target = seedBrokenDisplay();
+      expect(target.socketId).toBe('socket-of-the-dead-client');
+      const code = await startPairing('fresh-identifier-replaced');
+
+      await service.completePairing(ORG, ADMIN, {
+        code,
+        targetDisplayId: target.id,
+      });
+
+      const after = displays.get(target.id)!;
+      // Stale session state from the client that is being replaced. A leftover
+      // socketId points at a dead connection; a leftover unpairedAt is read by
+      // the dashboard through display-response.select.ts, so a repaired screen
+      // would keep reporting that it had been unpaired.
+      expect(after.socketId).toBeNull();
+      expect(after.unpairedAt).toBeNull();
+      // The new box's own description of itself.
+      expect(after.metadata).toEqual({ hostname: 'living-room-tv', os: 'android' });
+      // Freshly stamped, not the dead client's timestamps.
+      expect(after.pairedAt).not.toEqual(STALE_PAIRED_AT);
+      expect(after.pairedAt!.getTime()).toBeGreaterThan(STALE_PAIRED_AT.getTime());
+      expect(after.lastHeartbeat).not.toEqual(STALE_HEARTBEAT);
+      expect(after.lastHeartbeat!.getTime()).toBeGreaterThan(
+        STALE_HEARTBEAT.getTime(),
+      );
+    });
+
+    it('releases the per-target rebind claim so an immediate retry is not a 409', async () => {
+      // The claim carries a 300s TTL, so a leaked one turns the operator's very
+      // next attempt — the retry after a partial failure — into a conflict for
+      // five minutes.
+      const target = seedBrokenDisplay();
+      const first = await startPairing('fresh-identifier-retry-1');
+
+      await service.completePairing(ORG, ADMIN, {
+        code: first,
+        targetDisplayId: target.id,
+      });
+
+      expect(redisStore.has(`pairing-rebind-claim:${target.id}`)).toBe(false);
+
+      const second = await startPairing('fresh-identifier-retry-2');
+      const result = await service.completePairing(ORG, ADMIN, {
+        code: second,
+        targetDisplayId: target.id,
+      });
+      expect(result.display.id).toBe(target.id);
+      expect(displays.get(target.id)!.deviceIdentifier).toBe(
+        'fresh-identifier-retry-2',
+      );
     });
 
     it('PRESERVES the playlist assignment across the rebind', async () => {
@@ -721,12 +799,40 @@ describe('PairingService — repair an existing display', () => {
     });
   });
 
-  describe('deviceIdentifier collision — the ghost row from a previous clear-and-pair', () => {
-    it('retires the same-org ghost holding the identifier and frees its quota slot', async () => {
+  describe('deviceIdentifier collision — REFUSE, never take the identifier over', () => {
+    /**
+     * An earlier draft retired the colliding row automatically (rename +
+     * disable + clear credential). That was removed: `POST /displays/:id/disable`
+     * is `@Roles('admin')` while `pairing/complete` is `@Roles('admin','manager')`,
+     * so it let a manager perform an admin-only disable on a row they never
+     * named; it could not reach the clear-and-pair ghost it was written for
+     * (a PAIRED holder makes `requestPairingCode` refuse outright, so no
+     * session ever exists); and the rows it COULD reach were operator-created
+     * tokenless placeholders from `POST /displays`. These tests pin the refusal
+     * and, crucially, that NOTHING is written on the way to it.
+     */
+
+    const snapshotDisplays = () =>
+      new Map([...displays.entries()].map(([k, v]) => [k, { ...v }]));
+
+    it('CONTROL: the write probe really moves on a successful rebind', async () => {
+      // Without this, `expect(displayWrites).toBe(0)` below proves nothing.
       const target = seedBrokenDisplay();
-      // Seeded AFTER the code request: `requestPairingCode` refuses outright
-      // when a PAIRED row already owns the identifier, so the only way a
-      // credential-holding ghost reaches completion is by racing it.
+      const code = await startPairing('fresh-identifier-control');
+      displayWrites = 0;
+
+      await service.completePairing(ORG, ADMIN, {
+        code,
+        targetDisplayId: target.id,
+      });
+
+      expect(displayWrites).toBeGreaterThan(0);
+    });
+
+    it('same-org holder → 409 naming the conflicting row, and NOTHING is written', async () => {
+      const target = seedBrokenDisplay();
+      // Seeded after the code request only because `requestPairingCode` refuses
+      // when a PAIRED row owns the identifier; the refusal path is the same.
       const code = await startPairing('stable-hardware-id');
       displays.set(
         'display-ghost',
@@ -739,51 +845,78 @@ describe('PairingService — repair an existing display', () => {
           socketId: 'socket-abc',
         }),
       );
+      const before = snapshotDisplays();
+      displayWrites = 0;
 
-      const result = await service.completePairing(ORG, ADMIN, {
-        code,
-        targetDisplayId: target.id,
-      });
+      const error = await service
+        .completePairing(ORG, ADMIN, { code, targetDisplayId: target.id })
+        .catch((e: unknown) => e);
 
-      expect(result.display.id).toBe(target.id);
-      const ghost = displays.get('display-ghost')!;
-      // Not deleted — history is kept and the operator decides what to do with it.
-      expect(ghost.deviceIdentifier).toBe('retired:display-ghost');
-      expect(ghost.jwtToken).toBeNull();
-      expect(ghost.socketId).toBeNull();
-      expect(ghost.isDisabled).toBe(true);
-      expect(ghost.unpairedAt).toBeInstanceOf(Date);
-      // And the identifier really moved.
-      expect(displays.get(target.id)!.deviceIdentifier).toBe('stable-hardware-id');
-      // Quota slot released.
-      expect(
-        [...displays.values()].filter((d) => d.organizationId === ORG && !d.isDisabled)
-          .length,
-      ).toBe(1);
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).message).toContain('display-ghost');
+
+      expect(displayWrites).toBe(0);
+      expect(snapshotDisplays()).toEqual(before);
+      expect(auditLogs).toHaveLength(0);
+      expect(displaysService.sendDeviceRevoked).not.toHaveBeenCalled();
+      // The session was not consumed either — the operator can free the row
+      // and retry on the same code.
+      const request = JSON.parse(redisStore.get(`pairing:${code}`) as string);
+      expect(request.plaintextToken).toBeUndefined();
     });
 
-    it("never touches another tenant's row that holds the identifier", async () => {
+    it('an operator-created tokenless placeholder is refused, not silently disabled', async () => {
+      // The only population the removed takeover could actually reach:
+      // enabled + jwtToken null, created through POST /displays.
       const target = seedBrokenDisplay();
-      const code = await startPairing('contested-hardware-id');
-      displays.set(
-        'display-other-tenant',
-        displayRow({
-          id: 'display-other-tenant',
-          organizationId: OTHER_ORG,
-          deviceIdentifier: 'contested-hardware-id',
-          jwtToken: 'b'.repeat(64),
-        }),
-      );
+      const placeholder = displayRow({
+        id: 'display-placeholder',
+        organizationId: ORG,
+        deviceIdentifier: 'preassigned-hardware-id',
+        nickname: 'Meeting Room B (awaiting install)',
+        jwtToken: null,
+      });
+      displays.set(placeholder.id, placeholder);
+      const code = await startPairing('preassigned-hardware-id');
+      displayWrites = 0;
 
       await expect(
         service.completePairing(ORG, ADMIN, { code, targetDisplayId: target.id }),
-      ).rejects.toBeInstanceOf(NotFoundException);
+      ).rejects.toBeInstanceOf(ConflictException);
 
-      const other = displays.get('display-other-tenant')!;
-      expect(other.deviceIdentifier).toBe('contested-hardware-id');
-      expect(other.jwtToken).toBe('b'.repeat(64));
-      expect(other.isDisabled).toBe(false);
-      expect(displays.get(target.id)!.deviceIdentifier).toBe('old-hardware-id');
+      expect(displayWrites).toBe(0);
+      expect(displays.get(placeholder.id)).toEqual(placeholder);
+      expect(displays.get(placeholder.id)!.isDisabled).toBe(false);
+      expect(displays.get(placeholder.id)!.deviceIdentifier).toBe(
+        'preassigned-hardware-id',
+      );
+    });
+
+    it("another tenant's holder → the opaque refusal, and NOTHING is written", async () => {
+      const target = seedBrokenDisplay();
+      const code = await startPairing('contested-hardware-id');
+      const other = displayRow({
+        id: 'display-other-tenant',
+        organizationId: OTHER_ORG,
+        deviceIdentifier: 'contested-hardware-id',
+        jwtToken: 'b'.repeat(64),
+      });
+      displays.set(other.id, other);
+      const before = snapshotDisplays();
+      displayWrites = 0;
+
+      const error = await service
+        .completePairing(ORG, ADMIN, { code, targetDisplayId: target.id })
+        .catch((e: unknown) => e);
+
+      // Opaque on purpose — a cross-tenant collision must not confirm that the
+      // identifier exists, so it does NOT get the naming 409.
+      expect(error).toBeInstanceOf(NotFoundException);
+      expect((error as NotFoundException).message).not.toContain(other.id);
+
+      expect(displayWrites).toBe(0);
+      expect(snapshotDisplays()).toEqual(before);
+      expect(auditLogs).toHaveLength(0);
     });
 
     it('a rebind onto the row that already holds the identifier is a plain re-pair', async () => {
@@ -797,7 +930,7 @@ describe('PairingService — repair an existing display', () => {
 
       expect(result.display.id).toBe(target.id);
       expect(displays.size).toBe(1);
-      expect(auditLogs[0].changes.retiredDisplayId).toBeNull();
+      expect(auditLogs).toHaveLength(1);
     });
 
     it('maps a unique-constraint loss to a 409, never a raw P2002', async () => {
@@ -955,7 +1088,14 @@ describe('PairingService — repair an existing display', () => {
       ]);
 
       expect(settled.filter((s) => s.status === 'fulfilled')).toHaveLength(1);
-      expect(settled.filter((s) => s.status === 'rejected')).toHaveLength(1);
+      const losers = settled.filter((s) => s.status === 'rejected');
+      expect(losers).toHaveLength(1);
+      // Pin WHY it lost. Without this the test passes on any rejection at all —
+      // including one thrown for an unrelated reason that happens to leave the
+      // counts looking right. The per-CODE completion claim is the guard here.
+      const reason = (losers[0] as PromiseRejectedResult).reason as Error;
+      expect(reason).toBeInstanceOf(BadRequestException);
+      expect(reason.message).toBe('Pairing code is already being completed');
 
       const rebound = [...displays.values()].filter(
         (d) => d.deviceIdentifier === 'one-tv-identifier',
@@ -988,42 +1128,32 @@ describe('PairingService — repair an existing display', () => {
       expect(request.plaintextToken).toBeUndefined();
     });
 
-    it('12 — a failure while retiring the ghost rolls the ghost back too', async () => {
+    it('12 — the display write is rolled back when the LAST write (audit) fails', async () => {
       const target = seedBrokenDisplay();
-      const code = await startPairing('shared-hw');
-      const ghost = displayRow({
-        id: 'display-ghost',
-        organizationId: ORG,
-        deviceIdentifier: 'shared-hw',
-        jwtToken: 'c'.repeat(64),
-      });
-      displays.set(ghost.id, ghost);
-      // First write in the transaction is the ghost retirement; fail the SECOND.
-      let writes = 0;
-      const realUpdateMany = (db.display as unknown as { updateMany: unknown })
-        .updateMany as (args: unknown) => Promise<unknown>;
-      void realUpdateMany;
+      const before = { ...target };
+      const code = await startPairing('fresh-identifier-p2');
+
+      // The display update lands first and the audit insert fails after it, so
+      // this is the ordering where a missing rollback would be visible.
       const originalTx = db.$transaction.bind(db);
       (db as unknown as { $transaction: unknown }).$transaction = async (
         cb: (tx: never) => Promise<unknown>,
       ) =>
         originalTx(async (tx: never) => {
-          const txDisplay = (tx as unknown as { display: Record<string, unknown> })
-            .display;
-          const origUpdate = txDisplay.update as (a: unknown) => Promise<unknown>;
-          txDisplay.update = async (a: unknown) => {
-            writes++;
-            return origUpdate(a);
-          };
-          const origUpdateMany = txDisplay.updateMany as (a: unknown) => Promise<unknown>;
-          txDisplay.updateMany = async () => {
+          const txAudit = (tx as unknown as { auditLog: Record<string, unknown> })
+            .auditLog;
+          const origCreate = txAudit.create as (a: unknown) => Promise<unknown>;
+          txAudit.create = async () => {
+            // The display row really was updated by this point...
+            expect(displays.get(target.id)!.deviceIdentifier).toBe(
+              'fresh-identifier-p2',
+            );
             throw prismaError('P1001', 'connection lost');
           };
           try {
             return await cb(tx);
           } finally {
-            txDisplay.update = origUpdate;
-            txDisplay.updateMany = origUpdateMany;
+            txAudit.create = origCreate;
           }
         });
 
@@ -1031,10 +1161,10 @@ describe('PairingService — repair an existing display', () => {
         service.completePairing(ORG, ADMIN, { code, targetDisplayId: target.id }),
       ).rejects.toThrow();
 
-      expect(writes).toBe(1);
-      expect(displays.get('display-ghost')).toEqual(ghost);
-      expect(displays.get(target.id)).toEqual(target);
+      // ...and is gone again after the rollback.
+      expect(displays.get(target.id)).toEqual(before);
       expect(auditLogs).toHaveLength(0);
+      expect(displaysService.sendDeviceRevoked).not.toHaveBeenCalled();
     });
 
     it('14 — a delete that lands first wins; the rebind fails and creates no row', async () => {
@@ -1162,7 +1292,6 @@ describe('PairingService — repair an existing display', () => {
         event: 'pairing_rebind',
         previousDeviceIdentifier: 'old-hardware-id',
         newDeviceIdentifier: 'fresh-identifier-t',
-        retiredDisplayId: null,
       });
 
       const serialized = JSON.stringify(entry);
@@ -1180,24 +1309,25 @@ describe('PairingService — repair an existing display', () => {
       expect(serialized).not.toMatch(/jwt|token|secret/i);
     });
 
-    it('names the retired ghost in the audit record', async () => {
+    it('records exactly one row, and only for the display that was rebound', async () => {
       const target = seedBrokenDisplay();
-      displays.set(
-        'display-ghost',
-        displayRow({
-          id: 'display-ghost',
-          organizationId: ORG,
-          deviceIdentifier: 'shared-hw-2',
-        }),
-      );
-      const code = await startPairing('shared-hw-2');
+      const bystander = displayRow({
+        id: 'display-bystander',
+        organizationId: ORG,
+        deviceIdentifier: 'bystander-hw',
+        currentPlaylistId: 'playlist-bystander',
+      });
+      displays.set(bystander.id, bystander);
+      const code = await startPairing('fresh-identifier-u');
 
       await service.completePairing(ORG, ADMIN, {
         code,
         targetDisplayId: target.id,
       });
 
-      expect(auditLogs[0].changes.retiredDisplayId).toBe('display-ghost');
+      expect(auditLogs).toHaveLength(1);
+      expect(auditLogs[0].entityId).toBe(target.id);
+      expect(displays.get(bystander.id)).toEqual(bystander);
     });
   });
 });

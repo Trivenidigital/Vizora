@@ -241,8 +241,15 @@ jobs:
       # drifted. The customer-critical-path suite is intentionally included so
       # CI proves register -> pair -> content -> playlist -> schedule -> device
       # active-schedule delivery through the production /api/v1 route shape.
+      # display-repair is gated because some of what it proves is provable
+      # nowhere else. Its rollback test fails the LAST write of the rebind
+      # transaction from inside Postgres (a temporary BEFORE INSERT trigger on
+      # the audit table) and then asserts the display write is gone. The unit
+      # fake can only MODEL a rollback, and its `tx` and `db` handles append to
+      # the same array, so "the audit row cannot outlive a rolled-back rebind"
+      # has no other enforcement. Ungated, that is not a gate.
       - name: Run middleware E2E tests (gated suites)
-        run: pnpm --filter @vizora/middleware exec jest --config=jest.e2e.config.js --runInBand --testPathPattern="(agents|customer-critical-path|tenant-guard|b12-multi-tenant-revocation)"
+        run: pnpm --filter @vizora/middleware exec jest --config=jest.e2e.config.js --runInBand --testPathPattern="(agents|customer-critical-path|tenant-guard|b12-multi-tenant-revocation|display-repair)"
 
       # Realtime e2e (device-gateway.e2e-spec.ts) has a known pre-existing
        # failure in CI — it requires Prisma generate state + a MongoDB service
