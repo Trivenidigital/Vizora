@@ -583,6 +583,146 @@ describe('DeviceGateway', () => {
         expect(client.emit).not.toHaveBeenCalledWith('token:refresh', expect.anything());
       });
 
+      // ── refresh-cooldown latch (stranding regression) ───────────────────────────
+      //
+      // `tokenRefreshIssued` means "THIS CONNECTION completed a rotation". It once was
+      // also set when the connection merely lost the cooldown claim, which converted a
+      // transient condition into permanent per-connection suppression: one DB or
+      // grace-write blip left the claimant holding its own 1h key, latching on the very
+      // next beat and never attempting again. The token then expired while connected
+      // (invisible — `exp` is enforced only at handshake) and the device stranded on
+      // AUTH_EXPIRED at its next reconnect. These tests pin the invariant.
+      describe('refresh cooldown must not permanently suppress refresh', () => {
+        const inWindowData = () => ({
+          deviceId: 'device-1',
+          organizationId: 'org-1',
+          deviceIdentifier: 'test-id',
+          deviceTokenHash: hashToken(oldToken),
+          deviceTokenExp: Math.floor(Date.now() / 1000) + 3 * 86400,
+        });
+        const liveSocket = () => ({ id: 'socket-1', data: inWindowData(), emit: jest.fn(), disconnect: jest.fn() });
+        const beat = (c: any) => (gateway as any).maybeRefreshDeviceToken(c);
+        const rotationSucceeds = () =>
+          mockDatabaseService.display.updateMany.mockResolvedValue({ count: 1 } as any);
+
+        it('sets tokenRefreshIssued after a SUCCESSFUL rotation', async () => {
+          mockRedisService.setNx.mockResolvedValue(true);
+          rotationSucceeds();
+          const c = liveSocket();
+
+          await beat(c);
+
+          expect(c.data.tokenRefreshIssued).toBe(true);
+          expect(c.emit).toHaveBeenCalledWith('token:refresh', { token: 'new-token' });
+        });
+
+        it('does NOT set tokenRefreshIssued when it merely loses the cooldown claim', async () => {
+          mockRedisService.setNx.mockResolvedValue(false);
+          const c = liveSocket();
+
+          await beat(c);
+
+          expect(c.data.tokenRefreshIssued).toBeUndefined();
+          expect(c.emit).not.toHaveBeenCalledWith('token:refresh', expect.anything());
+        });
+
+        it('a failed rotation retries after the cooldown lapses and then rotates', async () => {
+          const c = liveSocket();
+          // Beat 1 — claims, DB rotation throws. Cooldown is deliberately NOT released.
+          mockRedisService.setNx.mockResolvedValueOnce(true);
+          mockDatabaseService.display.updateMany.mockRejectedValueOnce(new Error('db blip'));
+          await beat(c);
+          expect(c.data.tokenRefreshIssued).toBeUndefined();
+          expect(mockRedisService.delete).not.toHaveBeenCalledWith(
+            'device:token:refresh-cooldown:device-1',
+          );
+
+          // Beat 2 — its OWN 1h key still blocks it. This is the beat that used to latch.
+          mockRedisService.setNx.mockResolvedValueOnce(false);
+          await beat(c);
+          expect(c.data.tokenRefreshIssued).toBeUndefined();
+
+          // Beat 3 — cooldown lapsed; the same connection recovers on its own.
+          mockRedisService.setNx.mockResolvedValueOnce(true);
+          rotationSucceeds();
+          await beat(c);
+          expect(c.data.tokenRefreshIssued).toBe(true);
+          expect(c.emit).toHaveBeenCalledWith('token:refresh', { token: 'new-token' });
+        });
+
+        it('a Redis setNx ERROR retries next beat rather than suppressing permanently', async () => {
+          const c = liveSocket();
+          mockRedisService.setNx.mockRejectedValueOnce(new Error('redis down'));
+          await beat(c);
+          expect(c.data.tokenRefreshIssued).toBeUndefined();
+
+          mockRedisService.setNx.mockResolvedValueOnce(true);
+          rotationSucceeds();
+          await beat(c);
+          expect(c.data.tokenRefreshIssued).toBe(true);
+        });
+
+        it('a grace-write failure does not suppress permanently', async () => {
+          const c = liveSocket();
+          mockRedisService.setNx.mockResolvedValueOnce(true);
+          mockRedisService.set.mockRejectedValueOnce(new Error('grace write failed'));
+          await beat(c);
+          expect(c.data.tokenRefreshIssued).toBeUndefined();
+          expect(c.emit).not.toHaveBeenCalledWith('token:refresh', expect.anything());
+
+          mockRedisService.setNx.mockResolvedValueOnce(true);
+          rotationSucceeds();
+          await beat(c);
+          expect(c.data.tokenRefreshIssued).toBe(true);
+        });
+
+        it('stops attempting once this connection has rotated', async () => {
+          mockRedisService.setNx.mockResolvedValue(true);
+          rotationSucceeds();
+          const c = liveSocket();
+          await beat(c);
+          mockRedisService.setNx.mockClear();
+
+          for (let i = 0; i < 25; i += 1) await beat(c);
+
+          expect(mockRedisService.setNx).not.toHaveBeenCalled();
+          expect(c.emit).toHaveBeenCalledTimes(1);
+        });
+
+        it('a second socket losing the claim cannot produce a second rotation', async () => {
+          mockRedisService.setNx.mockResolvedValueOnce(true);
+          rotationSucceeds();
+          const a = liveSocket();
+          await beat(a);
+
+          mockRedisService.setNx.mockResolvedValue(false); // A holds the cooldown
+          const b = { ...liveSocket(), id: 'socket-2' };
+          for (let i = 0; i < 5; i += 1) await beat(b);
+
+          expect(b.emit).not.toHaveBeenCalledWith('token:refresh', expect.anything());
+          expect(a.emit).toHaveBeenCalledTimes(1);
+        });
+
+        it('the retry cannot revive a re-paired/revoked credential — only one winner', async () => {
+          // The rotation is conditional on the CURRENT stored hash. After a re-pair the
+          // guarded updateMany matches nothing, so the retry aborts instead of minting a
+          // token bound to a hash the DB no longer holds.
+          const c = liveSocket();
+          mockRedisService.setNx.mockResolvedValue(true);
+          mockDatabaseService.display.updateMany.mockImplementation((args: any) =>
+            Promise.resolve({ count: args?.where?.jwtToken ? 0 : 1 }),
+          );
+
+          for (let i = 0; i < 5; i += 1) await beat(c);
+
+          expect(c.emit).not.toHaveBeenCalledWith('token:refresh', expect.anything());
+          expect(c.data.tokenRefreshIssued).toBeUndefined();
+          expect(mockDatabaseService.display.updateMany).toHaveBeenCalledWith(
+            expect.objectContaining({ where: expect.objectContaining({ jwtToken: hashToken(oldToken) }) }),
+          );
+        });
+      });
+
       it('aborts the rotation (no emit) when the stored hash changed under it (re-pair race)', async () => {
         mockJwtService.verify.mockReturnValue(nearExpiryPayload());
         // Rotation update matches nothing (stored hash already changed); the
