@@ -141,6 +141,56 @@ describe('unverified credential claim telemetry (realtime handshake)', () => {
 
   // ---- everything else is untouched -----------------------------------------
 
+  it('carries NO claim on the payload-shape rejection — that sub is signature-backed', async () => {
+    // The signature verified; only the payload shape is wrong. `payload.sub` here is
+    // trusted, so it must not travel in the untrusted field or be logged under the
+    // `attribution=unverified` marker — that would blur the exact distinction this
+    // telemetry exists to keep sharp. Telemetry for structurally-invalid-but-SIGNED
+    // tokens would need its own trusted-attribution marker; this is not it.
+    const verify = jest.fn().mockReturnValue({
+      sub: REAL_DEVICE,
+      deviceIdentifier: 'dev-1',
+      organizationId: '', // verified, but unusable
+      type: 'device' as const,
+    });
+    const { deps, display } = makeDeps({ verify });
+    const result = await authenticateDeviceHandshake(forgedToken(REAL_DEVICE), deps);
+    expect(result).toEqual({
+      action: 'reject',
+      message: 'auth_invalid',
+      code: 'AUTH_INVALID',
+    });
+    expect(
+      (result as { unverifiedDeviceClaim?: string }).unverifiedDeviceClaim,
+    ).toBeUndefined();
+    expect(display.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('the claim appears ONLY when verification actually failed', async () => {
+    // Same token, same 401-equivalent verdict; the only difference is whether verify threw.
+    const verified = jest.fn().mockReturnValue({
+      sub: REAL_DEVICE,
+      deviceIdentifier: 'dev-1',
+      organizationId: '',
+      type: 'device' as const,
+    });
+    const signed = await authenticateDeviceHandshake(
+      forgedToken(REAL_DEVICE),
+      makeDeps({ verify: verified }).deps,
+    );
+    expect(
+      (signed as { unverifiedDeviceClaim?: string }).unverifiedDeviceClaim,
+    ).toBeUndefined();
+
+    const unsigned = await authenticateDeviceHandshake(
+      forgedToken(REAL_DEVICE),
+      makeDeps().deps,
+    );
+    expect((unsigned as { unverifiedDeviceClaim?: string }).unverifiedDeviceClaim).toBe(
+      REAL_DEVICE,
+    );
+  });
+
   it('an EXPIRED token still yields AUTH_EXPIRED and carries no claim', async () => {
     const verify = jest.fn(() => {
       const e = new Error('jwt expired');

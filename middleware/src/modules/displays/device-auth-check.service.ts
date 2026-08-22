@@ -80,10 +80,14 @@ export class DeviceAuthCheckService {
       typeof payload.organizationId !== 'string' ||
       payload.organizationId.trim() === ''
     ) {
-      // Signature verified here, but the token is not a usable device credential,
-      // so the request is still unauthenticated and the same diagnostics-only rule
-      // applies: the claim is logged, never trusted, never used for a lookup.
-      this.logUnverifiedClaim(token);
+      // Deliberately NO claim telemetry here, and this is not an oversight. The
+      // signature verified on this branch, so `payload.sub` is signature-backed —
+      // logging it under the `attribution=unverified` marker would file a trusted
+      // value under the untrusted one, blurring the exact distinction this telemetry
+      // exists to keep sharp, and inviting a future reader to generalise from it.
+      // (It matches realtime, which also emits nothing on its equivalent branch.)
+      // Telemetry for structurally-invalid-but-SIGNED tokens would need its own
+      // marker with trusted-attribution semantics; that is not this mechanism.
       return { httpStatus: 401, body: { code: 'AUTH_INVALID' } };
     }
 
@@ -163,6 +167,10 @@ export class DeviceAuthCheckService {
   /**
    * Diagnostics-only, and the realtime handshake's counterpart line (same fields,
    * same trust rules, same sanitisation, same budget).
+   *
+   * Called from ONE site: the `jwt.verify` catch block, i.e. verification actually
+   * failed. Never from the payload-shape branch below it, where the signature DID
+   * verify — see the comment there.
    *
    * There is deliberately no trusted `device=` field here: this endpoint has no
    * verified identity to report on an AUTH_INVALID, and `claimedDeviceId` must never

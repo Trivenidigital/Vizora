@@ -169,15 +169,37 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
     );
   });
 
-  it('logs the claim on the payload-shape rejection too, and still writes nothing', async () => {
-    // Signature verifies, but the token is not a usable device credential.
-    jwt.verify.mockReturnValue({ sub: REAL_DEVICE, type: 'user', organizationId: 'org-1' });
-    const result = await service.evaluate(forgedToken(REAL_DEVICE));
-
-    expect(result).toEqual({ httpStatus: 401, body: { code: 'AUTH_INVALID' } });
-    expect(claimLines()).toHaveLength(1);
+  it('emits NOTHING on the payload-shape rejection — that sub is signature-backed', async () => {
+    // Signature verifies, but the token is not a usable device credential. The `sub`
+    // on this branch is trusted, so filing it under `attribution=unverified` would
+    // blur the very distinction this telemetry exists to keep sharp. Telemetry for
+    // structurally-invalid-but-SIGNED tokens needs its own trusted-attribution
+    // marker, not this one.
+    const shapes = [
+      { sub: REAL_DEVICE, type: 'user', organizationId: 'org-1' },
+      { sub: REAL_DEVICE, type: 'device', organizationId: '' },
+      { sub: '', type: 'device', organizationId: 'org-1' },
+      { sub: REAL_DEVICE, type: 'device' },
+    ];
+    for (const payload of shapes) {
+      jwt.verify.mockReturnValue(payload);
+      const result = await service.evaluate(forgedToken(REAL_DEVICE));
+      expect(result).toEqual({ httpStatus: 401, body: { code: 'AUTH_INVALID' } });
+    }
+    expect(allLines()).toHaveLength(0);
     expect(display.findUnique).not.toHaveBeenCalled();
     assertNoWrites();
+  });
+
+  it('telemetry fires ONLY when verification actually failed', async () => {
+    // Same token, same claim, same 401 — the only difference is whether jwt.verify threw.
+    jwt.verify.mockReturnValue({ sub: REAL_DEVICE, type: 'user', organizationId: 'org-1' });
+    await service.evaluate(forgedToken(REAL_DEVICE));
+    expect(allLines()).toHaveLength(0);
+
+    jwt.verify.mockImplementation(badSignature);
+    await service.evaluate(forgedToken(REAL_DEVICE));
+    expect(claimLines()).toHaveLength(1);
   });
 
   // ---- 401 can never become 410 ---------------------------------------------
