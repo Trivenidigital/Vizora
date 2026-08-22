@@ -70,6 +70,34 @@ import {
 } from './unverified-credential-claim';
 import { redactDevicePlaylist } from '../services/device-content-payload';
 
+/**
+ * Connection source for the unverified-claim log line, diagnostics only.
+ *
+ * Reads `X-Real-IP`, NOT `X-Forwarded-For`. Prod nginx's `/socket.io/` location sets
+ * `proxy_set_header X-Real-IP $remote_addr`, which OVERWRITES whatever the client
+ * sent, so the value cannot be forged. `X-Forwarded-For` there is
+ * `$proxy_add_x_forwarded_for`, which APPENDS — its head is attacker-supplied, so
+ * `split(',')[0]` would let anyone name an innocent third party's IP in our logs,
+ * a worse version of the bug this field exists to fix. Never read XFF here.
+ *
+ * When the header is absent the connection did NOT come through nginx, and in exactly
+ * that case `handshake.address` IS the real peer. Behind nginx it is the proxy
+ * (127.0.0.1) and useless as a discriminator, which is why the header comes first.
+ *
+ * The result is sanitised: spaces and `=` are legal in a header value and arrive
+ * intact through Node's parser, so a raw `X-Real-IP: 1.2.3.4 attribution=verified`
+ * would forge fields inside our single line. CR/LF are already rejected by the
+ * parser, so a forged second LINE is not reachable — same-line forgery is, and the
+ * same helper that strips `=` from the claim closes it here too. It should almost
+ * never fire in prod (nginx overwrites the header), but the fallback path and any
+ * future proxy change are not guaranteed.
+ */
+function resolveUnverifiedPeer(socket: Socket): string | null {
+  const header = socket.handshake?.headers?.['x-real-ip'];
+  const realIp = Array.isArray(header) ? header[header.length - 1] : header;
+  return sanitiseUnverifiedPeer(realIp ?? socket.handshake?.address);
+}
+
 interface DevicePayload {
   sub: string; // device ID
   deviceIdentifier: string;
@@ -217,7 +245,7 @@ export class DeviceGateway
         // the sender CLAIMS to be — not who it is. The two fields are appended only
         // when a claim actually decoded; a malformed JWT stays unattributed, with the
         // line exactly as it was before this existed.
-        let suppressionNoticeDue = false;
+        let suppressedCount: number | null = null;
         if (result.code === 'AUTH_INVALID' && result.unverifiedDeviceClaim) {
           // The budget bounds how much attacker-controlled text reaches the logs AT
           // ALL, not merely at what level. Over budget the claim fields are simply not
@@ -228,22 +256,17 @@ export class DeviceGateway
           // fires per rejection regardless, so this costs nothing operationally.
           const now = Date.now();
           if (shouldEmitClaimTelemetry(result.unverifiedDeviceClaim, now)) {
-            // `peer=`, not `clientIp=`: this handshake path has NO rate limit
-            // (`validateConnectionRate` lives in handleConnection, which a rejected
-            // handshake never reaches), so anyone can put any customer's display id
-            // into this warn line at will. Without a source, that is indistinguishable
-            // from the named display genuinely misbehaving. The address is the only
-            // observed — rather than asserted — thing on the line, but behind nginx it
-            // is the PROXY: realtime has no trusted forwarded-address derivation (the
-            // middleware's `trust proxy` machinery has no analogue here), so the field
-            // is named for what it actually holds instead of implying a client IP.
-            const peer = sanitiseUnverifiedPeer(socket.handshake?.address);
+            // This handshake path has NO rate limit (`validateConnectionRate` lives in
+            // handleConnection, which a rejected handshake never reaches), so anyone
+            // can put any customer's display id into this warn line at will. Without a
+            // source that is indistinguishable from the named display misbehaving.
+            const peer = resolveUnverifiedPeer(socket);
             line +=
               ` claimedDeviceId=${result.unverifiedDeviceClaim}` +
               ` attribution=unauthenticated-claim peer=${peer ?? 'unknown'}`;
             atWarn = true;
           } else {
-            suppressionNoticeDue = takeClaimSuppressionNotice(now);
+            suppressedCount = takeClaimSuppressionNotice(now);
           }
         }
 
@@ -252,17 +275,25 @@ export class DeviceGateway
         // the middleware's outer try — so an unguarded throw would skip `next(err)`
         // and the outer catch would turn a REJECT into a PASS. That risk predates the
         // claim fields; this guard closes it for every log on the path.
+        //
+        // Deliberately note the widened blast radius: this now also swallows a failed
+        // DEVICE_REVOKED / TENANT_SUSPENDED warn — the line whose whole purpose is
+        // letting an operator SEE an unpair happen. Losing that line is the lesser
+        // harm; the alternative is a logger fault admitting a connection we decided to
+        // reject. If the tradeoff ever needs revisiting, the fix is a second channel
+        // for terminal codes, not removing this guard.
         try {
           if (atWarn) {
             this.logger.warn(line);
           } else {
             this.logger.debug(line);
           }
-          if (suppressionNoticeDue) {
-            // Once per window, with no claim value: without it, a quiet warn stream is
-            // ambiguous between "nothing is happening" and "the budget is exhausted".
+          if (suppressedCount !== null) {
+            // No claim value, and a COUNT so an operator can tell incidental budget
+            // exhaustion from an active flood — without it, a quiet warn stream is
+            // ambiguous between "nothing is happening" and "attribution is degraded".
             this.logger.warn(
-              'unverified_credential_claim_suppressed reason=rate-limit note=claim-values-withheld',
+              `unverified_credential_claim_suppressed reason=rate-limit suppressed=${suppressedCount} note=claim-values-withheld`,
             );
           }
         } catch {

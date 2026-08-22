@@ -17,6 +17,36 @@ import {
 } from './unverified-credential-claim';
 
 /**
+ * Spy EVERY Logger level, not just warn/debug.
+ *
+ * The specs used to build their "everything that was logged" view from `warn` and
+ * `debug` alone, which meant a `logger.log(`leak tok=${token}`)` inserted at either
+ * log site left the whole suite green — a full raw credential in prod logs, invisible
+ * to the tests whose stated job is bounding what reaches them. The argument in the
+ * source (prod runs with debug enabled) is precisely why the bound has to cover all
+ * levels rather than the two we happen to use.
+ */
+const LOGGER_LEVELS = ['log', 'error', 'warn', 'debug', 'verbose', 'fatal'] as const;
+
+const spyAllLoggerLevels = (): Record<string, jest.SpyInstance> => {
+  const spies: Record<string, jest.SpyInstance> = {};
+  for (const level of LOGGER_LEVELS) {
+    const proto = Logger.prototype as unknown as Record<string, unknown>;
+    if (typeof proto[level] !== 'function') continue; // level not in this Nest version
+    spies[level] = jest
+      .spyOn(Logger.prototype, level as 'warn')
+      .mockImplementation(() => undefined);
+  }
+  // Non-vacuous: if Nest ever renames these, the suite must fail loudly rather than
+  // silently watch nothing.
+  expect(Object.keys(spies)).toEqual(expect.arrayContaining(['log', 'warn', 'debug', 'error']));
+  return spies;
+};
+
+const linesFrom = (spies: Record<string, jest.SpyInstance>): string[] =>
+  Object.values(spies).flatMap((spy) => spy.mock.calls.map((c) => String(c[0])));
+
+/**
  * Diagnostics-only claim telemetry on the handshake path.
  *
  * The whole point of these tests is what must NOT happen. Decoding `sub` out of a
@@ -86,8 +116,12 @@ describe('unverified credential claim telemetry (realtime handshake)', () => {
 
   it('a fabricated sub naming a real device touches no row — no read, no write of any kind', async () => {
     const { deps, display } = makeDeps();
-    await authenticateDeviceHandshake(forgedToken(REAL_DEVICE), deps);
+    const result = await authenticateDeviceHandshake(forgedToken(REAL_DEVICE), deps);
 
+    // Non-vacuous: assert the path actually ran and produced the verdict. Without
+    // this, stubbing the handshake to return immediately would leave the
+    // not-called assertions below green while proving nothing.
+    expect(result).toMatchObject({ action: 'reject', code: 'AUTH_INVALID' });
     expect(display.findUnique).not.toHaveBeenCalled();
     expect(display.update).not.toHaveBeenCalled();
     expect(display.updateMany).not.toHaveBeenCalled();
@@ -256,6 +290,7 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
   let gateway: DeviceGateway;
   let warn: jest.SpyInstance;
   let debug: jest.SpyInstance;
+  let spies: Record<string, jest.SpyInstance>;
   let display: { findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock; delete: jest.Mock };
 
   const b64url = (value: unknown) =>
@@ -307,8 +342,9 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
       emit: jest.fn(),
       sockets: { sockets: new Map() },
     };
-    warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-    debug = jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
+    spies = spyAllLoggerLevels();
+    warn = spies.warn;
+    debug = spies.debug;
   });
 
   afterEach(() => {
@@ -319,10 +355,14 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
     ).forEach(clearInterval);
   });
 
-  const handshakeFrom = async (token: string, address: string | undefined) => {
+  const handshakeFrom = async (
+    token: string,
+    address: string | undefined,
+    headers: Record<string, string | string[]> = {},
+  ) => {
     const socket = {
       id: 'socket-1',
-      handshake: { auth: { token }, address },
+      handshake: { auth: { token }, address, headers },
       data: {} as Record<string, unknown>,
       emit: jest.fn(),
       disconnect: jest.fn(),
@@ -343,7 +383,8 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
 
   const warnings = () => warn.mock.calls.map((c) => String(c[0]));
   const debugs = () => debug.mock.calls.map((c) => String(c[0]));
-  const allLines = () => [...warnings(), ...debugs()];
+  /** EVERY level, so a leak at `log`/`error`/`verbose` cannot hide from these tests. */
+  const allLines = () => linesFrom(spies);
   const rejectLines = () => allLines().filter((l) => l.startsWith('handshake_reject '));
   const warnRejects = () => warnings().filter((l) => l.startsWith('handshake_reject '));
 
@@ -362,30 +403,81 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
     expect(rejectLines()[0]).not.toContain('device=display-real-1');
   });
 
-  it('names the source, and names it honestly as `peer` rather than a client IP', async () => {
+  it('reads X-Real-IP, which prod nginx OVERWRITES, so the source cannot be forged', async () => {
     // This path has NO rate limit — validateConnectionRate lives in handleConnection,
     // which a rejected handshake never reaches — so anyone can put any customer's
     // display id into this warn line. Without a source it is indistinguishable from
-    // that display genuinely misbehaving. Behind nginx the socket address is the
-    // proxy and realtime has no trusted forwarded-address derivation, so the field is
-    // `peer=` and must NOT claim to be the client's IP.
-    await handshake(forgedToken('display-real-1'));
+    // that display genuinely misbehaving.
+    await handshakeFrom(forgedToken('display-real-1'), '127.0.0.1', {
+      'x-real-ip': '203.0.113.9',
+    });
     const line = warnRejects()[0];
-    expect(line).toContain(' peer=127.0.0.1');
-    expect(line).not.toContain('clientIp=');
+    expect(line).toContain(' peer=203.0.113.9');
+    // The socket address behind nginx is the proxy and is useless as a discriminator.
+    expect(line).not.toContain('127.0.0.1');
+    expect(line).not.toContain('clientIp='); // named for what it holds, not what we wish
   });
 
-  it('sanitises the peer and falls back to `unknown` rather than omitting the field', async () => {
-    await handshakeFrom(forgedToken('display-real-1'), 'evil claimedDeviceId=victim');
-    expect(warnRejects()[0]).toMatch(
+  it('NEVER reads X-Forwarded-For — its head is attacker-supplied', async () => {
+    // nginx sets XFF with $proxy_add_x_forwarded_for, which APPENDS: the value is
+    // `<whatever the client sent>, <real peer>`. Taking [0] would let an attacker name
+    // an innocent third party's IP in our logs — a worse version of the bug the peer
+    // field exists to fix.
+    await handshakeFrom(forgedToken('display-real-1'), '127.0.0.1', {
+      'x-forwarded-for': '198.51.100.7, 203.0.113.9',
+      'x-real-ip': '203.0.113.9',
+    });
+    expect(warnRejects()[0]).toContain(' peer=203.0.113.9');
+    expect(allLines().join('\n')).not.toContain('198.51.100.7');
+  });
+
+  it('falls back to the socket address ONLY when X-Real-IP is absent, never to XFF', async () => {
+    // No X-Real-IP means the connection did not come through nginx, and in exactly
+    // that case the socket address IS the real peer.
+    await handshakeFrom(forgedToken('display-real-1'), '198.51.100.20', {
+      'x-forwarded-for': '198.51.100.7',
+    });
+    const line = warnRejects()[0];
+    expect(line).toContain(' peer=198.51.100.20');
+    expect(allLines().join('\n')).not.toContain('198.51.100.7');
+  });
+
+  it('sanitises X-Real-IP — spaces and `=` are legal in a header and arrive intact', async () => {
+    // Node's parser rejects CR/LF, so a forged second LINE is unreachable; same-line
+    // field forgery is not, and this is what closes it.
+    await handshakeFrom(forgedToken('display-real-1'), '127.0.0.1', {
+      'x-real-ip': '1.2.3.4 attribution=verified claimedDeviceId=victim',
+    });
+    const line = warnRejects()[0];
+    // The forged text survives as inert characters — what must NOT survive is its
+    // structure: one `claimedDeviceId=` and one `attribution=`, both ours.
+    expect(line.match(/claimedDeviceId=/g)).toHaveLength(1);
+    expect(line.match(/attribution=/g)).toHaveLength(1);
+    expect(line).not.toContain('attribution=verified');
+    expect(line).not.toContain('=victim');
+    expect(line.split(' peer=')[1]).not.toContain(' '); // no new fields after peer
+    expect(line).toMatch(
       /^handshake_reject device=unverified code=AUTH_INVALID claimedDeviceId=display-real-1 attribution=unauthenticated-claim peer=[A-Za-z0-9_.:-]+$/,
     );
-    // One `claimedDeviceId=` field, not two — a forged peer cannot inject one.
-    expect(warnRejects()[0].match(/claimedDeviceId=/g)).toHaveLength(1);
+  });
 
-    resetClaimTelemetryState();
-    warn.mockClear();
-    await handshakeFrom(forgedToken('display-real-2'), undefined);
+  it('caps an over-long X-Real-IP — the parser accepts thousands of characters', async () => {
+    await handshakeFrom(forgedToken('display-real-1'), '127.0.0.1', {
+      'x-real-ip': '9'.repeat(4000),
+    });
+    const peer = warnRejects()[0].split(' peer=')[1];
+    expect(peer).toHaveLength(64);
+  });
+
+  it('takes the last value when the header arrives more than once', async () => {
+    await handshakeFrom(forgedToken('display-real-1'), '127.0.0.1', {
+      'x-real-ip': ['198.51.100.7', '203.0.113.9'],
+    });
+    expect(warnRejects()[0]).toContain(' peer=203.0.113.9');
+  });
+
+  it('falls back to `unknown` rather than omitting the field', async () => {
+    await handshakeFrom(forgedToken('display-real-1'), undefined, {});
     expect(warnRejects()[0]).toContain(' peer=unknown');
   });
 
@@ -451,10 +543,12 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
     const suppressed = warnings().filter((l) =>
       l.startsWith('unverified_credential_claim_suppressed'),
     );
+    // A count, so an operator can tell incidental budget exhaustion from a flood.
     expect(suppressed).toEqual([
-      'unverified_credential_claim_suppressed reason=rate-limit note=claim-values-withheld',
+      'unverified_credential_claim_suppressed reason=rate-limit suppressed=1 note=claim-values-withheld',
+      'unverified_credential_claim_suppressed reason=rate-limit suppressed=10 note=claim-values-withheld',
     ]);
-    expect(suppressed[0]).not.toContain('flood-');
+    expect(suppressed.join('\n')).not.toContain('flood-');
   });
 
   it('a throwing logger cannot turn a REJECT into a PASS', async () => {

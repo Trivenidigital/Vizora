@@ -229,11 +229,13 @@ export class DeviceAuthCheckService {
         );
         return;
       }
-      if (takeClaimSuppressionNotice(now)) {
-        // Once per window, with no claim value: without it, a quiet warn stream is
-        // ambiguous between "nothing is happening" and "the budget is exhausted".
+      const suppressedCount = takeClaimSuppressionNotice(now);
+      if (suppressedCount !== null) {
+        // No claim value, and a COUNT so an operator can tell incidental budget
+        // exhaustion from an active flood — without it, a quiet warn stream is
+        // ambiguous between "nothing is happening" and "attribution is degraded".
         this.logger.warn(
-          'unverified_credential_claim_suppressed reason=rate-limit note=claim-values-withheld',
+          `unverified_credential_claim_suppressed reason=rate-limit suppressed=${suppressedCount} note=claim-values-withheld`,
         );
       }
     } catch {

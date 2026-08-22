@@ -11,6 +11,36 @@ import {
 } from './unverified-credential-claim';
 
 /**
+ * Spy EVERY Logger level, not just warn/debug.
+ *
+ * The specs used to build their "everything that was logged" view from `warn` and
+ * `debug` alone, which meant a `logger.log(`leak tok=${token}`)` inserted at either
+ * log site left the whole suite green — a full raw credential in prod logs, invisible
+ * to the tests whose stated job is bounding what reaches them. The argument in the
+ * source (prod runs with debug enabled) is precisely why the bound has to cover all
+ * levels rather than the two we happen to use.
+ */
+const LOGGER_LEVELS = ['log', 'error', 'warn', 'debug', 'verbose', 'fatal'] as const;
+
+const spyAllLoggerLevels = (): Record<string, jest.SpyInstance> => {
+  const spies: Record<string, jest.SpyInstance> = {};
+  for (const level of LOGGER_LEVELS) {
+    const proto = Logger.prototype as unknown as Record<string, unknown>;
+    if (typeof proto[level] !== 'function') continue; // level not in this Nest version
+    spies[level] = jest
+      .spyOn(Logger.prototype, level as 'warn')
+      .mockImplementation(() => undefined);
+  }
+  // Non-vacuous: if Nest ever renames these, the suite must fail loudly rather than
+  // silently watch nothing.
+  expect(Object.keys(spies)).toEqual(expect.arrayContaining(['log', 'warn', 'debug', 'error']));
+  return spies;
+};
+
+const linesFrom = (spies: Record<string, jest.SpyInstance>): string[] =>
+  Object.values(spies).flatMap((spy) => spy.mock.calls.map((c) => String(c[0])));
+
+/**
  * Diagnostics-only claim telemetry on `GET /devices/auth/check`.
  *
  * This endpoint is the SOLE authority for device credential destruction, so the
@@ -32,6 +62,7 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
   let redis: { get: jest.Mock; getOrThrow: jest.Mock };
   let warn: jest.SpyInstance;
   let debug: jest.SpyInstance;
+  let spies: Record<string, jest.SpyInstance>;
 
   const REAL_DEVICE = 'display-real-1';
 
@@ -74,8 +105,9 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
     service = module.get(DeviceAuthCheckService);
     process.env.DEVICE_JWT_SECRET = 'x'.repeat(32);
     process.env.JWT_SECRET = 'u'.repeat(32); // distinct, so the user-token check is real
-    warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-    debug = jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
+    spies = spyAllLoggerLevels();
+    warn = spies.warn;
+    debug = spies.debug;
   });
 
   afterEach(() => {
@@ -85,7 +117,8 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
 
   const warnings = () => warn.mock.calls.map((c) => String(c[0]));
   const debugs = () => debug.mock.calls.map((c) => String(c[0]));
-  const allLines = () => [...warnings(), ...debugs()];
+  /** EVERY level, so a leak at `log`/`error`/`verbose` cannot hide from these tests. */
+  const allLines = () => linesFrom(spies);
   const claimLines = () =>
     allLines().filter((l) => l.startsWith('device_auth_check_reject '));
   const warnClaimLines = () =>
@@ -200,7 +233,10 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
   });
 
   it('a fabricated sub naming a real device reads and writes NOTHING', async () => {
-    await service.evaluate(forgedToken(REAL_DEVICE));
+    const result = await service.evaluate(forgedToken(REAL_DEVICE));
+    // Non-vacuous: prove the path ran and produced the verdict, so the not-called
+    // assertions below cannot pass merely because nothing happened.
+    expect(result).toEqual({ httpStatus: 401, body: { code: 'AUTH_INVALID' } });
     expect(display.findUnique).not.toHaveBeenCalled();
     assertNoWrites();
     expect(redis.get).not.toHaveBeenCalled();
@@ -372,10 +408,12 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
     const suppressed = warnings().filter((l) =>
       l.startsWith('unverified_credential_claim_suppressed'),
     );
+    // A count, so an operator can tell incidental budget exhaustion from a flood.
     expect(suppressed).toEqual([
-      'unverified_credential_claim_suppressed reason=rate-limit note=claim-values-withheld',
+      'unverified_credential_claim_suppressed reason=rate-limit suppressed=1 note=claim-values-withheld',
+      'unverified_credential_claim_suppressed reason=rate-limit suppressed=10 note=claim-values-withheld',
     ]);
-    expect(suppressed[0]).not.toContain('flood-');
+    expect(suppressed.join('\n')).not.toContain('flood-');
   });
 
   it('a throwing logger cannot turn the 401 into a 5xx', async () => {

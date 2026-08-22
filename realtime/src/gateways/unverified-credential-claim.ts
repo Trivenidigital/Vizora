@@ -154,15 +154,15 @@ export function sanitiseUnverifiedPeer(peer: string | undefined | null): string 
 const lastEmittedAt = new Map<string, number>();
 let windowStartedAt = 0;
 let emissionsInWindow = 0;
-let ceilingHitInWindow = false;
-let suppressionNoticeTakenInWindow = false;
+let suppressedInWindow = 0;
+let noticesTakenInWindow = 0;
 
 function rollWindow(now: number): void {
   if (windowStartedAt === 0 || now - windowStartedAt >= CLAIM_TELEMETRY_WINDOW_MS) {
     windowStartedAt = now;
     emissionsInWindow = 0;
-    ceilingHitInWindow = false;
-    suppressionNoticeTakenInWindow = false;
+    suppressedInWindow = 0;
+    noticesTakenInWindow = 0;
   }
 }
 
@@ -182,7 +182,7 @@ export function shouldEmitClaimTelemetry(claim: string, now: number): boolean {
   if (previous !== undefined && now - previous < CLAIM_TELEMETRY_WINDOW_MS) return false;
 
   if (emissionsInWindow >= CLAIM_TELEMETRY_MAX_PER_WINDOW) {
-    ceilingHitInWindow = true;
+    suppressedInWindow += 1;
     return false;
   }
 
@@ -201,15 +201,28 @@ export function shouldEmitClaimTelemetry(claim: string, now: number): boolean {
 }
 
 /**
- * True at most once per window, and only after the global ceiling has actually
- * suppressed something. Lets the caller record THAT suppression happened without
- * recording any claim value.
+ * Order-of-magnitude checkpoints at which the caller should say that suppression is
+ * happening, and how much of it. A bare "suppression occurred" cannot separate two
+ * claims lost to incidental budget exhaustion from fifty thousand lost to an active
+ * flood, and that distinction is the whole reason the over-budget residual is
+ * tolerable. Escalating thresholds give the operator the first signal immediately and
+ * the magnitude as it develops, while bounding the notice itself to at most five
+ * lines per window — the count is a number WE generate, never attacker text, so it
+ * cannot be used to widen the flood.
  */
-export function takeClaimSuppressionNotice(now: number): boolean {
+const SUPPRESSION_NOTICE_AT = [1, 10, 100, 1000, 10000];
+
+/**
+ * The number of suppressed emissions so far this window, at the moments that number
+ * crosses one of `SUPPRESSION_NOTICE_AT` — otherwise null. Never a claim value.
+ */
+export function takeClaimSuppressionNotice(now: number): number | null {
   rollWindow(now);
-  if (!ceilingHitInWindow || suppressionNoticeTakenInWindow) return false;
-  suppressionNoticeTakenInWindow = true;
-  return true;
+  if (noticesTakenInWindow >= SUPPRESSION_NOTICE_AT.length) return null;
+  const nextThreshold = SUPPRESSION_NOTICE_AT[noticesTakenInWindow];
+  if (suppressedInWindow < nextThreshold) return null;
+  noticesTakenInWindow += 1;
+  return suppressedInWindow;
 }
 
 /** Test seam — module state is process-global. */
@@ -217,8 +230,8 @@ export function resetClaimTelemetryState(): void {
   lastEmittedAt.clear();
   windowStartedAt = 0;
   emissionsInWindow = 0;
-  ceilingHitInWindow = false;
-  suppressionNoticeTakenInWindow = false;
+  suppressedInWindow = 0;
+  noticesTakenInWindow = 0;
 }
 
 /** Test seam — asserts the Map cap is honoured. */
