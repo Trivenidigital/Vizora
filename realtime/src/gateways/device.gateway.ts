@@ -203,32 +203,45 @@ export class DeviceGateway
         // AUTH_EXPIRED / AUTH_INVALID are ordinary churn on a fleet with rotating
         // credentials; only the two terminal codes lead to a purge, so only those are
         // worth an operator's attention. Codes and the opaque display id only.
-        const line = `handshake_reject device=${result.deviceId ?? 'unverified'} code=${result.code}`;
-        if (result.code === 'DEVICE_REVOKED' || result.code === 'TENANT_SUSPENDED') {
+        // `device=` is the TRUSTED field: populated only once the JWT verified, so on
+        // an AUTH_INVALID it always reads `unverified`. The claim below never touches it.
+        let line = `handshake_reject device=${result.deviceId ?? 'unverified'} code=${result.code}`;
+        let atWarn =
+          result.code === 'DEVICE_REVOKED' || result.code === 'TENANT_SUSPENDED';
+
+        // AUTH_INVALID left the operator blind: `device=unverified` says a device
+        // somewhere cannot authenticate but never which one. `claimedDeviceId` narrows
+        // that down and `attribution=unverified` says in the line itself what it is
+        // worth: it was decoded from a token that FAILED verification, so it is what
+        // the sender CLAIMS to be — not who it is. The two fields are appended only
+        // when a claim actually decoded; a malformed JWT stays unattributed, with the
+        // line exactly as it was before this existed.
+        let suppressionNoticeDue = false;
+        if (result.code === 'AUTH_INVALID' && result.unverifiedDeviceClaim) {
+          line += ` claimedDeviceId=${result.unverifiedDeviceClaim} attribution=unverified`;
+          // The budget gates VISIBILITY, not extraction: an attributable rejection is
+          // promoted to warn so an operator sees it, but minting invalid JWTs with
+          // varying `sub` must not be a way to write unbounded warn-level volume.
+          // Rate-limited rejections still log the enriched line, at the usual debug.
+          const now = Date.now();
+          if (shouldEmitClaimTelemetry(result.unverifiedDeviceClaim, now)) {
+            atWarn = true;
+          } else {
+            suppressionNoticeDue = takeClaimSuppressionNotice(now);
+          }
+        }
+
+        if (atWarn) {
           this.logger.warn(line);
         } else {
           this.logger.debug(line);
         }
-        // AUTH_INVALID left the operator blind: `device=unverified` says a device
-        // somewhere cannot authenticate but never which one. The claim below narrows
-        // that down — and is DELIBERATELY logged on its own line, in its own field,
-        // with the note attached, because it is decoded from a token that FAILED
-        // verification. It is what the sender CLAIMS to be. Never the
-        // `device=<id> AUTH_INVALID` shape, which reads as authenticated attribution.
-        // Budgeted (1/claim/15min, 20/15min overall) so minting invalid JWTs with
-        // varying `sub` cannot flood the log.
-        if (result.code === 'AUTH_INVALID' && result.unverifiedDeviceClaim) {
-          const now = Date.now();
-          if (shouldEmitClaimTelemetry(result.unverifiedDeviceClaim, now)) {
-            this.logger.warn(
-              `unverified_credential_claim deviceClaim=${result.unverifiedDeviceClaim} reason=AUTH_INVALID note=unauthenticated-claim-not-attribution`,
-            );
-          } else if (takeClaimSuppressionNotice(now)) {
-            // Records THAT claims were dropped, with no claim value in the line.
-            this.logger.warn(
-              'unverified_credential_claim_suppressed reason=rate-limit note=claim-values-withheld',
-            );
-          }
+        if (suppressionNoticeDue) {
+          // Once per window, with no claim value: without it, a quiet warn stream is
+          // ambiguous between "nothing is happening" and "the budget is exhausted".
+          this.logger.warn(
+            'unverified_credential_claim_suppressed reason=rate-limit note=claim-values-withheld',
+          );
         }
         // err.message carries the legacy string (Electron client reads
         // connect_error.message); err.data.code carries the contract code

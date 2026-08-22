@@ -205,6 +205,7 @@ describe('unverified credential claim telemetry (realtime handshake)', () => {
 describe('unverified credential claim telemetry (gateway log site)', () => {
   let gateway: DeviceGateway;
   let warn: jest.SpyInstance;
+  let debug: jest.SpyInstance;
   let display: { findUnique: jest.Mock; update: jest.Mock; updateMany: jest.Mock; delete: jest.Mock };
 
   const b64url = (value: unknown) =>
@@ -257,7 +258,7 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
       sockets: { sockets: new Map() },
     };
     warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
-    jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
+    debug = jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -289,26 +290,36 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
   };
 
   const warnings = () => warn.mock.calls.map((c) => String(c[0]));
-  const claimLines = () =>
-    warnings().filter((l) => l.startsWith('unverified_credential_claim '));
+  const debugs = () => debug.mock.calls.map((c) => String(c[0]));
+  const allLines = () => [...warnings(), ...debugs()];
+  const rejectLines = () => allLines().filter((l) => l.startsWith('handshake_reject '));
+  const warnRejects = () => warnings().filter((l) => l.startsWith('handshake_reject '));
 
-  it('emits the operator line in the mandated shape, and never as authenticated attribution', async () => {
+  it('enriches the ONE handshake_reject line — never a second line', async () => {
     const err = await handshake(forgedToken('display-real-1'));
     expect((err as unknown as { data?: { code: string } })?.data?.code).toBe('AUTH_INVALID');
 
-    expect(claimLines()).toEqual([
-      'unverified_credential_claim deviceClaim=display-real-1 reason=AUTH_INVALID note=unauthenticated-claim-not-attribution',
+    expect(rejectLines()).toEqual([
+      'handshake_reject device=unverified code=AUTH_INVALID claimedDeviceId=display-real-1 attribution=unverified',
     ]);
-    // The `device=<id> CODE` shape reads as verified attribution — it must never
-    // be produced for a credential that did not verify.
-    expect(warnings().some((l) => /device=display-real-1/.test(l))).toBe(false);
+    // Exactly one log line in total for this rejection: the enriched one.
+    expect(allLines()).toHaveLength(1);
+    // The TRUSTED field keeps its meaning — the claim never populates it.
+    expect(rejectLines()[0]).toContain('device=unverified ');
+    expect(rejectLines()[0]).not.toContain('device=display-real-1');
+  });
+
+  it('promotes the attributable rejection to warn so an operator actually sees it', async () => {
+    await handshake(forgedToken('display-real-1'));
+    expect(warnRejects()).toHaveLength(1);
+    expect(debugs()).toHaveLength(0);
   });
 
   it('logs no token, no token segment and no hash', async () => {
     const token = forgedToken('display-real-1');
     const [header, payloadSegment, signature] = token.split('.');
     await handshake(token);
-    const emitted = warnings().join('\n');
+    const emitted = allLines().join('\n');
     expect(emitted).not.toContain(token);
     expect(emitted).not.toContain(header);
     expect(emitted).not.toContain(payloadSegment);
@@ -316,18 +327,25 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
     expect(emitted).not.toContain(hashDeviceToken(token));
   });
 
-  it('deduplicates the same claim inside the window', async () => {
+  it('deduplicates the same claim inside the window — repeats stay at debug', async () => {
     await handshake(forgedToken('display-real-1'));
     await handshake(forgedToken('display-real-1'));
     await handshake(forgedToken('display-real-1'));
-    expect(claimLines()).toHaveLength(1);
+    // Still attributed every time (extraction is not rate-limited)...
+    expect(rejectLines()).toHaveLength(3);
+    expect(
+      rejectLines().every((l) => l.includes('claimedDeviceId=display-real-1')),
+    ).toBe(true);
+    // ...but only the first is promoted to warn.
+    expect(warnRejects()).toHaveLength(1);
+    expect(debugs()).toHaveLength(2);
   });
 
-  it('stops emitting past the global ceiling and says so once, with no claim value', async () => {
+  it('stops promoting past the global ceiling and says so once, with no claim value', async () => {
     for (let i = 0; i < CLAIM_TELEMETRY_MAX_PER_WINDOW + 25; i++) {
       await handshake(forgedToken(`flood-${i}`));
     }
-    expect(claimLines()).toHaveLength(CLAIM_TELEMETRY_MAX_PER_WINDOW);
+    expect(warnRejects()).toHaveLength(CLAIM_TELEMETRY_MAX_PER_WINDOW);
     const suppressed = warnings().filter((l) =>
       l.startsWith('unverified_credential_claim_suppressed'),
     );
@@ -337,9 +355,11 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
     expect(suppressed[0]).not.toContain('flood-');
   });
 
-  it('emits nothing when no claim can be decoded — the existing line stands alone', async () => {
+  it('leaves the line exactly as it was when no claim can be decoded', async () => {
     await handshake('not-a-token');
-    expect(claimLines()).toHaveLength(0);
+    expect(rejectLines()).toEqual(['handshake_reject device=unverified code=AUTH_INVALID']);
+    expect(allLines()).toHaveLength(1);
+    expect(warnings()).toHaveLength(0); // unattributable churn stays at debug
   });
 
   it('never reads or writes a device row on this path', async () => {

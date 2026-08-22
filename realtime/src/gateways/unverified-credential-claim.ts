@@ -14,7 +14,7 @@
  * device; count as authenticated activity or a heartbeat; update lastSeen; become
  * dashboard device state; drive a tenant-scoped action; or suppress signature
  * verification. It is a hint for an operator reading logs, nothing more — which is
- * why the emitted line says `note=unauthenticated-claim-not-attribution` and why
+ * why the emitted line tags it `attribution=unverified` and why
  * this value never travels in the same field as the VERIFIED `deviceId` that
  * `DeviceHandshakeResult` already carries.
  *

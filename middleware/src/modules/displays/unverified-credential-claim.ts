@@ -14,7 +14,7 @@
  * device; count as authenticated activity or a heartbeat; update lastSeen; become
  * dashboard device state; drive a tenant-scoped action; or suppress signature
  * verification. It is a hint for an operator reading logs, nothing more — which is
- * why the emitted line says `note=unauthenticated-claim-not-attribution` and why
+ * why the emitted line tags it `attribution=unverified` and why
  * this value never appears in a response body and is never confused with the
  * VERIFIED `payload.sub` this service reads only AFTER `jwtService.verify` succeeds.
  *

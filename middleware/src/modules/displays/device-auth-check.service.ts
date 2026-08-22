@@ -161,21 +161,33 @@ export class DeviceAuthCheckService {
   }
 
   /**
-   * Diagnostics-only. Emits at most one line per distinct claim per 15 minutes and
-   * at most 20 lines per 15 minutes overall, so an attacker cannot flood the log by
-   * minting invalid tokens with varying `sub`. Never the `device=<id> AUTH_INVALID`
-   * shape — that reads as authenticated attribution, which this value is not.
-   * Only the sanitised claim is logged: never the token, a segment of it, or a hash.
+   * Diagnostics-only, and the realtime handshake's counterpart line (same fields,
+   * same trust rules, same sanitisation, same budget).
+   *
+   * There is deliberately no trusted `device=` field here: this endpoint has no
+   * verified identity to report on an AUTH_INVALID, and `claimedDeviceId` must never
+   * be mistaken for one — which is what `attribution=unverified` states in the line
+   * itself. Nothing is logged when no claim decodes, so an undecodable token leaves
+   * behaviour exactly as it was.
+   *
+   * The budget gates VISIBILITY: an attributable rejection is promoted to warn so an
+   * operator sees it, and beyond 20 per 15 minutes (or a repeat of the same claim
+   * inside 15 minutes) the same line drops to debug. Only the sanitised claim is ever
+   * logged — never the token, a segment of it, or a hash.
    */
   private logUnverifiedClaim(token: string): void {
     const claim = extractUnverifiedDeviceClaim(token);
-    if (!claim) return; // nothing decodable — the existing 401 line stands alone
+    if (!claim) return;
+    const line = `device_auth_check_reject code=AUTH_INVALID claimedDeviceId=${claim} attribution=unverified`;
     const now = Date.now();
     if (shouldEmitClaimTelemetry(claim, now)) {
-      this.logger.warn(
-        `unverified_credential_claim deviceClaim=${claim} reason=AUTH_INVALID note=unauthenticated-claim-not-attribution`,
-      );
-    } else if (takeClaimSuppressionNotice(now)) {
+      this.logger.warn(line);
+      return;
+    }
+    this.logger.debug(line);
+    if (takeClaimSuppressionNotice(now)) {
+      // Once per window, with no claim value: without it, a quiet warn stream is
+      // ambiguous between "nothing is happening" and "the budget is exhausted".
       this.logger.warn(
         'unverified_credential_claim_suppressed reason=rate-limit note=claim-values-withheld',
       );

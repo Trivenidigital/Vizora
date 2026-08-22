@@ -31,6 +31,7 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
   };
   let redis: { get: jest.Mock; getOrThrow: jest.Mock };
   let warn: jest.SpyInstance;
+  let debug: jest.SpyInstance;
 
   const REAL_DEVICE = 'display-real-1';
 
@@ -73,6 +74,7 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
     service = module.get(DeviceAuthCheckService);
     process.env.DEVICE_JWT_SECRET = 'x'.repeat(32);
     warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    debug = jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -81,8 +83,12 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
   });
 
   const warnings = () => warn.mock.calls.map((c) => String(c[0]));
+  const debugs = () => debug.mock.calls.map((c) => String(c[0]));
+  const allLines = () => [...warnings(), ...debugs()];
   const claimLines = () =>
-    warnings().filter((l) => l.startsWith('unverified_credential_claim '));
+    allLines().filter((l) => l.startsWith('device_auth_check_reject '));
+  const warnClaimLines = () =>
+    warnings().filter((l) => l.startsWith('device_auth_check_reject '));
 
   const currentDisplay = (over: Record<string, unknown> = {}) => ({
     id: REAL_DEVICE,
@@ -102,15 +108,28 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
 
   // ---- the claim is logged and does nothing else ----------------------------
 
-  it('emits the operator line in the mandated shape for a bad-signature token', async () => {
+  it('emits one structured line in the mandated shape for a bad-signature token', async () => {
     const result = await service.evaluate(forgedToken(REAL_DEVICE));
 
     expect(result).toEqual({ httpStatus: 401, body: { code: 'AUTH_INVALID' } });
     expect(claimLines()).toEqual([
-      `unverified_credential_claim deviceClaim=${REAL_DEVICE} reason=AUTH_INVALID note=unauthenticated-claim-not-attribution`,
+      `device_auth_check_reject code=AUTH_INVALID claimedDeviceId=${REAL_DEVICE} attribution=unverified`,
     ]);
-    // Never the authenticated-attribution shape.
-    expect(warnings().some((l) => /device=display-real-1/.test(l))).toBe(false);
+    expect(allLines()).toHaveLength(1);
+    // Never the trusted-attribution shape — this endpoint has no verified identity
+    // to report on an AUTH_INVALID, and the claim must not be dressed as one.
+    expect(allLines().some((l) => /(^|\s)device=/.test(l))).toBe(false);
+  });
+
+  it('promotes the attributable rejection to warn, and drops repeats to debug', async () => {
+    await service.evaluate(forgedToken(REAL_DEVICE));
+    expect(warnClaimLines()).toHaveLength(1);
+    expect(debugs()).toHaveLength(0);
+
+    await service.evaluate(forgedToken(REAL_DEVICE));
+    expect(warnClaimLines()).toHaveLength(1); // still just the first
+    expect(debugs()).toHaveLength(1); // the repeat is still attributed, just quieter
+    expect(debugs()[0]).toContain(`claimedDeviceId=${REAL_DEVICE}`);
   });
 
   it('the 401 response body is byte-identical and carries no claim', async () => {
@@ -131,7 +150,7 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
     const token = forgedToken(REAL_DEVICE);
     const [header, payloadSegment, signature] = token.split('.');
     await service.evaluate(token);
-    const emitted = warnings().join('\n');
+    const emitted = allLines().join('\n');
     expect(emitted).not.toContain(token);
     expect(emitted).not.toContain(header);
     expect(emitted).not.toContain(payloadSegment);
@@ -141,12 +160,12 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
 
   it('sanitises a sub carrying CR/LF so a 410-shaped log line cannot be forged', async () => {
     await service.evaluate(
-      forgedToken('display-1\r\nunverified_credential_claim deviceClaim=display-2'),
+      forgedToken('display-1\r\ndevice_auth_check_reject code=DEVICE_REVOKED claimedDeviceId=display-2'),
     );
     expect(claimLines()).toHaveLength(1);
     expect(claimLines()[0].split('\n')).toHaveLength(1);
     expect(claimLines()[0]).toMatch(
-      /^unverified_credential_claim deviceClaim=[A-Za-z0-9_.:-]+ reason=AUTH_INVALID note=unauthenticated-claim-not-attribution$/,
+      /^device_auth_check_reject code=AUTH_INVALID claimedDeviceId=[A-Za-z0-9_.:-]+ attribution=unverified$/,
     );
   });
 
@@ -249,14 +268,15 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
     await service.evaluate(forgedToken(REAL_DEVICE));
     await service.evaluate(forgedToken(REAL_DEVICE));
     await service.evaluate(forgedToken(REAL_DEVICE));
-    expect(claimLines()).toHaveLength(1);
+    expect(claimLines()).toHaveLength(3); // every reject stays attributed
+    expect(warnClaimLines()).toHaveLength(1); // only the first is promoted
   });
 
   it('stops emitting past the global ceiling and says so once, with no claim value', async () => {
     for (let i = 0; i < CLAIM_TELEMETRY_MAX_PER_WINDOW + 25; i++) {
       await service.evaluate(forgedToken(`flood-${i}`));
     }
-    expect(claimLines()).toHaveLength(CLAIM_TELEMETRY_MAX_PER_WINDOW);
+    expect(warnClaimLines()).toHaveLength(CLAIM_TELEMETRY_MAX_PER_WINDOW);
     const suppressed = warnings().filter((l) =>
       l.startsWith('unverified_credential_claim_suppressed'),
     );
@@ -266,8 +286,8 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
     expect(suppressed[0]).not.toContain('flood-');
   });
 
-  it('emits nothing when no claim can be decoded', async () => {
+  it('emits nothing at all when no claim can be decoded', async () => {
     await service.evaluate('not-a-token');
-    expect(claimLines()).toHaveLength(0);
+    expect(allLines()).toHaveLength(0);
   });
 });
