@@ -82,12 +82,6 @@ const PAIRING_IDENTIFIER_HOLDER_SELECT = {
   organizationId: true,
 } as const satisfies Prisma.DisplaySelect;
 
-/**
- * REPAIR — prefix stamped onto the `deviceIdentifier` of a row whose identifier
- * a rebind takes over. See `PairingService.rebindPairingSession` for the rule.
- */
-export const RETIRED_DEVICE_IDENTIFIER_PREFIX = 'retired:';
-
 /** Prisma unique-constraint violation. */
 const PRISMA_UNIQUE_VIOLATION = 'P2002';
 /** Prisma "record to update not found". */
@@ -415,6 +409,17 @@ export class PairingService implements OnModuleDestroy {
    * stored credential — the other screen would poll, receive a token, and be
    * rejected forever. Same SET NX EX primitive as the other two claims, and
    * the same fail-CLOSED posture: no Redis, no rebind.
+   *
+   * THIS CLAIM IS THE ONLY SERIALIZER — the DB compare-and-set is NOT a
+   * fallback for it. `rebindPairingSession`'s `updateMany` predicate is
+   * `{ id, organizationId, isDisabled: false }`; it deliberately does not carry
+   * the previous `jwtToken`, so two concurrent rebinds both satisfy it and both
+   * would "win" at the database. The CAS protects against a concurrent DELETE
+   * or DISABLE, nothing else. So do not weaken or remove this claim, and do not
+   * "align" it with the codebase's other Redis claims: `CronLeaderService` and
+   * friends are documented fail-OPEN because a skipped cron is worse than a
+   * double-run. Here a double-run hands two screens a credential for one row,
+   * one of which is dead on arrival. Fail closed.
    */
   private async claimRebindTarget(displayId: string): Promise<string> {
     const client = this.redisService.getClient();
@@ -946,9 +951,23 @@ export class PairingService implements OnModuleDestroy {
    * `deviceIdentifier`, `metadata`, `pairedAt`, `lastHeartbeat`, `status`, and
    * the stale `socketId` / `unpairedAt` session state.
    *
-   * ATOMICITY: identifier takeover + rebind + audit are one transaction, so a
-   * DB failure leaves the original display exactly as it was and creates no
-   * ghost row. Nothing outside the transaction is dispatched until it commits.
+   * WHERE THE CREDENTIAL GOES — and what that is NOT. The replacement token is
+   * never returned to the HTTP caller; it is parked in the pairing record for
+   * whoever polls `GET /devices/pairing/status/:code`, i.e. the client that is
+   * sitting on that code. That is a routing property, not a possession proof:
+   * `POST /devices/pairing/request` is `@Public()` and authenticates nothing,
+   * so the session originates from whoever asked for the code, which is not
+   * provably the screen. Do NOT write "only the physical TV can obtain a
+   * credential" anywhere — the platform does not enforce it, and separately
+   * `POST /displays/:id/pair` (`@Roles('admin','manager')`) already replaces
+   * `jwtToken` on any display and returns the plaintext 90-day JWT straight to
+   * the caller with no device involved. That gap predates this path and is
+   * tracked separately; this docblock exists so nobody builds on an absolute
+   * the system does not have.
+   *
+   * ATOMICITY: the rebind and its audit row are one transaction, so a DB
+   * failure leaves the original display exactly as it was and creates no ghost
+   * row. Nothing outside the transaction is dispatched until it commits.
    *
    * WINNER RULES (all deterministic, all negatively tested):
    *  - target must exist, belong to the caller's org, and NOT be `isDisabled`.
@@ -990,7 +1009,6 @@ export class PairingService implements OnModuleDestroy {
         select: typeof PAIRING_RESULT_SELECT;
       }>;
       previousDeviceIdentifier: string;
-      retiredDisplayId: string | null;
     };
 
     try {
@@ -1006,7 +1024,7 @@ export class PairingService implements OnModuleDestroy {
           throw notFound();
         }
 
-        const retiredDisplayId = await this.releaseDeviceIdentifier(
+        await this.assertDeviceIdentifierFree(
           tx,
           deviceIdentifier,
           target.id,
@@ -1060,25 +1078,20 @@ export class PairingService implements OnModuleDestroy {
               event: 'pairing_rebind',
               previousDeviceIdentifier: target.deviceIdentifier,
               newDeviceIdentifier: deviceIdentifier,
-              retiredDisplayId,
             },
           },
         });
 
-        return {
-          display,
-          previousDeviceIdentifier: target.deviceIdentifier,
-          retiredDisplayId,
-        };
+        return { display, previousDeviceIdentifier: target.deviceIdentifier };
       });
     } catch (error) {
       if (prismaErrorCode(error) === PRISMA_RECORD_NOT_FOUND) {
         throw notFound();
       }
       if (prismaErrorCode(error) === PRISMA_UNIQUE_VIOLATION) {
-        // `deviceIdentifier` is @unique and the takeover above lost a race
-        // (or the incoming identifier collides with a reserved retired name).
-        // Surface a conflict the operator can act on, never a raw P2002.
+        // `deviceIdentifier` is @unique and another row claimed it between the
+        // read in `assertDeviceIdentifierFree` and this write. Surface a
+        // conflict the operator can act on, never a raw P2002.
         throw new ConflictException(
           'That device identifier is already in use. Restart pairing on the display and try again.',
         );
@@ -1088,79 +1101,77 @@ export class PairingService implements OnModuleDestroy {
 
     // Committed. Everything below is best-effort cleanup of the OLD credential
     // and must never fail the rebind.
-    await this.invalidateOldDeviceCredential(
-      targetDisplayId,
-      result.retiredDisplayId,
-    );
+    await this.invalidateOldDeviceCredential(targetDisplayId);
 
     this.logger.log(
       `display_repaired display=${targetDisplayId} org=${organizationId} actor=${userId} ` +
-        `previousDeviceIdentifier=${result.previousDeviceIdentifier} ` +
-        `retiredDisplay=${result.retiredDisplayId ?? 'none'}`,
+        `previousDeviceIdentifier=${result.previousDeviceIdentifier}`,
     );
 
     return { display: result.display };
   }
 
   /**
-   * REPAIR — `Display.deviceIdentifier` is `@unique`, so a rebind must deal
-   * with the case where ANOTHER row already holds the identifier the TV is
-   * pairing with. That is exactly the ghost this feature exists to clean up:
-   * a clear-and-pair created a second row for the same physical box.
+   * REPAIR — `Display.deviceIdentifier` is `@unique`, so a rebind must decide
+   * what to do when ANOTHER row already holds the identifier the TV is pairing
+   * with. The answer is: REFUSE. This function only ever reads.
    *
-   * The rule, chosen for being deterministic, non-destructive and completable
-   * inside the pairing code's 5-minute life:
+   *  - holder IS the target     → nothing to do (a plain re-pair of the same
+   *    box onto its own row, which is the common case and stays allowed).
+   *  - holder is in ANOTHER org → the same opaque "not found" the rest of the
+   *    pairing flow uses for cross-tenant hits, so a rebind cannot be used to
+   *    probe which identifiers exist elsewhere.
+   *  - holder is a different row in the SAME org → `409` naming the row, so
+   *    the operator can remove or re-pair it and retry.
    *
-   *  - holder IS the target                → nothing to do (plain re-pair).
-   *  - holder is in ANOTHER org            → refuse, with the same opaque
-   *    "not found" the rest of the pairing flow uses for cross-tenant hits.
-   *    We never touch another tenant's row.
-   *  - holder is a different row, same org → RETIRE it: rename its identifier
-   *    to a reserved `retired:<id>` form, clear its credential and socket, and
-   *    disable it. Nothing is deleted, so the operator keeps the row and its
-   *    history and can delete it deliberately; disabling releases the quota
-   *    slot the ghost was holding, and clearing the credential means the box
-   *    can never authenticate as two displays at once. Refusing instead would
-   *    have been simpler but sends the admin away to delete a row and come
-   *    back — usually after the code has expired.
+   * An earlier draft took the holder over automatically — renaming its
+   * identifier, clearing its credential and disabling it. That was removed,
+   * and it must not come back, for three independent reasons:
    *
-   * `retired:<id>` is unique by construction (the row's own primary key) and
-   * stable across repeats, so retiring the same ghost twice is idempotent.
-   * A crafted identifier that collides with a reserved name still cannot slip
-   * through: the unique index rejects it and the caller maps P2002 to a 409.
+   *  1. ROLE BOUNDARY. Disabling a display is `@Roles('admin')` on
+   *     `POST /displays/:id/disable`. `pairing/complete` is
+   *     `@Roles('admin','manager')`. The takeover let a MANAGER perform an
+   *     admin-only disable — on a row they never named in the request.
+   *  2. IT COULD NOT REACH THE CASE IT WAS WRITTEN FOR. `requestPairingCode`
+   *     refuses to issue a code for an identifier already held by a PAIRED row
+   *     ("Device is already paired"). The clear-and-pair ghost this feature
+   *     exists for holds a token, so it can never produce a pairing session and
+   *     the takeover never fired for it.
+   *  3. IT DID REACH ROWS IT SHOULD NEVER TOUCH. The only remaining population
+   *     of enabled-and-tokenless rows is operator-created placeholders from
+   *     `POST /displays`, which were silently renamed and disabled as a side
+   *     effect of repairing an unrelated display. And the tokenless check
+   *     happened at code-REQUEST time and was never re-checked at takeover, so
+   *     a row that paired inside the 5-minute window was retired while healthy
+   *     and online.
+   *
+   * Refusing loses no real capability: `startPairing()` mints a fresh
+   * timestamped `deviceIdentifier` and never reuses one, so a legitimate
+   * rebind does not collide in the first place.
    */
-  private async releaseDeviceIdentifier(
+  private async assertDeviceIdentifierFree(
     tx: Prisma.TransactionClient,
     deviceIdentifier: string,
     targetDisplayId: string,
     organizationId: string,
-  ): Promise<string | null> {
+  ): Promise<void> {
     const holder = await tx.display.findUnique({
       where: { deviceIdentifier },
       select: PAIRING_IDENTIFIER_HOLDER_SELECT,
     });
 
     if (!holder || holder.id === targetDisplayId) {
-      return null;
+      return;
     }
 
     if (holder.organizationId !== organizationId) {
       throw new NotFoundException('Pairing code not found or expired');
     }
 
-    await tx.display.update({
-      where: { id: holder.id },
-      data: {
-        deviceIdentifier: `${RETIRED_DEVICE_IDENTIFIER_PREFIX}${holder.id}`,
-        jwtToken: null,
-        socketId: null,
-        isDisabled: true,
-        status: 'offline',
-        unpairedAt: new Date(),
-      },
-    });
-
-    return holder.id;
+    throw new ConflictException(
+      `Display ${holder.id} already uses this device identifier. ` +
+        'Remove or re-pair that display first, then restart pairing on this screen.',
+    );
   }
 
   /**
@@ -1187,31 +1198,22 @@ export class PairingService implements OnModuleDestroy {
    * `auth/check` before purging, so the NEW client, whose token is current,
    * gets a 200 and keeps its credential.
    */
-  private async invalidateOldDeviceCredential(
-    targetDisplayId: string,
-    retiredDisplayId: string | null,
-  ): Promise<void> {
-    const displayIds = retiredDisplayId
-      ? [targetDisplayId, retiredDisplayId]
-      : [targetDisplayId];
-
-    for (const displayId of displayIds) {
-      try {
-        await this.redisService.del(deviceTokenGraceKey(displayId));
-      } catch (error) {
-        this.logger.warn(
-          `Failed to clear device token grace record for ${displayId}: ${error}`,
-        );
-      }
-
-      this.displaysService
-        .sendDeviceRevoked(displayId, 'repaired')
-        .catch((error: Error) => {
-          this.logger.warn(
-            `Failed to send device:revoked for ${displayId}: ${error.message}`,
-          );
-        });
+  private async invalidateOldDeviceCredential(displayId: string): Promise<void> {
+    try {
+      await this.redisService.del(deviceTokenGraceKey(displayId));
+    } catch (error) {
+      this.logger.warn(
+        `Failed to clear device token grace record for ${displayId}: ${error}`,
+      );
     }
+
+    this.displaysService
+      .sendDeviceRevoked(displayId, 'repaired')
+      .catch((error: Error) => {
+        this.logger.warn(
+          `Failed to send device:revoked for ${displayId}: ${error.message}`,
+        );
+      });
   }
 
   async getActivePairings(
