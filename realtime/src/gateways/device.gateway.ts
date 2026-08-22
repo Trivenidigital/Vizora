@@ -63,6 +63,10 @@ import {
   authenticateDeviceHandshake,
   DeviceHandshakePayload,
 } from './device-handshake-auth';
+import {
+  shouldEmitClaimTelemetry,
+  takeClaimSuppressionNotice,
+} from './unverified-credential-claim';
 import { redactDevicePlaylist } from '../services/device-content-payload';
 
 interface DevicePayload {
@@ -204,6 +208,27 @@ export class DeviceGateway
           this.logger.warn(line);
         } else {
           this.logger.debug(line);
+        }
+        // AUTH_INVALID left the operator blind: `device=unverified` says a device
+        // somewhere cannot authenticate but never which one. The claim below narrows
+        // that down — and is DELIBERATELY logged on its own line, in its own field,
+        // with the note attached, because it is decoded from a token that FAILED
+        // verification. It is what the sender CLAIMS to be. Never the
+        // `device=<id> AUTH_INVALID` shape, which reads as authenticated attribution.
+        // Budgeted (1/claim/15min, 20/15min overall) so minting invalid JWTs with
+        // varying `sub` cannot flood the log.
+        if (result.code === 'AUTH_INVALID' && result.unverifiedDeviceClaim) {
+          const now = Date.now();
+          if (shouldEmitClaimTelemetry(result.unverifiedDeviceClaim, now)) {
+            this.logger.warn(
+              `unverified_credential_claim deviceClaim=${result.unverifiedDeviceClaim} reason=AUTH_INVALID note=unauthenticated-claim-not-attribution`,
+            );
+          } else if (takeClaimSuppressionNotice(now)) {
+            // Records THAT claims were dropped, with no claim value in the line.
+            this.logger.warn(
+              'unverified_credential_claim_suppressed reason=rate-limit note=claim-values-withheld',
+            );
+          }
         }
         // err.message carries the legacy string (Electron client reads
         // connect_error.message); err.data.code carries the contract code

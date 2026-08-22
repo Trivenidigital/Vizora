@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
@@ -9,6 +9,11 @@ import {
   isCurrentDeviceToken,
   isGraceAcceptedDeviceToken,
 } from '../common/device-token-auth.util';
+import {
+  extractUnverifiedDeviceClaim,
+  shouldEmitClaimTelemetry,
+  takeClaimSuppressionNotice,
+} from './unverified-credential-claim';
 
 /**
  * Device Revocation Contract v1.1 item 4 — the SOLE authority for device
@@ -34,6 +39,8 @@ export type DeviceAuthCheckResult =
 
 @Injectable()
 export class DeviceAuthCheckService {
+  private readonly logger = new Logger(DeviceAuthCheckService.name);
+
   constructor(
     private readonly jwtService: JwtService,
     private readonly db: DatabaseService,
@@ -54,6 +61,14 @@ export class DeviceAuthCheckService {
         return { httpStatus: 401, body: { code: 'AUTH_EXPIRED' } };
       }
       // NotBeforeError, JsonWebTokenError (bad signature/malformed), etc.
+      //
+      // The 401 is already decided, from the verification failure alone. Logging
+      // WHICH display the sender claims to be is diagnostics only: the value is
+      // decoded from a token that failed verification, so it is attacker-controlled
+      // metadata, never identity. It reaches no query, no write, no branch here,
+      // and — critically — no response body: the wire response stays exactly
+      // `401 {"code":"AUTH_INVALID"}`.
+      this.logUnverifiedClaim(token);
       return { httpStatus: 401, body: { code: 'AUTH_INVALID' } };
     }
 
@@ -65,6 +80,10 @@ export class DeviceAuthCheckService {
       typeof payload.organizationId !== 'string' ||
       payload.organizationId.trim() === ''
     ) {
+      // Signature verified here, but the token is not a usable device credential,
+      // so the request is still unauthenticated and the same diagnostics-only rule
+      // applies: the claim is logged, never trusted, never used for a lookup.
+      this.logUnverifiedClaim(token);
       return { httpStatus: 401, body: { code: 'AUTH_INVALID' } };
     }
 
@@ -139,5 +158,27 @@ export class DeviceAuthCheckService {
     }
 
     return { httpStatus: 200, body: { status: 'ok' } };
+  }
+
+  /**
+   * Diagnostics-only. Emits at most one line per distinct claim per 15 minutes and
+   * at most 20 lines per 15 minutes overall, so an attacker cannot flood the log by
+   * minting invalid tokens with varying `sub`. Never the `device=<id> AUTH_INVALID`
+   * shape — that reads as authenticated attribution, which this value is not.
+   * Only the sanitised claim is logged: never the token, a segment of it, or a hash.
+   */
+  private logUnverifiedClaim(token: string): void {
+    const claim = extractUnverifiedDeviceClaim(token);
+    if (!claim) return; // nothing decodable — the existing 401 line stands alone
+    const now = Date.now();
+    if (shouldEmitClaimTelemetry(claim, now)) {
+      this.logger.warn(
+        `unverified_credential_claim deviceClaim=${claim} reason=AUTH_INVALID note=unauthenticated-claim-not-attribution`,
+      );
+    } else if (takeClaimSuppressionNotice(now)) {
+      this.logger.warn(
+        'unverified_credential_claim_suppressed reason=rate-limit note=claim-values-withheld',
+      );
+    }
   }
 }

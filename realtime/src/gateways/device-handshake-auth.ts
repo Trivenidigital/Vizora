@@ -6,6 +6,7 @@ import {
   isGraceAcceptedDeviceToken,
   deviceTokenGraceKey,
 } from './device-token-hash';
+import { extractUnverifiedDeviceClaim } from './unverified-credential-claim';
 
 /**
  * Device Revocation Contract v1.1 item 2 — device handshake authentication.
@@ -74,6 +75,13 @@ export type DeviceHandshakeResult =
       // Present only once the JWT has verified, so a terminal rejection can be attributed
       // to a device in logs. Opaque display id — never credential material.
       deviceId?: string;
+      // DIAGNOSTICS ONLY, and deliberately a DIFFERENT field from `deviceId` above.
+      // Decoded from a token that FAILED verification, so it is attacker-controlled
+      // metadata, NOT identity and NOT attribution: anyone can mint an unsigned token
+      // naming any display. It may only reach a log line — never a lookup, a write, a
+      // revocation decision, or anything the device is told. See
+      // `unverified-credential-claim.ts` for the full trust boundary.
+      unverifiedDeviceClaim?: string;
     };
 
 export type DeviceHandshakeCode =
@@ -118,7 +126,18 @@ export async function authenticateDeviceHandshake(
     // credentials on connect_error.message.includes('invalid token'). These
     // legacy strings must never contain that substring or 'unauthorized'
     // (see the assertion in device-handshake-auth.spec.ts).
-    return { action: 'reject', message: 'auth_invalid', code: 'AUTH_INVALID' };
+    //
+    // The rejection itself is decided ABOVE, purely from the verification failure.
+    // The claim below is read afterwards and only so the gateway can log WHICH
+    // display the sender *says* it is; it changes no branch here and reaches no
+    // query. Verification has already failed, so it is a hint, not an identity.
+    const unverifiedDeviceClaim = extractUnverifiedDeviceClaim(token);
+    return {
+      action: 'reject',
+      message: 'auth_invalid',
+      code: 'AUTH_INVALID',
+      ...(unverifiedDeviceClaim ? { unverifiedDeviceClaim } : {}),
+    };
   }
 
   // A non-device token that happens to verify under DEVICE_JWT_SECRET → not our
