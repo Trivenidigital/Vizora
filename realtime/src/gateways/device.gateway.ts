@@ -1461,6 +1461,18 @@ export class DeviceGateway
       // Far from expiry, or already expired (can't happen on a live socket) → skip.
       if (msUntilExpiry <= 0 || msUntilExpiry > DEVICE_TOKEN_REFRESH_WITHIN_MS) return;
 
+      // Once per connection, not once per beat: this runs on every heartbeat for the
+      // whole 14-day window, so an unguarded log here would be a per-device storm. This
+      // is the DENOMINATOR the refresh success rate was missing — "entered the window"
+      // was previously unobservable, so a device that became eligible and never rotated
+      // looked identical to one that was never eligible at all.
+      if (!client.data.refreshEligibleLogged) {
+        client.data.refreshEligibleLogged = true;
+        this.logger.log(
+          `refresh_eligible device=${deviceId} hoursUntilExpiry=${Math.round(msUntilExpiry / 3600_000)}`,
+        );
+      }
+
       const deviceSecret = process.env.DEVICE_JWT_SECRET;
       if (!deviceSecret || deviceSecret.length < 32) {
         this.logger.warn(
@@ -1494,7 +1506,31 @@ export class DeviceGateway
         return;
       }
       if (!claimed) {
-        client.data.tokenRefreshIssued = true;
+        // Losing the claim is TRANSIENT — another connection holds the 1h cooldown, or
+        // this same connection holds its own key after a rotation that failed. It must
+        // NOT mark the connection done: `tokenRefreshIssued` means "this connection
+        // completed a rotation", and only the success path below may set it.
+        //
+        // Setting it here was a real stranding bug. One transient DB or grace-write
+        // failure was enough: the claimant took the 1h key, failed to rotate, and on its
+        // very next beat hit its OWN still-live key, latched, and never attempted again
+        // for the life of the connection. The token then expired while connected — which
+        // is invisible, because `exp` is only enforced at handshake, never on an
+        // established socket — and the device stranded on AUTH_EXPIRED at its next
+        // reconnect, needing a manual re-pair.
+        //
+        // Retrying every beat is deliberate and cheap: setNx is O(1), it is bounded by
+        // the cooldown's 1h TTL, and it is at most one extra Redis op per beat for
+        // devices inside the refresh window — against the one setDeviceStatus write
+        // every device already performs on every beat. The cooldown is NOT released
+        // early on failure: that TTL is the circuit-breaker that stops a persistently
+        // failing backend from turning into a 15-second rotation loop.
+        if (!client.data.refreshCooldownContendedLogged) {
+          client.data.refreshCooldownContendedLogged = true;
+          this.logger.log(
+            `refresh_cooldown_contended device=${deviceId} hoursUntilExpiry=${Math.round(msUntilExpiry / 3600_000)}`,
+          );
+        }
         return;
       }
 
