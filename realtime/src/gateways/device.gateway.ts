@@ -107,7 +107,12 @@ function resolveUnverifiedPeer(socket: Socket): string | null {
   // the array branch is defensive; sanitiseUnverifiedPeer takes the last element either
   // way, which is the value closest to us.
   const realIp = Array.isArray(header) ? header.join(',') : header;
-  return sanitiseUnverifiedPeer(realIp ?? address);
+  // `||` not `??`: an EMPTY x-real-ip must fall back to the socket address. With `??`
+  // an empty-string header suppresses the fallback and discards a perfectly good
+  // loopback socket address, yielding `unknown`. Unreachable today because nginx sets
+  // `$remote_addr`, which is never empty — but the fallback should be driven by "is
+  // there a usable value", not "is the property present".
+  return sanitiseUnverifiedPeer(realIp || address);
 }
 
 /** Loopback in the forms Node reports it: IPv4, IPv6, and the IPv4-mapped IPv6 one. */
