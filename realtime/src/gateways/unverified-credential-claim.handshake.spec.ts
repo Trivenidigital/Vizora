@@ -377,25 +377,46 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
     expect(emitted).not.toContain(hashDeviceToken(token));
   });
 
-  it('deduplicates the same claim inside the window — repeats stay at debug', async () => {
+  it('drops the claim fields entirely once the gate closes — not merely the level', async () => {
+    // Prod runs with debug enabled, so demoting an over-budget line to debug would
+    // still let anyone write unbounded attacker-controlled text into the logs.
     await handshake(forgedToken('display-real-1'));
     await handshake(forgedToken('display-real-1'));
     await handshake(forgedToken('display-real-1'));
-    // Still attributed every time (extraction is not rate-limited)...
+
+    // Non-vacuous: the first one DID emit the enriched line.
+    expect(warnRejects()).toEqual([
+      'handshake_reject device=unverified code=AUTH_INVALID claimedDeviceId=display-real-1 attribution=unverified',
+    ]);
+    // The line count is unchanged — the base line still fires per rejection...
     expect(rejectLines()).toHaveLength(3);
-    expect(
-      rejectLines().every((l) => l.includes('claimedDeviceId=display-real-1')),
-    ).toBe(true);
-    // ...but only the first is promoted to warn.
-    expect(warnRejects()).toHaveLength(1);
-    expect(debugs()).toHaveLength(2);
+    // ...but the over-budget ones carry nothing attacker-controlled.
+    expect(debugs()).toEqual([
+      'handshake_reject device=unverified code=AUTH_INVALID',
+      'handshake_reject device=unverified code=AUTH_INVALID',
+    ]);
+    expect(debugs().join('\n')).not.toContain('claimedDeviceId');
+    expect(debugs().join('\n')).not.toContain('display-real-1');
   });
 
-  it('stops promoting past the global ceiling and says so once, with no claim value', async () => {
-    for (let i = 0; i < CLAIM_TELEMETRY_MAX_PER_WINDOW + 25; i++) {
+  it('past the global ceiling no claim value reaches the log at ANY level', async () => {
+    const total = CLAIM_TELEMETRY_MAX_PER_WINDOW + 25;
+    for (let i = 0; i < total; i++) {
       await handshake(forgedToken(`flood-${i}`));
     }
+    // Non-vacuous: the budget's worth of enriched lines was emitted...
     expect(warnRejects()).toHaveLength(CLAIM_TELEMETRY_MAX_PER_WINDOW);
+    expect(rejectLines()).toHaveLength(total);
+    // ...and every over-budget rejection is the plain line, carrying no `flood-N`.
+    const overBudget = debugs();
+    expect(overBudget).toHaveLength(total - CLAIM_TELEMETRY_MAX_PER_WINDOW);
+    expect(
+      overBudget.every((l) => l === 'handshake_reject device=unverified code=AUTH_INVALID'),
+    ).toBe(true);
+    for (let i = CLAIM_TELEMETRY_MAX_PER_WINDOW; i < total; i++) {
+      expect(allLines().join('\n')).not.toContain(`flood-${i}`);
+    }
+
     const suppressed = warnings().filter((l) =>
       l.startsWith('unverified_credential_claim_suppressed'),
     );
@@ -403,6 +424,34 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
       'unverified_credential_claim_suppressed reason=rate-limit note=claim-values-withheld',
     ]);
     expect(suppressed[0]).not.toContain('flood-');
+  });
+
+  it('a throwing logger cannot turn a REJECT into a PASS', async () => {
+    // Everything on this path sits inside the middleware's outer try, whose catch
+    // calls next() — so an unguarded logger throw would ADMIT the connection.
+    warn.mockImplementation(() => {
+      throw new Error('EPIPE');
+    });
+    debug.mockImplementation(() => {
+      throw new Error('EPIPE');
+    });
+    const err = await handshake(forgedToken('display-real-1'));
+    expect(err).not.toBeNull();
+    expect((err as unknown as { data?: { code: string } })?.data?.code).toBe('AUTH_INVALID');
+    expect((err as unknown as Error).message).toBe('auth_invalid');
+  });
+
+  it('a throwing logger cannot change the unattributed rejection either', async () => {
+    // No claim decodes here, so this exercises the pre-existing plain-line log site.
+    warn.mockImplementation(() => {
+      throw new Error('EPIPE');
+    });
+    debug.mockImplementation(() => {
+      throw new Error('EPIPE');
+    });
+    const err = await handshake('not-a-token');
+    expect(err).not.toBeNull();
+    expect((err as unknown as { data?: { code: string } })?.data?.code).toBe('AUTH_INVALID');
   });
 
   it('leaves the line exactly as it was when no claim can be decoded', async () => {

@@ -121,15 +121,19 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
     expect(allLines().some((l) => /(^|\s)device=/.test(l))).toBe(false);
   });
 
-  it('promotes the attributable rejection to warn, and drops repeats to debug', async () => {
+  it('drops the claim entirely once the gate closes — not merely the level', async () => {
+    // Prod runs with debug enabled, so demoting an over-budget line to debug would
+    // still let anyone write unbounded attacker-controlled text into the logs.
     await service.evaluate(forgedToken(REAL_DEVICE));
+    // Non-vacuous: the first one DID emit.
     expect(warnClaimLines()).toHaveLength(1);
     expect(debugs()).toHaveLength(0);
 
     await service.evaluate(forgedToken(REAL_DEVICE));
+    await service.evaluate(forgedToken(REAL_DEVICE));
     expect(warnClaimLines()).toHaveLength(1); // still just the first
-    expect(debugs()).toHaveLength(1); // the repeat is still attributed, just quieter
-    expect(debugs()[0]).toContain(`claimedDeviceId=${REAL_DEVICE}`);
+    expect(allLines()).toHaveLength(1); // the repeats emit nothing at any level
+    expect(debugs()).toHaveLength(0);
   });
 
   it('the 401 response body is byte-identical and carries no claim', async () => {
@@ -290,15 +294,24 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
     await service.evaluate(forgedToken(REAL_DEVICE));
     await service.evaluate(forgedToken(REAL_DEVICE));
     await service.evaluate(forgedToken(REAL_DEVICE));
-    expect(claimLines()).toHaveLength(3); // every reject stays attributed
-    expect(warnClaimLines()).toHaveLength(1); // only the first is promoted
+    expect(claimLines()).toHaveLength(1); // only the first sighting is logged
+    expect(allLines()).toHaveLength(1); // and the repeats add nothing at any level
   });
 
-  it('stops emitting past the global ceiling and says so once, with no claim value', async () => {
-    for (let i = 0; i < CLAIM_TELEMETRY_MAX_PER_WINDOW + 25; i++) {
+  it('past the global ceiling no claim value reaches the log at ANY level', async () => {
+    const total = CLAIM_TELEMETRY_MAX_PER_WINDOW + 25;
+    for (let i = 0; i < total; i++) {
       await service.evaluate(forgedToken(`flood-${i}`));
     }
+    // Non-vacuous: the budget's worth of lines was emitted...
     expect(warnClaimLines()).toHaveLength(CLAIM_TELEMETRY_MAX_PER_WINDOW);
+    // ...and nothing at all beyond it, at any level.
+    expect(claimLines()).toHaveLength(CLAIM_TELEMETRY_MAX_PER_WINDOW);
+    expect(debugs()).toHaveLength(0);
+    for (let i = CLAIM_TELEMETRY_MAX_PER_WINDOW; i < total; i++) {
+      expect(allLines().join('\n')).not.toContain(`flood-${i}`);
+    }
+
     const suppressed = warnings().filter((l) =>
       l.startsWith('unverified_credential_claim_suppressed'),
     );
@@ -306,6 +319,32 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
       'unverified_credential_claim_suppressed reason=rate-limit note=claim-values-withheld',
     ]);
     expect(suppressed[0]).not.toContain('flood-');
+  });
+
+  it('a throwing logger cannot turn the 401 into a 5xx', async () => {
+    // `logUnverifiedClaim` is the first statement in the verify catch block that
+    // could throw. If it escaped, `evaluate` would reject and the device would get a
+    // Nest 5xx instead of the settled 401 — a changed response for a whole input class.
+    warn.mockImplementation(() => {
+      throw new Error('EPIPE');
+    });
+    debug.mockImplementation(() => {
+      throw new Error('EPIPE');
+    });
+    const result = await service.evaluate(forgedToken(REAL_DEVICE));
+    expect(result).toEqual({ httpStatus: 401, body: { code: 'AUTH_INVALID' } });
+    expect(JSON.stringify(result.body)).toBe('{"code":"AUTH_INVALID"}');
+  });
+
+  it('a throwing logger cannot break the suppression-notice path either', async () => {
+    for (let i = 0; i < CLAIM_TELEMETRY_MAX_PER_WINDOW; i++) {
+      await service.evaluate(forgedToken(`flood-${i}`));
+    }
+    warn.mockImplementation(() => {
+      throw new Error('EPIPE');
+    });
+    const result = await service.evaluate(forgedToken('over-budget'));
+    expect(result).toEqual({ httpStatus: 401, body: { code: 'AUTH_INVALID' } });
   });
 
   it('emits nothing at all when no claim can be decoded', async () => {

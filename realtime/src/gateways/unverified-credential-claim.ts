@@ -79,10 +79,18 @@ export function extractUnverifiedDeviceClaim(token: string | undefined): string 
 }
 
 // ---- emission budget -------------------------------------------------------
-// Module-level state. Minting invalid JWTs is free, so without a budget an
-// attacker can write unbounded log volume (and unbounded Map entries) by varying
-// `sub`. Only EMITTED claims are tracked, so a flood of distinct claims stops
-// consuming memory as soon as the global ceiling trips.
+// Minting invalid JWTs is free, so without a budget an attacker can write
+// unbounded attacker-controlled text into the logs (and unbounded Map entries) by
+// varying `sub`. Callers must therefore omit the claim entirely when the gate says
+// no, not merely log it more quietly: prod runs with debug enabled, so demoting the
+// level bounds nothing. Only EMITTED claims are tracked, so a flood of distinct
+// claims also stops consuming memory as soon as the global ceiling trips.
+//
+// The state is module-level, so the budget is PER PROCESS. Realtime runs one PM2
+// instance, so its numbers are the fleet-wide ones; middleware runs 2 in cluster
+// mode, giving ~2x the ceiling fleet-wide and independent dedupe maps — the same
+// claim can legitimately be logged once per worker inside one window. Same caveat
+// as the MCP in-memory rate limit. A duplicate line is not a bug.
 
 const lastEmittedAt = new Map<string, number>();
 let windowStartedAt = 0;

@@ -178,27 +178,43 @@ export class DeviceAuthCheckService {
    * itself. Nothing is logged when no claim decodes, so an undecodable token leaves
    * behaviour exactly as it was.
    *
-   * The budget gates VISIBILITY: an attributable rejection is promoted to warn so an
-   * operator sees it, and beyond 20 per 15 minutes (or a repeat of the same claim
-   * inside 15 minutes) the same line drops to debug. Only the sanitised claim is ever
-   * logged — never the token, a segment of it, or a hash.
+   * The budget bounds how much attacker-controlled text reaches the logs AT ALL, not
+   * merely at what level: over budget nothing is emitted here, because prod runs with
+   * debug enabled and "log it at debug instead" would still let anyone write unbounded
+   * `claimedDeviceId=` values by minting invalid tokens. Only the sanitised claim is
+   * ever logged — never the token, a segment of it, or a hash.
+   *
+   * The budget is PER PROCESS: state is module-level and middleware runs 2 PM2 cluster
+   * instances, so the effective ceiling is ~40 per 15 minutes fleet-wide and the dedupe
+   * maps are independent — the same claim can legitimately be warned once per worker in
+   * one window. Same caveat as the MCP in-memory rate limit. A duplicate line is not a
+   * bug.
    */
   private logUnverifiedClaim(token: string): void {
-    const claim = extractUnverifiedDeviceClaim(token);
-    if (!claim) return;
-    const line = `device_auth_check_reject code=AUTH_INVALID claimedDeviceId=${claim} attribution=unverified`;
-    const now = Date.now();
-    if (shouldEmitClaimTelemetry(claim, now)) {
-      this.logger.warn(line);
-      return;
-    }
-    this.logger.debug(line);
-    if (takeClaimSuppressionNotice(now)) {
-      // Once per window, with no claim value: without it, a quiet warn stream is
-      // ambiguous between "nothing is happening" and "the budget is exhausted".
-      this.logger.warn(
-        'unverified_credential_claim_suppressed reason=rate-limit note=claim-values-withheld',
-      );
+    // Diagnostics must never fail the auth path. This is the first statement in the
+    // `jwt.verify` catch block that could throw, and a logger CAN throw (EPIPE on a
+    // closed stdout, a future custom transport) — which would turn a settled
+    // `401 AUTH_INVALID` into a 5xx for a whole class of input. Same promise the
+    // extraction module makes one layer down.
+    try {
+      const claim = extractUnverifiedDeviceClaim(token);
+      if (!claim) return;
+      const now = Date.now();
+      if (shouldEmitClaimTelemetry(claim, now)) {
+        this.logger.warn(
+          `device_auth_check_reject code=AUTH_INVALID claimedDeviceId=${claim} attribution=unverified`,
+        );
+        return;
+      }
+      if (takeClaimSuppressionNotice(now)) {
+        // Once per window, with no claim value: without it, a quiet warn stream is
+        // ambiguous between "nothing is happening" and "the budget is exhausted".
+        this.logger.warn(
+          'unverified_credential_claim_suppressed reason=rate-limit note=claim-values-withheld',
+        );
+      }
+    } catch {
+      // Intentionally empty — the 401 is the contract, not the log.
     }
   }
 }

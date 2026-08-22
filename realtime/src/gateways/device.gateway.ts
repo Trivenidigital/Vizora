@@ -218,30 +218,42 @@ export class DeviceGateway
         // line exactly as it was before this existed.
         let suppressionNoticeDue = false;
         if (result.code === 'AUTH_INVALID' && result.unverifiedDeviceClaim) {
-          line += ` claimedDeviceId=${result.unverifiedDeviceClaim} attribution=unverified`;
-          // The budget gates VISIBILITY, not extraction: an attributable rejection is
-          // promoted to warn so an operator sees it, but minting invalid JWTs with
-          // varying `sub` must not be a way to write unbounded warn-level volume.
-          // Rate-limited rejections still log the enriched line, at the usual debug.
+          // The budget bounds how much attacker-controlled text reaches the logs AT
+          // ALL, not merely at what level. Over budget the claim fields are simply not
+          // appended and the line reverts to the plain form — because prod runs with
+          // debug enabled, so "log it at debug instead" would still let anyone write
+          // unbounded `claimedDeviceId=` values by minting invalid JWTs, one per
+          // connection attempt. The line COUNT is identical either way: the plain line
+          // fires per rejection regardless, so this costs nothing operationally.
           const now = Date.now();
           if (shouldEmitClaimTelemetry(result.unverifiedDeviceClaim, now)) {
+            line += ` claimedDeviceId=${result.unverifiedDeviceClaim} attribution=unverified`;
             atWarn = true;
           } else {
             suppressionNoticeDue = takeClaimSuppressionNotice(now);
           }
         }
 
-        if (atWarn) {
-          this.logger.warn(line);
-        } else {
-          this.logger.debug(line);
-        }
-        if (suppressionNoticeDue) {
-          // Once per window, with no claim value: without it, a quiet warn stream is
-          // ambiguous between "nothing is happening" and "the budget is exhausted".
-          this.logger.warn(
-            'unverified_credential_claim_suppressed reason=rate-limit note=claim-values-withheld',
-          );
+        // Diagnostics must never fail the auth path. A logger call can throw (EPIPE on
+        // a closed stdout, a future custom transport), and everything here sits inside
+        // the middleware's outer try — so an unguarded throw would skip `next(err)`
+        // and the outer catch would turn a REJECT into a PASS. That risk predates the
+        // claim fields; this guard closes it for every log on the path.
+        try {
+          if (atWarn) {
+            this.logger.warn(line);
+          } else {
+            this.logger.debug(line);
+          }
+          if (suppressionNoticeDue) {
+            // Once per window, with no claim value: without it, a quiet warn stream is
+            // ambiguous between "nothing is happening" and "the budget is exhausted".
+            this.logger.warn(
+              'unverified_credential_claim_suppressed reason=rate-limit note=claim-values-withheld',
+            );
+          }
+        } catch {
+          // Intentionally empty — the rejection below is the contract, not the log.
         }
         // err.message carries the legacy string (Electron client reads
         // connect_error.message); err.data.code carries the contract code
