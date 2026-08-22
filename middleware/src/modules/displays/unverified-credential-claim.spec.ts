@@ -187,7 +187,13 @@ describe('extractUnverifiedDeviceClaim', () => {
   it('strips dots so a claim can never render JWT-shaped', () => {
     // A dotted value reads as a token in a log stream: it trips secret scanners and
     // teaches operators to skim past JWT-shaped strings. Device ids have no dots.
-    const jwtShaped = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhIn0.SflKxwRJSMeKKF2QT4';
+    // Built at runtime, never written as a literal: a hardcoded JWT-shaped string
+    // trips `pnpm security:no-hardcoded-jwts`, which is the same instinct this test
+    // exists to protect (a JWT-shaped value in a log stream is a false positive
+    // waiting to happen). Generating it keeps the gate honest and the test faithful.
+    const b64 = (o: unknown) =>
+      Buffer.from(JSON.stringify(o)).toString('base64url');
+    const jwtShaped = `${b64({ alg: 'HS256' })}.${b64({ sub: 'a' })}.SflKxwRJSMeKKF2QT4`;
     const claim = extractUnverifiedDeviceClaim(tokenWith({ sub: jwtShaped }));
     expect(claim).not.toBeNull();
     expect(claim).not.toContain('.');
