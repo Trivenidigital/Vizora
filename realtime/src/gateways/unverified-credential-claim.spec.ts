@@ -1,5 +1,6 @@
 import {
   extractUnverifiedDeviceClaim,
+  sanitiseUnverifiedPeer,
   shouldEmitClaimTelemetry,
   takeClaimSuppressionNotice,
   resetClaimTelemetryState,
@@ -84,7 +85,7 @@ describe('extractUnverifiedDeviceClaim', () => {
     expect(claim).not.toContain('\r');
     expect(claim).not.toContain(' ');
     expect(claim as string).toMatch(/^display-1unverified_credential_claim/);
-    expect(claim as string).toMatch(/^[A-Za-z0-9_.:-]+$/);
+    expect(claim as string).toMatch(/^[A-Za-z0-9_:-]+$/);
   });
 
   it.each([
@@ -100,7 +101,7 @@ describe('extractUnverifiedDeviceClaim', () => {
   ])('sanitises %s out of the claim', (_label, sub) => {
     const claim = extractUnverifiedDeviceClaim(tokenWith({ sub }));
     expect(claim).not.toBeNull();
-    expect(claim as string).toMatch(/^[A-Za-z0-9_.:-]+$/);
+    expect(claim as string).toMatch(/^[A-Za-z0-9_:-]+$/);
   });
 
   it('truncates to 64 characters', () => {
@@ -109,8 +110,64 @@ describe('extractUnverifiedDeviceClaim', () => {
   });
 
   it('keeps the characters a real display id uses', () => {
-    const claim = extractUnverifiedDeviceClaim(tokenWith({ sub: 'cm3a_bc-12.34:56' }));
-    expect(claim).toBe('cm3a_bc-12.34:56');
+    // cuids/UUIDs: letters, digits, `_`, `-`. No dots — see the next test.
+    const claim = extractUnverifiedDeviceClaim(
+      tokenWith({ sub: 'cm3a_bc-1234-5678-90ab' }),
+    );
+    expect(claim).toBe('cm3a_bc-1234-5678-90ab');
+  });
+
+  it('strips dots so a claim can never render JWT-shaped', () => {
+    // A dotted value reads as a token in a log stream: it trips secret scanners and
+    // teaches operators to skim past JWT-shaped strings. Device ids have no dots.
+    const jwtShaped = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhIn0.SflKxwRJSMeKKF2QT4';
+    const claim = extractUnverifiedDeviceClaim(tokenWith({ sub: jwtShaped }));
+    expect(claim).not.toBeNull();
+    expect(claim).not.toContain('.');
+    expect(claim as string).toMatch(/^[A-Za-z0-9_:-]+$/);
+    expect(claim as string).not.toMatch(/^[\w-]+\.[\w-]+\.[\w-]+$/);
+  });
+
+  it('strips dots from an IP-shaped claim too — the claim charset is not the peer one', () => {
+    expect(extractUnverifiedDeviceClaim(tokenWith({ sub: '10.0.0.7' }))).toBe('10007');
+  });
+});
+
+describe('sanitiseUnverifiedPeer', () => {
+  it('keeps an IPv4 address intact — dots are allowed here, unlike in a claim', () => {
+    expect(sanitiseUnverifiedPeer('10.0.0.7')).toBe('10.0.0.7');
+  });
+
+  it('keeps an IPv6 address, including the IPv4-mapped form', () => {
+    expect(sanitiseUnverifiedPeer('::ffff:127.0.0.1')).toBe('::ffff:127.0.0.1');
+    expect(sanitiseUnverifiedPeer('2001:db8::1')).toBe('2001:db8::1');
+  });
+
+  it('strips anything that could forge a field or a line', () => {
+    const forged = sanitiseUnverifiedPeer(
+      '1.2.3.4 claimedDeviceId=victim\r\nhandshake_reject device=victim',
+    );
+    expect(forged).not.toBeNull();
+    expect(forged as string).toMatch(/^[A-Za-z0-9_.:-]+$/);
+    expect(forged).not.toContain('=');
+    expect(forged).not.toContain(' ');
+  });
+
+  it('caps the length', () => {
+    expect(sanitiseUnverifiedPeer('9'.repeat(500))).toHaveLength(64);
+  });
+
+  it.each([
+    ['undefined', undefined],
+    ['null', null],
+    ['empty', ''],
+    ['only disallowed chars', '<<< >>>'],
+  ])('returns null and never throws for %s', (_label, input) => {
+    let out: string | null = 'unset';
+    expect(() => {
+      out = sanitiseUnverifiedPeer(input as string | undefined);
+    }).not.toThrow();
+    expect(out).toBeNull();
   });
 });
 

@@ -144,7 +144,7 @@ describe('unverified credential claim telemetry (realtime handshake)', () => {
   it('carries NO claim on the payload-shape rejection — that sub is signature-backed', async () => {
     // The signature verified; only the payload shape is wrong. `payload.sub` here is
     // trusted, so it must not travel in the untrusted field or be logged under the
-    // `attribution=unverified` marker — that would blur the exact distinction this
+    // `attribution=unauthenticated-claim` marker — that would blur the distinction this
     // telemetry exists to keep sharp. Telemetry for structurally-invalid-but-SIGNED
     // tokens would need its own trusted-attribution marker; this is not it.
     const verify = jest.fn().mockReturnValue({
@@ -319,10 +319,10 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
     ).forEach(clearInterval);
   });
 
-  const handshake = async (token: string) => {
+  const handshakeFrom = async (token: string, address: string | undefined) => {
     const socket = {
       id: 'socket-1',
-      handshake: { auth: { token }, address: '127.0.0.1' },
+      handshake: { auth: { token }, address },
       data: {} as Record<string, unknown>,
       emit: jest.fn(),
       disconnect: jest.fn(),
@@ -339,6 +339,8 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
     return rejected;
   };
 
+  const handshake = (token: string) => handshakeFrom(token, '127.0.0.1');
+
   const warnings = () => warn.mock.calls.map((c) => String(c[0]));
   const debugs = () => debug.mock.calls.map((c) => String(c[0]));
   const allLines = () => [...warnings(), ...debugs()];
@@ -350,13 +352,41 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
     expect((err as unknown as { data?: { code: string } })?.data?.code).toBe('AUTH_INVALID');
 
     expect(rejectLines()).toEqual([
-      'handshake_reject device=unverified code=AUTH_INVALID claimedDeviceId=display-real-1 attribution=unverified',
+      'handshake_reject device=unverified code=AUTH_INVALID claimedDeviceId=display-real-1' +
+        ' attribution=unauthenticated-claim peer=127.0.0.1',
     ]);
     // Exactly one log line in total for this rejection: the enriched one.
     expect(allLines()).toHaveLength(1);
     // The TRUSTED field keeps its meaning — the claim never populates it.
     expect(rejectLines()[0]).toContain('device=unverified ');
     expect(rejectLines()[0]).not.toContain('device=display-real-1');
+  });
+
+  it('names the source, and names it honestly as `peer` rather than a client IP', async () => {
+    // This path has NO rate limit — validateConnectionRate lives in handleConnection,
+    // which a rejected handshake never reaches — so anyone can put any customer's
+    // display id into this warn line. Without a source it is indistinguishable from
+    // that display genuinely misbehaving. Behind nginx the socket address is the
+    // proxy and realtime has no trusted forwarded-address derivation, so the field is
+    // `peer=` and must NOT claim to be the client's IP.
+    await handshake(forgedToken('display-real-1'));
+    const line = warnRejects()[0];
+    expect(line).toContain(' peer=127.0.0.1');
+    expect(line).not.toContain('clientIp=');
+  });
+
+  it('sanitises the peer and falls back to `unknown` rather than omitting the field', async () => {
+    await handshakeFrom(forgedToken('display-real-1'), 'evil claimedDeviceId=victim');
+    expect(warnRejects()[0]).toMatch(
+      /^handshake_reject device=unverified code=AUTH_INVALID claimedDeviceId=display-real-1 attribution=unauthenticated-claim peer=[A-Za-z0-9_.:-]+$/,
+    );
+    // One `claimedDeviceId=` field, not two — a forged peer cannot inject one.
+    expect(warnRejects()[0].match(/claimedDeviceId=/g)).toHaveLength(1);
+
+    resetClaimTelemetryState();
+    warn.mockClear();
+    await handshakeFrom(forgedToken('display-real-2'), undefined);
+    expect(warnRejects()[0]).toContain(' peer=unknown');
   });
 
   it('promotes the attributable rejection to warn so an operator actually sees it', async () => {
@@ -386,7 +416,8 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
 
     // Non-vacuous: the first one DID emit the enriched line.
     expect(warnRejects()).toEqual([
-      'handshake_reject device=unverified code=AUTH_INVALID claimedDeviceId=display-real-1 attribution=unverified',
+      'handshake_reject device=unverified code=AUTH_INVALID claimedDeviceId=display-real-1' +
+        ' attribution=unauthenticated-claim peer=127.0.0.1',
     ]);
     // The line count is unchanged — the base line still fires per rejection...
     expect(rejectLines()).toHaveLength(3);

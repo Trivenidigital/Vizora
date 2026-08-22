@@ -73,6 +73,7 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
 
     service = module.get(DeviceAuthCheckService);
     process.env.DEVICE_JWT_SECRET = 'x'.repeat(32);
+    process.env.JWT_SECRET = 'u'.repeat(32); // distinct, so the user-token check is real
     warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     debug = jest.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
   });
@@ -113,7 +114,8 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
 
     expect(result).toEqual({ httpStatus: 401, body: { code: 'AUTH_INVALID' } });
     expect(claimLines()).toEqual([
-      `device_auth_check_reject code=AUTH_INVALID claimedDeviceId=${REAL_DEVICE} attribution=unverified`,
+      `device_auth_check_reject code=AUTH_INVALID claimedDeviceId=${REAL_DEVICE}` +
+        ' attribution=unauthenticated-claim clientIp=unknown',
     ]);
     expect(allLines()).toHaveLength(1);
     // Never the trusted-attribution shape — this endpoint has no verified identity
@@ -134,6 +136,61 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
     expect(warnClaimLines()).toHaveLength(1); // still just the first
     expect(allLines()).toHaveLength(1); // the repeats emit nothing at any level
     expect(debugs()).toHaveLength(0);
+  });
+
+  it('names the source, from the trust-proxy-resolved client IP', async () => {
+    // Without a source, a forged `claimedDeviceId` naming a real customer display is
+    // indistinguishable from that display genuinely misbehaving.
+    await service.evaluate(forgedToken(REAL_DEVICE), '203.0.113.9');
+    expect(warnClaimLines()[0]).toContain(' clientIp=203.0.113.9');
+  });
+
+  it('sanitises the client IP and cannot have a second field injected through it', async () => {
+    await service.evaluate(
+      forgedToken(REAL_DEVICE),
+      '203.0.113.9 claimedDeviceId=victim attribution=verified',
+    );
+    const line = warnClaimLines()[0];
+    expect(line.match(/claimedDeviceId=/g)).toHaveLength(1);
+    expect(line).not.toContain('attribution=verified');
+    expect(line).toMatch(
+      /^device_auth_check_reject code=AUTH_INVALID claimedDeviceId=[A-Za-z0-9_:-]+ attribution=unauthenticated-claim clientIp=[A-Za-z0-9_.:-]+$/,
+    );
+  });
+
+  it('emits NOTHING for a valid USER token — real user ids never enter these logs', async () => {
+    // A dashboard/mobile bearer fails the DEVICE verify and lands in the same catch.
+    // Its `sub` is a real user id, and logging it as `claimedDeviceId` would be both
+    // wrong and a way for one misconfigured client to burn the shared budget.
+    // Realtime avoids this by returning `pass` before extraction; this mirrors it.
+    const USER_TOKEN = forgedToken('user-abc-123');
+    jwt.verify.mockImplementation((_token: string, opts: { secret?: string }) => {
+      if (opts?.secret === process.env.JWT_SECRET) return { sub: 'user-abc-123', type: 'user' };
+      throw Object.assign(new Error('invalid signature'), { name: 'JsonWebTokenError' });
+    });
+
+    const result = await service.evaluate(USER_TOKEN, '203.0.113.9');
+    // The verdict is unchanged — a user token is still not a device credential.
+    expect(result).toEqual({ httpStatus: 401, body: { code: 'AUTH_INVALID' } });
+    expect(allLines()).toHaveLength(0);
+    expect(allLines().join('\n')).not.toContain('user-abc-123');
+  });
+
+  it('a user token does not consume the shared budget', async () => {
+    const realSignature = jwt.verify.getMockImplementation();
+    jwt.verify.mockImplementation((_token: string, opts: { secret?: string }) => {
+      if (opts?.secret === process.env.JWT_SECRET) return { sub: 'user-abc-123', type: 'user' };
+      throw Object.assign(new Error('invalid signature'), { name: 'JsonWebTokenError' });
+    });
+    for (let i = 0; i < CLAIM_TELEMETRY_MAX_PER_WINDOW + 5; i++) {
+      await service.evaluate(forgedToken(`user-${i}`), '203.0.113.9');
+    }
+    expect(allLines()).toHaveLength(0);
+
+    // The budget is untouched: a genuine device claim still gets its line.
+    jwt.verify.mockImplementation(realSignature as never);
+    await service.evaluate(forgedToken(REAL_DEVICE), '203.0.113.9');
+    expect(warnClaimLines()).toHaveLength(1);
   });
 
   it('the 401 response body is byte-identical and carries no claim', async () => {
@@ -169,13 +226,13 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
     expect(claimLines()).toHaveLength(1);
     expect(claimLines()[0].split('\n')).toHaveLength(1);
     expect(claimLines()[0]).toMatch(
-      /^device_auth_check_reject code=AUTH_INVALID claimedDeviceId=[A-Za-z0-9_.:-]+ attribution=unverified$/,
+      /^device_auth_check_reject code=AUTH_INVALID claimedDeviceId=[A-Za-z0-9_:-]+ attribution=unauthenticated-claim clientIp=[A-Za-z0-9_.:-]+$/,
     );
   });
 
   it('emits NOTHING on the payload-shape rejection — that sub is signature-backed', async () => {
     // Signature verifies, but the token is not a usable device credential. The `sub`
-    // on this branch is trusted, so filing it under `attribution=unverified` would
+    // on this branch is trusted, so filing it under the unauthenticated marker would
     // blur the very distinction this telemetry exists to keep sharp. Telemetry for
     // structurally-invalid-but-SIGNED tokens needs its own trusted-attribution
     // marker, not this one.

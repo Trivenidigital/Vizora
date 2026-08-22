@@ -14,7 +14,7 @@
  * device; count as authenticated activity or a heartbeat; update lastSeen; become
  * dashboard device state; drive a tenant-scoped action; or suppress signature
  * verification. It is a hint for an operator reading logs, nothing more — which is
- * why the emitted line tags it `attribution=unverified` and why
+ * why the emitted line tags it `attribution=unauthenticated-claim` and why
  * this value never travels in the same field as the VERIFIED `deviceId` that
  * `DeviceHandshakeResult` already carries.
  *
@@ -23,11 +23,28 @@
  * sync by hand.
  */
 
-/** Anything outside this set is stripped: the value lands in a log line. */
-const DISALLOWED_CLAIM_CHARS = /[^A-Za-z0-9_.:-]/g;
+/**
+ * Anything outside this set is stripped: the value lands in a log line.
+ *
+ * `.` is deliberately EXCLUDED. Device ids here are cuids/UUIDs and never contain
+ * one, while allowing it lets a `sub` render as a JWT-shaped `eyJ....eyJ....Sfl...`
+ * string — which trips secret scanners on the log stream and, worse, trains
+ * operators to skim past JWT-shaped values in logs.
+ */
+const DISALLOWED_CLAIM_CHARS = /[^A-Za-z0-9_:-]/g;
+
+/**
+ * Peers are addresses, so this set keeps `.` — stripping it would render 10.0.0.7 as
+ * `10007`, which is not merely lossy but actively misleading. Same helper, same
+ * anchored-strip discipline; only the alphabet differs, and for a stated reason.
+ */
+const DISALLOWED_PEER_CHARS = /[^A-Za-z0-9_.:-]/g;
 
 /** Log lines are for humans; a display id is a cuid, far shorter than this. */
 const MAX_CLAIM_LENGTH = 64;
+
+/** Enough for an IPv6 address with a zone id, and nothing like enough to spam. */
+const MAX_PEER_LENGTH = 64;
 
 /** A device JWT is ~400 bytes. Refuse to even decode an absurd input. */
 const MAX_TOKEN_LENGTH = 8192;
@@ -69,11 +86,45 @@ export function extractUnverifiedDeviceClaim(token: string | undefined): string 
     const sub = (parsed as { sub?: unknown }).sub;
     if (typeof sub !== 'string' || sub.length === 0) return null;
 
-    const sanitised = sub.replace(DISALLOWED_CLAIM_CHARS, '').slice(0, MAX_CLAIM_LENGTH);
-    return sanitised.length > 0 ? sanitised : null;
+    return sanitiseForLog(sub, DISALLOWED_CLAIM_CHARS, MAX_CLAIM_LENGTH);
   } catch {
     // JSON.parse, a RangeError on absurd nesting, anything at all — a diagnostic
     // must never become a failure mode of the auth path.
+    return null;
+  }
+}
+
+/**
+ * Strip every character outside `allowed` and cap the length. The ONLY way an
+ * untrusted value may reach a log line in this module — a CR/LF or an `=` surviving
+ * here is a forged log record, so the strip is a whitelist, never a blacklist.
+ */
+function sanitiseForLog(
+  value: string,
+  disallowed: RegExp,
+  maxLength: number,
+): string | null {
+  const sanitised = value.replace(disallowed, '').slice(0, maxLength);
+  return sanitised.length > 0 ? sanitised : null;
+}
+
+/**
+ * Sanitise the peer address that presented an unverifiable credential, for the
+ * `peer=` / `clientIp=` field on the reject line.
+ *
+ * The address is attacker-influenced in the same way the claim is (whatever the
+ * transport reports), and it is NOT identity either — it is the only thing on the
+ * line that is at least observed rather than asserted, which is exactly why the
+ * enriched line needs it: without a source, a forged `claimedDeviceId` naming a real
+ * customer display is indistinguishable from that display genuinely misbehaving.
+ *
+ * NEVER THROWS. Returns null when there is nothing usable.
+ */
+export function sanitiseUnverifiedPeer(peer: string | undefined | null): string | null {
+  try {
+    if (typeof peer !== 'string' || peer.length === 0) return null;
+    return sanitiseForLog(peer, DISALLOWED_PEER_CHARS, MAX_PEER_LENGTH);
+  } catch {
     return null;
   }
 }
@@ -85,6 +136,14 @@ export function extractUnverifiedDeviceClaim(token: string | undefined): string 
 // no, not merely log it more quietly: prod runs with debug enabled, so demoting the
 // level bounds nothing. Only EMITTED claims are tracked, so a flood of distinct
 // claims also stops consuming memory as soon as the global ceiling trips.
+//
+// ACCEPTED RESIDUAL, deliberately not fixed: an attacker who spends the window's
+// 20 distinct claims at its start suppresses genuine attribution for the rest of it.
+// That is the trade for not letting them write unbounded attacker-controlled text
+// into prod logs, and what makes it acceptable is the suppression notice the callers
+// emit — it converts "silently degraded" into "known degraded", so an operator who
+// sees an unattributed reject can tell whether attribution was withheld or simply
+// undecodable. Widening the budget would buy back the tail at the cost of the flood.
 //
 // The state is module-level, so the budget is PER PROCESS. Realtime runs one PM2
 // instance, so its numbers are the fleet-wide ones; middleware runs 2 in cluster

@@ -66,6 +66,7 @@ import {
 import {
   shouldEmitClaimTelemetry,
   takeClaimSuppressionNotice,
+  sanitiseUnverifiedPeer,
 } from './unverified-credential-claim';
 import { redactDevicePlaylist } from '../services/device-content-payload';
 
@@ -211,7 +212,7 @@ export class DeviceGateway
 
         // AUTH_INVALID left the operator blind: `device=unverified` says a device
         // somewhere cannot authenticate but never which one. `claimedDeviceId` narrows
-        // that down and `attribution=unverified` says in the line itself what it is
+        // that down and `attribution=unauthenticated-claim` says in the line what it is
         // worth: it was decoded from a token that FAILED verification, so it is what
         // the sender CLAIMS to be — not who it is. The two fields are appended only
         // when a claim actually decoded; a malformed JWT stays unattributed, with the
@@ -227,7 +228,19 @@ export class DeviceGateway
           // fires per rejection regardless, so this costs nothing operationally.
           const now = Date.now();
           if (shouldEmitClaimTelemetry(result.unverifiedDeviceClaim, now)) {
-            line += ` claimedDeviceId=${result.unverifiedDeviceClaim} attribution=unverified`;
+            // `peer=`, not `clientIp=`: this handshake path has NO rate limit
+            // (`validateConnectionRate` lives in handleConnection, which a rejected
+            // handshake never reaches), so anyone can put any customer's display id
+            // into this warn line at will. Without a source, that is indistinguishable
+            // from the named display genuinely misbehaving. The address is the only
+            // observed — rather than asserted — thing on the line, but behind nginx it
+            // is the PROXY: realtime has no trusted forwarded-address derivation (the
+            // middleware's `trust proxy` machinery has no analogue here), so the field
+            // is named for what it actually holds instead of implying a client IP.
+            const peer = sanitiseUnverifiedPeer(socket.handshake?.address);
+            line +=
+              ` claimedDeviceId=${result.unverifiedDeviceClaim}` +
+              ` attribution=unauthenticated-claim peer=${peer ?? 'unknown'}`;
             atWarn = true;
           } else {
             suppressionNoticeDue = takeClaimSuppressionNotice(now);

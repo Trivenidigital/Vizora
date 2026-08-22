@@ -13,6 +13,7 @@ import {
   extractUnverifiedDeviceClaim,
   shouldEmitClaimTelemetry,
   takeClaimSuppressionNotice,
+  sanitiseUnverifiedPeer,
 } from './unverified-credential-claim';
 
 /**
@@ -47,7 +48,13 @@ export class DeviceAuthCheckService {
     private readonly redis: RedisService,
   ) {}
 
-  async evaluate(token: string): Promise<DeviceAuthCheckResult> {
+  /**
+   * `clientIp` is diagnostics-only and OPTIONAL — it reaches nothing but a log line
+   * and no verdict depends on it. Callers pass `req.ip`, which Express resolves
+   * through `trust proxy` (TRUST_PROXY_HOPS), so unlike realtime's socket address it
+   * is the client rather than nginx.
+   */
+  async evaluate(token: string, clientIp?: string): Promise<DeviceAuthCheckResult> {
     // 1. Signature / expiry. Only jwt.verify is caught — expiry vs invalid.
     let payload: DeviceJwtPayload;
     try {
@@ -68,7 +75,7 @@ export class DeviceAuthCheckService {
       // metadata, never identity. It reaches no query, no write, no branch here,
       // and — critically — no response body: the wire response stays exactly
       // `401 {"code":"AUTH_INVALID"}`.
-      this.logUnverifiedClaim(token);
+      this.logUnverifiedClaim(token, clientIp);
       return { httpStatus: 401, body: { code: 'AUTH_INVALID' } };
     }
 
@@ -82,8 +89,8 @@ export class DeviceAuthCheckService {
     ) {
       // Deliberately NO claim telemetry here, and this is not an oversight. The
       // signature verified on this branch, so `payload.sub` is signature-backed —
-      // logging it under the `attribution=unverified` marker would file a trusted
-      // value under the untrusted one, blurring the exact distinction this telemetry
+      // logging it under the `attribution=unauthenticated-claim` marker would file a
+      // trusted value under the untrusted one, blurring the distinction this telemetry
       // exists to keep sharp, and inviting a future reader to generalise from it.
       // (It matches realtime, which also emits nothing on its equivalent branch.)
       // Telemetry for structurally-invalid-but-SIGNED tokens would need its own
@@ -174,9 +181,9 @@ export class DeviceAuthCheckService {
    *
    * There is deliberately no trusted `device=` field here: this endpoint has no
    * verified identity to report on an AUTH_INVALID, and `claimedDeviceId` must never
-   * be mistaken for one — which is what `attribution=unverified` states in the line
-   * itself. Nothing is logged when no claim decodes, so an undecodable token leaves
-   * behaviour exactly as it was.
+   * be mistaken for one — which is what `attribution=unauthenticated-claim` states in
+   * the line itself. Nothing is logged when no claim decodes, so an undecodable token
+   * leaves behaviour exactly as it was.
    *
    * The budget bounds how much attacker-controlled text reaches the logs AT ALL, not
    * merely at what level: over budget nothing is emitted here, because prod runs with
@@ -190,19 +197,35 @@ export class DeviceAuthCheckService {
    * one window. Same caveat as the MCP in-memory rate limit. A duplicate line is not a
    * bug.
    */
-  private logUnverifiedClaim(token: string): void {
+  private logUnverifiedClaim(token: string, clientIp?: string): void {
     // Diagnostics must never fail the auth path. This is the first statement in the
     // `jwt.verify` catch block that could throw, and a logger CAN throw (EPIPE on a
     // closed stdout, a future custom transport) — which would turn a settled
     // `401 AUTH_INVALID` into a 5xx for a whole class of input. Same promise the
     // extraction module makes one layer down.
     try {
+      // A USER access token presented here fails the DEVICE verify and lands in this
+      // branch, so without this check a dashboard or mobile client pointed at the wrong
+      // endpoint would put REAL USER IDS into warn logs under a field named
+      // `claimedDeviceId` — and one misconfigured client would burn the shared budget.
+      // Realtime never has this problem: it returns `pass` for a valid user token
+      // before extraction. This mirrors that, and is the one input where the two copies
+      // of this mechanism would otherwise diverge. The 401 is unaffected: a user token
+      // is still not a device credential.
+      if (this.isValidUserToken(token)) return;
+
       const claim = extractUnverifiedDeviceClaim(token);
       if (!claim) return;
       const now = Date.now();
       if (shouldEmitClaimTelemetry(claim, now)) {
+        // `clientIp=` (not realtime's `peer=`): Express resolves `req.ip` through
+        // `trust proxy`, so this is the client rather than the nginx in front of it.
+        // The source matters because a forged `claimedDeviceId` naming a real customer
+        // display is otherwise indistinguishable from that display misbehaving.
+        const peer = sanitiseUnverifiedPeer(clientIp);
         this.logger.warn(
-          `device_auth_check_reject code=AUTH_INVALID claimedDeviceId=${claim} attribution=unverified`,
+          `device_auth_check_reject code=AUTH_INVALID claimedDeviceId=${claim}` +
+            ` attribution=unauthenticated-claim clientIp=${peer ?? 'unknown'}`,
         );
         return;
       }
@@ -215,6 +238,22 @@ export class DeviceAuthCheckService {
       }
     } catch {
       // Intentionally empty — the 401 is the contract, not the log.
+    }
+  }
+
+  /**
+   * Mirrors `isValidUserToken` in realtime's `device-handshake-auth.ts`. Used ONLY to
+   * suppress diagnostics — it grants nothing and changes no verdict.
+   */
+  private isValidUserToken(token: string): boolean {
+    try {
+      const user = this.jwtService.verify<{ type?: string }>(token, {
+        secret: process.env.JWT_SECRET,
+        algorithms: ['HS256'],
+      });
+      return user.type !== 'device';
+    } catch {
+      return false;
     }
   }
 }
