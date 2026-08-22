@@ -267,6 +267,11 @@ export class DeviceAuthCheckService {
         secret: process.env.JWT_SECRET,
         algorithms: ['HS256'],
         ignoreExpiration: true,
+        // `ignoreExpiration` does NOT cover `nbf` — jsonwebtoken throws
+        // NotBeforeError regardless, so this second option is required for the
+        // docblock's claim above to be true. No Vizora-issued token sets `nbf`
+        // today; this keeps the suppression correct if that ever changes.
+        ignoreNotBefore: true,
       });
       return true;
     } catch {
