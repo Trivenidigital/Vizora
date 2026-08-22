@@ -1,3 +1,4 @@
+import { isIP } from 'net';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
@@ -207,27 +208,60 @@ describe('extractUnverifiedDeviceClaim', () => {
 });
 
 describe('sanitiseUnverifiedPeer', () => {
-  it('keeps an IPv4 address intact — dots are allowed here, unlike in a claim', () => {
+  it('accepts a real IPv4 and a real IPv6, including the IPv4-mapped form', () => {
     expect(sanitiseUnverifiedPeer('10.0.0.7')).toBe('10.0.0.7');
-  });
-
-  it('keeps an IPv6 address, including the IPv4-mapped form', () => {
-    expect(sanitiseUnverifiedPeer('::ffff:127.0.0.1')).toBe('::ffff:127.0.0.1');
     expect(sanitiseUnverifiedPeer('2001:db8::1')).toBe('2001:db8::1');
+    expect(sanitiseUnverifiedPeer('::ffff:127.0.0.1')).toBe('::ffff:127.0.0.1');
   });
 
-  it('strips anything that could forge a field or a line', () => {
-    const forged = sanitiseUnverifiedPeer(
-      '1.2.3.4 claimedDeviceId=victim\r\nhandshake_reject device=victim',
+  it('keeps an IPv6 zone id rather than silently mangling it', () => {
+    // A charset strip turned `fe80::1%eth0` into `fe80::1eth0` — a different, wrong
+    // address presented as fact.
+    expect(sanitiseUnverifiedPeer('fe80::1ff:fe23:4567:890a%eth0')).toBe(
+      'fe80::1ff:fe23:4567:890a%eth0',
     );
-    expect(forged).not.toBeNull();
-    expect(forged as string).toMatch(/^[A-Za-z0-9_.:-]+$/);
-    expect(forged).not.toContain('=');
-    expect(forged).not.toContain(' ');
+    expect(sanitiseUnverifiedPeer('fe80::1%bad zone')).toBeNull();
+    expect(sanitiseUnverifiedPeer('fe80::1%a%b')).toBeNull();
   });
 
-  it('caps the length', () => {
-    expect(sanitiseUnverifiedPeer('9'.repeat(500))).toHaveLength(64);
+  it('takes the LAST element of a joined header, never fabricating one', () => {
+    // Node joins repeated same-name headers with `, ` (only set-cookie arrays), so a
+    // duplicated X-Real-IP arrives as one string. A strip rendered it as the
+    // fabricated address `1.1.1.12.2.2.2`.
+    expect(sanitiseUnverifiedPeer('1.1.1.1, 2.2.2.2')).toBe('2.2.2.2');
+    expect(sanitiseUnverifiedPeer('1.1.1.1,2.2.2.2')).toBe('2.2.2.2');
+  });
+
+  it('rejects a JWT-shaped value instead of rendering it', () => {
+    // Keeping `.` for IPv4 would otherwise reopen on this field exactly the
+    // JWT-rendering the claim alphabet removes.
+    expect(
+      sanitiseUnverifiedPeer('eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhIn0.SflKxwRJSMeKKF2QT4'),
+    ).toBeNull();
+  });
+
+  it('rejects anything that is not an address, rather than laundering it', () => {
+    expect(sanitiseUnverifiedPeer('1.2.3.4 attribution=verified')).toBeNull();
+    expect(sanitiseUnverifiedPeer('not-an-ip')).toBeNull();
+    expect(sanitiseUnverifiedPeer('999.999.999.999')).toBeNull();
+    expect(sanitiseUnverifiedPeer('1.2.3.4/24')).toBeNull();
+    expect(sanitiseUnverifiedPeer('example.com')).toBeNull();
+    expect(sanitiseUnverifiedPeer('9'.repeat(4000))).toBeNull();
+  });
+
+  it('cannot emit a space, an `=`, or a newline whatever it is given', () => {
+    const hostile = [
+      '1.2.3.4 claimedDeviceId=victim',
+      '1.2.3.4\r\nhandshake_reject device=victim',
+      '1.2.3.4=x',
+      '1.2.3.4, 5.6.7.8 attribution=verified',
+    ];
+    for (const input of hostile) {
+      const out = sanitiseUnverifiedPeer(input);
+      if (out === null) continue;
+      expect(out).not.toMatch(/[\s=]/);
+      expect(isIP(out.split('%')[0])).not.toBe(0);
+    }
   });
 
   it.each([
@@ -235,6 +269,9 @@ describe('sanitiseUnverifiedPeer', () => {
     ['null', null],
     ['empty', ''],
     ['only disallowed chars', '<<< >>>'],
+    ['a lone comma', ','],
+    ['a number', 42],
+    ['an object', { ip: '1.2.3.4' }],
   ])('returns null and never throws for %s', (_label, input) => {
     let out: string | null = 'unset';
     expect(() => {

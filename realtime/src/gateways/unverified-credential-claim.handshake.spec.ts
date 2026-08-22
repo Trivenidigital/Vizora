@@ -173,6 +173,102 @@ describe('unverified credential claim telemetry (realtime handshake)', () => {
     expect(claim).not.toContain('\r');
   });
 
+
+  it('emits NO claim for an EXPIRED user token — the common case, not an edge one', async () => {
+    // `jsonwebtoken` checks the signature before `exp`, and the two secrets differ, so
+    // a user bearer fails the DEVICE verify on the SIGNATURE and lands on the
+    // AUTH_INVALID path whatever its expiry. With a 30m default lifetime an expired
+    // user token is the steady state for any client with a stale session — so a
+    // strict "verifies cleanly" check would have logged real user ids routinely.
+    const USER_ID = 'clxrealuserid00000001';
+    const verify = jest.fn((_t: string, opts: { secret?: string; ignoreExpiration?: boolean }) => {
+      if (opts?.secret !== USER_SECRET) {
+        throw Object.assign(new Error('invalid signature'), { name: 'JsonWebTokenError' });
+      }
+      if (!opts.ignoreExpiration) {
+        throw Object.assign(new Error('jwt expired'), { name: 'TokenExpiredError' });
+      }
+      return { sub: USER_ID, type: 'user' };
+    });
+    const { deps } = makeDeps({ verify });
+    const result = await authenticateDeviceHandshake(forgedToken(USER_ID), deps);
+
+    // Verdict unchanged — this is still not a device credential.
+    expect(result).toMatchObject({ action: 'reject', code: 'AUTH_INVALID' });
+    expect(
+      (result as { unverifiedDeviceClaim?: string }).unverifiedDeviceClaim,
+    ).toBeUndefined();
+    expect(JSON.stringify(result)).not.toContain(USER_ID);
+  });
+
+  it('emits NO claim for a not-yet-valid user token either', async () => {
+    const USER_ID = 'clxrealuserid00000002';
+    const verify = jest.fn((_t: string, opts: { secret?: string; ignoreExpiration?: boolean }) => {
+      if (opts?.secret !== USER_SECRET) {
+        throw Object.assign(new Error('invalid signature'), { name: 'JsonWebTokenError' });
+      }
+      if (!opts.ignoreExpiration) {
+        throw Object.assign(new Error('jwt not active'), { name: 'NotBeforeError' });
+      }
+      return { sub: USER_ID, type: 'user' };
+    });
+    const { deps } = makeDeps({ verify });
+    const result = await authenticateDeviceHandshake(forgedToken(USER_ID), deps);
+    expect(JSON.stringify(result)).not.toContain(USER_ID);
+  });
+
+  it('emits NO claim for a user-secret-signed token carrying type=device', async () => {
+    // The strict predicate returns false for this (type === 'device'), so it used to
+    // fall through to extraction.
+    const USER_ID = 'clxrealuserid00000003';
+    const verify = jest.fn((_t: string, opts: { secret?: string }) => {
+      if (opts?.secret !== USER_SECRET) {
+        throw Object.assign(new Error('invalid signature'), { name: 'JsonWebTokenError' });
+      }
+      return { sub: USER_ID, type: 'device' };
+    });
+    const { deps } = makeDeps({ verify });
+    const result = await authenticateDeviceHandshake(forgedToken(USER_ID), deps);
+    expect(JSON.stringify(result)).not.toContain(USER_ID);
+  });
+
+  it('an UNEXPIRED user token still PASSES — the verdict predicate is untouched', async () => {
+    // The telemetry skip is deliberately a separate, wider predicate. Widening the
+    // verdict one instead would have turned an expired user bearer from a structured
+    // rejection into a pass.
+    const verify = jest.fn((_t: string, opts: { secret?: string }) => {
+      if (opts?.secret !== USER_SECRET) {
+        throw Object.assign(new Error('invalid signature'), { name: 'JsonWebTokenError' });
+      }
+      return { sub: 'clxrealuserid00000004', type: 'user' };
+    });
+    const { deps } = makeDeps({ verify });
+    expect(await authenticateDeviceHandshake('a.b.c', deps)).toEqual({ action: 'pass' });
+  });
+
+  it('an EXPIRED user token still REJECTS rather than passing', async () => {
+    const verify = jest.fn((_t: string, opts: { secret?: string; ignoreExpiration?: boolean }) => {
+      if (opts?.secret !== USER_SECRET) {
+        throw Object.assign(new Error('invalid signature'), { name: 'JsonWebTokenError' });
+      }
+      if (!opts.ignoreExpiration) {
+        throw Object.assign(new Error('jwt expired'), { name: 'TokenExpiredError' });
+      }
+      return { sub: 'clxrealuserid00000005', type: 'user' };
+    });
+    const { deps } = makeDeps({ verify });
+    const result = await authenticateDeviceHandshake(forgedToken('x'), deps);
+    expect(result).toMatchObject({ action: 'reject', code: 'AUTH_INVALID' });
+  });
+
+  it('a DEVICE claim is still logged — the skip is not a blanket off-switch', async () => {
+    const { deps } = makeDeps(); // nothing verifies under either secret
+    const result = await authenticateDeviceHandshake(forgedToken(REAL_DEVICE), deps);
+    expect((result as { unverifiedDeviceClaim?: string }).unverifiedDeviceClaim).toBe(
+      REAL_DEVICE,
+    );
+  });
+
   // ---- everything else is untouched -----------------------------------------
 
   it('carries NO claim on the payload-shape rejection — that sub is signature-backed', async () => {
@@ -418,6 +514,29 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
     expect(line).not.toContain('clientIp='); // named for what it holds, not what we wish
   });
 
+  it('trusts X-Real-IP ONLY from a loopback socket — otherwise nginx was bypassed', async () => {
+    // nginx and realtime share a host, so a loopback peer is what "came through the
+    // proxy" looks like. A direct connection (3002 exposed, a future ingress) can set
+    // the header to anything, but ITS socket address is the real peer — so the header
+    // is ignored and the address wins. Structural, not dependent on the firewall.
+    await handshakeFrom(forgedToken('display-real-1'), '198.51.100.20', {
+      'x-real-ip': '203.0.113.9',
+    });
+    const line = warnRejects()[0];
+    expect(line).toContain(' peer=198.51.100.20');
+    expect(allLines().join('\n')).not.toContain('203.0.113.9');
+  });
+
+  it.each([['::1'], ['127.0.0.1'], ['::ffff:127.0.0.1']])(
+    'treats %s as the proxy and honours the header',
+    async (address) => {
+      await handshakeFrom(forgedToken('display-real-1'), address, {
+        'x-real-ip': '203.0.113.9',
+      });
+      expect(warnRejects()[0]).toContain(' peer=203.0.113.9');
+    },
+  );
+
   it('NEVER reads X-Forwarded-For — its head is attacker-supplied', async () => {
     // nginx sets XFF with $proxy_add_x_forwarded_for, which APPENDS: the value is
     // `<whatever the client sent>, <real peer>`. Taking [0] would let an attacker name
@@ -431,9 +550,7 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
     expect(allLines().join('\n')).not.toContain('198.51.100.7');
   });
 
-  it('falls back to the socket address ONLY when X-Real-IP is absent, never to XFF', async () => {
-    // No X-Real-IP means the connection did not come through nginx, and in exactly
-    // that case the socket address IS the real peer.
+  it('falls back to the socket address when X-Real-IP is absent, never to XFF', async () => {
     await handshakeFrom(forgedToken('display-real-1'), '198.51.100.20', {
       'x-forwarded-for': '198.51.100.7',
     });
@@ -442,38 +559,44 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
     expect(allLines().join('\n')).not.toContain('198.51.100.7');
   });
 
-  it('sanitises X-Real-IP — spaces and `=` are legal in a header and arrive intact', async () => {
-    // Node's parser rejects CR/LF, so a forged second LINE is unreachable; same-line
-    // field forgery is not, and this is what closes it.
+  it('reports `unknown` for a header that is not an address, rather than rendering it', async () => {
+    // Spaces and `=` are legal in a header and arrive intact through Node's parser, so
+    // a charset strip would leave inert-but-ugly text; a shape check refuses it.
     await handshakeFrom(forgedToken('display-real-1'), '127.0.0.1', {
       'x-real-ip': '1.2.3.4 attribution=verified claimedDeviceId=victim',
     });
     const line = warnRejects()[0];
-    // The forged text survives as inert characters — what must NOT survive is its
-    // structure: one `claimedDeviceId=` and one `attribution=`, both ours.
+    expect(line).toBe(
+      'handshake_reject device=unverified code=AUTH_INVALID claimedDeviceId=display-real-1' +
+        ' attribution=unauthenticated-claim peer=unknown',
+    );
     expect(line.match(/claimedDeviceId=/g)).toHaveLength(1);
     expect(line.match(/attribution=/g)).toHaveLength(1);
-    expect(line).not.toContain('attribution=verified');
-    expect(line).not.toContain('=victim');
-    expect(line.split(' peer=')[1]).not.toContain(' '); // no new fields after peer
-    expect(line).toMatch(
-      /^handshake_reject device=unverified code=AUTH_INVALID claimedDeviceId=display-real-1 attribution=unauthenticated-claim peer=[A-Za-z0-9_.:-]+$/,
-    );
   });
 
-  it('caps an over-long X-Real-IP — the parser accepts thousands of characters', async () => {
+  it('refuses a JWT-shaped X-Real-IP', async () => {
+    await handshakeFrom(forgedToken('display-real-1'), '127.0.0.1', {
+      'x-real-ip': 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhIn0.SflKxwRJSMeKKF2QT4',
+    });
+    expect(warnRejects()[0]).toContain(' peer=unknown');
+    expect(allLines().join('\n')).not.toContain('eyJ');
+  });
+
+  it('refuses an over-long X-Real-IP — the parser accepts thousands of characters', async () => {
     await handshakeFrom(forgedToken('display-real-1'), '127.0.0.1', {
       'x-real-ip': '9'.repeat(4000),
     });
-    const peer = warnRejects()[0].split(' peer=')[1];
-    expect(peer).toHaveLength(64);
+    expect(warnRejects()[0]).toContain(' peer=unknown');
   });
 
-  it('takes the last value when the header arrives more than once', async () => {
+  it('takes the last value when the header arrives twice and is joined by Node', async () => {
     await handshakeFrom(forgedToken('display-real-1'), '127.0.0.1', {
-      'x-real-ip': ['198.51.100.7', '203.0.113.9'],
+      'x-real-ip': '198.51.100.7, 203.0.113.9',
     });
-    expect(warnRejects()[0]).toContain(' peer=203.0.113.9');
+    const line = warnRejects()[0];
+    expect(line).toContain(' peer=203.0.113.9');
+    // Never the fabricated concatenation a strip would have produced.
+    expect(line).not.toContain('198.51.100.7203.0.113.9');
   });
 
   it('falls back to `unknown` rather than omitting the field', async () => {

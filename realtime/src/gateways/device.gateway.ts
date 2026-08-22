@@ -93,9 +93,31 @@ import { redactDevicePlaylist } from '../services/device-content-payload';
  * future proxy change are not guaranteed.
  */
 function resolveUnverifiedPeer(socket: Socket): string | null {
+  const address = socket.handshake?.address;
+  // Trust the header ONLY from our own proxy. nginx and realtime share a host, so a
+  // loopback socket address is what "arrived through nginx" looks like; anything else
+  // reached us without traversing it and can therefore set `X-Real-IP` to whatever it
+  // likes, while ITS socket address is the real peer and needs no header. This makes
+  // the guarantee structural instead of resting on the firewall staying closed: if
+  // 3002 is ever exposed, this fails closed rather than handing the attacker the field.
+  if (!isLoopbackAddress(address)) return sanitiseUnverifiedPeer(address);
+
   const header = socket.handshake?.headers?.['x-real-ip'];
-  const realIp = Array.isArray(header) ? header[header.length - 1] : header;
-  return sanitiseUnverifiedPeer(realIp ?? socket.handshake?.address);
+  // Node joins repeated headers with `, ` (only `set-cookie` arrives as an array), so
+  // the array branch is defensive; sanitiseUnverifiedPeer takes the last element either
+  // way, which is the value closest to us.
+  const realIp = Array.isArray(header) ? header.join(',') : header;
+  return sanitiseUnverifiedPeer(realIp ?? address);
+}
+
+/** Loopback in the forms Node reports it: IPv4, IPv6, and the IPv4-mapped IPv6 one. */
+function isLoopbackAddress(address: string | undefined): boolean {
+  if (typeof address !== 'string' || address.length === 0) return false;
+  return (
+    address === '::1' ||
+    address.startsWith('127.') ||
+    address.startsWith('::ffff:127.')
+  );
 }
 
 interface DevicePayload {

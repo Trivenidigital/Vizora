@@ -208,11 +208,11 @@ export class DeviceAuthCheckService {
       // branch, so without this check a dashboard or mobile client pointed at the wrong
       // endpoint would put REAL USER IDS into warn logs under a field named
       // `claimedDeviceId` — and one misconfigured client would burn the shared budget.
-      // Realtime never has this problem: it returns `pass` for a valid user token
-      // before extraction. This mirrors that, and is the one input where the two copies
-      // of this mechanism would otherwise diverge. The 401 is unaffected: a user token
-      // is still not a device credential.
-      if (this.isValidUserToken(token)) return;
+      // Realtime has the same exposure and the same skip (`isUserSecretSigned` there);
+      // its earlier `pass` for a valid user token covers only UNEXPIRED ones, which is
+      // not the common case. The 401 is unaffected: a user token is not a device
+      // credential whether or not we log about it.
+      if (this.isUserSecretSigned(token)) return;
 
       const claim = extractUnverifiedDeviceClaim(token);
       if (!claim) return;
@@ -244,16 +244,31 @@ export class DeviceAuthCheckService {
   }
 
   /**
-   * Mirrors `isValidUserToken` in realtime's `device-handshake-auth.ts`. Used ONLY to
+   * Whether the token is signed by OUR USER SECRET, expiry ignored. Used ONLY to
    * suppress diagnostics — it grants nothing and changes no verdict.
+   *
+   * `ignoreExpiration` is load-bearing, not laxness. `jsonwebtoken` checks the
+   * signature before `exp`, and the user and device secrets differ, so a user bearer
+   * ALWAYS fails the device verify on the signature and lands on the AUTH_INVALID
+   * path whatever its expiry. A stricter check would therefore still log the `sub` of
+   * every expired user token — and with `JWT_EXPIRES_IN` defaulting to 30m that is the
+   * steady state for any client with a stale session, making a real user id the common
+   * case in these logs rather than an edge one. Same for a future `nbf`, and for a
+   * user-secret-signed token carrying `type: 'device'`.
+   *
+   * The question here is not "may this token do anything" — it may not, the 401 stands
+   * either way — but "is this `sub` one of OUR USER IDS". Wider is correct for that.
+   * Realtime keeps the two questions in two predicates for the same reason: there the
+   * strict one gates `action: 'pass'`, so widening it would change a verdict.
    */
-  private isValidUserToken(token: string): boolean {
+  private isUserSecretSigned(token: string): boolean {
     try {
-      const user = this.jwtService.verify<{ type?: string }>(token, {
+      this.jwtService.verify(token, {
         secret: process.env.JWT_SECRET,
         algorithms: ['HS256'],
+        ignoreExpiration: true,
       });
-      return user.type !== 'device';
+      return true;
     } catch {
       return false;
     }

@@ -23,6 +23,8 @@
  * sync by hand.
  */
 
+import { isIP } from 'net';
+
 /**
  * Anything outside this set is stripped: the value lands in a log line.
  *
@@ -34,17 +36,26 @@
 const DISALLOWED_CLAIM_CHARS = /[^A-Za-z0-9_:-]/g;
 
 /**
- * Peers are addresses, so this set keeps `.` — stripping it would render 10.0.0.7 as
- * `10007`, which is not merely lossy but actively misleading. Same helper, same
- * anchored-strip discipline; only the alphabet differs, and for a stated reason.
+ * A peer is validated by SHAPE, not filtered by alphabet.
+ *
+ * A charset filter cannot work here: keeping `.` (which IPv4 needs) would let a
+ * JWT-shaped header render intact as `peer=eyJ....eyJ....Sfl...`, reopening on this
+ * field exactly the rendering the claim alphabet removes; dropping `.` would render
+ * 10.0.0.7 as `10007`, which is worse than lossy. So the value must either BE an
+ * address or be reported as unknown — `net.isIP` decides, and its accepted output
+ * (hex digits, dots, colons) cannot contain a space, an `=`, or a newline, which is
+ * a stronger guarantee than any strip.
  */
-const DISALLOWED_PEER_CHARS = /[^A-Za-z0-9_.:-]/g;
+const PEER_ZONE_ID = /^[A-Za-z0-9_.-]{1,32}$/;
 
 /** Log lines are for humans; a display id is a cuid, far shorter than this. */
 const MAX_CLAIM_LENGTH = 64;
 
-/** Enough for an IPv6 address with a zone id, and nothing like enough to spam. */
-const MAX_PEER_LENGTH = 64;
+/** Enough for an IPv6 address plus a zone id (45 + 1 + 32 at the extreme). */
+const MAX_PEER_LENGTH = 78;
+
+/** Refuse to even parse an absurd header; the parser accepts thousands of bytes. */
+const MAX_PEER_INPUT_LENGTH = 512;
 
 /** A device JWT is ~400 bytes. Refuse to even decode an absurd input. */
 const MAX_TOKEN_LENGTH = 8192;
@@ -109,21 +120,41 @@ function sanitiseForLog(
 }
 
 /**
- * Sanitise the peer address that presented an unverifiable credential, for the
- * `peer=` / `clientIp=` field on the reject line.
+ * Validate the peer address that presented an unverifiable credential, for the
+ * `peer=` / `clientIp=` field on the reject line. Returns the address, or null when
+ * the value is not one — callers render null as `unknown` rather than dropping the
+ * field, so the line shape stays stable.
  *
- * The address is attacker-influenced in the same way the claim is (whatever the
- * transport reports), and it is NOT identity either — it is the only thing on the
- * line that is at least observed rather than asserted, which is exactly why the
- * enriched line needs it: without a source, a forged `claimedDeviceId` naming a real
- * customer display is indistinguishable from that display genuinely misbehaving.
+ * The address is attacker-influenced in the same way the claim is, and it is NOT
+ * identity either — it is the only thing on the line that is observed rather than
+ * asserted, which is why the enriched line needs it: without a source, a forged
+ * `claimedDeviceId` naming a real customer display is indistinguishable from that
+ * display genuinely misbehaving.
  *
- * NEVER THROWS. Returns null when there is nothing usable.
+ * Takes the LAST comma-separated element. Node joins repeated headers of the same
+ * name with `, ` (it only arrays `set-cookie`), so a duplicated header arrives as
+ * `"1.1.1.1, 2.2.2.2"` — which a naive strip would render as the fabricated address
+ * `1.1.1.12.2.2.2`. The last element is the one closest to us.
+ *
+ * NEVER THROWS.
  */
 export function sanitiseUnverifiedPeer(peer: string | undefined | null): string | null {
   try {
     if (typeof peer !== 'string' || peer.length === 0) return null;
-    return sanitiseForLog(peer, DISALLOWED_PEER_CHARS, MAX_PEER_LENGTH);
+    if (peer.length > MAX_PEER_INPUT_LENGTH) return null;
+
+    const candidate = (peer.split(',').pop() ?? '').trim();
+    if (candidate.length === 0 || candidate.length > MAX_PEER_LENGTH) return null;
+
+    // An IPv6 zone id (`fe80::1%eth0`) is legitimate and `net.isIP` rejects it, so
+    // split it off, constrain it, and validate the address on its own.
+    const parts = candidate.split('%');
+    if (parts.length > 2) return null;
+    const [address, zone] = parts;
+    if (zone !== undefined && !PEER_ZONE_ID.test(zone)) return null;
+    if (isIP(address) === 0) return null;
+
+    return zone === undefined ? address : `${address}%${zone}`;
   } catch {
     return null;
   }

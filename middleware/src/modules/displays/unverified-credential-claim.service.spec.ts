@@ -72,10 +72,13 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
   const forgedToken = (sub: unknown, extra: Record<string, unknown> = {}) =>
     `eyJhbGciOiJIUzI1NiJ9.${b64url({ sub, type: 'device', organizationId: 'org-1', ...extra })}.AAAA`;
 
-  const badSignature = () => {
+  const badSignatureError = () => {
     const e = new Error('invalid signature');
     e.name = 'JsonWebTokenError';
-    throw e;
+    return e;
+  };
+  const badSignature = () => {
+    throw badSignatureError();
   };
 
   beforeEach(async () => {
@@ -297,6 +300,76 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
     jwt.verify.mockImplementation(badSignature);
     await service.evaluate(forgedToken(REAL_DEVICE));
     expect(claimLines()).toHaveLength(1);
+  });
+
+
+  it('emits NOTHING for an EXPIRED user token — the common case, not an edge one', async () => {
+    // `jsonwebtoken` checks the signature before `exp`, and the two secrets differ, so
+    // a user bearer fails the DEVICE verify on the SIGNATURE and reaches this branch
+    // whatever its expiry. `JWT_EXPIRES_IN` defaults to 30m, so an expired user token
+    // is the steady state for any client with a stale session — a strict "verifies
+    // cleanly" skip would have logged real user ids routinely, not rarely.
+    const USER_ID = 'clxrealuserid00000001';
+    jwt.verify.mockImplementation(
+      (_token: string, opts: { secret?: string; ignoreExpiration?: boolean }) => {
+        if (opts?.secret !== process.env.JWT_SECRET) throw badSignatureError();
+        if (!opts.ignoreExpiration) {
+          throw Object.assign(new Error('jwt expired'), { name: 'TokenExpiredError' });
+        }
+        return { sub: USER_ID, type: 'user' };
+      },
+    );
+
+    const result = await service.evaluate(forgedToken(USER_ID), '203.0.113.9');
+    // Verdict unchanged.
+    expect(result).toEqual({ httpStatus: 401, body: { code: 'AUTH_INVALID' } });
+    expect(allLines()).toHaveLength(0);
+    expect(allLines().join('\n')).not.toContain(USER_ID);
+  });
+
+  it('emits NOTHING for a not-yet-valid user token, or one carrying type=device', async () => {
+    const NBF_USER = 'clxrealuserid00000002';
+    jwt.verify.mockImplementation(
+      (_token: string, opts: { secret?: string; ignoreExpiration?: boolean }) => {
+        if (opts?.secret !== process.env.JWT_SECRET) throw badSignatureError();
+        if (!opts.ignoreExpiration) {
+          throw Object.assign(new Error('jwt not active'), { name: 'NotBeforeError' });
+        }
+        return { sub: NBF_USER, type: 'user' };
+      },
+    );
+    await service.evaluate(forgedToken(NBF_USER), '203.0.113.9');
+    expect(allLines()).toHaveLength(0);
+
+    const DEVICE_TYPED = 'clxrealuserid00000003';
+    jwt.verify.mockImplementation((_token: string, opts: { secret?: string }) => {
+      if (opts?.secret !== process.env.JWT_SECRET) throw badSignatureError();
+      return { sub: DEVICE_TYPED, type: 'device' };
+    });
+    await service.evaluate(forgedToken(DEVICE_TYPED), '203.0.113.9');
+    expect(allLines()).toHaveLength(0);
+    expect(allLines().join('\n')).not.toContain(DEVICE_TYPED);
+  });
+
+  it('expired user tokens do not burn the shared budget either', async () => {
+    jwt.verify.mockImplementation(
+      (_token: string, opts: { secret?: string; ignoreExpiration?: boolean }) => {
+        if (opts?.secret !== process.env.JWT_SECRET) throw badSignatureError();
+        if (!opts.ignoreExpiration) {
+          throw Object.assign(new Error('jwt expired'), { name: 'TokenExpiredError' });
+        }
+        return { sub: 'clxstaleuser', type: 'user' };
+      },
+    );
+    for (let i = 0; i < CLAIM_TELEMETRY_MAX_PER_WINDOW + 5; i++) {
+      await service.evaluate(forgedToken(`clxstaleuser-${i}`), '203.0.113.9');
+    }
+    expect(allLines()).toHaveLength(0);
+
+    // Non-vacuous: the budget is intact, so a genuine device claim still lands.
+    jwt.verify.mockImplementation(badSignature);
+    await service.evaluate(forgedToken(REAL_DEVICE), '203.0.113.9');
+    expect(warnClaimLines()).toHaveLength(1);
   });
 
   // ---- 401 can never become 410 ---------------------------------------------
