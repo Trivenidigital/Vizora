@@ -531,7 +531,11 @@ describe('DeviceGateway', () => {
 
         // Minted a fresh 90d token with the SAME claims.
         expect(mockJwtService.sign).toHaveBeenCalledWith(
-          { sub: 'device-1', deviceIdentifier: 'test-id', organizationId: 'org-1', type: 'device' },
+          expect.objectContaining({
+            sub: 'device-1', deviceIdentifier: 'test-id', organizationId: 'org-1', type: 'device',
+            // Unique per mint, so two rotations in the same second cannot be byte-identical.
+            jti: expect.any(String),
+          }),
           expect.objectContaining({ algorithm: 'HS256', expiresIn: '90d' }),
         );
         // Grace record published BEFORE the rotation (old hash stays valid).
@@ -600,7 +604,13 @@ describe('DeviceGateway', () => {
           deviceTokenHash: hashToken(oldToken),
           deviceTokenExp: Math.floor(Date.now() / 1000) + 3 * 86400,
         });
-        const liveSocket = () => ({ id: 'socket-1', data: inWindowData(), emit: jest.fn(), disconnect: jest.fn() });
+        /** Registers the socket as the device's active one, as handleConnection does
+         *  (deviceSockets.set) before it reaches the refresh step. Rotation is fenced to
+         *  the active socket, so an unregistered socket models a superseded connection. */
+        const liveSocket = (id = 'socket-1') => {
+          (gateway as any).deviceSockets.set('device-1', id);
+          return { id, data: inWindowData(), emit: jest.fn(), disconnect: jest.fn() };
+        };
         const beat = (c: any) => (gateway as any).maybeRefreshDeviceToken(c);
         const rotationSucceeds = () =>
           mockDatabaseService.display.updateMany.mockResolvedValue({ count: 1 } as any);
@@ -696,11 +706,46 @@ describe('DeviceGateway', () => {
           await beat(a);
 
           mockRedisService.setNx.mockResolvedValue(false); // A holds the cooldown
-          const b = { ...liveSocket(), id: 'socket-2' };
+          const b = liveSocket('socket-2');
           for (let i = 0; i < 5; i += 1) await beat(b);
 
           expect(b.emit).not.toHaveBeenCalledWith('token:refresh', expect.anything());
           expect(a.emit).toHaveBeenCalledTimes(1);
+        });
+
+        it('a SUPERSEDED socket does not rotate — it cannot advance authority into the void', async () => {
+          // dedup disconnects the old socket but does not cancel its in-flight refresh.
+          // Without the fence it would rotate the stored hash and emit the replacement
+          // into a closed socket, manufacturing exactly the failed handoff we are fixing.
+          const stale = { id: 'socket-OLD', data: inWindowData(), emit: jest.fn(), disconnect: jest.fn() };
+          (gateway as any).deviceSockets.set('device-1', 'socket-NEW');
+          mockRedisService.setNx.mockResolvedValue(true);
+          rotationSucceeds();
+
+          await beat(stale);
+
+          expect(mockDatabaseService.display.updateMany).not.toHaveBeenCalled();
+          expect(stale.emit).not.toHaveBeenCalledWith('token:refresh', expect.anything());
+        });
+
+        it('an uncertain rotation commit RETAINS the bridge rather than assuming it failed', async () => {
+          // A throw cannot distinguish "did not commit" from "committed, ack lost". If it
+          // did commit and we removed the bridge, the device holds a credential that is
+          // neither stored nor bridged — a permanent lockout with no attacker involved.
+          const c = liveSocket();
+          mockRedisService.setNx.mockResolvedValue(true);
+          // The record the rotation just wrote must be READABLE, or the ownership-checked
+          // delete short-circuits on a null read and the assertion below is vacuous.
+          mockRedisService.get.mockImplementation(async (key: string) =>
+            key === 'device:token:grace:device-1'
+              ? JSON.stringify({ prev: hashToken(oldToken), next: hashToken('new-token') })
+              : null,
+          );
+          mockDatabaseService.display.updateMany.mockRejectedValueOnce(new Error('ack lost'));
+
+          await beat(c);
+
+          expect(mockRedisService.delete).not.toHaveBeenCalledWith('device:token:grace:device-1');
         });
 
         it('the retry cannot revive a re-paired/revoked credential — only one winner', async () => {

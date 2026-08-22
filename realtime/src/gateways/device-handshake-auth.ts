@@ -50,7 +50,21 @@ export type DeviceHandshakeResult =
   | { action: 'pass' }
   // Verified device — hand the payload + token hash to handleConnection so it
   // does NOT re-verify or re-query (single auth authority, no handler-stacking).
-  | { action: 'accept'; payload: DeviceHandshakePayload; tokenHash: string }
+  | {
+      action: 'accept';
+      payload: DeviceHandshakePayload;
+      // AUTHORITATIVE current generation — the only hash WsDeviceGuard and delivery
+      // may compare against. On a grace accept this is the STORED hash, which the
+      // device may not hold yet.
+      tokenHash: string;
+      // The credential the DEVICE proved it possesses by authenticating with it.
+      // Equals tokenHash on a normal accept. Recovery evidence only — never authority.
+      // Its lifetime is payload.exp, i.e. this exact credential's own expiry.
+      presentedTokenHash: string;
+      // True when the two differ: the device authenticated on the previous generation
+      // through the grace bridge, so the stored generation is NOT proven installed.
+      authenticatedViaGrace: boolean;
+    }
   // Structured rejection. `message` carries the legacy string (so the Electron
   // client's connect_error.message logic still works); `code` is the contract code.
   | { action: 'reject'; message: string; code: DeviceHandshakeCode };
@@ -171,7 +185,13 @@ export async function authenticateDeviceHandshake(
     return { action: 'reject', message: 'tenant_suspended', code: 'TENANT_SUSPENDED' };
   }
 
-  return { action: 'accept', payload, tokenHash: resolvedHash };
+  return {
+    action: 'accept',
+    payload,
+    tokenHash: resolvedHash,
+    presentedTokenHash: tokenHash,
+    authenticatedViaGrace: resolvedHash !== tokenHash,
+  };
 }
 
 function isValidUserToken(token: string, deps: DeviceHandshakeDeps): boolean {

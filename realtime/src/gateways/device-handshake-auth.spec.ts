@@ -52,6 +52,10 @@ describe('authenticateDeviceHandshake', () => {
       action: 'accept',
       payload: devicePayload,
       tokenHash: hashDeviceToken(TOKEN),
+      // A normal accept: the credential presented IS the authoritative one, so the
+      // recovery-evidence fields mirror it and no grace bridge was involved.
+      presentedTokenHash: hashDeviceToken(TOKEN),
+      authenticatedViaGrace: false,
     });
   });
 
@@ -182,6 +186,8 @@ describe('authenticateDeviceHandshake', () => {
         action: 'accept',
         payload: devicePayload,
         tokenHash: hashDeviceToken(NEW_TOKEN),
+        presentedTokenHash: hashDeviceToken(NEW_TOKEN),
+        authenticatedViaGrace: false,
       });
     });
 
@@ -199,6 +205,11 @@ describe('authenticateDeviceHandshake', () => {
         action: 'accept',
         payload: devicePayload,
         tokenHash: hashDeviceToken(NEW_TOKEN),
+        // …but the recovery evidence records the OLD token the device actually proved it
+        // holds, which is what a later rotation must bridge from. Conflating the two is
+        // what let a second failed handoff unpair a healthy device.
+        presentedTokenHash: hashDeviceToken(OLD_TOKEN),
+        authenticatedViaGrace: true,
       });
       expect(redisGet).toHaveBeenCalledWith(deviceTokenGraceKey('display-1'));
     });
