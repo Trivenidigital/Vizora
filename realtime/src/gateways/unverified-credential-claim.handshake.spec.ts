@@ -499,7 +499,7 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
 
     expect(rejectLines()).toEqual([
       'handshake_reject device=unverified code=AUTH_INVALID claimedDeviceId=display-real-1' +
-        ' attribution=unauthenticated-claim peer=127.0.0.1',
+        ' attribution=unauthenticated-claim peer=127.0.0.0/24',
     ]);
     // Exactly one log line in total for this rejection: the enriched one.
     expect(allLines()).toHaveLength(1);
@@ -517,9 +517,10 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
       'x-real-ip': '203.0.113.9',
     });
     const line = warnRejects()[0];
-    expect(line).toContain(' peer=203.0.113.9');
+    expect(line).toContain(' peer=203.0.113.0/24');
     // The socket address behind nginx is the proxy and is useless as a discriminator.
-    expect(line).not.toContain('127.0.0.1');
+    expect(line).not.toContain('203.0.113.9'); // host bits never reach a WARN line
+    expect(line).not.toContain('127.0.0.');
     expect(line).not.toContain('clientIp='); // named for what it holds, not what we wish
   });
 
@@ -532,8 +533,8 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
       'x-real-ip': '203.0.113.9',
     });
     const line = warnRejects()[0];
-    expect(line).toContain(' peer=198.51.100.20');
-    expect(allLines().join('\n')).not.toContain('203.0.113.9');
+    expect(line).toContain(' peer=198.51.100.0/24');
+    expect(allLines().join('\n')).not.toContain('203.0.113');
   });
 
   it.each([['::1'], ['127.0.0.1'], ['::ffff:127.0.0.1']])(
@@ -542,7 +543,7 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
       await handshakeFrom(forgedToken('display-real-1'), address, {
         'x-real-ip': '203.0.113.9',
       });
-      expect(warnRejects()[0]).toContain(' peer=203.0.113.9');
+      expect(warnRejects()[0]).toContain(' peer=203.0.113.0/24');
     },
   );
 
@@ -555,7 +556,7 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
       'x-forwarded-for': '198.51.100.7, 203.0.113.9',
       'x-real-ip': '203.0.113.9',
     });
-    expect(warnRejects()[0]).toContain(' peer=203.0.113.9');
+    expect(warnRejects()[0]).toContain(' peer=203.0.113.0/24');
     expect(allLines().join('\n')).not.toContain('198.51.100.7');
   });
 
@@ -564,7 +565,7 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
       'x-forwarded-for': '198.51.100.7',
     });
     const line = warnRejects()[0];
-    expect(line).toContain(' peer=198.51.100.20');
+    expect(line).toContain(' peer=198.51.100.0/24');
     expect(allLines().join('\n')).not.toContain('198.51.100.7');
   });
 
@@ -603,7 +604,7 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
       'x-real-ip': '198.51.100.7, 203.0.113.9',
     });
     const line = warnRejects()[0];
-    expect(line).toContain(' peer=203.0.113.9');
+    expect(line).toContain(' peer=203.0.113.0/24');
     // Never the fabricated concatenation a strip would have produced.
     expect(line).not.toContain('198.51.100.7203.0.113.9');
   });
@@ -641,7 +642,7 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
     // Non-vacuous: the first one DID emit the enriched line.
     expect(warnRejects()).toEqual([
       'handshake_reject device=unverified code=AUTH_INVALID claimedDeviceId=display-real-1' +
-        ' attribution=unauthenticated-claim peer=127.0.0.1',
+        ' attribution=unauthenticated-claim peer=127.0.0.0/24',
     ]);
     // The line count is unchanged — the base line still fires per rejection...
     expect(rejectLines()).toHaveLength(3);

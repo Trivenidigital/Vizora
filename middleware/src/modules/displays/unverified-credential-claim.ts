@@ -154,10 +154,63 @@ export function sanitiseUnverifiedPeer(peer: string | undefined | null): string 
     if (zone !== undefined && !PEER_ZONE_ID.test(zone)) return null;
     if (isIP(address) === 0) return null;
 
-    return zone === undefined ? address : `${address}%${zone}`;
+    return toNetworkPrefix(address, zone);
   } catch {
     return null;
   }
+}
+
+/**
+ * Reduce a validated address to a NETWORK PREFIX — IPv4 /24, IPv6 /48.
+ *
+ * These lines are WARN-level diagnostics on an attacker-triggerable path, so a full
+ * customer-premises IP does not belong in them: it is personal data arriving as a side
+ * effect of a diagnostics feature, retained in PM2 logs that are trimmed by size rather
+ * than by policy, and an attacker can force arbitrary addresses into that stream.
+ *
+ * A prefix keeps everything the field exists for. Its whole job is to separate "one
+ * broken display retrying" from "someone forging claims about other people's displays",
+ * and a /24 or /48 discriminates those just as well as a host address — a real device
+ * and a forger are essentially never inside the same prefix.
+ *
+ * The exact address deliberately goes nowhere. If a security investigation ever needs
+ * host-level attribution, that belongs in restricted telemetry under the existing
+ * retention and access policy, not in ordinary WARN output.
+ *
+ * The zone id is dropped with the host bits: it identifies a local interface and is
+ * meaningless once the host portion is gone.
+ */
+function toNetworkPrefix(address: string, zone: string | undefined): string | null {
+  const version = isIP(address);
+  if (version === 4) {
+    const octets = address.split('.');
+    if (octets.length !== 4) return null;
+    return `${octets[0]}.${octets[1]}.${octets[2]}.0/24`;
+  }
+  if (version === 6) {
+    // /48 is the first three hextets. Expand `::` so a compressed address cannot
+    // silently yield a prefix built from the wrong groups.
+    const expanded = expandIpv6(address);
+    if (expanded === null) return null;
+    return `${expanded.slice(0, 3).join(':')}::/48`;
+  }
+  // Unreachable: isIP already gated. Zone is intentionally unused — see docblock.
+  void zone;
+  return null;
+}
+
+/** Expand an IPv6 address to its 8 hextets, or null if it cannot be parsed. */
+function expandIpv6(address: string): string[] | null {
+  const halves = address.split('::');
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(':') : [];
+  const tail = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+  if (halves.length === 1) {
+    return head.length === 8 ? head : null;
+  }
+  const fill = 8 - head.length - tail.length;
+  if (fill < 0) return null;
+  return [...head, ...Array(fill).fill('0'), ...tail];
 }
 
 // ---- emission budget -------------------------------------------------------

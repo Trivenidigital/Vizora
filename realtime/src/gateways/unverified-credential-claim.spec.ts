@@ -1,4 +1,3 @@
-import { isIP } from 'net';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
@@ -217,28 +216,79 @@ describe('extractUnverifiedDeviceClaim', () => {
 });
 
 describe('sanitiseUnverifiedPeer', () => {
-  it('accepts a real IPv4 and a real IPv6, including the IPv4-mapped form', () => {
-    expect(sanitiseUnverifiedPeer('10.0.0.7')).toBe('10.0.0.7');
-    expect(sanitiseUnverifiedPeer('2001:db8::1')).toBe('2001:db8::1');
-    expect(sanitiseUnverifiedPeer('::ffff:127.0.0.1')).toBe('::ffff:127.0.0.1');
+  it('reduces an IPv4 host to its /24 network prefix', () => {
+    // WARN-level diagnostics on an attacker-triggerable path must not carry a full
+    // customer-premises address.
+    expect(sanitiseUnverifiedPeer('198.51.100.5')).toBe('198.51.100.0/24');
+    expect(sanitiseUnverifiedPeer('10.0.0.7')).toBe('10.0.0.0/24');
+    expect(sanitiseUnverifiedPeer('203.0.113.9')).not.toContain('.9');
   });
 
-  it('keeps an IPv6 zone id rather than silently mangling it', () => {
-    // A charset strip turned `fe80::1%eth0` into `fe80::1eth0` — a different, wrong
-    // address presented as fact.
-    expect(sanitiseUnverifiedPeer('fe80::1ff:fe23:4567:890a%eth0')).toBe(
-      'fe80::1ff:fe23:4567:890a%eth0',
+  it('still discriminates premises: same /24 collapses, different /24 does not', () => {
+    // This is the whole job of the field — separate "one broken display retrying" from
+    // "someone forging claims about other people's displays". A prefix does that; a
+    // host address adds nothing to it.
+    expect(sanitiseUnverifiedPeer('203.0.113.9')).toBe(
+      sanitiseUnverifiedPeer('203.0.113.200'),
     );
+    expect(sanitiseUnverifiedPeer('203.0.113.9')).not.toBe(
+      sanitiseUnverifiedPeer('203.0.114.9'),
+    );
+  });
+
+  it('reduces a FULL IPv6 address to its /48 prefix', () => {
+    expect(sanitiseUnverifiedPeer('2001:db8:1234:5678:9abc:def0:1234:5678')).toBe(
+      '2001:db8:1234::/48',
+    );
+  });
+
+  it('expands `::` before taking the /48 — a naive split gives the WRONG prefix', () => {
+    // `2001:db8::1` split on ':' is ['2001','db8','','1'], whose first three groups
+    // render as `2001:db8:` — not the same value at all.
+    expect(sanitiseUnverifiedPeer('2001:db8::1')).toBe('2001:db8:0::/48');
+
+    // The dangerous one: this address's first three hextets are all ZERO, but a naive
+    // split reads ['','','2001'] and would report a prefix that looks like 2001::/48.
+    const leadingZeros = sanitiseUnverifiedPeer('::2001:db8:1');
+    expect(leadingZeros).toBe('0:0:0::/48');
+    expect(leadingZeros).not.toContain('2001');
+  });
+
+  it('drops the zone id with the host bits', () => {
+    // A zone names a local interface; it is meaningless once the host portion is gone.
+    expect(sanitiseUnverifiedPeer('fe80::1ff:fe23:4567:890a%eth0')).toBe('fe80:0:0::/48');
     expect(sanitiseUnverifiedPeer('fe80::1%bad zone')).toBeNull();
     expect(sanitiseUnverifiedPeer('fe80::1%a%b')).toBeNull();
+  });
+
+  it('handles loopback and the IPv4-mapped form sensibly', () => {
+    expect(sanitiseUnverifiedPeer('127.0.0.1')).toBe('127.0.0.0/24');
+    expect(sanitiseUnverifiedPeer('::1')).toBe('0:0:0::/48');
+    expect(sanitiseUnverifiedPeer('::ffff:127.0.0.1')).toBe('0:0:0::/48');
+  });
+
+  it('emits no host octet or hextet beyond the prefix, for any valid address', () => {
+    // Non-vacuous sweep: every one of these must come back as a prefix, and none may
+    // carry the host portion it was built from.
+    const hosts: Array<[string, string, string]> = [
+      ['198.51.100.77', '198.51.100.0/24', '77'],
+      ['203.0.113.222', '203.0.113.0/24', '222'],
+      ['2001:db8:1234:5678:9abc:def0:1234:5678', '2001:db8:1234::/48', '9abc'],
+      ['2001:db8:abcd::c0ff:ee', '2001:db8:abcd::/48', 'c0ff'],
+    ];
+    for (const [host, expected, hostPart] of hosts) {
+      const out = sanitiseUnverifiedPeer(host);
+      expect(out).toBe(expected);
+      expect(out).not.toContain(hostPart);
+    }
   });
 
   it('takes the LAST element of a joined header, never fabricating one', () => {
     // Node joins repeated same-name headers with `, ` (only set-cookie arrays), so a
     // duplicated X-Real-IP arrives as one string. A strip rendered it as the
     // fabricated address `1.1.1.12.2.2.2`.
-    expect(sanitiseUnverifiedPeer('1.1.1.1, 2.2.2.2')).toBe('2.2.2.2');
-    expect(sanitiseUnverifiedPeer('1.1.1.1,2.2.2.2')).toBe('2.2.2.2');
+    expect(sanitiseUnverifiedPeer('1.1.1.1, 2.2.2.2')).toBe('2.2.2.0/24');
+    expect(sanitiseUnverifiedPeer('1.1.1.1,2.2.2.2')).toBe('2.2.2.0/24');
   });
 
   it('rejects a JWT-shaped value instead of rendering it', () => {
@@ -269,7 +319,7 @@ describe('sanitiseUnverifiedPeer', () => {
       const out = sanitiseUnverifiedPeer(input);
       if (out === null) continue;
       expect(out).not.toMatch(/[\s=]/);
-      expect(isIP(out.split('%')[0])).not.toBe(0);
+      expect(out).toMatch(/^[0-9a-f.:]+\/(24|48)$/);
     }
   });
 

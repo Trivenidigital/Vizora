@@ -178,10 +178,12 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
     // Without a source, a forged `claimedDeviceId` naming a real customer display is
     // indistinguishable from that display genuinely misbehaving.
     await service.evaluate(forgedToken(REAL_DEVICE), '203.0.113.9');
-    expect(warnClaimLines()[0]).toContain(' clientIp=203.0.113.9');
+    expect(warnClaimLines()[0]).toContain(' clientIp=203.0.113.0/24');
+    // The full customer-premises address never reaches a WARN line.
+    expect(warnClaimLines()[0]).not.toContain('203.0.113.9');
   });
 
-  it('sanitises the client IP and cannot have a second field injected through it', async () => {
+  it('refuses a non-address client IP and cannot have a second field injected through it', async () => {
     await service.evaluate(
       forgedToken(REAL_DEVICE),
       '203.0.113.9 claimedDeviceId=victim attribution=verified',
@@ -190,7 +192,7 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
     expect(line.match(/claimedDeviceId=/g)).toHaveLength(1);
     expect(line).not.toContain('attribution=verified');
     expect(line).toMatch(
-      /^device_auth_check_reject code=AUTH_INVALID claimedDeviceId=[A-Za-z0-9_:-]+ attribution=unauthenticated-claim clientIp=[A-Za-z0-9_.:-]+$/,
+      /^device_auth_check_reject code=AUTH_INVALID claimedDeviceId=[A-Za-z0-9_:-]+ attribution=unauthenticated-claim clientIp=unknown$/,
     );
   });
 
@@ -265,7 +267,7 @@ describe('unverified credential claim telemetry (device auth/check)', () => {
     expect(claimLines()).toHaveLength(1);
     expect(claimLines()[0].split('\n')).toHaveLength(1);
     expect(claimLines()[0]).toMatch(
-      /^device_auth_check_reject code=AUTH_INVALID claimedDeviceId=[A-Za-z0-9_:-]+ attribution=unauthenticated-claim clientIp=[A-Za-z0-9_.:-]+$/,
+      /^device_auth_check_reject code=AUTH_INVALID claimedDeviceId=[A-Za-z0-9_:-]+ attribution=unauthenticated-claim clientIp=unknown$/,
     );
   });
 
