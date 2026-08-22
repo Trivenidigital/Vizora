@@ -63,7 +63,67 @@ import {
   authenticateDeviceHandshake,
   DeviceHandshakePayload,
 } from './device-handshake-auth';
+import {
+  shouldEmitClaimTelemetry,
+  takeClaimSuppressionNotice,
+  sanitiseUnverifiedPeer,
+} from './unverified-credential-claim';
 import { redactDevicePlaylist } from '../services/device-content-payload';
+
+/**
+ * Connection source for the unverified-claim log line, diagnostics only.
+ *
+ * Reads `X-Real-IP`, NOT `X-Forwarded-For`. Prod nginx's `/socket.io/` location sets
+ * `proxy_set_header X-Real-IP $remote_addr`, which OVERWRITES whatever the client
+ * sent, so the value cannot be forged. `X-Forwarded-For` there is
+ * `$proxy_add_x_forwarded_for`, which APPENDS — its head is attacker-supplied, so
+ * `split(',')[0]` would let anyone name an innocent third party's IP in our logs,
+ * a worse version of the bug this field exists to fix. Never read XFF here.
+ *
+ * When the header is absent the connection did NOT come through nginx, and in exactly
+ * that case `handshake.address` IS the real peer. Behind nginx it is the proxy
+ * (127.0.0.1) and useless as a discriminator, which is why the header comes first.
+ *
+ * The result is sanitised: spaces and `=` are legal in a header value and arrive
+ * intact through Node's parser, so a raw `X-Real-IP: 1.2.3.4 attribution=verified`
+ * would forge fields inside our single line. CR/LF are already rejected by the
+ * parser, so a forged second LINE is not reachable — same-line forgery is, and the
+ * same helper that strips `=` from the claim closes it here too. It should almost
+ * never fire in prod (nginx overwrites the header), but the fallback path and any
+ * future proxy change are not guaranteed.
+ */
+function resolveUnverifiedPeer(socket: Socket): string | null {
+  const address = socket.handshake?.address;
+  // Trust the header ONLY from our own proxy. nginx and realtime share a host, so a
+  // loopback socket address is what "arrived through nginx" looks like; anything else
+  // reached us without traversing it and can therefore set `X-Real-IP` to whatever it
+  // likes, while ITS socket address is the real peer and needs no header. This makes
+  // the guarantee structural instead of resting on the firewall staying closed: if
+  // 3002 is ever exposed, this fails closed rather than handing the attacker the field.
+  if (!isLoopbackAddress(address)) return sanitiseUnverifiedPeer(address);
+
+  const header = socket.handshake?.headers?.['x-real-ip'];
+  // Node joins repeated headers with `, ` (only `set-cookie` arrives as an array), so
+  // the array branch is defensive; sanitiseUnverifiedPeer takes the last element either
+  // way, which is the value closest to us.
+  const realIp = Array.isArray(header) ? header.join(',') : header;
+  // `||` not `??`: an EMPTY x-real-ip must fall back to the socket address. With `??`
+  // an empty-string header suppresses the fallback and discards a perfectly good
+  // loopback socket address, yielding `unknown`. Unreachable today because nginx sets
+  // `$remote_addr`, which is never empty — but the fallback should be driven by "is
+  // there a usable value", not "is the property present".
+  return sanitiseUnverifiedPeer(realIp || address);
+}
+
+/** Loopback in the forms Node reports it: IPv4, IPv6, and the IPv4-mapped IPv6 one. */
+function isLoopbackAddress(address: string | undefined): boolean {
+  if (typeof address !== 'string' || address.length === 0) return false;
+  return (
+    address === '::1' ||
+    address.startsWith('127.') ||
+    address.startsWith('::ffff:127.')
+  );
+}
 
 interface DevicePayload {
   sub: string; // device ID
@@ -199,11 +259,72 @@ export class DeviceGateway
         // AUTH_EXPIRED / AUTH_INVALID are ordinary churn on a fleet with rotating
         // credentials; only the two terminal codes lead to a purge, so only those are
         // worth an operator's attention. Codes and the opaque display id only.
-        const line = `handshake_reject device=${result.deviceId ?? 'unverified'} code=${result.code}`;
-        if (result.code === 'DEVICE_REVOKED' || result.code === 'TENANT_SUSPENDED') {
-          this.logger.warn(line);
-        } else {
-          this.logger.debug(line);
+        // `device=` is the TRUSTED field: populated only once the JWT verified, so on
+        // an AUTH_INVALID it always reads `unverified`. The claim below never touches it.
+        let line = `handshake_reject device=${result.deviceId ?? 'unverified'} code=${result.code}`;
+        let atWarn =
+          result.code === 'DEVICE_REVOKED' || result.code === 'TENANT_SUSPENDED';
+
+        // AUTH_INVALID left the operator blind: `device=unverified` says a device
+        // somewhere cannot authenticate but never which one. `claimedDeviceId` narrows
+        // that down and `attribution=unauthenticated-claim` says in the line what it is
+        // worth: it was decoded from a token that FAILED verification, so it is what
+        // the sender CLAIMS to be — not who it is. The two fields are appended only
+        // when a claim actually decoded; a malformed JWT stays unattributed, with the
+        // line exactly as it was before this existed.
+        let suppressedCount: number | null = null;
+        if (result.code === 'AUTH_INVALID' && result.unverifiedDeviceClaim) {
+          // The budget bounds how much attacker-controlled text reaches the logs AT
+          // ALL, not merely at what level. Over budget the claim fields are simply not
+          // appended and the line reverts to the plain form — because prod runs with
+          // debug enabled, so "log it at debug instead" would still let anyone write
+          // unbounded `claimedDeviceId=` values by minting invalid JWTs, one per
+          // connection attempt. The line COUNT is identical either way: the plain line
+          // fires per rejection regardless, so this costs nothing operationally.
+          const now = Date.now();
+          if (shouldEmitClaimTelemetry(result.unverifiedDeviceClaim, now)) {
+            // This handshake path has NO rate limit (`validateConnectionRate` lives in
+            // handleConnection, which a rejected handshake never reaches), so anyone
+            // can put any customer's display id into this warn line at will. Without a
+            // source that is indistinguishable from the named display misbehaving.
+            const peer = resolveUnverifiedPeer(socket);
+            line +=
+              ` claimedDeviceId=${result.unverifiedDeviceClaim}` +
+              ` attribution=unauthenticated-claim peer=${peer ?? 'unknown'}`;
+            atWarn = true;
+          } else {
+            suppressedCount = takeClaimSuppressionNotice(now);
+          }
+        }
+
+        // Diagnostics must never fail the auth path. A logger call can throw (EPIPE on
+        // a closed stdout, a future custom transport), and everything here sits inside
+        // the middleware's outer try — so an unguarded throw would skip `next(err)`
+        // and the outer catch would turn a REJECT into a PASS. That risk predates the
+        // claim fields; this guard closes it for every log on the path.
+        //
+        // Deliberately note the widened blast radius: this now also swallows a failed
+        // DEVICE_REVOKED / TENANT_SUSPENDED warn — the line whose whole purpose is
+        // letting an operator SEE an unpair happen. Losing that line is the lesser
+        // harm; the alternative is a logger fault admitting a connection we decided to
+        // reject. If the tradeoff ever needs revisiting, the fix is a second channel
+        // for terminal codes, not removing this guard.
+        try {
+          if (atWarn) {
+            this.logger.warn(line);
+          } else {
+            this.logger.debug(line);
+          }
+          if (suppressedCount !== null) {
+            // No claim value, and a COUNT so an operator can tell incidental budget
+            // exhaustion from an active flood — without it, a quiet warn stream is
+            // ambiguous between "nothing is happening" and "attribution is degraded".
+            this.logger.warn(
+              `unverified_credential_claim_suppressed reason=rate-limit suppressed=${suppressedCount} note=claim-values-withheld`,
+            );
+          }
+        } catch {
+          // Intentionally empty — the rejection below is the contract, not the log.
         }
         // err.message carries the legacy string (Electron client reads
         // connect_error.message); err.data.code carries the contract code

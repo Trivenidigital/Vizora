@@ -6,6 +6,7 @@ import {
   isGraceAcceptedDeviceToken,
   deviceTokenGraceKey,
 } from './device-token-hash';
+import { extractUnverifiedDeviceClaim } from './unverified-credential-claim';
 
 /**
  * Device Revocation Contract v1.1 item 2 — device handshake authentication.
@@ -74,6 +75,13 @@ export type DeviceHandshakeResult =
       // Present only once the JWT has verified, so a terminal rejection can be attributed
       // to a device in logs. Opaque display id — never credential material.
       deviceId?: string;
+      // DIAGNOSTICS ONLY, and deliberately a DIFFERENT field from `deviceId` above.
+      // Decoded from a token that FAILED verification, so it is attacker-controlled
+      // metadata, NOT identity and NOT attribution: anyone can mint an unsigned token
+      // naming any display. It may only reach a log line — never a lookup, a write, a
+      // revocation decision, or anything the device is told. See
+      // `unverified-credential-claim.ts` for the full trust boundary.
+      unverifiedDeviceClaim?: string;
     };
 
 export type DeviceHandshakeCode =
@@ -118,7 +126,27 @@ export async function authenticateDeviceHandshake(
     // credentials on connect_error.message.includes('invalid token'). These
     // legacy strings must never contain that substring or 'unauthorized'
     // (see the assertion in device-handshake-auth.spec.ts).
-    return { action: 'reject', message: 'auth_invalid', code: 'AUTH_INVALID' };
+    //
+    // The rejection itself is decided ABOVE, purely from the verification failure.
+    // The claim below is read afterwards and only so the gateway can log WHICH
+    // display the sender *says* it is; it changes no branch here and reaches no
+    // query. Verification has already failed, so it is a hint, not an identity.
+    //
+    // Except when the token is one of OUR user tokens: its `sub` is then a real USER
+    // id, which must never be logged under a field named `claimedDeviceId`. A user
+    // bearer fails the device verify on the SIGNATURE (the secrets differ, and
+    // signature is checked before exp), so expired and not-yet-valid ones land here
+    // too — and with a 30m default lifetime, expired is the steady state for any
+    // client with a stale session.
+    const unverifiedDeviceClaim = isUserSecretSigned(token, deps)
+      ? null
+      : extractUnverifiedDeviceClaim(token);
+    return {
+      action: 'reject',
+      message: 'auth_invalid',
+      code: 'AUTH_INVALID',
+      ...(unverifiedDeviceClaim ? { unverifiedDeviceClaim } : {}),
+    };
   }
 
   // A non-device token that happens to verify under DEVICE_JWT_SECRET → not our
@@ -208,6 +236,42 @@ function isValidUserToken(token: string, deps: DeviceHandshakeDeps): boolean {
       algorithms: ['HS256'],
     });
     return user.type !== 'device';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether the token is signed by OUR USER SECRET, expiry ignored. Used ONLY to
+ * suppress claim telemetry — never to decide the handshake.
+ *
+ * `isValidUserToken` above cannot serve this purpose, and widening it would be a
+ * verdict change: it gates `action: 'pass'`, so accepting expired tokens there would
+ * turn an expired user bearer from a structured rejection into a pass. This predicate
+ * is deliberately separate and deliberately wider.
+ *
+ * Wider is right HERE because the question is not "may this token do anything" but
+ * "is this `sub` one of OUR USER IDS". `jsonwebtoken` checks the signature before
+ * `exp`, and the user and device secrets differ, so a user bearer always fails the
+ * DEVICE verify on the SIGNATURE — landing on the AUTH_INVALID path regardless of
+ * expiry. With `JWT_EXPIRES_IN` defaulting to 30m, an expired user token is the
+ * steady state for any client with a stale session, which made a real user id the
+ * COMMON case in these logs rather than an edge one. Same for a future `nbf`, and for
+ * a user-secret-signed token carrying `type: 'device'`.
+ */
+function isUserSecretSigned(token: string, deps: DeviceHandshakeDeps): boolean {
+  try {
+    deps.jwtService.verify(token, {
+      secret: deps.userSecret,
+      algorithms: ['HS256'],
+      ignoreExpiration: true,
+      // `ignoreExpiration` does NOT cover `nbf` — jsonwebtoken throws
+      // NotBeforeError regardless, so this second option is required for the
+      // docblock's claim above to be true. No Vizora-issued token sets `nbf`
+      // today; this keeps the suppression correct if that ever changes.
+      ignoreNotBefore: true,
+    });
+    return true;
   } catch {
     return false;
   }

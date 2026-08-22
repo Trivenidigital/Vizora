@@ -38,7 +38,10 @@ export class DeviceAuthController {
     // propagates to Nest's exception layer as a 5xx, which the device reads as
     // transport-layer and leaves its credentials untouched. Converting it to a
     // 4xx/410 body would risk a false mass-unpair.
-    const result = await this.authCheck.evaluate(token);
+    // `req.ip` is diagnostics-only here — it reaches a log line and nothing else.
+    // Express resolves it through `trust proxy` (TRUST_PROXY_HOPS), so it is the
+    // client rather than the nginx in front. No verdict depends on it.
+    const result = await this.authCheck.evaluate(token, req.ip);
     res.status(result.httpStatus).json(result.body);
   }
 }

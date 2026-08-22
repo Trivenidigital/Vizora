@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
@@ -9,6 +9,12 @@ import {
   isCurrentDeviceToken,
   isGraceAcceptedDeviceToken,
 } from '../common/device-token-auth.util';
+import {
+  extractUnverifiedDeviceClaim,
+  shouldEmitClaimTelemetry,
+  takeClaimSuppressionNotice,
+  sanitiseUnverifiedPeer,
+} from './unverified-credential-claim';
 
 /**
  * Device Revocation Contract v1.1 item 4 — the SOLE authority for device
@@ -34,13 +40,21 @@ export type DeviceAuthCheckResult =
 
 @Injectable()
 export class DeviceAuthCheckService {
+  private readonly logger = new Logger(DeviceAuthCheckService.name);
+
   constructor(
     private readonly jwtService: JwtService,
     private readonly db: DatabaseService,
     private readonly redis: RedisService,
   ) {}
 
-  async evaluate(token: string): Promise<DeviceAuthCheckResult> {
+  /**
+   * `clientIp` is diagnostics-only and OPTIONAL — it reaches nothing but a log line
+   * and no verdict depends on it. Callers pass `req.ip`, which Express resolves
+   * through `trust proxy` (TRUST_PROXY_HOPS), so unlike realtime's socket address it
+   * is the client rather than nginx.
+   */
+  async evaluate(token: string, clientIp?: string): Promise<DeviceAuthCheckResult> {
     // 1. Signature / expiry. Only jwt.verify is caught — expiry vs invalid.
     let payload: DeviceJwtPayload;
     try {
@@ -54,6 +68,14 @@ export class DeviceAuthCheckService {
         return { httpStatus: 401, body: { code: 'AUTH_EXPIRED' } };
       }
       // NotBeforeError, JsonWebTokenError (bad signature/malformed), etc.
+      //
+      // The 401 is already decided, from the verification failure alone. Logging
+      // WHICH display the sender claims to be is diagnostics only: the value is
+      // decoded from a token that failed verification, so it is attacker-controlled
+      // metadata, never identity. It reaches no query, no write, no branch here,
+      // and — critically — no response body: the wire response stays exactly
+      // `401 {"code":"AUTH_INVALID"}`.
+      this.logUnverifiedClaim(token, clientIp);
       return { httpStatus: 401, body: { code: 'AUTH_INVALID' } };
     }
 
@@ -65,6 +87,14 @@ export class DeviceAuthCheckService {
       typeof payload.organizationId !== 'string' ||
       payload.organizationId.trim() === ''
     ) {
+      // Deliberately NO claim telemetry here, and this is not an oversight. The
+      // signature verified on this branch, so `payload.sub` is signature-backed —
+      // logging it under the `attribution=unauthenticated-claim` marker would file a
+      // trusted value under the untrusted one, blurring the distinction this telemetry
+      // exists to keep sharp, and inviting a future reader to generalise from it.
+      // (It matches realtime, which also emits nothing on its equivalent branch.)
+      // Telemetry for structurally-invalid-but-SIGNED tokens would need its own
+      // marker with trusted-attribution semantics; that is not this mechanism.
       return { httpStatus: 401, body: { code: 'AUTH_INVALID' } };
     }
 
@@ -139,5 +169,113 @@ export class DeviceAuthCheckService {
     }
 
     return { httpStatus: 200, body: { status: 'ok' } };
+  }
+
+  /**
+   * Diagnostics-only, and the realtime handshake's counterpart line (same fields,
+   * same trust rules, same sanitisation, same budget).
+   *
+   * Called from ONE site: the `jwt.verify` catch block, i.e. verification actually
+   * failed. Never from the payload-shape branch below it, where the signature DID
+   * verify — see the comment there.
+   *
+   * There is deliberately no trusted `device=` field here: this endpoint has no
+   * verified identity to report on an AUTH_INVALID, and `claimedDeviceId` must never
+   * be mistaken for one — which is what `attribution=unauthenticated-claim` states in
+   * the line itself. Nothing is logged when no claim decodes, so an undecodable token
+   * leaves behaviour exactly as it was.
+   *
+   * The budget bounds how much attacker-controlled text reaches the logs AT ALL, not
+   * merely at what level: over budget nothing is emitted here, because prod runs with
+   * debug enabled and "log it at debug instead" would still let anyone write unbounded
+   * `claimedDeviceId=` values by minting invalid tokens. Only the sanitised claim is
+   * ever logged — never the token, a segment of it, or a hash.
+   *
+   * The budget is PER PROCESS: state is module-level and middleware runs 2 PM2 cluster
+   * instances, so the effective ceiling is ~40 per 15 minutes fleet-wide and the dedupe
+   * maps are independent — the same claim can legitimately be warned once per worker in
+   * one window. Same caveat as the MCP in-memory rate limit. A duplicate line is not a
+   * bug.
+   */
+  private logUnverifiedClaim(token: string, clientIp?: string): void {
+    // Diagnostics must never fail the auth path. This is the first statement in the
+    // `jwt.verify` catch block that could throw, and a logger CAN throw (EPIPE on a
+    // closed stdout, a future custom transport) — which would turn a settled
+    // `401 AUTH_INVALID` into a 5xx for a whole class of input. Same promise the
+    // extraction module makes one layer down.
+    try {
+      // A USER access token presented here fails the DEVICE verify and lands in this
+      // branch, so without this check a dashboard or mobile client pointed at the wrong
+      // endpoint would put REAL USER IDS into warn logs under a field named
+      // `claimedDeviceId` — and one misconfigured client would burn the shared budget.
+      // Realtime has the same exposure and the same skip (`isUserSecretSigned` there);
+      // its earlier `pass` for a valid user token covers only UNEXPIRED ones, which is
+      // not the common case. The 401 is unaffected: a user token is not a device
+      // credential whether or not we log about it.
+      if (this.isUserSecretSigned(token)) return;
+
+      const claim = extractUnverifiedDeviceClaim(token);
+      if (!claim) return;
+      const now = Date.now();
+      if (shouldEmitClaimTelemetry(claim, now)) {
+        // `clientIp=` (not realtime's `peer=`): Express resolves `req.ip` through
+        // `trust proxy`, so this is the client rather than the nginx in front of it.
+        // The source matters because a forged `claimedDeviceId` naming a real customer
+        // display is otherwise indistinguishable from that display misbehaving.
+        const peer = sanitiseUnverifiedPeer(clientIp);
+        this.logger.warn(
+          `device_auth_check_reject code=AUTH_INVALID claimedDeviceId=${claim}` +
+            ` attribution=unauthenticated-claim clientIp=${peer ?? 'unknown'}`,
+        );
+        return;
+      }
+      const suppressedCount = takeClaimSuppressionNotice(now);
+      if (suppressedCount !== null) {
+        // No claim value, and a COUNT so an operator can tell incidental budget
+        // exhaustion from an active flood — without it, a quiet warn stream is
+        // ambiguous between "nothing is happening" and "attribution is degraded".
+        this.logger.warn(
+          `unverified_credential_claim_suppressed reason=rate-limit suppressed=${suppressedCount} note=claim-values-withheld`,
+        );
+      }
+    } catch {
+      // Intentionally empty — the 401 is the contract, not the log.
+    }
+  }
+
+  /**
+   * Whether the token is signed by OUR USER SECRET, expiry ignored. Used ONLY to
+   * suppress diagnostics — it grants nothing and changes no verdict.
+   *
+   * `ignoreExpiration` is load-bearing, not laxness. `jsonwebtoken` checks the
+   * signature before `exp`, and the user and device secrets differ, so a user bearer
+   * ALWAYS fails the device verify on the signature and lands on the AUTH_INVALID
+   * path whatever its expiry. A stricter check would therefore still log the `sub` of
+   * every expired user token — and with `JWT_EXPIRES_IN` defaulting to 30m that is the
+   * steady state for any client with a stale session, making a real user id the common
+   * case in these logs rather than an edge one. Same for a future `nbf`, and for a
+   * user-secret-signed token carrying `type: 'device'`.
+   *
+   * The question here is not "may this token do anything" — it may not, the 401 stands
+   * either way — but "is this `sub` one of OUR USER IDS". Wider is correct for that.
+   * Realtime keeps the two questions in two predicates for the same reason: there the
+   * strict one gates `action: 'pass'`, so widening it would change a verdict.
+   */
+  private isUserSecretSigned(token: string): boolean {
+    try {
+      this.jwtService.verify(token, {
+        secret: process.env.JWT_SECRET,
+        algorithms: ['HS256'],
+        ignoreExpiration: true,
+        // `ignoreExpiration` does NOT cover `nbf` — jsonwebtoken throws
+        // NotBeforeError regardless, so this second option is required for the
+        // docblock's claim above to be true. No Vizora-issued token sets `nbf`
+        // today; this keeps the suppression correct if that ever changes.
+        ignoreNotBefore: true,
+      });
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
