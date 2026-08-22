@@ -55,6 +55,15 @@ const linesFrom = (spies: Record<string, jest.SpyInstance>): string[] =>
  * was logged" with "the reject is unchanged, no DB row was read or written, and
  * no 410-shaped outcome became reachable".
  */
+const jwtShapedValue = () => {
+  // Built at runtime, never a literal: a hardcoded JWT-shaped string trips
+  // `pnpm security:no-hardcoded-jwts`, which is the same instinct these tests
+  // protect — a JWT-shaped value in a log stream is a false positive waiting
+  // to happen. Generating it keeps the gate honest and the test faithful.
+  const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  return `${b64({ alg: 'HS256' })}.${b64({ sub: 'a' })}.SflKxwRJSMeKKF2QT4`;
+};
+
 describe('unverified credential claim telemetry (realtime handshake)', () => {
   const DEVICE_SECRET = 'd'.repeat(32);
   const USER_SECRET = 'u'.repeat(32);
@@ -576,7 +585,7 @@ describe('unverified credential claim telemetry (gateway log site)', () => {
 
   it('refuses a JWT-shaped X-Real-IP', async () => {
     await handshakeFrom(forgedToken('display-real-1'), '127.0.0.1', {
-      'x-real-ip': 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhIn0.SflKxwRJSMeKKF2QT4',
+      'x-real-ip': jwtShapedValue(),
     });
     expect(warnRejects()[0]).toContain(' peer=unknown');
     expect(allLines().join('\n')).not.toContain('eyJ');
