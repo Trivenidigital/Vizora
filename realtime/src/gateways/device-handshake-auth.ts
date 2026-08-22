@@ -67,7 +67,14 @@ export type DeviceHandshakeResult =
     }
   // Structured rejection. `message` carries the legacy string (so the Electron
   // client's connect_error.message logic still works); `code` is the contract code.
-  | { action: 'reject'; message: string; code: DeviceHandshakeCode };
+  | {
+      action: 'reject';
+      message: string;
+      code: DeviceHandshakeCode;
+      // Present only once the JWT has verified, so a terminal rejection can be attributed
+      // to a device in logs. Opaque display id — never credential material.
+      deviceId?: string;
+    };
 
 export type DeviceHandshakeCode =
   | 'AUTH_EXPIRED'
@@ -150,7 +157,7 @@ export async function authenticateDeviceHandshake(
     display.organizationId !== payload.organizationId ||
     display.isDisabled
   ) {
-    return { action: 'reject', message: 'device_token_stale', code: 'DEVICE_REVOKED' };
+    return { action: 'reject', message: 'device_token_stale', code: 'DEVICE_REVOKED', deviceId: payload.sub };
   }
 
   const tokenHash = hashDeviceToken(token);
@@ -176,13 +183,13 @@ export async function authenticateDeviceHandshake(
       }
     }
     if (!isGraceAcceptedDeviceToken(graceRaw, tokenHash, display.jwtToken)) {
-      return { action: 'reject', message: 'device_token_stale', code: 'DEVICE_REVOKED' };
+      return { action: 'reject', message: 'device_token_stale', code: 'DEVICE_REVOKED', deviceId: payload.sub };
     }
     resolvedHash = display.jwtToken ?? tokenHash;
   }
 
   if (display.organization?.subscriptionStatus === 'suspended') {
-    return { action: 'reject', message: 'tenant_suspended', code: 'TENANT_SUSPENDED' };
+    return { action: 'reject', message: 'tenant_suspended', code: 'TENANT_SUSPENDED', deviceId: payload.sub };
   }
 
   return {

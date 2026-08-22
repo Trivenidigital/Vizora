@@ -119,7 +119,11 @@ describe('authenticateDeviceHandshake', () => {
     const verify = jest.fn().mockReturnValue(devicePayload);
     const findUnique = jest.fn().mockResolvedValue(null);
     const r = await authenticateDeviceHandshake(TOKEN, makeDeps({ verify, findUnique }));
-    expect(r).toEqual({ action: 'reject', message: 'device_token_stale', code: 'DEVICE_REVOKED' });
+    // deviceId rides along on terminal rejects so an unpair can be attributed to a
+    // device in logs. Opaque display id, never credential material.
+    expect(r).toEqual({
+      action: 'reject', message: 'device_token_stale', code: 'DEVICE_REVOKED', deviceId: 'display-1',
+    });
   });
 
   it('rejects a disabled device with DEVICE_REVOKED', async () => {
@@ -144,7 +148,9 @@ describe('authenticateDeviceHandshake', () => {
       currentDisplay({ organization: { subscriptionStatus: 'suspended' } }),
     );
     const r = await authenticateDeviceHandshake(TOKEN, makeDeps({ verify, findUnique }));
-    expect(r).toEqual({ action: 'reject', message: 'tenant_suspended', code: 'TENANT_SUSPENDED' });
+    expect(r).toEqual({
+      action: 'reject', message: 'tenant_suspended', code: 'TENANT_SUSPENDED', deviceId: 'display-1',
+    });
   });
 
   it('does NOT suspend active/free/canceled tenants (accept)', async () => {

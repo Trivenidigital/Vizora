@@ -37,6 +37,7 @@ import { DatabaseService } from '../database/database.service';
 import { StorageService } from '../storage/storage.service';
 import { authenticateDeviceHandshake } from './device-handshake-auth';
 import { hashDeviceToken, deviceTokenGraceKey } from './device-token-hash';
+import { WsDeviceGuard } from './guards/ws-auth.guard';
 
 describe('credential handoff state machine', () => {
   const DEVICE = 'device-1';
@@ -48,7 +49,8 @@ describe('credential handoff state machine', () => {
 
   const NOW = () => Math.floor(Date.now() / 1000);
   /** Short synthetic lifetimes keep the expiry tests deterministic. */
-  const NEAR = () => NOW() + 60;              // inside the 14d window, 60s of life left
+  const NEAR = () => NOW() + 3600;            // 1h of life left — well above the 60s TTL floor,
+                                              // so a floor-derived TTL cannot satisfy the bound below
   const NEARER = () => NOW() + 10 * 86400;    // inside the window, far more life than NEAR
 
   let gateway: DeviceGateway;
@@ -58,6 +60,9 @@ describe('credential handoff state machine', () => {
   let redis: any;
   let db: any;
   let expiredTokens: Set<string>;
+  let tokenExp: Map<string, number>;
+  let mintedPayloads: any[];
+  let socketSeq: number;
   let redisFailures: { get?: boolean; set?: boolean; del?: boolean };
   let dbFailures: { find?: boolean; rotate?: boolean };
 
@@ -67,6 +72,9 @@ describe('credential handoff state machine', () => {
     kv = new Map();
     graceTtls = [];
     expiredTokens = new Set();
+    tokenExp = new Map();
+    mintedPayloads = [];
+    socketSeq = 1;
     redisFailures = {};
     dbFailures = {};
 
@@ -113,7 +121,23 @@ describe('credential handoff state machine', () => {
     const mod: TestingModule = await Test.createTestingModule({
       providers: [
         DeviceGateway,
-        { provide: JwtService, useValue: { sign: jest.fn(), verify: jest.fn() } },
+        {
+          provide: JwtService,
+          useValue: {
+            sign: jest.fn((payload: any) => { mintedPayloads.push(payload); return nextMint; }),
+            verify: jest.fn((token: string) => {
+              if (expiredTokens.has(token)) {
+                const e: any = new Error('jwt expired');
+                e.name = 'TokenExpiredError';
+                throw e;
+              }
+              return {
+                sub: DEVICE, type: 'device', organizationId: ORG, deviceIdentifier: 'i',
+                exp: tokenExp.get(token) ?? NEARER(),
+              };
+            }),
+          },
+        },
         { provide: RedisService, useValue: redis },
         { provide: HeartbeatService, useValue: { processHeartbeat: jest.fn(), forgetDevice: jest.fn() } },
         { provide: PlaylistService, useValue: {} },
@@ -131,53 +155,51 @@ describe('credential handoff state machine', () => {
   afterEach(() => ((gateway as any).cleanupIntervals || []).forEach(clearInterval));
 
   // ── harness ────────────────────────────────────────────────────────────────────
-  /** Real handshake. `expiredTokens` models JWT `exp` enforcement inside verify(). */
-  const handshake = (token: string, exp: number) =>
-    authenticateDeviceHandshake(token, {
-      jwtService: {
-        verify: jest.fn(() => {
-          if (expiredTokens.has(token)) {
-            const e: any = new Error('jwt expired');
-            e.name = 'TokenExpiredError';
-            throw e;
-          }
-          return { sub: DEVICE, type: 'device', organizationId: ORG, deviceIdentifier: 'i', exp };
-        }),
-      } as any,
+  // Everything below drives the PRODUCTION construction path. Earlier revisions of this
+  // suite hand-built `client.data` from the handshake result, which meant the two
+  // statements that actually carry the presented credential onto the socket
+  // (the handshake middleware, and authenticateConnection) were never executed —
+  // deleting either left the whole suite green while production reverted to the bug.
+  // `runDeviceHandshake` is the middleware body registered in afterInit.
+  let nextMint = 'unset';
+
+  const rawSocket = (id: string, token: string) => ({
+    id,
+    handshake: { auth: { token }, address: '127.0.0.1' },
+    data: {} as Record<string, any>,
+    emit: jest.fn(),
+    disconnect: jest.fn(),
+    join: jest.fn(),
+  });
+
+  /** Full real path: handshake middleware -> authenticateConnection. */
+  const connect = async (token: string, exp: number, id = `socket-${socketSeq++}`) => {
+    tokenExp.set(token, exp);
+    const socket = rawSocket(id, token);
+    let rejected: any = null;
+    await (gateway as any).runDeviceHandshake(socket, (err?: Error) => { rejected = err ?? null; });
+    if (rejected) {
+      return { rejected: { code: (rejected as any).data?.code, message: rejected.message }, socket: null as any };
+    }
+    const auth = await (gateway as any).authenticateConnection(socket);
+    return { rejected: null, socket, auth, accepted: socket.data };
+  };
+
+  /** Handshake only — for verdict assertions that must not mutate socket registration. */
+  const handshake = (token: string, exp: number) => {
+    tokenExp.set(token, exp);
+    return authenticateDeviceHandshake(token, {
+      jwtService: (gateway as any).jwtService,
       databaseService: db,
       deviceSecret: 'd'.repeat(48),
       userSecret: 'u'.repeat(48),
       redis,
     });
-
-  /** A socket as handleConnection would populate it from a handshake result. */
-  const socketFrom = (accepted: any, exp: number) => ({
-    id: 'socket-1',
-    data: {
-      deviceId: DEVICE,
-      organizationId: ORG,
-      deviceIdentifier: 'i',
-      deviceTokenHash: accepted.tokenHash,
-      presentedDeviceTokenHash: accepted.presentedTokenHash,
-      authenticatedViaGrace: accepted.authenticatedViaGrace,
-      deviceTokenExp: exp,
-    },
-    emit: jest.fn(),
-    disconnect: jest.fn(),
-  });
-
-  /** Connect for real: handshake, then register the socket as handleConnection does. */
-  const connect = async (token: string, exp: number) => {
-    const r: any = await handshake(token, exp);
-    if (r.action !== 'accept') return { rejected: r, socket: null as any };
-    const socket = socketFrom(r, exp);
-    (gateway as any).deviceSockets.set(DEVICE, socket.id);
-    return { rejected: null, socket, accepted: r };
   };
 
   const rotate = async (socket: any, next: string) => {
-    (gateway as any).jwtService.sign.mockReturnValue(next);
-    kv.delete(COOLDOWN_KEY);           // model the cooldown having lapsed
+    nextMint = next;
+    kv.delete(COOLDOWN_KEY);
     delete socket.data.tokenRefreshIssued;
     await (gateway as any).maybeRefreshDeviceToken(socket);
   };
@@ -202,7 +224,7 @@ describe('credential handoff state machine', () => {
 
       const b = await connect(T2, NEARER());
       expect(b.accepted.authenticatedViaGrace).toBe(false);
-      expect(b.accepted.tokenHash).toBe(h(T2));
+      expect(b.accepted.deviceTokenHash).toBe(h(T2));
     });
 
     it('failed handoff: the device recovers on T1 through the bridge', async () => {
@@ -213,8 +235,8 @@ describe('credential handoff state machine', () => {
       const b = await connect(T1, e);
       expect(b.rejected).toBeNull();
       expect(b.accepted.authenticatedViaGrace).toBe(true);
-      expect(b.accepted.tokenHash).toBe(h(T2));            // authority is still T2
-      expect(b.accepted.presentedTokenHash).toBe(h(T1));   // proof is T1
+      expect(b.accepted.deviceTokenHash).toBe(h(T2));            // authority is still T2
+      expect(b.accepted.presentedDeviceTokenHash).toBe(h(T1));   // proof is T1
     });
 
     it('TWO consecutive failed handoffs no longer unpair the device', async () => {
@@ -229,7 +251,7 @@ describe('credential handoff state machine', () => {
 
       const c = await connect(T1, e);
       expect(c.rejected).toBeNull();                 // the regression this suite exists for
-      expect(c.accepted.tokenHash).toBe(h(T3));
+      expect(c.accepted.deviceTokenHash).toBe(h(T3));
     });
 
     it('failed then successful handoff: the anchor advances, no stale T1 remains', async () => {
@@ -243,8 +265,11 @@ describe('credential handoff state machine', () => {
       const c = await connect(T3, e3);               // device now holds T3
       expect(c.accepted.authenticatedViaGrace).toBe(false);   // anchor advanced
 
+      // At this point presented == authoritative == T3, so this alone does not
+      // discriminate the rule; it pins that the anchor ADVANCED rather than staying
+      // pinned to T1. The discriminating case is the two-failed-handoffs test above.
       await rotate(c.socket, T4);
-      expect(grace()).toEqual({ prev: h(T3), next: h(T4) });   // bridges from T3, not T1
+      expect(grace()).toEqual({ prev: h(T3), next: h(T4) });
     });
 
     it('a later T3 -> T4 failed handoff still leaves T3 recoverable', async () => {
@@ -255,7 +280,7 @@ describe('credential handoff state machine', () => {
 
       const d = await connect(T3, e3);
       expect(d.rejected).toBeNull();
-      expect(d.accepted.tokenHash).toBe(h(T4));
+      expect(d.accepted.deviceTokenHash).toBe(h(T4));
     });
 
 
@@ -271,7 +296,10 @@ describe('credential handoff state machine', () => {
       return a;
     };
 
-    it('with A OFFLINE, a B-driven rotation preserves B and cuts A off (accepted trade-off)', async () => {
+    // NOTE: being online does NOT protect the legitimate device — B's connect
+    // dedup-disconnects A before rotating (authenticateConnection), so the attacker
+    // creates the precondition. Recorded explicitly rather than left implied.
+    it('a replay-driven rotation preserves the replayed credential and cuts off the newer one (accepted trade-off)', async () => {
       const e = NEARER();
       await coexist(e);
       const b = await connect(T1, e);                // attacker replays T1
@@ -343,10 +371,11 @@ describe('credential handoff state machine', () => {
       const b = await connect(T1, e);                // grace-authenticated
       await rotate(b.socket, T3);
 
+      // Must be T1's actual remaining life (~3600s), not the 60s floor and not the
+      // newer credential's 10-day life. Both wrong sources are outside this band.
       const ttl = graceTtls[graceTtls.length - 1];
-      expect(ttl).toBeGreaterThan(0);
-      expect(ttl).toBeLessThanOrEqual(60);           // T1's own remaining life
-      expect(ttl).toBeLessThan(10 * 86400);
+      expect(ttl).toBeGreaterThan(3500);
+      expect(ttl).toBeLessThanOrEqual(3600);
     });
 
     it('just BEFORE its exp the bridged credential still authenticates', async () => {
@@ -421,6 +450,9 @@ describe('credential handoff state machine', () => {
       await rotate(a.socket, T2);
 
       expect(store.jwtToken).toBe(h(T1));
+      // The title claims the BRIDGE stays consistent, so actually read it: an uncertain
+      // commit must retain the record rather than assume the write did not land.
+      expect(grace()).toEqual({ prev: h(T1), next: h(T2) });
       expect((await handshake(T1, e) as any).action).toBe('accept');
     });
 
@@ -438,7 +470,7 @@ describe('credential handoff state machine', () => {
       // Redis survives the restart; in-memory socket state does not.
       const b = await connect(T1, e);
       expect(b.rejected).toBeNull();
-      expect(b.accepted.tokenHash).toBe(h(T2));
+      expect(b.accepted.deviceTokenHash).toBe(h(T2));
     });
 
     it('cooldown contention does not corrupt the bridge', async () => {
@@ -451,6 +483,72 @@ describe('credential handoff state machine', () => {
       expect(store.jwtToken).toBe(h(T1));
       expect(grace()).toBeNull();
       expect(a.socket.data.tokenRefreshIssued).toBeUndefined();
+    });
+  });
+
+  // ── the authority / evidence split ─────────────────────────────────────────────
+  describe('presented-credential state is evidence, never authority', () => {
+    it('WsDeviceGuard rejects a socket whose AUTHORITATIVE hash is stale, even when the presented one matches', async () => {
+      // The PR puts a second, weaker hash on client.data. Nothing else pins that
+      // authorization must not read it — swapping the guard to the presented hash would
+      // otherwise be silently green, and would let a superseded credential keep a live
+      // socket alive after its generation stopped being authoritative.
+      store.jwtToken = h(T2);
+      const client = {
+        id: 'socket-guard',
+        data: {
+          deviceId: DEVICE,
+          organizationId: ORG,
+          deviceTokenHash: h(T1),                  // stale authority
+          presentedDeviceTokenHash: h(T2),         // matches storage
+        },
+        emit: jest.fn(),
+        disconnect: jest.fn(),
+      };
+      const ctx = { switchToWs: () => ({ getClient: () => client }) } as any;
+
+      await expect(new WsDeviceGuard(db as any).canActivate(ctx)).rejects.toThrow();
+      expect(client.disconnect).toHaveBeenCalledWith(true);
+    });
+
+    it('a grace-authenticated socket still passes the guard on the authoritative hash', async () => {
+      const e = NEAR();
+      const a = await connect(T1, e);
+      await rotate(a.socket, T2);
+      const b = await connect(T1, e);              // grace accept
+      expect(b.accepted.authenticatedViaGrace).toBe(true);
+
+      const ctx = { switchToWs: () => ({ getClient: () => b.socket }) } as any;
+      await expect(new WsDeviceGuard(db as any).canActivate(ctx)).resolves.toBe(true);
+    });
+  });
+
+  describe('rotation identity and superseded sockets', () => {
+    it('two rotations mint distinguishable credentials (jti), so cleanup cannot cross wires', async () => {
+      const e = NEAR();
+      const a = await connect(T1, e);
+      await rotate(a.socket, T2);
+      const b = await connect(T2, NEARER());
+      await rotate(b.socket, T3);
+
+      const jtis = mintedPayloads.map((p) => p.jti);
+      expect(jtis).toHaveLength(2);
+      expect(jtis[0]).toBeTruthy();
+      expect(jtis[0]).not.toBe(jtis[1]);            // the uniqueness the claim exists for
+    });
+
+    it('a SUPERSEDED socket does not rotate, and leaves the incumbent bridge intact', async () => {
+      const e = NEAR();
+      const a = await connect(T1, e);
+      await rotate(a.socket, T2);                   // bridge {T1 -> T2} now live
+      const before = grace();
+
+      await connect(T1, e);                         // a NEW socket supersedes `a`
+      await rotate(a.socket, T3);                   // the old socket tries to rotate
+
+      expect(store.jwtToken).toBe(h(T2));           // authority did not move
+      expect(grace()).toEqual(before);              // incumbent bridge untouched
+      expect(a.socket.emit).not.toHaveBeenCalledWith('token:refresh', { token: T3 });
     });
   });
 
@@ -477,12 +575,10 @@ describe('credential handoff state machine', () => {
         const presentedEver = new Set<string>([h(T1)]);
 
         for (let step = 0; step < 6; step += 1) {
-          const r: any = await handshake(held, exp);
-          if (r.action !== 'accept') break;
-          presentedEver.add(r.presentedTokenHash);
-
-          const socket = socketFrom(r, exp);
-          (gateway as any).deviceSockets.set(DEVICE, socket.id);
+          const c = await connect(held, exp);
+          if (c.rejected) break;
+          presentedEver.add(c.accepted.presentedDeviceTokenHash);
+          const socket = c.socket;
 
           if (rnd() < 0.7) {
             gen += 1;

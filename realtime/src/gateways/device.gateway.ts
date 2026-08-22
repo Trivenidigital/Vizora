@@ -196,9 +196,15 @@ export class DeviceGateway
         // handshake rejection produced no realtime log, and the 410 that follows it is
         // the one response that makes a player discard its pairing. An operator could
         // not see an unpair happen. Codes only — never token or hash material.
-        this.logger.warn(
-          `handshake_reject socket=${socket.id} code=${result.code} message=${result.message}`,
-        );
+        // AUTH_EXPIRED / AUTH_INVALID are ordinary churn on a fleet with rotating
+        // credentials; only the two terminal codes lead to a purge, so only those are
+        // worth an operator's attention. Codes and the opaque display id only.
+        const line = `handshake_reject device=${result.deviceId ?? 'unverified'} code=${result.code}`;
+        if (result.code === 'DEVICE_REVOKED' || result.code === 'TENANT_SUSPENDED') {
+          this.logger.warn(line);
+        } else {
+          this.logger.debug(line);
+        }
         // err.message carries the legacy string (Electron client reads
         // connect_error.message); err.data.code carries the contract code
         // (the Android TV app reads connect_error.data.code).
@@ -976,6 +982,13 @@ export class DeviceGateway
       client.data.presentedDeviceTokenHash =
         client.data.deviceAuthPresentedHash ?? client.data.deviceAuthTokenHash;
       client.data.authenticatedViaGrace = client.data.deviceAuthViaGrace === true;
+      if (client.data.authenticatedViaGrace) {
+        // This device is alive only because of a Redis bridge record: it authenticated
+        // on a credential the DB no longer considers authoritative, which means an
+        // earlier handoff did not land. Unobservable until now, and it is exactly the
+        // population that a Redis loss would strand.
+        this.logger.warn(`device_authenticated_via_grace device=${deviceId}`);
+      }
       client.data.deviceTokenExp = preVerified.exp; // the PRESENTED credential's expiry
 
       return { kind: 'device', payload: preVerified as DevicePayload };
@@ -1568,6 +1581,21 @@ export class DeviceGateway
         { secret: deviceSecret, algorithm: 'HS256', expiresIn: DEVICE_TOKEN_TTL },
       );
       const newHash = hashDeviceToken(newToken);
+
+      // Fence before touching the grace slot. A superseded socket (dedup disconnects it
+      // but does not cancel this in-flight promise) must not overwrite a live bridge and
+      // then delete it on abort — that would destroy a recovery path the device still
+      // needs. Release the cooldown we claimed but did not use, so the socket that
+      // actually replaced us is not blocked for the full hour.
+      if (!this.isActiveDeviceSocket(client, deviceId)) {
+        this.logger.warn(
+          `refresh_aborted_stale_socket device=${deviceId} — superseded connection, not rotating`,
+        );
+        await this.redisService
+          .delete(`device:token:refresh-cooldown:${deviceId}`)
+          .catch(() => undefined);
+        return;
+      }
 
       // 1) Grace FIRST — the old token stays valid across the rotation.
       // F1 — TTL equals the OLD token's remaining validity (`oldTokenExp - now`)
