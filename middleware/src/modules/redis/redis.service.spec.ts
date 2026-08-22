@@ -30,6 +30,37 @@ describe('RedisService', () => {
     await service.onModuleDestroy();
   });
 
+  describe('getOrThrow — failure must be distinguishable from absence', () => {
+    // get() deliberately swallows everything and answers null, which is correct for a
+    // cache. It is wrong wherever absence is a security verdict: the device auth-check
+    // reads the token-rotation grace record, and "Redis is down" answering as "no grace
+    // record" yields 410 DEVICE_REVOKED — the one response that purges a player's
+    // pairing. These pin the two postures apart on the REAL service, not on a mock that
+    // was free to reject.
+    it('throws when the client is unavailable, where get() reports absence', async () => {
+      // no onModuleInit(), so there is no client
+      await expect(service.getOrThrow('k')).rejects.toThrow();
+      await expect(service.get('k')).resolves.toBeNull();
+    });
+
+    it('propagates a client error, where get() swallows it', async () => {
+      await service.onModuleInit();
+      const client: any = service.getClient();
+      client.get.mockRejectedValue(new Error('CONNRESET'));
+
+      await expect(service.getOrThrow('k')).rejects.toThrow('CONNRESET');
+      await expect(service.get('k')).resolves.toBeNull();
+    });
+
+    it('returns the value unchanged on the happy path', async () => {
+      await service.onModuleInit();
+      const client: any = service.getClient();
+      client.get.mockResolvedValue('{"prev":"a","next":"b"}');
+
+      await expect(service.getOrThrow('k')).resolves.toBe('{"prev":"a","next":"b"}');
+    });
+  });
+
   describe('initialization', () => {
     it('should be defined', () => {
       expect(service).toBeDefined();

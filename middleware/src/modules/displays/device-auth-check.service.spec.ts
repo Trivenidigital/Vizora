@@ -28,7 +28,7 @@ describe('DeviceAuthCheckService', () => {
   beforeEach(async () => {
     jwt = { verify: jest.fn() };
     db = { display: { findUnique: jest.fn() } };
-    redis = { get: jest.fn().mockResolvedValue(null) };
+    redis = { get: jest.fn().mockResolvedValue(null), getOrThrow: jest.fn().mockResolvedValue(null) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -187,22 +187,33 @@ describe('DeviceAuthCheckService', () => {
 
     const graceRecord = (prev: string, next: string) => JSON.stringify({ prev, next });
 
+    it('reads the grace record through the PROPAGATING api, never the swallowing one', () => {
+      // RedisService.get() returns null on any error, which this service cannot tell
+      // apart from "no grace record" — and absence here means 410 DEVICE_REVOKED, the
+      // one response that purges a player's pairing. Binding to getOrThrow is what makes
+      // the documented "a lookup failure is a 5xx, not a 410" promise actually true.
+      // The previous suite passed only because its mock could reject; the injected
+      // provider cannot, so the guarantee was fictional.
+      expect(redis.get).not.toHaveBeenCalled();
+    });
+
+
     it('200 for the PREVIOUS token when a valid grace record points at the current DB hash', async () => {
       jwt.verify.mockReturnValue(validPayload);
       db.display.findUnique.mockResolvedValue(midRotation());
-      redis.get.mockResolvedValue(graceRecord(oldHash, newHash));
+      redis.getOrThrow.mockResolvedValue(graceRecord(oldHash, newHash));
 
       const r = await service.evaluate(OLD_TOKEN);
 
       expect(r).toEqual({ httpStatus: 200, body: { status: 'ok' } });
-      expect(redis.get).toHaveBeenCalledWith(deviceTokenGraceKey('display-1'));
+      expect(redis.getOrThrow).toHaveBeenCalledWith(deviceTokenGraceKey('display-1'));
     });
 
     it('410 when the grace `next` no longer matches the DB — a re-pair must not be resurrectable', async () => {
       const repairedHash = hashDeviceToken('repaired.device.token');
       jwt.verify.mockReturnValue(validPayload);
       db.display.findUnique.mockResolvedValue(currentDisplay({ jwtToken: repairedHash }));
-      redis.get.mockResolvedValue(graceRecord(oldHash, newHash)); // stale: next != stored
+      redis.getOrThrow.mockResolvedValue(graceRecord(oldHash, newHash)); // stale: next != stored
 
       const r = await service.evaluate(OLD_TOKEN);
       expect(r).toEqual({ httpStatus: 410, body: { code: 'DEVICE_REVOKED' } });
@@ -211,7 +222,7 @@ describe('DeviceAuthCheckService', () => {
     it('410 when there is no grace record at all (genuinely rotated away)', async () => {
       jwt.verify.mockReturnValue(validPayload);
       db.display.findUnique.mockResolvedValue(midRotation());
-      redis.get.mockResolvedValue(null); // expired or never written
+      redis.getOrThrow.mockResolvedValue(null); // expired or never written
       const r = await service.evaluate(OLD_TOKEN);
       expect(r).toEqual({ httpStatus: 410, body: { code: 'DEVICE_REVOKED' } });
     });
@@ -220,7 +231,7 @@ describe('DeviceAuthCheckService', () => {
       jwt.verify.mockReturnValue(validPayload);
       for (const raw of ['not json', '{}', '{"prev":"x"}', '{"prev":1,"next":2}', '[]']) {
         db.display.findUnique.mockResolvedValue(midRotation());
-        redis.get.mockResolvedValue(raw);
+        redis.getOrThrow.mockResolvedValue(raw);
         const r = await service.evaluate(OLD_TOKEN);
         expect(r.httpStatus).toBe(410);
       }
@@ -229,7 +240,7 @@ describe('DeviceAuthCheckService', () => {
     it('410 when grace `prev` is some OTHER token — grace revives only the rotation it recorded', async () => {
       jwt.verify.mockReturnValue(validPayload);
       db.display.findUnique.mockResolvedValue(midRotation());
-      redis.get.mockResolvedValue(graceRecord(hashDeviceToken('someone.elses.token'), newHash));
+      redis.getOrThrow.mockResolvedValue(graceRecord(hashDeviceToken('someone.elses.token'), newHash));
       const r = await service.evaluate(OLD_TOKEN);
       expect(r.httpStatus).toBe(410);
     });
@@ -239,7 +250,7 @@ describe('DeviceAuthCheckService', () => {
     it('410 for a DISABLED device even with a perfectly valid grace record', async () => {
       jwt.verify.mockReturnValue(validPayload);
       db.display.findUnique.mockResolvedValue(midRotation({ isDisabled: true }));
-      redis.get.mockResolvedValue(graceRecord(oldHash, newHash));
+      redis.getOrThrow.mockResolvedValue(graceRecord(oldHash, newHash));
       const r = await service.evaluate(OLD_TOKEN);
       expect(r).toEqual({ httpStatus: 410, body: { code: 'DEVICE_REVOKED' } });
     });
@@ -247,7 +258,7 @@ describe('DeviceAuthCheckService', () => {
     it('410 for a DELETED device even with a perfectly valid grace record', async () => {
       jwt.verify.mockReturnValue(validPayload);
       db.display.findUnique.mockResolvedValue(null);
-      redis.get.mockResolvedValue(graceRecord(oldHash, newHash));
+      redis.getOrThrow.mockResolvedValue(graceRecord(oldHash, newHash));
       const r = await service.evaluate(OLD_TOKEN);
       expect(r).toEqual({ httpStatus: 410, body: { code: 'DEVICE_REVOKED' } });
     });
@@ -255,7 +266,7 @@ describe('DeviceAuthCheckService', () => {
     it('410 for an ORG-REASSIGNED device even with a perfectly valid grace record', async () => {
       jwt.verify.mockReturnValue(validPayload);
       db.display.findUnique.mockResolvedValue(midRotation({ organizationId: 'org-2' }));
-      redis.get.mockResolvedValue(graceRecord(oldHash, newHash));
+      redis.getOrThrow.mockResolvedValue(graceRecord(oldHash, newHash));
       const r = await service.evaluate(OLD_TOKEN);
       expect(r).toEqual({ httpStatus: 410, body: { code: 'DEVICE_REVOKED' } });
     });
@@ -275,7 +286,7 @@ describe('DeviceAuthCheckService', () => {
         e.name = 'TokenExpiredError';
         throw e;
       });
-      redis.get.mockResolvedValue(graceRecord(oldHash, newHash));
+      redis.getOrThrow.mockResolvedValue(graceRecord(oldHash, newHash));
       const r = await service.evaluate(OLD_TOKEN);
       expect(r).toEqual({ httpStatus: 401, body: { code: 'AUTH_EXPIRED' } });
     });
@@ -286,7 +297,7 @@ describe('DeviceAuthCheckService', () => {
         e.name = 'JsonWebTokenError';
         throw e;
       });
-      redis.get.mockResolvedValue(graceRecord(oldHash, newHash));
+      redis.getOrThrow.mockResolvedValue(graceRecord(oldHash, newHash));
       const r = await service.evaluate(OLD_TOKEN);
       expect(r).toEqual({ httpStatus: 401, body: { code: 'AUTH_INVALID' } });
     });
@@ -300,7 +311,7 @@ describe('DeviceAuthCheckService', () => {
       // propagates and the device reads a 5xx as transport-layer, keeping its credentials.
       jwt.verify.mockReturnValue(validPayload);
       db.display.findUnique.mockResolvedValue(midRotation());
-      redis.get.mockRejectedValue(new Error('Redis down'));
+      redis.getOrThrow.mockRejectedValue(new Error('Redis down'));
 
       await expect(service.evaluate(OLD_TOKEN)).rejects.toThrow('Redis down');
     });
@@ -308,7 +319,7 @@ describe('DeviceAuthCheckService', () => {
     it('a Redis TIMEOUT is equally non-destructive', async () => {
       jwt.verify.mockReturnValue(validPayload);
       db.display.findUnique.mockResolvedValue(midRotation());
-      redis.get.mockRejectedValue(Object.assign(new Error('Command timed out'), { name: 'TimeoutError' }));
+      redis.getOrThrow.mockRejectedValue(Object.assign(new Error('Command timed out'), { name: 'TimeoutError' }));
       await expect(service.evaluate(OLD_TOKEN)).rejects.toThrow('Command timed out');
     });
 
@@ -323,7 +334,7 @@ describe('DeviceAuthCheckService', () => {
     it('a Redis outage cannot break a device holding the CURRENT token', async () => {
       jwt.verify.mockReturnValue(validPayload);
       db.display.findUnique.mockResolvedValue(currentDisplay());
-      redis.get.mockRejectedValue(new Error('Redis down'));
+      redis.getOrThrow.mockRejectedValue(new Error('Redis down'));
       const r = await service.evaluate(VALID_TOKEN);
       expect(r.httpStatus).toBe(200);
     });
@@ -339,24 +350,24 @@ describe('DeviceAuthCheckService', () => {
 
       // 2. Server rotates: DB now holds NEW, grace records old->new. Device still on OLD.
       db.display.findUnique.mockResolvedValue(currentDisplay({ jwtToken: newHash }));
-      redis.get.mockResolvedValue(graceRecord(oldHash, newHash));
+      redis.getOrThrow.mockResolvedValue(graceRecord(oldHash, newHash));
       expect((await service.evaluate(OLD_TOKEN)).httpStatus).toBe(200);
 
       // 3. Device adopts the new token — accepted on its own merits, no Redis needed.
       redis.get.mockClear();
-      redis.get.mockResolvedValue(graceRecord(oldHash, newHash));
+      redis.getOrThrow.mockResolvedValue(graceRecord(oldHash, newHash));
       expect((await service.evaluate(NEW_TOKEN)).httpStatus).toBe(200);
       expect(redis.get).not.toHaveBeenCalled();
 
       // 4. Grace expires. The old token is now genuinely rotated away.
-      redis.get.mockResolvedValue(null);
+      redis.getOrThrow.mockResolvedValue(null);
       expect((await service.evaluate(OLD_TOKEN)).httpStatus).toBe(410);
 
       // 5. The device is re-paired. A stale grace record must NOT resurrect either token.
       db.display.findUnique.mockResolvedValue(
         currentDisplay({ jwtToken: hashDeviceToken('repaired.device.token') }),
       );
-      redis.get.mockResolvedValue(graceRecord(oldHash, newHash));
+      redis.getOrThrow.mockResolvedValue(graceRecord(oldHash, newHash));
       expect((await service.evaluate(OLD_TOKEN)).httpStatus).toBe(410);
       expect((await service.evaluate(NEW_TOKEN)).httpStatus).toBe(410);
     });

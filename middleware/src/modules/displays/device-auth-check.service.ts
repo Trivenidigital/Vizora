@@ -115,7 +115,11 @@ export class DeviceAuthCheckService {
       // propagates as 500, exactly like the DB read above — the device reads a 5xx as
       // transport-layer and keeps its credentials. Same grace MODEL as realtime; opposite
       // failure posture, because the consequence of being wrong is not symmetric.
-      const graceRaw = await this.redis.get(deviceTokenGraceKey(payload.sub));
+      // getOrThrow, NOT get: the comment above promises a lookup failure surfaces as a
+      // 5xx the device reads as transport-layer. `get()` swallows errors and returns
+      // null, which this code cannot distinguish from "no grace record" — so the promise
+      // was not being kept and a Redis outage produced 410s instead.
+      const graceRaw = await this.redis.getOrThrow(deviceTokenGraceKey(payload.sub));
 
       // Accepts only when the presented hash is the recorded `prev` AND the DB still
       // holds the recorded `next` — so a re-paired device (whose stored hash moved on)

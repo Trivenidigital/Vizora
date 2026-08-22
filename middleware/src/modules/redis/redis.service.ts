@@ -173,6 +173,24 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * A GET that PROPAGATES failure instead of reporting "absent".
+   *
+   * `get()` above swallows every error and returns null, which is right for a cache: a
+   * miss and an outage are equally "not cached". It is wrong wherever absence is a
+   * SECURITY VERDICT. The device auth-check reads the token-rotation grace record, and
+   * for that caller "Redis is down" answering as "no grace record exists" turns a
+   * transient outage into `410 DEVICE_REVOKED` — the one response that makes a player
+   * discard its pairing. During a rotation window that is a fleet-wide unpair from a
+   * Redis blip. Callers that must distinguish the two use this.
+   */
+  async getOrThrow(key: string): Promise<string | null> {
+    if (!this.client) {
+      throw new Error('Redis client unavailable');
+    }
+    return await this.client.get(key);
+  }
+
   async set(key: string, value: string, ttlSeconds?: number): Promise<boolean> {
     if (!this.client) return false;
     try {
