@@ -115,14 +115,19 @@ export class DisplaysController {
     return this.displaysService.update(organizationId, id, updateDisplayDto);
   }
 
-  @Post(':id/pair')
-  @Roles('admin', 'manager')
-  async generatePairingToken(
-    @CurrentUser('organizationId') organizationId: string,
-    @Param('id', ParseUUIDPipe) id: string,
-  ) {
-    return this.displaysService.generatePairingToken(organizationId, id);
-  }
+  // REMOVED 2026-08-23 — `POST :id/pair` (`DisplaysService.generatePairingToken`).
+  // It minted a plaintext 90-day device JWT and returned it in the response body,
+  // which the dashboard then rendered on screen. Nothing could consume it: every
+  // Vizora display client (vizora-tv, Electron, web, mobile) pairs only through the
+  // 6-char code flow in `pairing.controller.ts`. Worse, the write was unconditional
+  // and wrote no rotation grace record, so invoking it on a healthy screen made
+  // `auth/check` answer 410 DEVICE_REVOKED — the device purged its credentials and
+  // put a pairing code on customer glass with no way to self-recover. Fourteen days
+  // of nginx logs and ten of middleware logs show zero calls in production.
+  //
+  // Do not reintroduce this as an operator convenience. Device-credential issuance
+  // must be bound to a live, device-initiated pairing session — see
+  // `pairing.service.ts`, which is the only supported path.
 
   @Post(':deviceId/heartbeat')
   @Public() // Bypass user JWT guard -- device JWT verified manually below

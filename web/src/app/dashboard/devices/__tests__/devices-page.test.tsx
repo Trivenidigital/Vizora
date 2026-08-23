@@ -7,7 +7,6 @@ const mockGetPlaylists = jest.fn();
 const mockGetDisplayGroups = jest.fn();
 const mockDeleteDisplay = jest.fn();
 const mockUpdateDisplay = jest.fn();
-const mockGeneratePairingToken = jest.fn();
 const mockBulkDeleteDisplays = jest.fn();
 const mockBulkAssignPlaylist = jest.fn();
 const mockBulkAssignGroup = jest.fn();
@@ -40,7 +39,6 @@ jest.mock('@/lib/api', () => ({
     getDisplayGroups: (...args: any[]) => mockGetDisplayGroups(...args),
     deleteDisplay: (...args: any[]) => mockDeleteDisplay(...args),
     updateDisplay: (...args: any[]) => mockUpdateDisplay(...args),
-    generatePairingToken: (...args: any[]) => mockGeneratePairingToken(...args),
     bulkDeleteDisplays: (...args: any[]) => mockBulkDeleteDisplays(...args),
     bulkAssignPlaylist: (...args: any[]) => mockBulkAssignPlaylist(...args),
     bulkAssignGroup: (...args: any[]) => mockBulkAssignGroup(...args),
@@ -288,12 +286,6 @@ describe('DevicesClient', () => {
     mockBulkDeleteDisplays.mockResolvedValue({ deleted: 0 });
     mockBulkAssignPlaylist.mockResolvedValue({ updated: 0 });
     mockBulkAssignGroup.mockResolvedValue({ added: 0 });
-    mockGeneratePairingToken.mockResolvedValue({
-      pairingToken: 'eyJ.mock.pairing-token',
-      expiresIn: '30d',
-      displayId: 'd1',
-      deviceIdentifier: 'device-d1',
-    });
   });
 
   it('renders and loads data with empty initial props', async () => {
@@ -414,7 +406,6 @@ describe('DevicesClient', () => {
     expect(screen.queryByText('Emergency Override')).not.toBeInTheDocument();
     expect(screen.queryByText('Pair New Device')).not.toBeInTheDocument();
     expect(screen.queryByText('Edit')).not.toBeInTheDocument();
-    expect(screen.queryByText('Pair')).not.toBeInTheDocument();
     expect(screen.queryByText('Delete')).not.toBeInTheDocument();
     expect(screen.getAllByText('Preview').length).toBeGreaterThan(0);
     expect(screen.getAllByTestId(/playlist-select-/).every((select) => select.hasAttribute('disabled'))).toBe(true);
@@ -466,7 +457,6 @@ describe('DevicesClient', () => {
     expect(screen.getByTestId('fleet-dropdown')).toBeInTheDocument();
     expect(screen.getByText('Pair New Device')).toBeInTheDocument();
     expect(screen.getAllByText('Edit').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Pair').length).toBeGreaterThan(0);
     expect(screen.queryByText('Emergency Override')).not.toBeInTheDocument();
     expect(screen.queryByText('Delete')).not.toBeInTheDocument();
   });
@@ -529,7 +519,11 @@ describe('DevicesClient', () => {
     expect(screen.getAllByText(/device/i).length).toBeGreaterThan(0);
   });
 
-  it('renders backend pairingToken when pairing an existing device', async () => {
+  // Removed 2026-08-23: the per-row "Pair" action called POST /displays/:id/pair,
+  // which returned a plaintext 90d device JWT that this page rendered on screen.
+  // No display client could consume it and the call silently revoked a live screen.
+  // Pairing goes through /dashboard/devices/pair (the 6-char code flow) only.
+  it('offers no per-row action that mints a device token', async () => {
     mockGetDisplays.mockResolvedValue({ data: sampleDevices, meta: { total: 3 } });
 
     render(<DevicesClient initialDevices={sampleDevices as any} initialPlaylists={samplePlaylists as any} />);
@@ -538,13 +532,10 @@ describe('DevicesClient', () => {
       expect(screen.getByText('Lobby Display')).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getAllByText('Pair')[0]);
-
-    await waitFor(() => {
-      expect(mockGeneratePairingToken).toHaveBeenCalledWith('d1');
-      expect(screen.getByText('eyJ.mock.pairing-token')).toBeInTheDocument();
-    });
-    expect(screen.queryByText('N/A')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pair')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Generate a pairing token/i)).not.toBeInTheDocument();
+    // The legitimate code-entry flow is untouched.
+    expect(screen.getByText('Pair New Device')).toBeInTheDocument();
   });
 
   it('requires confirmation before bulk deleting selected devices and reports the backend count', async () => {
@@ -1048,7 +1039,7 @@ describe('DevicesClient fleet status summary', () => {
  *
  * Sorting was a bare `onClick` on the `<th>`: not focusable, not activatable by
  * keyboard, and announcing no sort state at all. Row actions were four buttons
- * all named "Delete"/"Edit"/"Pair" — identical accessible names repeated once
+ * all named "Delete"/"Edit" — identical accessible names repeated once
  * per device, so a screen-reader user tabbing a 500-row list heard "Delete
  * button" 500 times with nothing to tell them apart.
  */

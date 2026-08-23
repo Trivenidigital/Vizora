@@ -23,7 +23,6 @@ describe('DisplaysController', () => {
       findAll: jest.fn(),
       findOne: jest.fn(),
       update: jest.fn(),
-      generatePairingToken: jest.fn(),
       updateHeartbeat: jest.fn(),
       remove: jest.fn(),
       pushContent: jest.fn(),
@@ -156,18 +155,20 @@ describe('DisplaysController', () => {
     });
   });
 
-  describe('generatePairingToken', () => {
-    it('should generate a pairing token for a display', async () => {
-      const expectedResult = { token: 'pairing-token-123', expiresAt: new Date().toISOString() };
-      mockDisplaysService.generatePairingToken.mockResolvedValue(expectedResult as any);
+  // The operator-facing `POST :id/pair` route was removed 2026-08-23 — it returned a
+  // plaintext 90d device JWT no client could consume and silently revoked live screens.
+  // See the marker in displays.controller.ts. This test exists so reintroducing it fails.
+  describe('generatePairingToken removal', () => {
+    it('exposes no generatePairingToken handler', () => {
+      expect((controller as unknown as Record<string, unknown>).generatePairingToken).toBeUndefined();
+    });
 
-      const result = await controller.generatePairingToken(organizationId, 'display-123');
-
-      expect(result).toEqual(expectedResult);
-      expect(mockDisplaysService.generatePairingToken).toHaveBeenCalledWith(
-        organizationId,
-        'display-123',
+    it('registers no POST :id/pair route', () => {
+      const proto = Object.getPrototypeOf(controller);
+      const paired = Object.getOwnPropertyNames(proto).filter(
+        (key) => Reflect.getMetadata('path', proto[key]) === ':id/pair',
       );
+      expect(paired).toEqual([]);
     });
   });
 
