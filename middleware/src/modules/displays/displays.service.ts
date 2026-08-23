@@ -2,7 +2,6 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
-  InternalServerErrorException,
   ServiceUnavailableException,
   UnauthorizedException,
   Logger,
@@ -10,7 +9,6 @@ import {
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma, DEVICE_OFFLINE_THRESHOLD_MS } from '@vizora/database';
-import { JwtService } from '@nestjs/jwt';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import * as crypto from 'crypto';
@@ -22,17 +20,6 @@ import { UpdateDisplayDto } from './dto/update-display.dto';
 import { UpdateQrOverlayDto } from './dto/update-qr-overlay.dto';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 import { getDisplayDetailSelect, getDisplayListSelect } from './display-response.select';
-
-/**
- * Hash a token using SHA-256 for secure storage
- * We use SHA-256 instead of bcrypt because:
- * 1. JWT tokens are already cryptographically random
- * 2. We only need to verify exact matches, not password-like comparisons
- * 3. Faster lookup performance for real-time operations
- */
-function hashToken(token: string): string {
-  return crypto.createHash('sha256').update(token).digest('hex');
-}
 
 /** Circuit breaker configuration for realtime service */
 const REALTIME_CIRCUIT_CONFIG = {
@@ -50,7 +37,6 @@ export class DisplaysService {
 
   constructor(
     private readonly db: DatabaseService,
-    private readonly jwtService: JwtService,
     private readonly httpService: HttpService,
     private readonly circuitBreaker: CircuitBreakerService,
     private readonly storageService: StorageService,
@@ -343,9 +329,8 @@ export class DisplaysService {
 
   /**
    * Reset displays stuck in 'pairing' state. A device gets status='pairing'
-   * when generatePairingToken() fires (operator started pairing) but
-   * transitions to 'online' only when the device makes its first WebSocket
-   * connection. If the device loses power or network in between — or the
+   * when PairingService completes a code pairing but transitions to 'online'
+   * only when the device makes its first WebSocket connection. If the device loses power or network in between — or the
    * QR code never gets scanned — the row stays 'pairing' forever, which
    * confuses dashboards and prevents the operator from re-pairing the same
    * deviceIdentifier (the existing-display check throws "already paired").
@@ -368,7 +353,7 @@ export class DisplaysService {
     const stale = await this.db.display.findMany({
       where: {
         status: 'pairing',
-        // Use updatedAt — that's when generatePairingToken touched the row.
+        // Use updatedAt — that's when the pairing write touched the row.
         // lastHeartbeat is the wrong field here because a pairing-state
         // device by definition has never heartbeated.
         updatedAt: { lt: threshold },
@@ -388,66 +373,12 @@ export class DisplaysService {
     );
   }
 
-  async generatePairingToken(organizationId: string, id: string) {
-    const display = await this.findOne(organizationId, id);
-
-    // Generate device JWT token using DEVICE_JWT_SECRET (not the user JWT_SECRET)
-    const deviceSecret = process.env.DEVICE_JWT_SECRET;
-    if (!deviceSecret || deviceSecret.length < 32) {
-      // Server-side misconfiguration — surface to the client as 500 so
-      // ops sees it in error tracking without hiding behind a generic
-      // unhandled exception (which the global filter would turn into
-      // an empty 500 with no useful message in the audit log).
-      throw new InternalServerErrorException(
-        'DEVICE_JWT_SECRET must be set and be at least 32 characters',
-      );
-    }
-
-    const pairingToken = this.jwtService.sign(
-      {
-        sub: display.id,
-        deviceIdentifier: display.deviceIdentifier,
-        organizationId: display.organizationId,
-        type: 'device',
-      },
-      {
-        secret: deviceSecret,
-        algorithm: 'HS256',
-        // B10: this explicit signOptions object OVERRIDES the JwtModule default,
-        // so without expiresIn the token had NO exp claim (non-expiring). Match
-        // the primary pairing path (pairing.service.ts, 90d). Expiry is now
-        // graceful: an expired device token → AUTH_EXPIRED on the socket handshake
-        // → the device keeps playing cached content and re-auths (Slice 0), it
-        // does not de-pair.
-        expiresIn: '90d',
-      },
-    );
-
-    // Hash the token before storing in database for security
-    // If database is compromised, attacker cannot use the hashed tokens
-    const hashedToken = hashToken(pairingToken);
-
-    // Defense-in-depth: include organizationId in where clause to prevent TOCTOU races
-    const pairingResult = await this.db.display.updateMany({
-      where: { id, organizationId },
-      data: {
-        jwtToken: hashedToken, // Store hash, not plaintext
-        pairedAt: new Date(),
-        status: 'pairing',
-      },
-    });
-    if (pairingResult.count === 0) {
-      throw new NotFoundException('Display not found');
-    }
-
-    // Return the actual token to the client (only time it's available)
-    return {
-      pairingToken,
-      expiresIn: '90d', // now truthful — the token actually carries a 90d exp
-      displayId: display.id,
-      deviceIdentifier: display.deviceIdentifier,
-    };
-  }
+  // REMOVED 2026-08-23 — `generatePairingToken()`. See the marker on the deleted
+  // `POST :id/pair` route in `displays.controller.ts` for the full rationale.
+  // Short version: it handed an operator a plaintext 90-day device JWT no client
+  // could consume, and its unconditional ungraced credential rotation silently
+  // revoked whatever screen it was pointed at. Device credentials must be issued
+  // only against a live device-initiated pairing session (`pairing.service.ts`).
 
   async remove(organizationId: string, id: string) {
     await this.findOne(organizationId, id);

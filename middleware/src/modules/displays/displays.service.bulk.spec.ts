@@ -37,12 +37,11 @@ describe('DisplaysService - Bulk Operations', () => {
       },
     };
 
-    // Service has 4 constructor dependencies: db, jwtService, httpService, circuitBreaker
-    const mockJwtService = { sign: jest.fn() } as any;
+    // Service has 3 constructor dependencies exercised here: db, httpService, circuitBreaker
     const mockHttpService = { post: jest.fn() } as any;
     const mockCircuitBreaker = { executeWithFallback: jest.fn() } as any;
 
-    service = new DisplaysService(mockDb, mockJwtService, mockHttpService, mockCircuitBreaker);
+    service = new DisplaysService(mockDb, mockHttpService, mockCircuitBreaker);
   });
 
   describe('bulkDelete', () => {

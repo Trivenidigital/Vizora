@@ -1,5 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { JwtService } from '@nestjs/jwt';
 import { HttpService } from '@nestjs/axios';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { of, throwError } from 'rxjs';
@@ -22,7 +21,6 @@ import { PaginationDto } from '../common/dto/pagination.dto';
 describe('DisplaysService', () => {
   let service: DisplaysService;
   let databaseService: jest.Mocked<DatabaseService>;
-  let jwtService: jest.Mocked<JwtService>;
   let httpService: jest.Mocked<HttpService>;
 
   const mockOrganizationId = 'org-123';
@@ -104,11 +102,6 @@ describe('DisplaysService', () => {
       },
     };
 
-    const mockJwtService = {
-      sign: jest.fn(),
-      verify: jest.fn(),
-    };
-
     const mockHttpService = {
       post: jest.fn(),
       get: jest.fn(),
@@ -128,10 +121,6 @@ describe('DisplaysService', () => {
         {
           provide: DatabaseService,
           useValue: mockDatabaseService,
-        },
-        {
-          provide: JwtService,
-          useValue: mockJwtService,
         },
         {
           provide: HttpService,
@@ -158,7 +147,6 @@ describe('DisplaysService', () => {
 
     service = module.get<DisplaysService>(DisplaysService);
     databaseService = module.get(DatabaseService);
-    jwtService = module.get(JwtService);
     httpService = module.get(HttpService);
   });
 
@@ -1213,7 +1201,6 @@ describe('DisplaysService', () => {
       const realCircuitBreaker = new CircuitBreakerService();
       const serviceWithRealCircuit = new DisplaysService(
         databaseService,
-        {} as any,
         httpService,
         realCircuitBreaker,
         {
@@ -1249,25 +1236,11 @@ describe('DisplaysService', () => {
     });
   });
 
-  describe('generatePairingToken (B10 — token must expire)', () => {
-    beforeEach(() => {
-      process.env.DEVICE_JWT_SECRET = 'x'.repeat(32);
-      databaseService.display.findFirst.mockResolvedValue(mockDisplay as any);
-      databaseService.display.updateMany.mockResolvedValue({ count: 1 } as any);
-      (jwtService.sign as jest.Mock).mockReturnValue('signed.device.token');
-    });
-
-    it('signs the device token WITH a 90d expiry (not a non-expiring token)', async () => {
-      const result = await service.generatePairingToken(mockOrganizationId, mockDisplayId);
-
-      // The explicit signOptions overrides the module default, so expiresIn must
-      // be set here or the token has no exp claim (the B10 bug).
-      expect(jwtService.sign).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'device' }),
-        expect.objectContaining({ algorithm: 'HS256', expiresIn: '90d' }),
-      );
-      // Returned value is now truthful.
-      expect(result.expiresIn).toBe('90d');
+  // Removed 2026-08-23 with `generatePairingToken()` itself — the operator-facing
+  // plaintext-device-JWT path. See the marker in displays.controller.ts.
+  describe('generatePairingToken removal', () => {
+    it('exposes no generatePairingToken method', () => {
+      expect((service as unknown as Record<string, unknown>).generatePairingToken).toBeUndefined();
     });
   });
 });

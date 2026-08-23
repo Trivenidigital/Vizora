@@ -155,10 +155,7 @@ export default function DevicesClient({
  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
- const [isPairingModalOpen, setIsPairingModalOpen] = useState(false);
  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
- const [pairingCode, setPairingCode] = useState('');
- const [pairingExpiresIn, setPairingExpiresIn] = useState('');
  const [editForm, setEditForm] = useState({ nickname: '', location: '' });
  const [actionLoading, setActionLoading] = useState(false);
  const [searchQuery, setSearchQuery] = useState('');
@@ -401,21 +398,6 @@ export default function DevicesClient({
  );
  } catch (error: any) {
  toast.error(error.message || 'Failed to delete device');
- } finally {
- setActionLoading(false);
- }
- };
-
- const handleGeneratePairingCode = async (device: Display) => {
- try {
- setActionLoading(true);
- const response = await apiClient.generatePairingToken(device.id);
- setPairingCode(response.pairingToken);
- setPairingExpiresIn(response.expiresIn || '5 minutes');
- setSelectedDevice(device);
- setIsPairingModalOpen(true);
- } catch (error: any) {
- toast.error(error.message || 'Failed to generate pairing code');
  } finally {
  setActionLoading(false);
  }
@@ -1096,9 +1078,6 @@ export default function DevicesClient({
  {permissions.canManageDevices && (
  <button onClick={() => handleEdit(device)} className="eh-row-action" aria-label={`Edit ${device.nickname}`}>Edit</button>
  )}
- {permissions.canPairDevices && (
- <button onClick={() => handleGeneratePairingCode(device)} className="eh-row-action" aria-label={`Generate a pairing token for ${device.nickname}`}>Pair</button>
- )}
  {permissions.canDeleteDevices && (
  <button onClick={() => handleDelete(device)} className="eh-row-action eh-row-action-danger" aria-label={`Delete ${device.nickname}`}>Delete</button>
  )}
@@ -1186,18 +1165,6 @@ export default function DevicesClient({
  <button onClick={() => setIsEditModalOpen(false)} className="eh-btn-ghost eh-btn-sm min-h-[44px] rounded-xl px-4" disabled={actionLoading}>Cancel</button>
  <button onClick={handleSaveEdit} className="eh-btn-neon eh-btn-sm flex min-h-[44px] items-center gap-2 rounded-xl px-4 disabled:opacity-50" disabled={actionLoading || !editForm.nickname.trim()}>{actionLoading && <LoadingSpinner size="sm" />}Save Changes</button>
  </div>
- </div>
- </Modal>
-
- <Modal isOpen={isPairingModalOpen && permissions.canPairDevices} onClose={() => setIsPairingModalOpen(false)} title="Pairing Token">
- <div className="space-y-5 text-center">
- <p className="text-sm text-[var(--foreground-secondary)]">Use this token on your display device to pair it:</p>
- <div className="rounded-xl border border-[var(--border)] bg-[var(--background-secondary)] p-6">
- {/* Ink, not the neon fill: this is a string that has to be transcribed. */}
- <div className="break-all font-mono text-lg font-bold tracking-wide text-[var(--primary-ink)]">{pairingCode}</div>
- </div>
- <p className="text-sm text-[var(--foreground-tertiary)]">This token expires in {pairingExpiresIn}</p>
- <button onClick={() => setIsPairingModalOpen(false)} className="eh-btn-neon min-h-[44px] w-full rounded-xl px-4 py-2 text-sm font-medium">Done</button>
  </div>
  </Modal>
 

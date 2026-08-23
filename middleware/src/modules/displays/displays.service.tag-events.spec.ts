@@ -29,10 +29,9 @@ describe('DisplaysService — display.tags.changed emission (O4)', () => {
     };
     eventEmitter = { emit: jest.fn() };
 
-    // Constructor: (db, jwt, http, circuitBreaker, storage, eventEmitter)
+    // Constructor: (db, http, circuitBreaker, storage, eventEmitter)
     service = new DisplaysService(
       db as unknown as DatabaseService,
-      {} as any,
       {} as any,
       {} as any,
       {} as any,
