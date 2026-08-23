@@ -6,6 +6,12 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RedisService.name);
   private client: Redis | null = null;
   private isConnected = false;
+  /**
+   * Set by `disconnect()` so the `'end'` handler can tell an EXPECTED shutdown
+   * from a genuine loss of the connection. Without it every graceful shutdown
+   * logged at ERROR — see the handler below.
+   */
+  private shuttingDown = false;
 
   async onModuleInit() {
     await this.connect();
@@ -76,7 +82,21 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
       this.client.on('end', () => {
         this.isConnected = false;
-        this.logger.error('Redis connection ended (max retries exceeded or disconnected)');
+        // The old message claimed "max retries exceeded", which this client can no
+        // longer do: `retryStrategy` above ALWAYS returns a number, so retry never
+        // terminates and 'end' is unreachable that way. In practice 'end' fires from
+        // `quit()` in `disconnect()` during `onModuleDestroy` — i.e. every ordinary
+        // shutdown logged an ERROR asserting a Redis failure that had not happened.
+        // On 2026-08-23 that false ERROR cost a full investigation before being traced
+        // back to ordinary process termination.
+        //
+        // A genuine end (client destroyed without `quit()`) is still an error and
+        // still logged as one.
+        if (this.shuttingDown) {
+          this.logger.log('Redis connection closed during shutdown');
+        } else {
+          this.logger.error('Redis connection ended unexpectedly (not a shutdown)');
+        }
       });
 
       // Attempt to connect
@@ -90,6 +110,8 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   private async disconnect(): Promise<void> {
     if (this.client) {
+      // Set BEFORE quit() so the 'end' handler it triggers sees the shutdown flag.
+      this.shuttingDown = true;
       try {
         await this.client.quit();
         this.logger.log('Redis disconnected');
