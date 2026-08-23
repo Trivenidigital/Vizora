@@ -565,6 +565,33 @@ Swagger publicly at `/api/v1/docs`. **`curl https://vizora.cloud/api/v1/docs`
 returning 200 instead of 404 is the cheapest tell that a restart selected the
 wrong environment** — check it after every reload.
 
+### Wait for readiness to STABILIZE before running deploy-verify
+
+**Never run `scripts/deploy-verify.sh` immediately after a reload.** Run the gate first:
+
+```bash
+npx tsx scripts/ops/await-readiness-cli.ts          # exit 0 = stabilized, exit 1 = rollout failure
+bash scripts/deploy-verify.sh > /tmp/deploy-verify.post.txt 2>&1 || true
+diff /tmp/deploy-verify.pre.txt /tmp/deploy-verify.post.txt
+```
+
+Why: on 2026-08-22 a clean middleware-only deploy was verified straight after the
+reload and reported `FAIL GET /api/v1/health/ready -> 200 status=degraded` against an
+`ok` baseline. That is textbook "a check that newly fails", which this runbook —
+correctly — calls a rollout failure. **It was not one.** The process had ~10s uptime;
+a direct query returned `ok`, and a re-run once warm gave 0 failures with the diff
+reduced to the commit line. So reload-then-verify manufactures the exact signal you
+are told to roll back on.
+
+The gate requires **3 CONSECUTIVE** `status=ok` samples inside a bounded timeout
+(defaults 3 / 120s / 3s interval; `--consecutive`, `--timeout-ms`, `--interval-ms`).
+A single `ok` is not enough — readiness can flap through `ok` during warm-up, so any
+non-ok RESETS the run. This weakens nothing: **failing to stabilize before the timeout
+is itself a rollout failure**, and the exit code says so. It only stops the clock
+starting too early. Do not replace it with a fixed `sleep` — that is simultaneously too
+long on an idle box, too short on a loaded one, and silently passes a service that
+never becomes ready.
+
 `pm2 restart <app>` / `reload all` reuse PM2's *stored* env and do NOT re-read
 the ecosystem file, so their outcome depends on how the process was last
 started. Full procedure + the `env_production` coverage invariant (enforced by
