@@ -194,6 +194,20 @@ function seedState(tmpRoot: string, incidents: Incident[]): void {
   writeFileSync(join(tmpRoot, 'logs', 'ops-state.json'), JSON.stringify(state, null, 2));
 }
 
+const STREAK_FILE = 'health-guardian-timeout-streaks.json';
+
+/**
+ * Seed the streak file — the DECISION input. `Incident.consecutiveTimeouts` is
+ * only the operator-visible copy, so seeding the incident alone proves nothing.
+ */
+function seedStreaks(tmpRoot: string, streaks: Record<string, number>): void {
+  const at = new Date().toISOString();
+  const payload = Object.fromEntries(
+    Object.entries(streaks).map(([service, count]) => [service, { count, at }]),
+  );
+  writeFileSync(join(tmpRoot, 'logs', STREAK_FILE), JSON.stringify(payload, null, 2));
+}
+
 function readIncident(tmpRoot: string, id: string): Incident | undefined {
   const updated = JSON.parse(
     readFileSync(join(tmpRoot, 'logs', 'ops-state.json'), 'utf8'),
@@ -269,6 +283,7 @@ test('a timeout that persists to the threshold IS restarted — a real hang stil
     writeRecordingPm2(join(tmpRoot, 'bin'), recordPath, 1);
     // Two prior consecutive timeouts; this run makes three.
     seedState(tmpRoot, [timeoutIncident({ consecutiveTimeouts: TIMEOUT_RESTART_THRESHOLD - 1 })]);
+    seedStreaks(tmpRoot, { middleware: TIMEOUT_RESTART_THRESHOLD - 1 });
 
     const result = await runHealthGuardian(tmpRoot, baseUrl, 90_000);
 
@@ -508,6 +523,60 @@ test('an existing CRITICAL incident is never downgraded by a sub-threshold timeo
       incident?.severity,
       'critical',
       `a change of failure mode must not tell the operator an ongoing outage improved\n${result.stdout}`,
+    );
+  } finally {
+    close();
+    rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
+
+test('the streak survives an ops-state.json that cannot be read', async () => {
+  const tmpRoot = mkdtempSync(join(repoRoot, '.tmp-guardian-starvation-'));
+  const { baseUrl, close } = await startServer(hangsMiddlewareProbe);
+  const recordPath = join(tmpRoot, 'pm2-invocations.log');
+
+  try {
+    prepareTmpRoot(tmpRoot);
+    writeRecordingPm2(join(tmpRoot, 'bin'), recordPath, 1);
+    // The regression this sidecar exists for: the shared state file is
+    // unusable, so the incident and its `detected` stamp are both gone. The
+    // streak must still reach the threshold and restart a genuinely hung
+    // service, instead of restarting from 1 forever.
+    writeFileSync(join(tmpRoot, 'logs', 'ops-state.json'), '{ this is not json');
+    seedStreaks(tmpRoot, { middleware: TIMEOUT_RESTART_THRESHOLD - 1 });
+
+    const result = await runHealthGuardian(tmpRoot, baseUrl, 90_000);
+
+    assert.ok(
+      readPm2Invocations(recordPath).includes('restart vizora-middleware'),
+      `a hang must still be recovered when ops-state.json is unreadable; pm2 saw `
+      + `${JSON.stringify(readPm2Invocations(recordPath))}\n${result.stdout}`,
+    );
+  } finally {
+    close();
+    rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
+
+test('an UNREADABLE streak file fails toward remediation, an absent one does not', async () => {
+  const tmpRoot = mkdtempSync(join(repoRoot, '.tmp-guardian-starvation-'));
+  const { baseUrl, close } = await startServer(hangsMiddlewareProbe);
+  const recordPath = join(tmpRoot, 'pm2-invocations.log');
+
+  try {
+    prepareTmpRoot(tmpRoot);
+    writeRecordingPm2(join(tmpRoot, 'bin'), recordPath, 1);
+    seedState(tmpRoot, []);
+    // Present but unusable — the streak is UNKNOWN, and an unknown streak can
+    // never accumulate, so waiting on it would reproduce the closed failure.
+    writeFileSync(join(tmpRoot, 'logs', STREAK_FILE), 'not json at all');
+
+    const result = await runHealthGuardian(tmpRoot, baseUrl, 90_000);
+
+    assert.match(result.stdout, /timeout streak unavailable/);
+    assert.ok(
+      readPm2Invocations(recordPath).includes('restart vizora-middleware'),
+      `an unknown streak must fail toward remediation\n${result.stdout}`,
     );
   } finally {
     close();

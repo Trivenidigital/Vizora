@@ -70,6 +70,17 @@ function getStateFile(): string {
   return process.env.OPS_STATE_FILE || DEFAULT_STATE_FILE;
 }
 
+/**
+ * Directory holding the ops state file.
+ *
+ * Exported so sibling per-agent state (e.g. health-guardian's timeout streaks)
+ * lands beside `ops-state.json` and follows an `OPS_STATE_FILE` relocation,
+ * rather than re-deriving the path and silently diverging under test.
+ */
+export function getOpsStateDir(): string {
+  return dirname(getStateFile());
+}
+
 function getLockFile(): string {
   return getStateFile() + '.lock';
 }
