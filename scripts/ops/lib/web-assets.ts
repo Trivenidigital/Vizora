@@ -24,6 +24,8 @@
  * distinguishes "serving" from "serving something usable".
  */
 
+import { classifyFetchError, type ProbeFailureKind } from './probe-failure.js';
+
 /** Asset kinds worth probing. Both were 500 during the incident. */
 const ASSET_PATTERN = /(?:src|href)=["'](\/_next\/static\/[^"']+\.(?:js|css))["']/g;
 
@@ -88,6 +90,8 @@ export interface AssetProbeOutcome {
   status?: number;
   ok: boolean;
   error?: string;
+  /** Set when the fetch THREW, so the caller can tell slow from broken. */
+  kind?: ProbeFailureKind;
 }
 
 /**
@@ -156,14 +160,21 @@ export async function probeWebAssets(
   baseUrl: string,
   fetchImpl: ProbeFetch,
   sampleSize = 2,
-): Promise<{ ok: boolean; detail: string }> {
+): Promise<{ ok: boolean; detail: string; kind?: ProbeFailureKind }> {
   let html: string;
   try {
     const res = await fetchImpl(baseUrl);
     if (!res.ok) return { ok: false, detail: `HTML fetch returned ${res.status}` };
     html = await res.text();
   } catch (err) {
-    return { ok: false, detail: `HTML fetch failed: ${err instanceof Error ? err.message : err}` };
+    // WHY it failed survives: this fetch is bounded by the same deadline as the
+    // caller's, so it can abort on a slow box even though the caller's own
+    // earlier GET of this same URL returned 200. See lib/probe-failure.ts.
+    return {
+      ok: false,
+      detail: `HTML fetch failed: ${err instanceof Error ? err.message : err}`,
+      kind: classifyFetchError(err),
+    };
   }
 
   const plan = planAssetProbe(html, sampleSize);
@@ -180,9 +191,33 @@ export async function probeWebAssets(
       // redirect already resolves to its final 2xx response.
       outcomes.push({ path, status: res.status, ok: res.ok });
     } catch (err) {
-      outcomes.push({ path, ok: false, error: err instanceof Error ? err.message : String(err) });
+      outcomes.push({
+        path,
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+        kind: classifyFetchError(err),
+      });
     }
   }
 
-  return summarizeAssetProbe(outcomes);
+  const summary = summarizeAssetProbe(outcomes);
+  if (summary.ok) return summary;
+
+  // A DEFINITE bad status outranks a maybe-slow box. A non-2xx is positive
+  // evidence of a specific fault; an abort is only absence of evidence. The
+  // incident this probe exists for — 2026-08-12, `.next` wiped by an OOM-killed
+  // build — had every asset 500 while the box thrashed, which is exactly where
+  // one of the two sampled assets could also abort. Letting the abort win there
+  // would delay a correct verdict by ~10 minutes to avoid a restart that was
+  // never going to happen anyway (that incident escalated, it did not recover).
+  // Leaving `kind` unset hands the caller back its own 'asset-failure'.
+  if (outcomes.some((outcome) => outcome.status !== undefined && !outcome.ok)) {
+    return summary;
+  }
+
+  // Nothing answered badly, so any abort in the sample means the box was too
+  // slow rather than broken. Checked before `kinds[0]` so sample ORDER cannot
+  // change the verdict.
+  const kinds = outcomes.flatMap((outcome) => (outcome.kind ? [outcome.kind] : []));
+  return { ...summary, kind: kinds.includes('timeout') ? 'timeout' : kinds[0] };
 }

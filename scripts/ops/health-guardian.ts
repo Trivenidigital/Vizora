@@ -22,7 +22,30 @@
  * jlist` findings are not gated by it — PM2's own view of a crashed or bloated
  * process is local authoritative evidence with no edge component.
  *
+ * The consecutive-timeout streak lives in its OWN single-writer file, not in
+ * ops-state.json — see `lib/timeout-streaks.ts`. Putting it in the shared file
+ * made a hung service unrecoverable whenever that file could not be read.
+ * `Incident.consecutiveTimeouts` is still written as the operator-visible copy.
+ *
+ * A probe TIMEOUT is not a crash. A listening-but-slow process and a dead one
+ * are identical at the socket, but only one is fixed by a restart — and
+ * restarting the other spends the CPU it is already short of. So a timeout must
+ * persist `GUARDIAN_TIMEOUT_RESTART_THRESHOLD` consecutive cycles (default 3)
+ * before it reaches pm2; every other failure kind, including anything the
+ * classifier does not recognise, still restarts on the first observation. The
+ * incident is raised immediately at `warning`. See `lib/probe-failure.ts`.
+ *
+ * That gate covers the ENDPOINT PROBE ONLY. The `pm2 jlist` paths above remain
+ * deliberately ungated, so the guardian can still bounce a process while the
+ * box is starved — via an errored/stopped verdict, or via the >85% memory
+ * reload. "The guardian never restarts during starvation" is NOT an invariant
+ * of this file; "the endpoint probe never does" is.
+ *
  * Escalation: After 2 failed restart attempts, incident is marked 'escalated'.
+ * That state is terminal until the service answers again, which is why the
+ * escalated check runs BEFORE the timeout gate — an escalated incident must not
+ * be walked back to 'open', nor have its message rewritten with softer text,
+ * just because its failure mode shifted to a timeout.
  *
  * Exit codes:
  *   0 — all services healthy
@@ -47,10 +70,18 @@ import {
   recordAgentRun,
   addRemediation,
   makeIncidentId,
+  getOpsStateDir,
 } from './lib/state.js';
+import { readTimeoutStreaks, writeTimeoutStreaks } from './lib/timeout-streaks.js';
 import { log, pingHeartbeat, sendInlineAlert } from './lib/alerting.js';
 import { readEcosystemMemoryPolicy } from './lib/ecosystem.js';
 import { isLoopback, splitProbeTargets, type ProbeService } from './lib/probe-targets.js';
+import {
+  classifyFetchError,
+  decideRestart,
+  resolveRestartThreshold,
+  type ProbeFailureKind,
+} from './lib/probe-failure.js';
 import { probeWebAssets, type ProbeFetch } from './lib/web-assets.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -59,6 +90,25 @@ const AGENT = 'health-guardian';
 const MAX_RESTART_ATTEMPTS = 2;
 const RESTART_COOLDOWN_MS = 30_000;
 const HEALTH_CHECK_TIMEOUT_MS = 10_000;
+
+/**
+ * Consecutive probe timeouts required before a timeout earns a `pm2 restart`.
+ *
+ * Overridable so an operator has a lever during a live incident without a
+ * deploy. It cuts both ways, and both are legitimate:
+ *
+ *   =1  restores restart-on-first-timeout. Use when a service is genuinely hung
+ *       and is NOT being auto-recovered — for instance because the streak keeps
+ *       resetting on an unreadable ops-state.json.
+ *   >3  during a known capacity incident, when even the current threshold is
+ *       producing restarts that cannot help.
+ *
+ * Clamped to >= 1. Anything unparseable falls back to the default and says so,
+ * rather than silently disabling the gate in either direction.
+ */
+const { threshold: timeoutRestartThreshold, warning: thresholdWarning } =
+  resolveRestartThreshold(process.env.GUARDIAN_TIMEOUT_RESTART_THRESHOLD);
+if (thresholdWarning) log(AGENT, thresholdWarning);
 
 /**
  * Customer APK install surface (https://vizora.cloud/tv + /downloads/).
@@ -190,7 +240,21 @@ function getServiceDefs(): ResolvedTargets {
  * Check if a service health endpoint responds with 2xx/3xx.
  * Returns true if healthy, false if unreachable or error response.
  */
-async function checkEndpoint(url: string): Promise<{ ok: boolean; status?: number; error?: string }> {
+interface ProbeResult {
+  ok: boolean;
+  status?: number;
+  error?: string;
+  /** Why it failed, when it failed. Absent on success. */
+  kind?: ProbeFailureKind;
+}
+
+/**
+ * The `kind` is classified HERE rather than re-derived from `error` downstream:
+ * the exception object carries the abort flag and the libuv code, and both are
+ * lost once it is flattened to a message string. Call sites that know more than
+ * the exception does (a non-2xx status, a broken-asset verdict) set their own.
+ */
+async function checkEndpoint(url: string): Promise<ProbeResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
   try {
@@ -201,10 +265,16 @@ async function checkEndpoint(url: string): Promise<{ ok: boolean; status?: numbe
     });
     clearTimeout(timer);
     const ok = res.status >= 200 && res.status < 400;
-    return { ok, status: res.status };
+    // `status` is kept on BOTH paths: the healthy log line and the post-restart
+    // recheck both read it.
+    return ok ? { ok, status: res.status } : { ok, status: res.status, kind: 'http-error' };
   } catch (err) {
     clearTimeout(timer);
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+      kind: classifyFetchError(err),
+    };
   }
 }
 
@@ -222,7 +292,9 @@ async function checkEndpoint(url: string): Promise<{ ok: boolean; status?: numbe
  * Decision logic lives in `lib/web-assets.ts` so it is testable without a
  * server; this only supplies the timeout-bounded fetch.
  */
-async function probeWebAssetHealth(baseUrl: string): Promise<{ ok: boolean; detail: string }> {
+async function probeWebAssetHealth(
+  baseUrl: string,
+): Promise<{ ok: boolean; detail: string; kind?: ProbeFailureKind }> {
   const boundedFetch: ProbeFetch = async (url: string) => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
@@ -510,6 +582,18 @@ async function main(): Promise<void> {
 
   // ─── 1. Service Endpoint Checks ──────────────────────────────────────────
 
+  // The timeout streak lives in its own single-writer file, NOT in
+  // ops-state.json — see lib/timeout-streaks.ts for why. Read once per run.
+  const streakSnapshot = readTimeoutStreaks(getOpsStateDir());
+  if (streakSnapshot.degraded) {
+    log(
+      AGENT,
+      `timeout streak unavailable (${streakSnapshot.reason}) — any timeout this cycle is ` +
+      `treated as restart-eligible rather than waiting on a streak that cannot accumulate`,
+    );
+  }
+  const nextStreaks: Record<string, number> = {};
+
   for (const svc of services) {
     const incidentId = makeIncidentId(AGENT, 'service-down', svc.name);
     const existingIncident = priorState.incidents.find(i => i.id === incidentId);
@@ -522,7 +606,18 @@ async function main(): Promise<void> {
       const assets = await probeWebAssetHealth(svc.assetBaseUrl);
       log(AGENT, `${svc.name}: asset probe — ${assets.detail}`);
       if (!assets.ok) {
-        result = { ok: false, status: result.status, error: `referenced assets unhealthy: ${assets.detail}` };
+        result = {
+          ok: false,
+          status: result.status,
+          error: `referenced assets unhealthy: ${assets.detail}`,
+          // NOT unconditionally 'asset-failure'. The asset probe runs its own
+          // 10s-bounded fetches, so it can abort on a slow box even though the
+          // shell answered 200 a moment earlier — and web makes up to 3 of them
+          // per cycle, so it is the service MOST exposed to starvation, not the
+          // least. It reports 'timeout' when it aborted; only a real non-2xx
+          // (which throws nothing) falls through to a broken-build verdict.
+          kind: assets.kind ?? 'asset-failure',
+        };
       }
     }
 
@@ -530,6 +625,8 @@ async function main(): Promise<void> {
 
     if (result.ok) {
       log(AGENT, `${svc.name}: healthy (status ${result.status})`);
+      // Answering breaks the streak. Omitted from nextStreaks, so it is dropped
+      // from the file rather than lingering until the age cutoff.
 
       // Resolve existing incident if service recovered, including incidents
       // that were previously escalated after exhausted restart attempts.
@@ -539,6 +636,8 @@ async function main(): Promise<void> {
           ...existingIncident,
           status: 'resolved',
           resolvedAt: new Date().toISOString(),
+          // The streak counts CONSECUTIVE timeouts; answering breaks it.
+          consecutiveTimeouts: 0,
         });
         issuesFixed++;
       }
@@ -576,11 +675,83 @@ async function main(): Promise<void> {
       continue;
     }
 
-    // Check if already escalated
+    // Checked BEFORE the starvation gate below: an incident that already
+    // escalated must not be walked back to 'open' just because its failure mode
+    // shifted to a timeout. Escalated is a terminal operator-facing state.
     if (existingIncident && existingIncident.status === 'escalated') {
       log(AGENT, `${svc.name}: already escalated — skipping restart`);
       incidents.push(existingIncident);
       issuesEscalated++;
+      continue;
+    }
+
+    // STARVATION_IS_NOT_A_CRASH: a listening-but-slow process and a dead one look
+    // identical at the socket, but only one of them is fixed by a restart — and
+    // restarting the other spends the CPU it is already short of. Persistence is
+    // the discriminator, so a timeout must repeat before it earns pm2. The
+    // incident is raised on the FIRST one regardless. See lib/probe-failure.ts.
+    //
+    // The streak comes from the single-writer sidecar, NOT from the incident, so
+    // it survives an unreadable/locked/trimmed ops-state.json — the three ways
+    // the shared file used to silently reset it and leave a hung service
+    // unrecoverable. `GUARDIAN_TIMEOUT_RESTART_THRESHOLD=1` remains the manual
+    // override.
+    const priorTimeouts = streakSnapshot.streaks[svc.name] ?? 0;
+    const consecutiveTimeouts = result.kind === 'timeout' ? priorTimeouts + 1 : 0;
+    if (consecutiveTimeouts > 0) nextStreaks[svc.name] = consecutiveTimeouts;
+
+    // FAIL TOWARD REMEDIATION, honoured at the call site and not just in the
+    // classifier: if the streak file existed but could not be read, the streak
+    // is UNKNOWN, and an unknown streak can never accumulate to the threshold.
+    // Waiting on it would reproduce the exact closed-failure the sidecar exists
+    // to remove. An ABSENT file is a legitimate first run and does not qualify.
+    const decision =
+      streakSnapshot.degraded && result.kind === 'timeout'
+        ? {
+            restart: true,
+            reason:
+              `timeout streak is unreadable, so persistence cannot be established — ` +
+              `treating this timeout as restart-eligible`,
+          }
+        : decideRestart(result.kind ?? 'unknown', consecutiveTimeouts, timeoutRestartThreshold);
+
+    if (!decision.restart) {
+      log(AGENT, `${svc.name}: NOT auto-restarting — ${decision.reason}`);
+      incidents.push({
+        id: incidentId,
+        agent: AGENT,
+        type: 'service-down',
+        // A FIRST slow answer is warning/DEGRADED: calling it CRITICAL spends
+        // the operator's attention on something that historically clears by
+        // itself within one cycle, and it becomes critical the moment the
+        // guardian actually acts on it.
+        //
+        // But NEVER downgrade. This is L1's walk-back on the severity axis, and
+        // the escalated guard does not cover it because the incident is 'open'.
+        // A crash-loop on a starved box produces exactly the wrong sequence —
+        // ECONNREFUSED while the process is down, then an abort while the new
+        // one boots under load — so an unconditional 'warning' would move the
+        // box CRITICAL → DEGRADED mid-outage and, because shouldSendAlert fires
+        // on any status change, actively tell the operator it had improved.
+        severity:
+          existingIncident &&
+          existingIncident.status !== 'resolved' &&
+          existingIncident.severity === 'critical'
+            ? 'critical'
+            : 'warning',
+        target: 'service',
+        targetId: svc.name,
+        detected: existingIncident?.detected ?? new Date().toISOString(),
+        message: `${svc.name} is unresponsive at ${svc.healthUrl} — ${decision.reason}`,
+        remediation:
+          `Check host resource pressure (CPU idle/steal, load average, swap, and any ` +
+          `co-tenant workload) before restarting ${svc.pm2Name}: a restart spends the ` +
+          `resource that is already exhausted. Auto-restart engages if this persists.`,
+        status: 'open',
+        attempts: existingIncident?.attempts ?? 0,
+        consecutiveTimeouts,
+        error: errorDetail,
+      });
       continue;
     }
 
@@ -602,6 +773,7 @@ async function main(): Promise<void> {
         remediation: `pm2 restart ${svc.pm2Name}`,
         status: 'escalated',
         attempts: previousAttempts,
+        consecutiveTimeouts,
         error: errorDetail,
       });
       issuesEscalated++;
@@ -610,7 +782,10 @@ async function main(): Promise<void> {
 
     // Attempt restart
     const attemptNum = previousAttempts + 1;
-    log(AGENT, `${svc.name}: attempting restart (attempt ${attemptNum}/${MAX_RESTART_ATTEMPTS})`);
+    log(
+      AGENT,
+      `${svc.name}: attempting restart (attempt ${attemptNum}/${MAX_RESTART_ATTEMPTS}) — ${decision.reason}`,
+    );
 
     const restartSuccess = pm2Restart(svc.pm2Name);
 
@@ -645,6 +820,7 @@ async function main(): Promise<void> {
           remediation: `pm2 restart ${svc.pm2Name}`,
           status: 'resolved',
           attempts: attemptNum,
+          consecutiveTimeouts: 0,
           resolvedAt: new Date().toISOString(),
         });
         issuesFixed++;
@@ -663,6 +839,7 @@ async function main(): Promise<void> {
           remediation: `pm2 restart ${svc.pm2Name}`,
           status: 'open',
           attempts: attemptNum,
+          consecutiveTimeouts,
           error: recheck.error || `HTTP ${recheck.status}`,
         });
       }
@@ -681,11 +858,25 @@ async function main(): Promise<void> {
         remediation: `pm2 restart ${svc.pm2Name}`,
         status: 'open',
         attempts: attemptNum,
+        consecutiveTimeouts,
         error: 'pm2 restart command failed',
       });
     }
 
     remediations.push(remediation);
+  }
+
+  // Persisted immediately after the probes, before the slower PM2 work: this is
+  // the one piece of state whose loss changes a future DECISION rather than just
+  // a report, so it should not ride on the rest of the run completing.
+  const streakWrite = writeTimeoutStreaks(getOpsStateDir(), nextStreaks);
+  if (!streakWrite.ok) {
+    log(
+      AGENT,
+      `could not persist the timeout streak (${streakWrite.error}) — a sustained hang may ` +
+      `not accumulate toward auto-restart until this clears; GUARDIAN_TIMEOUT_RESTART_THRESHOLD=1 ` +
+      `forces it`,
+    );
   }
 
   // ─── 2. PM2 Process Status Checks ────────────────────────────────────────
@@ -1044,7 +1235,38 @@ async function main(): Promise<void> {
 
   // Brief locked read→merge→write with no I/O in between. recordAgentRun
   // upserts our incidents by id, preserving other agents' concurrent updates.
-  const state = readOpsState();
+  //
+  // The read is guarded because it CAN throw — `readOpsState` gives up on the
+  // file lock after 5s, and seven cron agents contend for it, worst exactly
+  // when the box is starved. An unguarded throw escapes as a bare stack trace
+  // that reads like a guardian crash. It is not: it is a persist failure, and
+  // it has a specific consequence worth naming, because the consecutive-timeout
+  // streak lives in this file — while writes keep failing, a genuinely hung
+  // service cannot accumulate a streak and so is never auto-restarted. §12b.
+  let state: ReturnType<typeof readOpsState>;
+  try {
+    state = readOpsState();
+  } catch (err) {
+    log(
+      AGENT,
+      `STATE PERSIST FAILED (${err instanceof Error ? err.message : String(err)}) — this run's ` +
+      `findings were NOT recorded (found: ${issuesFound}, fixed: ${issuesFixed}, ` +
+      `escalated: ${issuesEscalated}) and no consecutive-timeout streak advanced. If a service ` +
+      `is hung and is not being restarted, set GUARDIAN_TIMEOUT_RESTART_THRESHOLD=1.`,
+    );
+    // Ping /fail rather than staying silent. A missed ping only alarms once the
+    // grace period lapses, and the next cycle's success resets it — so a
+    // one-off lock timeout, the most likely shape here, would produce NO
+    // external signal at all. It would also be asymmetric with its own sibling:
+    // if `writeOpsState` throws in the finally below, that escapes to
+    // main().catch, which does fail-ping. Same fault class, twenty lines apart.
+    // And it matches this file's stated doctrine that the fail ping separates
+    // "ran but issues remain" from "didn't run at all" — this is the former.
+    await pingHeartbeat(AGENT, process.env.HEALTHCHECKS_HEALTH_GUARDIAN_URL, 'fail');
+    process.exitCode = 2;
+    return;
+  }
+
   try {
     recordAgentRun(state, result);
 
@@ -1073,6 +1295,17 @@ async function main(): Promise<void> {
   // itself is gone. NOTE: this changes the install-surface check's dead-man
   // contribution (moot today — TV_DOWNLOAD_MONITOR_ENABLED is false and
   // HEALTHCHECKS_HEALTH_GUARDIAN_URL is empty on prod).
+  // The dead-man is SEVERITY-BLIND by design, and must stay that way. It
+  // reports unfixed findings on the three processes this box owns;
+  // `ops-reporter` reports how bad they are. Those are different questions, and
+  // the exclusion that already exists proves it: `offBoxFound` excludes by
+  // OWNERSHIP, not by importance.
+  //
+  // Do NOT exclude `warning` here to match the sub-threshold timeout severity.
+  // A service parked below the restart threshold — timing out every cycle
+  // forever, or alternating so the streak never reaches 3 — would compute
+  // `deadManFound = 0` and ping SUCCESS indefinitely while it is half
+  // unavailable. That is strictly worse than the noise it would remove.
   const deadManFound = issuesFound - offBoxFound;
   const deadManFixed = issuesFixed - offBoxFixed;
   const deadManOk = !(deadManFound > 0 && deadManFixed < deadManFound);

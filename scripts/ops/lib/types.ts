@@ -38,6 +38,15 @@ export interface Incident {
   status: IncidentStatus;
   /** Number of remediation attempts */
   attempts: number;
+  /**
+   * Consecutive probe TIMEOUTS observed for this target, across cycles.
+   *
+   * Distinguishes a resource-starved but listening process (clears within a
+   * cycle) from a genuine hang (persists), so the guardian does not answer
+   * CPU starvation with a restart. Reset to 0 by any non-timeout failure and
+   * by recovery. See `scripts/ops/lib/probe-failure.ts`.
+   */
+  consecutiveTimeouts?: number;
   /** ISO timestamp when resolved (if resolved) */
   resolvedAt?: string;
   /** Error message from last failed remediation attempt */

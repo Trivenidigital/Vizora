@@ -71,6 +71,7 @@ Thumbs.db
 .tmp-health-guardian-*/
 .tmp-tv-surface-*/
 .tmp-edge-vs-local-*/
+.tmp-guardian-starvation-*/
 .cache/
 .turbo/
 .swc/
