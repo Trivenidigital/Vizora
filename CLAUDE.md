@@ -565,6 +565,24 @@ Swagger publicly at `/api/v1/docs`. **`curl https://vizora.cloud/api/v1/docs`
 returning 200 instead of 404 is the cheapest tell that a restart selected the
 wrong environment** — check it after every reload.
 
+### The verification rule these two lessons share
+
+Twice in one session a green signal turned out to be evidence of nothing:
+
+- `npx tsc --noEmit` in `middleware/` exits 0 while type-checking **zero files** (see
+  "Known Test State" → TypeScript). A command exiting 0 is not evidence until you have
+  established that it exercised the intended code.
+- `GET /api/v1/health/ready` returning **200** is not readiness. It answers 200 while
+  reporting `status=degraded`, and it reports `degraded` for the first seconds after a
+  reload — so a verification run started too early reads a healthy deploy as a regression.
+
+Same rule, two shapes: **a signal is only evidence once you have established what it
+actually measured.** Before trusting a check — especially one about to gate a rollback,
+a merge, or a claim in a report — ask what it would look like if it were measuring
+nothing, and confirm you are not looking at that. Where it is cheap, make the check
+prove its own reach (`--listFiles`, a required consecutive-success count, a control
+input that MUST fail).
+
 ### Wait for readiness to STABILIZE before running deploy-verify
 
 **Never run `scripts/deploy-verify.sh` immediately after a reload.** Run the gate first:
