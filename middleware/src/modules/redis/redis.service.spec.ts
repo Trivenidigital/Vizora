@@ -30,6 +30,69 @@ describe('RedisService', () => {
     await service.onModuleDestroy();
   });
 
+  describe("the 'end' event — shutdown must not look like a failure", () => {
+    /**
+     * Regression for 2026-08-23. The handler logged
+     * `Redis connection ended (max retries exceeded or disconnected)` at ERROR on
+     * EVERY graceful shutdown. Retry exhaustion is impossible here (retryStrategy
+     * always returns a number), so the message asserted a Redis failure that had
+     * not happened, and it cost a full investigation before being traced back to
+     * ordinary process termination.
+     *
+     * Both directions matter: an expected shutdown must be quiet, and a genuine
+     * unexpected end must STAY at error level.
+     */
+    function captureEndHandler(svc: RedisService): () => void {
+      const Redis = jest.requireMock('ioredis') as jest.Mock;
+      const instance = Redis.mock.results[Redis.mock.results.length - 1]?.value;
+      const on = instance.on as jest.Mock;
+      const entry = on.mock.calls.find((c: unknown[]) => c[0] === 'end');
+      expect(entry).toBeDefined(); // non-vacuous: the handler must have been registered
+      return entry![1] as () => void;
+    }
+
+    it('logs an expected shutdown at log level, not error', async () => {
+      await service.onModuleInit();
+      const endHandler = captureEndHandler(service);
+
+      const errorSpy = jest.spyOn(service['logger'], 'error').mockImplementation();
+      const logSpy = jest.spyOn(service['logger'], 'log').mockImplementation();
+
+      // Shutting down sets the flag, then quit() triggers 'end'.
+      await service.onModuleDestroy();
+      endHandler();
+
+      const errors = errorSpy.mock.calls.map((c) => String(c[0])).join(' | ');
+      expect(errors).not.toMatch(/connection ended/i);
+      expect(errors).not.toMatch(/max retries/i);
+      expect(logSpy.mock.calls.map((c) => String(c[0])).join(' | ')).toMatch(
+        /closed during shutdown/i,
+      );
+    });
+
+    it('still logs an UNEXPECTED end at error level', async () => {
+      await service.onModuleInit();
+      const endHandler = captureEndHandler(service);
+
+      const errorSpy = jest.spyOn(service['logger'], 'error').mockImplementation();
+
+      // No disconnect() first — the connection died on its own.
+      endHandler();
+
+      const errors = errorSpy.mock.calls.map((c) => String(c[0])).join(' | ');
+      expect(errors).toMatch(/ended unexpectedly/i);
+      // And it must not resurrect the false claim.
+      expect(errors).not.toMatch(/max retries/i);
+    });
+
+    it('marks the client disconnected either way', async () => {
+      await service.onModuleInit();
+      const endHandler = captureEndHandler(service);
+      endHandler();
+      expect(service['isConnected']).toBe(false);
+    });
+  });
+
   describe('getOrThrow — failure must be distinguishable from absence', () => {
     // get() deliberately swallows everything and answers null, which is correct for a
     // cache. It is wrong wherever absence is a security verdict: the device auth-check
