@@ -454,8 +454,12 @@ TV_DOWNLOAD_MONITOR_ENABLED  # 'true' makes health-guardian probe /tv + /downloa
                         # in the SAME change that publishes the first APK, never before.
 TV_APK_URL, TV_PAGE_URL # Optional overrides for the two probed URLs (default the vizora.cloud ones)
 GUARDIAN_TIMEOUT_RESTART_THRESHOLD  # Consecutive probe TIMEOUTS before health-guardian answers
-                        # one with `pm2 restart`. Default 3 (~10 min at */5); clamped >= 1, a
-                        # bad value is ignored + logged. A listening-but-slow process and a dead
+                        # one with `pm2 restart`. Default 3 (~10 min at */5). Matched STRICTLY
+                        # as /^[0-9]+$/ — `parseInt` truncates rather than rejecting, so '1e9'
+                        # would silently become 1 and hand an operator reaching for "never
+                        # auto-restart" the exact opposite. Non-integer or <1 is ignored +
+                        # logged; above 12 (~1h) is honoured but logged as effectively disabling
+                        # the auto-restart. A listening-but-slow process and a dead
                         # one are identical at the socket, but only one is fixed by a restart —
                         # and restarting the other spends the CPU it is already short of. In the
                         # 2026-08-19..23 prod window ALL 6 UNHEALTHY verdicts were timeouts and 0
@@ -639,7 +643,7 @@ Available at `http://localhost:3000/api/v1/docs` in development mode only.
 - **Middleware**: **3760 / 3760 tests pass** across **179 / 179 suites**, 1 snapshot, 0 fail (re-measured 2026-08-22 on `d2dbaf1e`).
 - **Realtime**: **554 / 554 tests pass** across **19 / 19 suites** (re-measured 2026-08-22 on `d2dbaf1e`). The historical Prisma-generate-in-test-env issue NO LONGER REPRODUCES.
 - **Web**: **1167 / 1167 tests pass** across **113 / 113 suites**, 0 skipped (verified 2026-08-03).
-- **Ops scripts**: **600 / 600 tests pass** via `pnpm test:ops` (node:test + tsx) — verified 2026-08-23.
+- **Ops scripts**: **610 / 610 tests pass** via `pnpm test:ops` (node:test + tsx) — verified 2026-08-23.
   Note `pnpm test:ops` runs under tsx, which strips types without checking them, and CI's
   `typecheck` job covers only `display` while `lint` covers only `middleware/src` + `realtime/src`.
   `scripts/` **is** now type-checked in CI by TWO configs, both in the `test` job:

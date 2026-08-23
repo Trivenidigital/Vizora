@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  TIMEOUT_RESTART_CEILING,
   TIMEOUT_RESTART_THRESHOLD,
   classifyFetchError,
   decideRestart,
+  resolveRestartThreshold,
   type ProbeFailureKind,
 } from './probe-failure.js';
 
@@ -111,4 +113,64 @@ test('the default threshold is more than one — a single timeout can never rest
   // sets the threshold to 1 and silently restores the old behaviour.
   assert.ok(TIMEOUT_RESTART_THRESHOLD > 1);
   assert.equal(decideRestart('timeout', 1).restart, false);
+});
+
+// ─── resolveRestartThreshold ────────────────────────────────────────────────
+
+test('an absent or blank override uses the default', () => {
+  for (const raw of [undefined, '', '   ']) {
+    const r = resolveRestartThreshold(raw);
+    assert.equal(r.threshold, TIMEOUT_RESTART_THRESHOLD);
+    assert.equal(r.warning, undefined);
+  }
+});
+
+test('a plain integer is honoured, with surrounding whitespace', () => {
+  assert.equal(resolveRestartThreshold('1').threshold, 1);
+  assert.equal(resolveRestartThreshold('  4 ').threshold, 4);
+  assert.equal(resolveRestartThreshold('4').warning, undefined);
+});
+
+test('values that parseInt would TRUNCATE are rejected, not truncated', () => {
+  // The whole reason this is matched rather than parsed. Each of these used to
+  // be silently accepted as a different number than the operator wrote.
+  for (const raw of ['3x', '2.9', '1e9', '0x10', '+3', ' 3 4', '3,000']) {
+    const r = resolveRestartThreshold(raw);
+    assert.equal(r.threshold, TIMEOUT_RESTART_THRESHOLD, `${raw} must not be honoured`);
+    assert.match(r.warning ?? '', /not a plain integer/, `${raw} must warn`);
+  }
+});
+
+test("'1e9' does not silently become 1 — the intent-inverting case", () => {
+  // An operator reaching for "effectively never auto-restart" must not get
+  // "restart on the very first timeout" instead.
+  const r = resolveRestartThreshold('1e9');
+  assert.notEqual(r.threshold, 1);
+  assert.equal(r.threshold, TIMEOUT_RESTART_THRESHOLD);
+});
+
+test('zero and negatives are refused — the gate cannot be disabled by 0', () => {
+  for (const raw of ['0', '00', '-1']) {
+    const r = resolveRestartThreshold(raw);
+    assert.equal(r.threshold, TIMEOUT_RESTART_THRESHOLD);
+    assert.ok(r.warning, `${raw} must warn`);
+  }
+});
+
+test('a threshold above the ceiling is honoured but says so out loud', () => {
+  const r = resolveRestartThreshold(String(TIMEOUT_RESTART_CEILING + 1));
+  assert.equal(r.threshold, TIMEOUT_RESTART_CEILING + 1);
+  assert.match(r.warning ?? '', /effectively\s+DISABLED/);
+});
+
+test('a threshold at the ceiling is honoured silently', () => {
+  const r = resolveRestartThreshold(String(TIMEOUT_RESTART_CEILING));
+  assert.equal(r.threshold, TIMEOUT_RESTART_CEILING);
+  assert.equal(r.warning, undefined);
+});
+
+test('an absurd integer cannot overflow into an unsafe value', () => {
+  const r = resolveRestartThreshold('9'.repeat(30));
+  assert.equal(r.threshold, TIMEOUT_RESTART_THRESHOLD);
+  assert.match(r.warning ?? '', /not an integer >= 1/);
 });

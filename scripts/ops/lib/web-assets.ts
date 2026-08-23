@@ -203,10 +203,21 @@ export async function probeWebAssets(
   const summary = summarizeAssetProbe(outcomes);
   if (summary.ok) return summary;
 
-  // A timeout anywhere in the sample dominates: one aborted asset fetch means
-  // the box was too slow to answer, which no restart repairs. A non-2xx status
-  // throws no exception and leaves `kind` unset, so the caller keeps its own
-  // 'asset-failure' verdict for a genuinely broken build.
+  // A DEFINITE bad status outranks a maybe-slow box. A non-2xx is positive
+  // evidence of a specific fault; an abort is only absence of evidence. The
+  // incident this probe exists for — 2026-08-12, `.next` wiped by an OOM-killed
+  // build — had every asset 500 while the box thrashed, which is exactly where
+  // one of the two sampled assets could also abort. Letting the abort win there
+  // would delay a correct verdict by ~10 minutes to avoid a restart that was
+  // never going to happen anyway (that incident escalated, it did not recover).
+  // Leaving `kind` unset hands the caller back its own 'asset-failure'.
+  if (outcomes.some((outcome) => outcome.status !== undefined && !outcome.ok)) {
+    return summary;
+  }
+
+  // Nothing answered badly, so any abort in the sample means the box was too
+  // slow rather than broken. Checked before `kinds[0]` so sample ORDER cannot
+  // change the verdict.
   const kinds = outcomes.flatMap((outcome) => (outcome.kind ? [outcome.kind] : []));
   return { ...summary, kind: kinds.includes('timeout') ? 'timeout' : kinds[0] };
 }

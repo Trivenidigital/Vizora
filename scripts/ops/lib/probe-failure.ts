@@ -172,3 +172,66 @@ export function decideRestart(
       `waiting for it to persist before treating it as a hang`,
   };
 }
+
+export interface ThresholdResolution {
+  /** The threshold to use. Always a safe integer >= 1. */
+  threshold: number;
+  /** Operator-facing line to log, when the raw value was not honoured as given. */
+  warning?: string;
+}
+
+/**
+ * Above this, timeout auto-restart is effectively off (~1h at the 5-minute cadence).
+ * Honoured, but said out loud.
+ */
+export const TIMEOUT_RESTART_CEILING = 12;
+
+/**
+ * Resolve GUARDIAN_TIMEOUT_RESTART_THRESHOLD.
+ *
+ * Matched STRICTLY rather than parsed. `Number.parseInt` truncates instead of
+ * rejecting, so '3x' becomes 3 and '2.9' becomes 2 despite the documented
+ * contract — and '1e9' becomes 1, which hands an operator reaching for
+ * "effectively never auto-restart during this incident" the exact opposite:
+ * restart on the very first timeout, silently. Same posture as this repo's
+ * API_KEY_ENTITLEMENT_GATE_ENABLED: only a well-formed value counts, anything
+ * else is ignored and warned about.
+ *
+ * Pure so every rejection case is cheap to pin, including the ones that
+ * previously passed `parseInt` and should not have.
+ */
+export function resolveRestartThreshold(raw: string | undefined): ThresholdResolution {
+  if (raw === undefined || raw.trim() === '') return { threshold: TIMEOUT_RESTART_THRESHOLD };
+
+  const trimmed = raw.trim();
+  if (!/^[0-9]+$/.test(trimmed)) {
+    return {
+      threshold: TIMEOUT_RESTART_THRESHOLD,
+      warning:
+        `GUARDIAN_TIMEOUT_RESTART_THRESHOLD='${raw}' is not a plain integer — ` +
+        `ignoring it and using the default of ${TIMEOUT_RESTART_THRESHOLD}`,
+    };
+  }
+
+  const parsed = Number.parseInt(trimmed, 10);
+  if (!Number.isSafeInteger(parsed) || parsed < 1) {
+    return {
+      threshold: TIMEOUT_RESTART_THRESHOLD,
+      warning:
+        `GUARDIAN_TIMEOUT_RESTART_THRESHOLD='${raw}' is not an integer >= 1 — ` +
+        `ignoring it and using the default of ${TIMEOUT_RESTART_THRESHOLD}`,
+    };
+  }
+
+  if (parsed > TIMEOUT_RESTART_CEILING) {
+    return {
+      threshold: parsed,
+      warning:
+        `GUARDIAN_TIMEOUT_RESTART_THRESHOLD=${parsed} is above ${TIMEOUT_RESTART_CEILING} ` +
+        `(~1h at the every-5-minutes cadence) — timeout auto-restart is effectively ` +
+        `DISABLED. Honouring it, but saying so out loud.`,
+    };
+  }
+
+  return { threshold: parsed };
+}

@@ -449,3 +449,68 @@ test('an unparseable GUARDIAN_TIMEOUT_RESTART_THRESHOLD is ignored, not obeyed',
     rmSync(tmpRoot, { recursive: true, force: true });
   }
 });
+
+test('a definite bad status outranks an abort in the same asset sample', async () => {
+  // Positive evidence of a fault beats absence of evidence. Order-independent.
+  {
+    const html = '<html><head>'
+      + '<script src="/_next/static/chunks/a.js"></script>'
+      + '<script src="/_next/static/chunks/b.js"></script>'
+      + '</head></html>';
+    const build = (abortFirst: boolean): ProbeFetch => async (url: string) => {
+      if (url.endsWith('a.js')) {
+        if (abortFirst) {
+          const err = new Error('This operation was aborted');
+          err.name = 'AbortError';
+          throw err;
+        }
+        return { ok: false, status: 500, text: async () => '' };
+      }
+      if (url.endsWith('b.js')) {
+        if (abortFirst) return { ok: false, status: 500, text: async () => '' };
+        const err = new Error('This operation was aborted');
+        err.name = 'AbortError';
+        throw err;
+      }
+      return { ok: true, status: 200, text: async () => html };
+    };
+
+    for (const abortFirst of [true, false]) {
+      const outcome = await probeWebAssets('http://127.0.0.1:1', build(abortFirst));
+      assert.equal(outcome.ok, false);
+      assert.equal(
+        outcome.kind,
+        undefined,
+        `abortFirst=${abortFirst}: a 500 in the sample must win, so the caller restarts`,
+      );
+    }
+  }
+});
+
+test('an existing CRITICAL incident is never downgraded by a sub-threshold timeout', async () => {
+  const tmpRoot = mkdtempSync(join(repoRoot, '.tmp-guardian-starvation-'));
+  const { baseUrl, close } = await startServer(hangsMiddlewareProbe);
+  const recordPath = join(tmpRoot, 'pm2-invocations.log');
+
+  try {
+    prepareTmpRoot(tmpRoot);
+    writeRecordingPm2(join(tmpRoot, 'bin'), recordPath);
+    // The crash-loop shape: down and refused (critical, one failed restart),
+    // then the next observation aborts while the new process boots under load.
+    seedState(tmpRoot, [
+      timeoutIncident({ severity: 'critical', status: 'open', attempts: 1 }),
+    ]);
+
+    const result = await runHealthGuardian(tmpRoot, baseUrl, 90_000);
+
+    const incident = readIncident(tmpRoot, MIDDLEWARE_INCIDENT);
+    assert.equal(
+      incident?.severity,
+      'critical',
+      `a change of failure mode must not tell the operator an ongoing outage improved\n${result.stdout}`,
+    );
+  } finally {
+    close();
+    rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});

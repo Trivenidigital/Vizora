@@ -70,9 +70,9 @@ import { log, pingHeartbeat, sendInlineAlert } from './lib/alerting.js';
 import { readEcosystemMemoryPolicy } from './lib/ecosystem.js';
 import { isLoopback, splitProbeTargets, type ProbeService } from './lib/probe-targets.js';
 import {
-  TIMEOUT_RESTART_THRESHOLD,
   classifyFetchError,
   decideRestart,
+  resolveRestartThreshold,
   type ProbeFailureKind,
 } from './lib/probe-failure.js';
 import { probeWebAssets, type ProbeFetch } from './lib/web-assets.js';
@@ -99,23 +99,9 @@ const HEALTH_CHECK_TIMEOUT_MS = 10_000;
  * Clamped to >= 1. Anything unparseable falls back to the default and says so,
  * rather than silently disabling the gate in either direction.
  */
-function resolveTimeoutRestartThreshold(): number {
-  const raw = process.env.GUARDIAN_TIMEOUT_RESTART_THRESHOLD;
-  if (raw === undefined || raw.trim() === '') return TIMEOUT_RESTART_THRESHOLD;
-
-  const parsed = Number.parseInt(raw.trim(), 10);
-  if (!Number.isInteger(parsed) || parsed < 1) {
-    log(
-      AGENT,
-      `GUARDIAN_TIMEOUT_RESTART_THRESHOLD='${raw}' is not an integer >= 1 — ` +
-      `ignoring it and using the default of ${TIMEOUT_RESTART_THRESHOLD}`,
-    );
-    return TIMEOUT_RESTART_THRESHOLD;
-  }
-  return parsed;
-}
-
-const timeoutRestartThreshold = resolveTimeoutRestartThreshold();
+const { threshold: timeoutRestartThreshold, warning: thresholdWarning } =
+  resolveRestartThreshold(process.env.GUARDIAN_TIMEOUT_RESTART_THRESHOLD);
+if (thresholdWarning) log(AGENT, thresholdWarning);
 
 /**
  * Customer APK install surface (https://vizora.cloud/tv + /downloads/).
@@ -702,11 +688,24 @@ async function main(): Promise<void> {
         id: incidentId,
         agent: AGENT,
         type: 'service-down',
-        // WARNING, not critical, until it persists: one slow answer is a
-        // DEGRADED box, and calling it CRITICAL spends the operator's attention
-        // on something that historically clears by itself within one cycle. It
-        // becomes critical the moment the guardian actually acts on it.
-        severity: 'warning',
+        // A FIRST slow answer is warning/DEGRADED: calling it CRITICAL spends
+        // the operator's attention on something that historically clears by
+        // itself within one cycle, and it becomes critical the moment the
+        // guardian actually acts on it.
+        //
+        // But NEVER downgrade. This is L1's walk-back on the severity axis, and
+        // the escalated guard does not cover it because the incident is 'open'.
+        // A crash-loop on a starved box produces exactly the wrong sequence —
+        // ECONNREFUSED while the process is down, then an abort while the new
+        // one boots under load — so an unconditional 'warning' would move the
+        // box CRITICAL → DEGRADED mid-outage and, because shouldSendAlert fires
+        // on any status change, actively tell the operator it had improved.
+        severity:
+          existingIncident &&
+          existingIncident.status !== 'resolved' &&
+          existingIncident.severity === 'critical'
+            ? 'critical'
+            : 'warning',
         target: 'service',
         targetId: svc.name,
         detected: existingIncident?.detected ?? new Date().toISOString(),
@@ -1209,8 +1208,15 @@ async function main(): Promise<void> {
       `escalated: ${issuesEscalated}) and no consecutive-timeout streak advanced. If a service ` +
       `is hung and is not being restarted, set GUARDIAN_TIMEOUT_RESTART_THRESHOLD=1.`,
     );
-    // Exit 2 and send NO dead-man ping: the agent did not complete its job, and
-    // a missed ping is exactly what the external dead-man exists to catch.
+    // Ping /fail rather than staying silent. A missed ping only alarms once the
+    // grace period lapses, and the next cycle's success resets it — so a
+    // one-off lock timeout, the most likely shape here, would produce NO
+    // external signal at all. It would also be asymmetric with its own sibling:
+    // if `writeOpsState` throws in the finally below, that escapes to
+    // main().catch, which does fail-ping. Same fault class, twenty lines apart.
+    // And it matches this file's stated doctrine that the fail ping separates
+    // "ran but issues remain" from "didn't run at all" — this is the former.
+    await pingHeartbeat(AGENT, process.env.HEALTHCHECKS_HEALTH_GUARDIAN_URL, 'fail');
     process.exitCode = 2;
     return;
   }
