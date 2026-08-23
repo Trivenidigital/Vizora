@@ -10,6 +10,19 @@ export class ApiError extends Error {
     public statusCode: number,
     message: string,
     public userMessage: string = message,
+    /**
+     * Machine-readable discriminator from the error body, for endpoints that
+     * publish one (the backend convention is a SCREAMING_SNAKE `code`, e.g.
+     * `DEVICE_IDENTIFIER_IN_USE`). Callers that need to tell two failures of
+     * the same status apart should switch on this, never on `message`.
+     */
+    public code?: string,
+    /**
+     * The parsed error body. This is DATA, not copy — it may contain
+     * arbitrary backend text. Read named, validated fields out of it; never
+     * render a value from here directly.
+     */
+    public details?: Record<string, unknown>,
   ) {
     super(message);
     this.name = 'ApiError';

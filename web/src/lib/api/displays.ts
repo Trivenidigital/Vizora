@@ -3,6 +3,70 @@
 import type { Display, DisplayOrientation, PaginatedResponse, DisplayGroup, QrOverlayConfig } from '../types';
 import { ApiClient } from './client';
 
+/**
+ * REPAIR — what `POST /devices/pairing/complete` answers on the rebind path.
+ *
+ * Deliberately narrow, and it matches the server exactly: the replacement
+ * device credential is NOT in this response. The server parks it in the
+ * pairing record for whoever polls `GET /devices/pairing/status/:code` — i.e.
+ * the screen showing the code. Typing the response this way keeps it
+ * structurally impossible for the dashboard to render a credential it was
+ * never given.
+ */
+export interface RepairPairingResponse {
+  success: boolean;
+  display: {
+    id: string;
+    nickname: string | null;
+    deviceIdentifier: string;
+    status: string;
+  };
+}
+
+/**
+ * REPAIR — the conflict contract published by
+ * `middleware/src/modules/displays/pairing-error-codes.ts`. Mirrored here
+ * rather than imported: `web` does not depend on `middleware`.
+ *
+ * The UI selects its copy from `statusCode` + this code. It must never select
+ * copy from, or render, the server's message text — a 4xx body is curated
+ * today but nothing structurally guarantees that, and a 5xx body is not
+ * curated at all.
+ */
+export const REPAIR_PAIRING_ERROR_CODES = [
+  'ORG_PAIRING_IN_PROGRESS',
+  'DISPLAY_REBIND_IN_PROGRESS',
+  'DEVICE_IDENTIFIER_IN_USE',
+  'DEVICE_IDENTIFIER_TAKEN_DURING_REBIND',
+] as const;
+
+export type RepairPairingErrorCode =
+  (typeof REPAIR_PAIRING_ERROR_CODES)[number];
+
+/** Narrow an error's `code` to the published contract, or undefined. */
+export function readRepairPairingErrorCode(
+  code: unknown,
+): RepairPairingErrorCode | undefined {
+  return REPAIR_PAIRING_ERROR_CODES.find((known) => known === code);
+}
+
+/**
+ * Pull `conflictingDisplayId` out of a structured error body.
+ *
+ * Validated, not merely type-checked: the value becomes both link text and a
+ * URL path segment, so anything that is not an id shape is dropped rather
+ * than rendered. Absent or malformed → undefined, and the caller falls back
+ * to the variant with no link.
+ */
+export function readConflictingDisplayId(
+  details: Record<string, unknown> | undefined,
+): string | undefined {
+  const value = details?.conflictingDisplayId;
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value)
+    ? value
+    : undefined;
+}
+
 declare module './client' {
   interface ApiClient {
     getDisplays(params?: { page?: number; limit?: number }): Promise<PaginatedResponse<Display>>;
@@ -11,6 +75,7 @@ declare module './client' {
     updateDisplay(id: string, data: Partial<{ nickname: string; location?: string; currentPlaylistId?: string | null; orientation?: DisplayOrientation }>): Promise<Display>;
     deleteDisplay(id: string): Promise<void>;
     completePairing(data: { code: string; nickname: string; location?: string }): Promise<Display>;
+    repairDisplayPairing(displayId: string, code: string): Promise<RepairPairingResponse>;
     pushContentToDisplay(displayId: string, contentId: string, duration?: number): Promise<{ success: boolean; message: string }>;
     requestDeviceScreenshot(displayId: string): Promise<{ requestId: string; status: string }>;
     getDeviceScreenshot(displayId: string): Promise<{ url: string; capturedAt: string; width?: number; height?: number } | null>;
@@ -80,6 +145,27 @@ ApiClient.prototype.completePairing = async function (data: { code: string; nick
   return this.request<Display>('/devices/pairing/complete', {
     method: 'POST',
     body: JSON.stringify({ code, nickname, ...(location && { location }) }),
+  });
+};
+
+/**
+ * REPAIR — rebind a live pairing session onto an EXISTING display row instead
+ * of creating a new one. Same endpoint as `completePairing`; `targetDisplayId`
+ * is what selects the rebind path server-side.
+ *
+ * `nickname` and `location` are deliberately NOT sent. On the rebind path the
+ * server preserves whatever the operator already named the screen unless a
+ * replacement is supplied, and this flow has no reason to rename anything.
+ * `provisioningTemplateId` is rejected outright alongside `targetDisplayId`,
+ * so it is not offered either.
+ */
+ApiClient.prototype.repairDisplayPairing = async function (
+  displayId: string,
+  code: string,
+): Promise<RepairPairingResponse> {
+  return this.request<RepairPairingResponse>('/devices/pairing/complete', {
+    method: 'POST',
+    body: JSON.stringify({ code, targetDisplayId: displayId }),
   });
 };
 

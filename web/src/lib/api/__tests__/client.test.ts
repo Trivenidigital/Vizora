@@ -67,6 +67,80 @@ describe('ApiClient auth error handling', () => {
   });
 });
 
+/**
+ * `AllExceptionsFilter` returns an object-form HttpException response as-is,
+ * so an endpoint that publishes a structured error contract reaches the client
+ * intact. Callers branch on that contract instead of parsing English, so it
+ * has to survive the trip through `buildApiError`.
+ */
+describe('ApiClient structured error contract', () => {
+  beforeEach(() => {
+    jest.restoreAllMocks();
+    Object.defineProperty(document, 'cookie', {
+      writable: true,
+      value: 'vizora_csrf_token=test-csrf',
+    });
+    global.fetch = jest.fn();
+  });
+
+  const rejectWith = (status: number, body: unknown) => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: false,
+      status,
+      statusText: 'Error',
+      json: async () => body,
+    });
+    return new ApiClient('/api/v1').request('/devices/pairing/complete', {
+      method: 'POST',
+    });
+  };
+
+  it('carries `code` and the structured body through to ApiError', async () => {
+    const error = await rejectWith(409, {
+      statusCode: 409,
+      code: 'DEVICE_IDENTIFIER_IN_USE',
+      conflictingDisplayId: 'display-ghost',
+      message: 'Display display-ghost already uses this device identifier.',
+    }).catch((e: unknown) => e as ApiError);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error.statusCode).toBe(409);
+    expect(error.code).toBe('DEVICE_IDENTIFIER_IN_USE');
+    expect(error.details).toMatchObject({
+      conflictingDisplayId: 'display-ghost',
+    });
+  });
+
+  it('leaves `code` undefined when the body publishes none', async () => {
+    const error = await rejectWith(409, {
+      statusCode: 409,
+      message: 'Some prose-only conflict',
+    }).catch((e: unknown) => e as ApiError);
+
+    expect(error.code).toBeUndefined();
+    expect(error.details).toMatchObject({ message: 'Some prose-only conflict' });
+  });
+
+  it('ignores a non-string `code` rather than trusting it', async () => {
+    const error = await rejectWith(409, {
+      statusCode: 409,
+      code: { nested: 'not-a-code' },
+      message: 'Conflict',
+    }).catch((e: unknown) => e as ApiError);
+
+    expect(error.code).toBeUndefined();
+  });
+
+  it('leaves `details` undefined for a non-object body', async () => {
+    const error = await rejectWith(500, 'plain string body').catch(
+      (e: unknown) => e as ApiError,
+    );
+
+    expect(error.details).toBeUndefined();
+    expect(error.code).toBeUndefined();
+  });
+});
+
 describe('ApiClient auto-refresh on 401 (PR-17b)', () => {
   const okEnvelope = (data: unknown) => ({
     ok: true,

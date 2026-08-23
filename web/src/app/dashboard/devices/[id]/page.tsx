@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { apiClient } from '@/lib/api';
@@ -8,6 +8,7 @@ import { Display } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import DeviceStatusIndicator from '@/components/DeviceStatusIndicator';
 import { DeviceControls } from '@/components/devices/DeviceControls';
+import { RepairDisplayPanel } from '@/components/devices/RepairDisplayPanel';
 import { Icon } from '@/theme/icons';
 
 // Extended display type for fields the backend returns but the base type doesn't include
@@ -29,24 +30,36 @@ export default function DeviceDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!deviceId) return;
-
-    const loadDevice = async () => {
+  const loadDevice = useCallback(
+    async (options?: { silent?: boolean }) => {
+      const silent = options?.silent === true;
       try {
-        setLoading(true);
+        if (!silent) setLoading(true);
         setError(null);
         const data = await apiClient.getDisplay(deviceId);
         setDevice(data as DisplayDetail);
       } catch (err: unknown) {
+        // A silent re-read must not swap the whole page for the error view —
+        // it runs underneath a panel that is already reporting an outcome, so
+        // the failure is thrown back for that panel to report in context.
+        if (silent) throw err;
         setError(err instanceof Error ? err.message : 'Failed to load device');
       } finally {
-        setLoading(false);
+        if (!silent) setLoading(false);
       }
-    };
+    },
+    [deviceId],
+  );
 
-    loadDevice();
-  }, [deviceId]);
+  useEffect(() => {
+    if (!deviceId) return;
+    void loadDevice();
+  }, [deviceId, loadDevice]);
+
+  const refreshDevice = useCallback(
+    () => loadDevice({ silent: true }),
+    [loadDevice],
+  );
 
   if (loading) {
     return (
@@ -221,6 +234,13 @@ export default function DeviceDetailPage() {
 
       {/* Device Controls */}
       <DeviceControls deviceId={device.id} />
+
+      {/* Re-pair onto a different physical screen */}
+      <RepairDisplayPanel
+        displayId={device.id}
+        displayName={device.nickname}
+        onRepaired={refreshDevice}
+      />
 
       {/* Current Playlist */}
       {device.currentPlaylistId && (
