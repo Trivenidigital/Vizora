@@ -924,8 +924,13 @@ export class DisplaysService {
    * previously a success was logged but a missing INTERNAL_API_SECRET returned
    * before logging anything revocation-specific, which made a never-attempted
    * delivery indistinguishable from one that was never requested.
+   *
+   * Public because PairingService's repair/rebind path reuses it: replacing a
+   * display's stored credential must also terminate whatever socket the old
+   * credential still holds, and this is the ONE revocation channel. Do not add
+   * a second one.
    */
-  private async sendDeviceRevoked(displayId: string, reason: string): Promise<void> {
+  async sendDeviceRevoked(displayId: string, reason: string): Promise<void> {
     this.logger.log(`device_revoked_dispatched device=${displayId} reason=${reason}`);
 
     const headers = this.getInternalApiHeaders();
