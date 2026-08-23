@@ -958,12 +958,14 @@ export class PairingService implements OnModuleDestroy {
    * `POST /devices/pairing/request` is `@Public()` and authenticates nothing,
    * so the session originates from whoever asked for the code, which is not
    * provably the screen. Do NOT write "only the physical TV can obtain a
-   * credential" anywhere — the platform does not enforce it, and separately
-   * `POST /displays/:id/pair` (`@Roles('admin','manager')`) already replaces
-   * `jwtToken` on any display and returns the plaintext 90-day JWT straight to
-   * the caller with no device involved. That gap predates this path and is
-   * tracked separately; this docblock exists so nobody builds on an absolute
-   * the system does not have.
+   * credential" anywhere — the platform does not enforce it.
+   *
+   * What HAS changed since this was written: `POST /displays/:id/pair`, which
+   * returned a plaintext 90-day device JWT to any admin/manager with no TV
+   * involved, was removed 2026-08-23. So the remaining gap is narrower than it
+   * was — it is the unauthenticated pairing REQUEST, not a second minting
+   * endpoint. The invariant worth working toward is that credential issuance is
+   * bound to a live device-initiated session; do not claim it is already held.
    *
    * ATOMICITY: the rebind and its audit row are one transaction, so a DB
    * failure leaves the original display exactly as it was and creates no ghost

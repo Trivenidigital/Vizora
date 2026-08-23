@@ -36,10 +36,12 @@ export class CompletePairingDto {
    * That is routing, NOT a possession guarantee, and must not be written up as
    * one. `POST /devices/pairing/request` is `@Public()`, so the session
    * originates from whoever asked for the code rather than from a device that
-   * proved anything. The platform separately already lets an admin or manager
-   * mint a device credential with no TV involved (`POST /displays/:id/pair`
-   * returns the plaintext JWT to the caller). Rebinding neither creates nor
-   * closes that gap.
+   * proved anything.
+   *
+   * The other minting path this originally warned about — `POST /displays/:id/pair`,
+   * which handed a plaintext device JWT to an admin/manager with no TV involved —
+   * was removed 2026-08-23. What remains is the unauthenticated pairing request,
+   * so treat this as routing until issuance is bound to a device-proved session.
    *
    * Absent  → behaviour is byte-identical to the pre-repair pairing flow.
    * Present → `PairingService.completePairing` takes the rebind path: the target
