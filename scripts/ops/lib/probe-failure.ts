@@ -30,13 +30,24 @@
  * loop, deadlock) also presents as a timeout, and there a restart IS the remedy.
  * The discriminator is not the observation, it is PERSISTENCE — starvation clears
  * within a cycle, a hang does not. So a timeout still earns a restart, it just has
- * to survive `TIMEOUT_RESTART_THRESHOLD` consecutive cycles first. The incident is
- * raised on the FIRST timeout either way, so the operator loses no visibility; only
- * the automated pm2 action waits.
+ * to survive `TIMEOUT_RESTART_THRESHOLD` consecutive cycles first.
  *
- * FAIL TOWARD REMEDIATION: anything this module cannot classify is treated as
- * restart-eligible, so an unanticipated error shape degrades to the previous
- * behaviour rather than silently disabling auto-remediation.
+ * The operator does not lose visibility — they GAIN a notification, and that is
+ * not a rounding error. Previously a starvation blip was restarted and resolved
+ * inside a single run, so no incident outlived the cycle and no status change
+ * occurred. Now the incident stays open across the waiting cycles, which moves
+ * systemStatus and makes `ops-reporter` alert on the transition. It is filed at
+ * `warning` (DEGRADED) rather than `critical` precisely because of that: a box
+ * too slow to answer a health check in 10s IS worth telling someone about, but
+ * spending CRITICAL on something that historically clears by itself is how
+ * alerts get tuned out. What waits is the pm2 action, not the reporting.
+ *
+ * FAIL TOWARD REMEDIATION, with one honest limit: anything THIS MODULE cannot
+ * classify is restart-eligible, so an unanticipated error shape degrades to the
+ * previous behaviour. That safety does not extend to the stateful call site — a
+ * correctly-classified timeout whose streak is lost (see the KNOWN LIMIT at the
+ * gate in `health-guardian.ts`) degrades the other way, to never-remediate.
+ * `GUARDIAN_TIMEOUT_RESTART_THRESHOLD=1` is the lever for that case.
  */
 
 /** Why a probe failed, in terms of what remedy could possibly apply. */

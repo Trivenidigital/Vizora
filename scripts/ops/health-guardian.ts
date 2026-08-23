@@ -22,7 +22,25 @@
  * jlist` findings are not gated by it — PM2's own view of a crashed or bloated
  * process is local authoritative evidence with no edge component.
  *
+ * A probe TIMEOUT is not a crash. A listening-but-slow process and a dead one
+ * are identical at the socket, but only one is fixed by a restart — and
+ * restarting the other spends the CPU it is already short of. So a timeout must
+ * persist `GUARDIAN_TIMEOUT_RESTART_THRESHOLD` consecutive cycles (default 3)
+ * before it reaches pm2; every other failure kind, including anything the
+ * classifier does not recognise, still restarts on the first observation. The
+ * incident is raised immediately at `warning`. See `lib/probe-failure.ts`.
+ *
+ * That gate covers the ENDPOINT PROBE ONLY. The `pm2 jlist` paths above remain
+ * deliberately ungated, so the guardian can still bounce a process while the
+ * box is starved — via an errored/stopped verdict, or via the >85% memory
+ * reload. "The guardian never restarts during starvation" is NOT an invariant
+ * of this file; "the endpoint probe never does" is.
+ *
  * Escalation: After 2 failed restart attempts, incident is marked 'escalated'.
+ * That state is terminal until the service answers again, which is why the
+ * escalated check runs BEFORE the timeout gate — an escalated incident must not
+ * be walked back to 'open', nor have its message rewritten with softer text,
+ * just because its failure mode shifted to a timeout.
  *
  * Exit codes:
  *   0 — all services healthy
