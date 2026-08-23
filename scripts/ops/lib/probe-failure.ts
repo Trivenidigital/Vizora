@@ -55,9 +55,12 @@ export type ProbeFailureKind =
 /**
  * Consecutive timeout observations required before a timeout earns a restart.
  *
- * At the every-5-minutes cron cadence this is ~10 minutes of sustained unresponsiveness. Every
- * starvation event in the observed window recovered inside a single cycle; a real
- * hang persists indefinitely, so it still gets restarted, ~15 minutes later.
+ * At the every-5-minutes cron cadence that is ~10 minutes from the FIRST failed
+ * probe to the first restart (cycle 1 observes, cycle 3 acts), or up to ~15
+ * minutes from actual onset once you add detection latency. Every starvation
+ * event in the observed window recovered inside a single cycle; a real hang
+ * persists, so it is still restarted — just later. That delay is the price of
+ * the fix, and it is why `GUARDIAN_TIMEOUT_RESTART_THRESHOLD` exists.
  */
 export const TIMEOUT_RESTART_THRESHOLD = 3;
 
@@ -136,11 +139,16 @@ export function decideRestart(
     return { restart: true, reason: `failure kind '${kind}' is answerable by a restart` };
   }
 
-  if (consecutiveTimeouts >= threshold) {
+  // Being asked about a timeout means at least one was observed, whatever the
+  // caller's bookkeeping says. Without this a caller passing 0 gets a decision
+  // reasoned as "timed out 0/3", which reads as nonsense in an incident.
+  const observed = Math.max(1, consecutiveTimeouts);
+
+  if (observed >= threshold) {
     return {
       restart: true,
       reason:
-        `unresponsive for ${consecutiveTimeouts} consecutive checks (>= ${threshold}) — ` +
+        `unresponsive for ${observed} consecutive checks (>= ${threshold}) — ` +
         `sustained past what resource starvation explains, treating it as a hang`,
     };
   }
@@ -148,7 +156,7 @@ export function decideRestart(
   return {
     restart: false,
     reason:
-      `timed out ${consecutiveTimeouts}/${threshold} consecutive checks — the process is ` +
+      `timed out ${observed}/${threshold} consecutive checks — the process is ` +
       `listening but slow, which a restart cannot fix and would make worse by spending CPU; ` +
       `waiting for it to persist before treating it as a hang`,
   };

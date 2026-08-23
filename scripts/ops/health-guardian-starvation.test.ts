@@ -18,7 +18,7 @@
  *
  * The harness is deliberately separate from `health-guardian.test.ts`: this one
  * needs a pm2 shim that RECORDS its invocations (so "no restart happened" is
- * provable rather than assumed) and a server that hangs (so the timeout is real
+ * provable rather than assumed) and servers that hang (so the timeout is real
  * rather than mocked).
  */
 import assert from 'node:assert/strict';
@@ -39,19 +39,21 @@ import { fileURLToPath } from 'node:url';
 
 import type { Incident, OpsState } from './lib/types.js';
 import { TIMEOUT_RESTART_THRESHOLD } from './lib/probe-failure.js';
+import { probeWebAssets, type ProbeFetch } from './lib/web-assets.js';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-/** Serves realtime + web normally, but never answers the middleware probe. */
-function startMiddlewareHangsServer(): Promise<{ baseUrl: string; close: () => void }> {
+/**
+ * Serve a normal healthy app, except for the URLs `shouldHang` selects, which
+ * are accepted and then never answered. That is what starvation looks like from
+ * the guardian's side.
+ */
+function startServer(shouldHang: (url: string) => boolean): Promise<{ baseUrl: string; close: () => void }> {
   const sockets = new Set<{ destroy: () => void }>();
 
   const server = createServer((req, res) => {
     const url = req.url ?? '/';
-
-    // The middleware readiness probe: accept the connection, never answer.
-    // This is what CPU starvation looks like from the guardian's side.
-    if (url.startsWith('/api/v1/health')) return;
+    if (shouldHang(url)) return;
 
     if (url === '/') {
       res.writeHead(200, { 'content-type': 'text/html', connection: 'close' });
@@ -91,6 +93,9 @@ function startMiddlewareHangsServer(): Promise<{ baseUrl: string; close: () => v
   });
 }
 
+const hangsMiddlewareProbe = (url: string) => url.startsWith('/api/v1/health');
+const hangsWebAssets = (url: string) => url.startsWith('/_next/static/');
+
 /** A pm2 shim that records every invocation, so "no restart" is provable. */
 function writeRecordingPm2(binDir: string, recordPath: string, restartExitCode = 0): void {
   const jlist = JSON.stringify([
@@ -129,6 +134,7 @@ function runHealthGuardian(
   tmpRoot: string,
   baseUrl: string,
   killAfterMs: number,
+  extraEnv: Record<string, string> = {},
 ): Promise<{ code: number | null; stdout: string; stderr: string }> {
   const pathSeparator = process.platform === 'win32' ? ';' : ':';
   const child = spawn(
@@ -144,6 +150,7 @@ function runHealthGuardian(
         WEB_URL: baseUrl,
         HEALTHCHECKS_HEALTH_GUARDIAN_URL: '',
         SLACK_WEBHOOK_URL: '',
+        ...extraEnv,
       },
       stdio: 'pipe',
     },
@@ -187,11 +194,38 @@ function seedState(tmpRoot: string, incidents: Incident[]): void {
   writeFileSync(join(tmpRoot, 'logs', 'ops-state.json'), JSON.stringify(state, null, 2));
 }
 
-const INCIDENT_ID = 'health-guardian:service-down:middleware';
+function readIncident(tmpRoot: string, id: string): Incident | undefined {
+  const updated = JSON.parse(
+    readFileSync(join(tmpRoot, 'logs', 'ops-state.json'), 'utf8'),
+  ) as OpsState;
+  return updated.incidents.find((item) => item.id === id);
+}
+
+const MIDDLEWARE_INCIDENT = 'health-guardian:service-down:middleware';
+const WEB_INCIDENT = 'health-guardian:service-down:web';
+
+function timeoutIncident(overrides: Partial<Incident> = {}): Incident {
+  return {
+    id: MIDDLEWARE_INCIDENT,
+    agent: 'health-guardian',
+    type: 'service-down',
+    severity: 'warning',
+    target: 'service',
+    targetId: 'middleware',
+    detected: new Date().toISOString(),
+    message: 'middleware is unresponsive',
+    remediation: 'investigate host resource pressure',
+    status: 'open',
+    attempts: 0,
+    ...overrides,
+  };
+}
+
+// ─── The endpoint probe ─────────────────────────────────────────────────────
 
 test('a single probe timeout raises an incident but does NOT restart the service', async () => {
   const tmpRoot = mkdtempSync(join(repoRoot, '.tmp-guardian-starvation-'));
-  const { baseUrl, close } = await startMiddlewareHangsServer();
+  const { baseUrl, close } = await startServer(hangsMiddlewareProbe);
   const recordPath = join(tmpRoot, 'pm2-invocations.log');
 
   try {
@@ -209,13 +243,12 @@ test('a single probe timeout raises an incident but does NOT restart the service
     );
     assert.match(result.stdout, /middleware: NOT auto-restarting/);
 
-    const updated = JSON.parse(
-      readFileSync(join(tmpRoot, 'logs', 'ops-state.json'), 'utf8'),
-    ) as OpsState;
-    const incident = updated.incidents.find((item) => item.id === INCIDENT_ID);
+    const incident = readIncident(tmpRoot, MIDDLEWARE_INCIDENT);
     assert.ok(incident, `the incident must still be raised on the first timeout\n${result.stdout}`);
     assert.equal(incident.status, 'open');
     assert.equal(incident.consecutiveTimeouts, 1);
+    // One slow answer is a DEGRADED box, not a CRITICAL one.
+    assert.equal(incident.severity, 'warning');
     // The operator must be pointed at capacity, not at pm2.
     assert.match(incident.remediation, /host resource pressure/);
   } finally {
@@ -226,7 +259,7 @@ test('a single probe timeout raises an incident but does NOT restart the service
 
 test('a timeout that persists to the threshold IS restarted — a real hang still gets fixed', async () => {
   const tmpRoot = mkdtempSync(join(repoRoot, '.tmp-guardian-starvation-'));
-  const { baseUrl, close } = await startMiddlewareHangsServer();
+  const { baseUrl, close } = await startServer(hangsMiddlewareProbe);
   const recordPath = join(tmpRoot, 'pm2-invocations.log');
 
   try {
@@ -234,24 +267,8 @@ test('a timeout that persists to the threshold IS restarted — a real hang stil
     // Exit 1 on restart: the guardian then skips its 30s post-restart cooldown,
     // which keeps this test fast while still proving the restart was attempted.
     writeRecordingPm2(join(tmpRoot, 'bin'), recordPath, 1);
-
-    seedState(tmpRoot, [
-      {
-        id: INCIDENT_ID,
-        agent: 'health-guardian',
-        type: 'service-down',
-        severity: 'critical',
-        target: 'service',
-        targetId: 'middleware',
-        detected: new Date().toISOString(),
-        message: 'middleware is unresponsive',
-        remediation: 'investigate host resource pressure',
-        status: 'open',
-        attempts: 0,
-        // Two prior consecutive timeouts; this run makes three.
-        consecutiveTimeouts: TIMEOUT_RESTART_THRESHOLD - 1,
-      },
-    ]);
+    // Two prior consecutive timeouts; this run makes three.
+    seedState(tmpRoot, [timeoutIncident({ consecutiveTimeouts: TIMEOUT_RESTART_THRESHOLD - 1 })]);
 
     const result = await runHealthGuardian(tmpRoot, baseUrl, 90_000);
 
@@ -262,12 +279,171 @@ test('a timeout that persists to the threshold IS restarted — a real hang stil
     );
     assert.match(result.stdout, /treating it as a hang/);
 
-    const updated = JSON.parse(
-      readFileSync(join(tmpRoot, 'logs', 'ops-state.json'), 'utf8'),
-    ) as OpsState;
-    const incident = updated.incidents.find((item) => item.id === INCIDENT_ID);
+    const incident = readIncident(tmpRoot, MIDDLEWARE_INCIDENT);
     assert.equal(incident?.consecutiveTimeouts, TIMEOUT_RESTART_THRESHOLD);
     assert.equal(incident?.attempts, 1);
+  } finally {
+    close();
+    rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
+
+// ─── The web asset probe ────────────────────────────────────────────────────
+//
+// web is the service MOST exposed to starvation, not the least: it makes up to
+// three sequential 10s-bounded fetches per cycle (shell, then a sample of the
+// assets the shell references) where the others make one. Stamping every asset
+// failure as a broken build would leave the most-exposed service unprotected.
+
+test('probeWebAssets reports a timeout when the HTML fetch aborts', async () => {
+  const aborting: ProbeFetch = async () => {
+    const err = new Error('This operation was aborted');
+    err.name = 'AbortError';
+    throw err;
+  };
+  const outcome = await probeWebAssets('http://127.0.0.1:1/', aborting);
+  assert.equal(outcome.ok, false);
+  assert.equal(outcome.kind, 'timeout');
+});
+
+test('probeWebAssets reports a timeout when an ASSET fetch aborts', async () => {
+  const html = '<html><head><script src="/_next/static/chunks/a.js"></script></head></html>';
+  const fetchImpl: ProbeFetch = async (url: string) => {
+    if (url.includes('_next')) {
+      const err = new Error('This operation was aborted');
+      err.name = 'AbortError';
+      throw err;
+    }
+    return { ok: true, status: 200, text: async () => html };
+  };
+  const outcome = await probeWebAssets('http://127.0.0.1:1', fetchImpl);
+  assert.equal(outcome.ok, false);
+  assert.equal(outcome.kind, 'timeout');
+});
+
+test('probeWebAssets leaves kind unset for a genuinely broken build', async () => {
+  // A 500 throws nothing, so the caller keeps its own 'asset-failure' verdict
+  // and the service is restarted immediately, exactly as before.
+  const html = '<html><head><script src="/_next/static/chunks/a.js"></script></head></html>';
+  const fetchImpl: ProbeFetch = async (url: string) => {
+    if (url.includes('_next')) return { ok: false, status: 500, text: async () => '' };
+    return { ok: true, status: 200, text: async () => html };
+  };
+  const outcome = await probeWebAssets('http://127.0.0.1:1', fetchImpl);
+  assert.equal(outcome.ok, false);
+  assert.equal(outcome.kind, undefined);
+});
+
+test('a web asset probe that times out does NOT restart web', async () => {
+  const tmpRoot = mkdtempSync(join(repoRoot, '.tmp-guardian-starvation-'));
+  // The shell answers 200 immediately; only the referenced chunk hangs.
+  const { baseUrl, close } = await startServer(hangsWebAssets);
+  const recordPath = join(tmpRoot, 'pm2-invocations.log');
+
+  try {
+    prepareTmpRoot(tmpRoot);
+    writeRecordingPm2(join(tmpRoot, 'bin'), recordPath);
+    seedState(tmpRoot, []);
+
+    const result = await runHealthGuardian(tmpRoot, baseUrl, 90_000);
+
+    const invocations = readPm2Invocations(recordPath);
+    assert.deepEqual(
+      invocations.filter((line) => line.startsWith('restart')),
+      [],
+      `an aborted asset probe is starvation, not a broken build; pm2 saw ${JSON.stringify(invocations)}\n${result.stdout}`,
+    );
+
+    const incident = readIncident(tmpRoot, WEB_INCIDENT);
+    assert.ok(incident, `expected a web incident\n${result.stdout}`);
+    assert.equal(incident.consecutiveTimeouts, 1);
+  } finally {
+    close();
+    rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
+
+// ─── Ordering and operator control ──────────────────────────────────────────
+
+test('an already-escalated incident is not walked back to open by a timeout', async () => {
+  const tmpRoot = mkdtempSync(join(repoRoot, '.tmp-guardian-starvation-'));
+  const { baseUrl, close } = await startServer(hangsMiddlewareProbe);
+  const recordPath = join(tmpRoot, 'pm2-invocations.log');
+
+  try {
+    prepareTmpRoot(tmpRoot);
+    writeRecordingPm2(join(tmpRoot, 'bin'), recordPath);
+    // Escalated after two failed restarts on a NON-timeout failure, so it
+    // carries no streak. The failure mode then shifts to a timeout.
+    seedState(tmpRoot, [
+      timeoutIncident({
+        severity: 'critical',
+        status: 'escalated',
+        attempts: 2,
+        consecutiveTimeouts: 0,
+      }),
+    ]);
+
+    const result = await runHealthGuardian(tmpRoot, baseUrl, 90_000);
+
+    assert.match(result.stdout, /middleware: already escalated/);
+    const incident = readIncident(tmpRoot, MIDDLEWARE_INCIDENT);
+    assert.equal(
+      incident?.status,
+      'escalated',
+      `escalated is terminal and must survive a change of failure mode\n${result.stdout}`,
+    );
+  } finally {
+    close();
+    rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
+
+test('GUARDIAN_TIMEOUT_RESTART_THRESHOLD=1 restores restart-on-first-timeout', async () => {
+  const tmpRoot = mkdtempSync(join(repoRoot, '.tmp-guardian-starvation-'));
+  const { baseUrl, close } = await startServer(hangsMiddlewareProbe);
+  const recordPath = join(tmpRoot, 'pm2-invocations.log');
+
+  try {
+    prepareTmpRoot(tmpRoot);
+    writeRecordingPm2(join(tmpRoot, 'bin'), recordPath, 1);
+    seedState(tmpRoot, []);
+
+    const result = await runHealthGuardian(tmpRoot, baseUrl, 90_000, {
+      GUARDIAN_TIMEOUT_RESTART_THRESHOLD: '1',
+    });
+
+    assert.ok(
+      readPm2Invocations(recordPath).includes('restart vizora-middleware'),
+      `the operator override must take effect without a deploy\n${result.stdout}`,
+    );
+  } finally {
+    close();
+    rmSync(tmpRoot, { recursive: true, force: true });
+  }
+});
+
+test('an unparseable GUARDIAN_TIMEOUT_RESTART_THRESHOLD is ignored, not obeyed', async () => {
+  const tmpRoot = mkdtempSync(join(repoRoot, '.tmp-guardian-starvation-'));
+  const { baseUrl, close } = await startServer(hangsMiddlewareProbe);
+  const recordPath = join(tmpRoot, 'pm2-invocations.log');
+
+  try {
+    prepareTmpRoot(tmpRoot);
+    writeRecordingPm2(join(tmpRoot, 'bin'), recordPath);
+    seedState(tmpRoot, []);
+
+    // 0 would disable the gate entirely if it were honoured.
+    const result = await runHealthGuardian(tmpRoot, baseUrl, 90_000, {
+      GUARDIAN_TIMEOUT_RESTART_THRESHOLD: '0',
+    });
+
+    assert.match(result.stdout, /is not an integer >= 1/);
+    assert.deepEqual(
+      readPm2Invocations(recordPath).filter((line) => line.startsWith('restart')),
+      [],
+      `a bad override must fall back to the default, not disable the gate\n${result.stdout}`,
+    );
   } finally {
     close();
     rmSync(tmpRoot, { recursive: true, force: true });

@@ -24,6 +24,8 @@
  * distinguishes "serving" from "serving something usable".
  */
 
+import { classifyFetchError, type ProbeFailureKind } from './probe-failure.js';
+
 /** Asset kinds worth probing. Both were 500 during the incident. */
 const ASSET_PATTERN = /(?:src|href)=["'](\/_next\/static\/[^"']+\.(?:js|css))["']/g;
 
@@ -88,6 +90,8 @@ export interface AssetProbeOutcome {
   status?: number;
   ok: boolean;
   error?: string;
+  /** Set when the fetch THREW, so the caller can tell slow from broken. */
+  kind?: ProbeFailureKind;
 }
 
 /**
@@ -156,14 +160,21 @@ export async function probeWebAssets(
   baseUrl: string,
   fetchImpl: ProbeFetch,
   sampleSize = 2,
-): Promise<{ ok: boolean; detail: string }> {
+): Promise<{ ok: boolean; detail: string; kind?: ProbeFailureKind }> {
   let html: string;
   try {
     const res = await fetchImpl(baseUrl);
     if (!res.ok) return { ok: false, detail: `HTML fetch returned ${res.status}` };
     html = await res.text();
   } catch (err) {
-    return { ok: false, detail: `HTML fetch failed: ${err instanceof Error ? err.message : err}` };
+    // WHY it failed survives: this fetch is bounded by the same deadline as the
+    // caller's, so it can abort on a slow box even though the caller's own
+    // earlier GET of this same URL returned 200. See lib/probe-failure.ts.
+    return {
+      ok: false,
+      detail: `HTML fetch failed: ${err instanceof Error ? err.message : err}`,
+      kind: classifyFetchError(err),
+    };
   }
 
   const plan = planAssetProbe(html, sampleSize);
@@ -180,9 +191,22 @@ export async function probeWebAssets(
       // redirect already resolves to its final 2xx response.
       outcomes.push({ path, status: res.status, ok: res.ok });
     } catch (err) {
-      outcomes.push({ path, ok: false, error: err instanceof Error ? err.message : String(err) });
+      outcomes.push({
+        path,
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+        kind: classifyFetchError(err),
+      });
     }
   }
 
-  return summarizeAssetProbe(outcomes);
+  const summary = summarizeAssetProbe(outcomes);
+  if (summary.ok) return summary;
+
+  // A timeout anywhere in the sample dominates: one aborted asset fetch means
+  // the box was too slow to answer, which no restart repairs. A non-2xx status
+  // throws no exception and leaves `kind` unset, so the caller keeps its own
+  // 'asset-failure' verdict for a genuinely broken build.
+  const kinds = outcomes.flatMap((outcome) => (outcome.kind ? [outcome.kind] : []));
+  return { ...summary, kind: kinds.includes('timeout') ? 'timeout' : kinds[0] };
 }
