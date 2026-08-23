@@ -7,6 +7,7 @@ import { JwtService } from '@nestjs/jwt';
 import { PairingService } from './pairing.service';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
+import { PAIRING_ERROR_CODES } from './pairing-error-codes';
 
 // Mock QRCode
 jest.mock('qrcode', () => ({
@@ -886,6 +887,19 @@ describe('PairingService', () => {
       ).rejects.toThrow(
         'Another display pairing is already being completed for this organization',
       );
+      // Machine-readable contract the dashboard selects its copy from — the
+      // English sentence above is for humans, not for clients to parse.
+      const error = (await service
+        .completePairing(organizationId, userId, {
+          code: pairingResult.code,
+        })
+        .catch((e: unknown) => e)) as ConflictException;
+      expect(error.getResponse()).toMatchObject({
+        statusCode: 409,
+        code: PAIRING_ERROR_CODES.ORG_PAIRING_IN_PROGRESS,
+        message:
+          'Another display pairing is already being completed for this organization',
+      });
       expect(
         mockDatabaseService.organization.findUnique,
       ).not.toHaveBeenCalled();

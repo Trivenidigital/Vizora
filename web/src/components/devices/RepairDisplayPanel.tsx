@@ -3,6 +3,10 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { apiClient } from '@/lib/api';
+import {
+  readConflictingDisplayId,
+  readRepairPairingErrorCode,
+} from '@/lib/api/displays';
 import { isApiError } from '@/lib/error-handler';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { getDashboardPermissions } from '@/lib/permissions';
@@ -23,84 +27,125 @@ interface RepairDisplayPanelProps {
 }
 
 export interface RepairFailure {
-  /** Names the class of failure. */
+  /** Names the class of failure. Curated here, never server text. */
   title: string;
-  /** The server's own words. Never rewritten, never genericised. */
+  /** What happened, in our words. Curated here, never server text. */
   detail: string;
   /** What to do next about THIS class of failure. */
   hint: string;
-  /** Same-org display already holding the device identifier (409 only). */
+  /**
+   * Same-org display already holding the device identifier. Read from the
+   * STRUCTURED `conflictingDisplayId` field, never scraped out of a sentence.
+   */
   conflictingDisplayId?: string;
 }
 
 /**
- * The 409 the server raises from `assertDeviceIdentifierFree` names the row
- * that already holds the identifier, because the remedy is to deal with that
- * display first. Pull the id back out so it can be linked rather than left
- * buried in prose. The other 409 (a concurrent re-pair of this same display)
- * carries no id and correctly yields undefined.
+ * A generic failure. Everything that is not a recognised 4xx lands here —
+ * 5xx, an unmapped status, a transport error, a thrown non-Error. Nothing
+ * from the response reaches the operator on this path.
+ *
+ * `AllExceptionsFilter` already replaces a non-`HttpException` body with a
+ * flat 'Internal server error' outside `NODE_ENV=development`, so stack
+ * traces, SQL and Redis strings should never arrive here in the first place.
+ * This is the second lock: even if one did, the UI has no path that renders
+ * it.
  */
-function parseConflictingDisplayId(message: string): string | undefined {
-  return /^Display (\S+) already uses/.exec(message)?.[1];
-}
+const GENERIC_FAILURE: RepairFailure = {
+  title: 'Re-pairing failed',
+  detail: 'Something went wrong and the re-pair did not complete.',
+  hint: 'Reload this page to check the display, then try again. If it keeps failing, contact support.',
+};
+
+/** Curated copy for each 409 in the published contract. */
+const CONFLICT_COPY: Record<string, Omit<RepairFailure, 'conflictingDisplayId'>> = {
+  DEVICE_IDENTIFIER_IN_USE: {
+    title: 'Another display is already using that screen',
+    detail:
+      'The screen showing that code is already bound to a different display in this organization.',
+    hint: 'Remove or re-pair that display first, then restart pairing on this screen.',
+  },
+  DEVICE_IDENTIFIER_TAKEN_DURING_REBIND: {
+    title: 'Another display claimed that screen first',
+    detail:
+      'The screen was bound to a different display while this re-pair was still in flight.',
+    hint: 'Restart pairing on the display to get a fresh code, then try again.',
+  },
+  DISPLAY_REBIND_IN_PROGRESS: {
+    title: 'This display is already being re-paired',
+    detail: 'Another re-pair of this display has not finished yet.',
+    hint: 'Wait for it to finish, then try again.',
+  },
+  ORG_PAIRING_IN_PROGRESS: {
+    title: 'Another pairing is in progress',
+    detail:
+      'Someone else in this organization is completing a pairing right now.',
+    hint: 'Wait a moment, then try again.',
+  },
+};
+
+/** A 409 whose body carries no code we recognise. */
+const UNKNOWN_CONFLICT: RepairFailure = {
+  title: 'Re-pair refused — conflict',
+  detail: 'Something else is already using that screen or this display.',
+  hint: 'Reload this page to check the display, then try again.',
+};
 
 /**
- * Map a failed re-pair onto the outcomes the server actually distinguishes.
+ * Map a failed re-pair onto the outcomes the server distinguishes, selecting
+ * on `statusCode` + the published `code` — NEVER on message text.
  *
- * The server's message is always shown verbatim in `detail` — the generic
- * per-status text `ApiError.userMessage` carries ("Invalid request. Please
- * check your input.") throws away the only information the operator needs.
+ * Every string the operator reads is written here. The server's `message` is
+ * curated today, but binding copy to prose means a reworded sentence silently
+ * changes behaviour, and it forces a rendering path for arbitrary backend
+ * exception text that must not exist at all. The only server value that
+ * reaches the DOM is `conflictingDisplayId`, and only after id-shape
+ * validation in `readConflictingDisplayId`.
  *
  * 404 is deliberately ambiguous at the source: an unknown code, an expired
  * code and a target display in ANOTHER org all answer identically so a rebind
- * cannot be used to probe for display ids. Do not try to tell them apart here.
+ * cannot be used to probe for display ids. Do not try to tell them apart.
  */
 export function describeRepairFailure(error: unknown): RepairFailure {
-  if (isApiError(error)) {
-    switch (error.statusCode) {
-      case 404:
-        return {
-          title: 'Pairing code not found or expired',
-          detail: error.message,
-          hint: 'Check the code on the screen. Codes expire — restart pairing on the display to get a new one.',
-        };
-      case 400:
-        return {
-          title: 'That pairing code cannot be used',
-          detail: error.message,
-          hint: 'Restart pairing on the display to get a fresh code, then try again.',
-        };
-      case 409: {
-        const conflictingDisplayId = parseConflictingDisplayId(error.message);
-        return {
-          title: 'Re-pair refused — conflict',
-          detail: error.message,
-          hint: conflictingDisplayId
-            ? 'Open that display and remove or re-pair it first, then restart pairing on this screen.'
-            : 'Another re-pair of this display is still in flight. Wait for it to finish, then try again.',
-          conflictingDisplayId,
-        };
-      }
-      case 403:
-        return {
-          title: 'Your role cannot re-pair displays',
-          detail: error.message,
-          hint: 'Ask an admin or a manager to re-pair this display.',
-        };
-      default:
-        return {
-          title: 'Re-pairing failed',
-          detail: error.message,
-          hint: 'Reload this page to check the display before retrying.',
-        };
-    }
-  }
+  if (!isApiError(error)) return GENERIC_FAILURE;
 
-  return {
-    title: 'Re-pairing failed',
-    detail: error instanceof Error ? error.message : 'An unexpected error occurred.',
-    hint: 'Reload this page to check the display before retrying.',
-  };
+  switch (error.statusCode) {
+    case 404:
+      return {
+        title: 'Pairing code not found or expired',
+        detail:
+          'That code is not valid for this organization, or it has already expired.',
+        hint: 'Check the code on the screen. Codes expire — restart pairing on the display to get a new one.',
+      };
+    case 400:
+      return {
+        title: 'That pairing code cannot be used',
+        detail:
+          'The code has already been used, has expired, or is being completed by someone else right now.',
+        hint: 'Restart pairing on the display to get a fresh code, then try again.',
+      };
+    case 403:
+      return {
+        title: 'Your role cannot re-pair displays',
+        detail: 'Re-pairing a display is limited to admins and managers.',
+        hint: 'Ask an admin or a manager to re-pair this display.',
+      };
+    case 409: {
+      const code = readRepairPairingErrorCode(error.code);
+      if (!code) return UNKNOWN_CONFLICT;
+      return {
+        ...CONFLICT_COPY[code],
+        // Only this one code carries an id, and only when the server sent a
+        // well-formed one. Absent or malformed → the no-link variant.
+        conflictingDisplayId:
+          code === 'DEVICE_IDENTIFIER_IN_USE'
+            ? readConflictingDisplayId(error.details)
+            : undefined,
+      };
+    }
+    default:
+      return GENERIC_FAILURE;
+  }
 }
 
 /**

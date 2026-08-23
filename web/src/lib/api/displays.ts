@@ -23,6 +23,50 @@ export interface RepairPairingResponse {
   };
 }
 
+/**
+ * REPAIR — the conflict contract published by
+ * `middleware/src/modules/displays/pairing-error-codes.ts`. Mirrored here
+ * rather than imported: `web` does not depend on `middleware`.
+ *
+ * The UI selects its copy from `statusCode` + this code. It must never select
+ * copy from, or render, the server's message text — a 4xx body is curated
+ * today but nothing structurally guarantees that, and a 5xx body is not
+ * curated at all.
+ */
+export const REPAIR_PAIRING_ERROR_CODES = [
+  'ORG_PAIRING_IN_PROGRESS',
+  'DISPLAY_REBIND_IN_PROGRESS',
+  'DEVICE_IDENTIFIER_IN_USE',
+  'DEVICE_IDENTIFIER_TAKEN_DURING_REBIND',
+] as const;
+
+export type RepairPairingErrorCode =
+  (typeof REPAIR_PAIRING_ERROR_CODES)[number];
+
+/** Narrow an error's `code` to the published contract, or undefined. */
+export function readRepairPairingErrorCode(
+  code: unknown,
+): RepairPairingErrorCode | undefined {
+  return REPAIR_PAIRING_ERROR_CODES.find((known) => known === code);
+}
+
+/**
+ * Pull `conflictingDisplayId` out of a structured error body.
+ *
+ * Validated, not merely type-checked: the value becomes both link text and a
+ * URL path segment, so anything that is not an id shape is dropped rather
+ * than rendered. Absent or malformed → undefined, and the caller falls back
+ * to the variant with no link.
+ */
+export function readConflictingDisplayId(
+  details: Record<string, unknown> | undefined,
+): string | undefined {
+  const value = details?.conflictingDisplayId;
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value)
+    ? value
+    : undefined;
+}
+
 declare module './client' {
   interface ApiClient {
     getDisplays(params?: { page?: number; limit?: number }): Promise<PaginatedResponse<Display>>;

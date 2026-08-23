@@ -11,6 +11,7 @@ import { DeviceAuthCheckService } from './device-auth-check.service';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
 import { deviceTokenGraceKey } from '../common/device-token-auth.util';
+import { PAIRING_ERROR_CODES } from './pairing-error-codes';
 
 jest.mock('qrcode', () => ({
   toDataURL: jest.fn().mockResolvedValue('data:image/png;base64,mockQRCode'),
@@ -941,6 +942,102 @@ describe('PairingService — repair an existing display', () => {
       await expect(
         service.completePairing(ORG, ADMIN, { code, targetDisplayId: target.id }),
       ).rejects.toBeInstanceOf(ConflictException);
+    });
+  });
+
+  /**
+   * The dashboard selects its copy — and builds the "open the conflicting
+   * display" link — from these fields, NOT from the English sentence. Pin the
+   * contract so a reworded message cannot silently change the UI, and so the
+   * id can never again have to be regex'd back out of prose.
+   */
+  describe('conflict responses carry a machine-readable contract', () => {
+    const conflictBody = (error: unknown) => {
+      expect(error).toBeInstanceOf(ConflictException);
+      return (error as ConflictException).getResponse() as Record<
+        string,
+        unknown
+      >;
+    };
+
+    it('same-org holder → DEVICE_IDENTIFIER_IN_USE carrying the conflicting id structurally', async () => {
+      const target = seedBrokenDisplay();
+      const code = await startPairing('stable-hardware-id');
+      displays.set(
+        'display-ghost',
+        displayRow({
+          id: 'display-ghost',
+          organizationId: ORG,
+          deviceIdentifier: 'stable-hardware-id',
+          jwtToken: 'a'.repeat(64),
+        }),
+      );
+
+      const body = conflictBody(
+        await service
+          .completePairing(ORG, ADMIN, { code, targetDisplayId: target.id })
+          .catch((e: unknown) => e),
+      );
+
+      expect(body.statusCode).toBe(409);
+      expect(body.code).toBe(PAIRING_ERROR_CODES.DEVICE_IDENTIFIER_IN_USE);
+      expect(body.conflictingDisplayId).toBe('display-ghost');
+      // The curated sentence is unchanged — fields were added, not reworded.
+      expect(body.message).toBe(
+        'Display display-ghost already uses this device identifier. ' +
+          'Remove or re-pair that display first, then restart pairing on this screen.',
+      );
+    });
+
+    it('unique-constraint race → DEVICE_IDENTIFIER_TAKEN_DURING_REBIND, and no id is invented', async () => {
+      const target = seedBrokenDisplay();
+      const code = await startPairing('fresh-identifier-contract');
+      failNextDisplayWrite = 'P2002';
+
+      const body = conflictBody(
+        await service
+          .completePairing(ORG, ADMIN, { code, targetDisplayId: target.id })
+          .catch((e: unknown) => e),
+      );
+
+      expect(body.statusCode).toBe(409);
+      expect(body.code).toBe(
+        PAIRING_ERROR_CODES.DEVICE_IDENTIFIER_TAKEN_DURING_REBIND,
+      );
+      // The winner is not known on this path, so no id may be asserted.
+      expect(body.conflictingDisplayId).toBeUndefined();
+      expect(body.message).toBe(
+        'That device identifier is already in use. Restart pairing on the display and try again.',
+      );
+    });
+
+    it('a concurrent re-pair of the same display → DISPLAY_REBIND_IN_PROGRESS', async () => {
+      const target = seedBrokenDisplay();
+      const codeA = await startPairing('tv-a-contract');
+      const codeB = await startPairing('tv-b-contract');
+
+      const settled = await Promise.allSettled([
+        service.completePairing(ORG, ADMIN, {
+          code: codeA,
+          targetDisplayId: target.id,
+        }),
+        service.completePairing(ORG, 'user-admin-2', {
+          code: codeB,
+          targetDisplayId: target.id,
+        }),
+      ]);
+
+      const loser = settled.find(
+        (s): s is PromiseRejectedResult => s.status === 'rejected',
+      );
+      const body = conflictBody(loser?.reason);
+
+      expect(body.statusCode).toBe(409);
+      expect(body.code).toBe(PAIRING_ERROR_CODES.DISPLAY_REBIND_IN_PROGRESS);
+      expect(body.conflictingDisplayId).toBeUndefined();
+      expect(body.message).toBe(
+        'This display is already being re-paired. Please try again.',
+      );
     });
   });
 

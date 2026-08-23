@@ -117,10 +117,20 @@ async function buildApiError(response: Response, fallbackMessage: string): Promi
   const message = Array.isArray(errorData?.message)
     ? errorData.message.join(', ')
     : errorData?.message || `HTTP ${response.status}`;
+  // `AllExceptionsFilter` returns an object-form HttpException response as-is,
+  // so an endpoint that publishes a structured error contract (a `code`, plus
+  // whatever identifiers the client needs) reaches us intact. Carry it through
+  // so callers can branch on the contract instead of parsing English.
+  const details =
+    errorData && typeof errorData === 'object' && !Array.isArray(errorData)
+      ? (errorData as Record<string, unknown>)
+      : undefined;
   return new ApiError(
     response.status,
     message,
     getUserMessageForStatus(response.status, message),
+    typeof details?.code === 'string' ? details.code : undefined,
+    details,
   );
 }
 

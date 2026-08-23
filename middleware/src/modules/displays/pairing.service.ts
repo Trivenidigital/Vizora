@@ -5,6 +5,7 @@ import {
   InternalServerErrorException,
   ForbiddenException,
   ConflictException,
+  HttpStatus,
   OnModuleDestroy,
   Logger,
 } from '@nestjs/common';
@@ -18,6 +19,7 @@ import { deviceTokenGraceKey } from '../common/device-token-auth.util';
 import { resolvePublicAppUrl } from '../common/utils/public-app-url';
 import { RequestPairingDto } from './dto/request-pairing.dto';
 import { CompletePairingDto } from './dto/complete-pairing.dto';
+import { PAIRING_ERROR_CODES } from './pairing-error-codes';
 import type { Prisma } from '@vizora/database';
 import * as crypto from 'crypto';
 import * as QRCode from 'qrcode';
@@ -359,9 +361,12 @@ export class PairingService implements OnModuleDestroy {
       );
 
       if (result !== 'OK') {
-        throw new ConflictException(
-          'Another display pairing is already being completed for this organization',
-        );
+        throw new ConflictException({
+          statusCode: HttpStatus.CONFLICT,
+          code: PAIRING_ERROR_CODES.ORG_PAIRING_IN_PROGRESS,
+          message:
+            'Another display pairing is already being completed for this organization',
+        });
       }
 
       return claimToken;
@@ -440,9 +445,11 @@ export class PairingService implements OnModuleDestroy {
       );
 
       if (result !== 'OK') {
-        throw new ConflictException(
-          'This display is already being re-paired. Please try again.',
-        );
+        throw new ConflictException({
+          statusCode: HttpStatus.CONFLICT,
+          code: PAIRING_ERROR_CODES.DISPLAY_REBIND_IN_PROGRESS,
+          message: 'This display is already being re-paired. Please try again.',
+        });
       }
 
       return claimToken;
@@ -1094,9 +1101,12 @@ export class PairingService implements OnModuleDestroy {
         // `deviceIdentifier` is @unique and another row claimed it between the
         // read in `assertDeviceIdentifierFree` and this write. Surface a
         // conflict the operator can act on, never a raw P2002.
-        throw new ConflictException(
-          'That device identifier is already in use. Restart pairing on the display and try again.',
-        );
+        throw new ConflictException({
+          statusCode: HttpStatus.CONFLICT,
+          code: PAIRING_ERROR_CODES.DEVICE_IDENTIFIER_TAKEN_DURING_REBIND,
+          message:
+            'That device identifier is already in use. Restart pairing on the display and try again.',
+        });
       }
       throw error;
     }
@@ -1170,10 +1180,17 @@ export class PairingService implements OnModuleDestroy {
       throw new NotFoundException('Pairing code not found or expired');
     }
 
-    throw new ConflictException(
-      `Display ${holder.id} already uses this device identifier. ` +
+    // `conflictingDisplayId` is carried STRUCTURALLY. The id is in the message
+    // too, for humans reading a log or a raw response — but no client should
+    // ever have to parse it back out of the sentence.
+    throw new ConflictException({
+      statusCode: HttpStatus.CONFLICT,
+      code: PAIRING_ERROR_CODES.DEVICE_IDENTIFIER_IN_USE,
+      conflictingDisplayId: holder.id,
+      message:
+        `Display ${holder.id} already uses this device identifier. ` +
         'Remove or re-pair that display first, then restart pairing on this screen.',
-    );
+    });
   }
 
   /**
