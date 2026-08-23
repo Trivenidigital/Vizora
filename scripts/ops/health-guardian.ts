@@ -51,6 +51,11 @@ import {
 import { log, pingHeartbeat, sendInlineAlert } from './lib/alerting.js';
 import { readEcosystemMemoryPolicy } from './lib/ecosystem.js';
 import { isLoopback, splitProbeTargets, type ProbeService } from './lib/probe-targets.js';
+import {
+  classifyFetchError,
+  decideRestart,
+  type ProbeFailureKind,
+} from './lib/probe-failure.js';
 import { probeWebAssets, type ProbeFetch } from './lib/web-assets.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -190,7 +195,21 @@ function getServiceDefs(): ResolvedTargets {
  * Check if a service health endpoint responds with 2xx/3xx.
  * Returns true if healthy, false if unreachable or error response.
  */
-async function checkEndpoint(url: string): Promise<{ ok: boolean; status?: number; error?: string }> {
+interface ProbeResult {
+  ok: boolean;
+  status?: number;
+  error?: string;
+  /** Why it failed, when it failed. Absent on success. */
+  kind?: ProbeFailureKind;
+}
+
+/**
+ * The `kind` is classified HERE rather than re-derived from `error` downstream:
+ * the exception object carries the abort flag and the libuv code, and both are
+ * lost once it is flattened to a message string. Call sites that know more than
+ * the exception does (a non-2xx status, a broken-asset verdict) set their own.
+ */
+async function checkEndpoint(url: string): Promise<ProbeResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
   try {
@@ -201,10 +220,16 @@ async function checkEndpoint(url: string): Promise<{ ok: boolean; status?: numbe
     });
     clearTimeout(timer);
     const ok = res.status >= 200 && res.status < 400;
-    return { ok, status: res.status };
+    // `status` is kept on BOTH paths: the healthy log line and the post-restart
+    // recheck both read it.
+    return ok ? { ok, status: res.status } : { ok, status: res.status, kind: 'http-error' };
   } catch (err) {
     clearTimeout(timer);
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+      kind: classifyFetchError(err),
+    };
   }
 }
 
@@ -522,7 +547,13 @@ async function main(): Promise<void> {
       const assets = await probeWebAssetHealth(svc.assetBaseUrl);
       log(AGENT, `${svc.name}: asset probe — ${assets.detail}`);
       if (!assets.ok) {
-        result = { ok: false, status: result.status, error: `referenced assets unhealthy: ${assets.detail}` };
+        result = {
+          ok: false,
+          status: result.status,
+          error: `referenced assets unhealthy: ${assets.detail}`,
+          // The shell answered, so this is a broken build, not resource starvation.
+          kind: 'asset-failure',
+        };
       }
     }
 
@@ -539,6 +570,8 @@ async function main(): Promise<void> {
           ...existingIncident,
           status: 'resolved',
           resolvedAt: new Date().toISOString(),
+          // The streak counts CONSECUTIVE timeouts; answering breaks it.
+          consecutiveTimeouts: 0,
         });
         issuesFixed++;
       }
@@ -576,6 +609,41 @@ async function main(): Promise<void> {
       continue;
     }
 
+    // STARVATION_IS_NOT_A_CRASH: a listening-but-slow process and a dead one look
+    // identical at the socket, but only one of them is fixed by a restart — and
+    // restarting the other spends the CPU it is already short of. Persistence is
+    // the discriminator, so a timeout must repeat before it earns pm2. The
+    // incident is raised on the FIRST one regardless. See lib/probe-failure.ts.
+    const priorTimeouts =
+      existingIncident && existingIncident.status !== 'resolved'
+        ? (existingIncident.consecutiveTimeouts ?? 0)
+        : 0;
+    const consecutiveTimeouts = result.kind === 'timeout' ? priorTimeouts + 1 : 0;
+    const decision = decideRestart(result.kind ?? 'unknown', consecutiveTimeouts);
+
+    if (!decision.restart) {
+      log(AGENT, `${svc.name}: NOT auto-restarting — ${decision.reason}`);
+      incidents.push({
+        id: incidentId,
+        agent: AGENT,
+        type: 'service-down',
+        severity: 'critical',
+        target: 'service',
+        targetId: svc.name,
+        detected: existingIncident?.detected ?? new Date().toISOString(),
+        message: `${svc.name} is unresponsive at ${svc.healthUrl} — ${decision.reason}`,
+        remediation:
+          `Check host resource pressure (CPU idle/steal, load average, swap, and any ` +
+          `co-tenant workload) before restarting ${svc.pm2Name}: a restart spends the ` +
+          `resource that is already exhausted. Auto-restart engages if this persists.`,
+        status: 'open',
+        attempts: existingIncident?.attempts ?? 0,
+        consecutiveTimeouts,
+        error: errorDetail,
+      });
+      continue;
+    }
+
     // Check if already escalated
     if (existingIncident && existingIncident.status === 'escalated') {
       log(AGENT, `${svc.name}: already escalated — skipping restart`);
@@ -602,6 +670,7 @@ async function main(): Promise<void> {
         remediation: `pm2 restart ${svc.pm2Name}`,
         status: 'escalated',
         attempts: previousAttempts,
+        consecutiveTimeouts,
         error: errorDetail,
       });
       issuesEscalated++;
@@ -610,7 +679,10 @@ async function main(): Promise<void> {
 
     // Attempt restart
     const attemptNum = previousAttempts + 1;
-    log(AGENT, `${svc.name}: attempting restart (attempt ${attemptNum}/${MAX_RESTART_ATTEMPTS})`);
+    log(
+      AGENT,
+      `${svc.name}: attempting restart (attempt ${attemptNum}/${MAX_RESTART_ATTEMPTS}) — ${decision.reason}`,
+    );
 
     const restartSuccess = pm2Restart(svc.pm2Name);
 
@@ -645,6 +717,7 @@ async function main(): Promise<void> {
           remediation: `pm2 restart ${svc.pm2Name}`,
           status: 'resolved',
           attempts: attemptNum,
+          consecutiveTimeouts: 0,
           resolvedAt: new Date().toISOString(),
         });
         issuesFixed++;
@@ -663,6 +736,7 @@ async function main(): Promise<void> {
           remediation: `pm2 restart ${svc.pm2Name}`,
           status: 'open',
           attempts: attemptNum,
+          consecutiveTimeouts,
           error: recheck.error || `HTTP ${recheck.status}`,
         });
       }
@@ -681,6 +755,7 @@ async function main(): Promise<void> {
         remediation: `pm2 restart ${svc.pm2Name}`,
         status: 'open',
         attempts: attemptNum,
+        consecutiveTimeouts,
         error: 'pm2 restart command failed',
       });
     }
