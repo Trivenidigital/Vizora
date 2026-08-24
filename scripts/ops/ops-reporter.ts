@@ -37,6 +37,9 @@ import {
   sendSlackAlert,
   sendEmailAlert,
   updateDashboard,
+  anyDelivered,
+  describeDelivery,
+  type DeliveryResult,
 } from './lib/alerting.js';
 import { login, releaseSessions } from './lib/api-client.js';
 
@@ -252,21 +255,38 @@ async function main(): Promise<void> {
   // Captured for phase 3 so the suppression timestamp reflects when the alert
   // actually went out.
   let alertTimestamp: string | null = null;
+  let delivery: DeliveryResult[] = [];
 
   if (decision.shouldAlert) {
+    const channels = decision.isRecovery ? 'Slack only (recovery)' : 'Slack + Email';
+    // DETECTED and ATTEMPTED are separate lines from DELIVERED, deliberately.
+    log(AGENT, `Alert condition detected — attempting delivery via ${channels}`);
+
     if (decision.isRecovery) {
-      // Recovery — Slack only (good news)
-      log(AGENT, 'Sending recovery alert (Slack only)');
-      await sendSlackAlert(currentStatus, previousStatus, activeIncidents, fixedCount);
+      delivery = [await sendSlackAlert(currentStatus, previousStatus, activeIncidents, fixedCount)];
     } else {
-      // Degraded or Critical — both channels
-      log(AGENT, 'Sending alerts (Slack + Email)');
-      await sendSlackAlert(currentStatus, previousStatus, activeIncidents, fixedCount);
-      await sendEmailAlert(currentStatus, activeIncidents, fixedCount);
+      delivery = [
+        await sendSlackAlert(currentStatus, previousStatus, activeIncidents, fixedCount),
+        await sendEmailAlert(currentStatus, activeIncidents, fixedCount),
+      ];
     }
 
-    // Record alert timestamp for suppression tracking (persisted in phase 3)
-    alertTimestamp = new Date().toISOString();
+    const summary = describeDelivery(delivery);
+    if (anyDelivered(delivery)) {
+      log(AGENT, `Alert DELIVERED — ${summary}`);
+      // Only a real delivery may arm the re-alert suppression window. Stamping
+      // it on the decision meant an alert nobody received could suppress a
+      // later one that would have been.
+      alertTimestamp = new Date().toISOString();
+    } else if (delivery.every((r) => r.outcome === 'not_configured')) {
+      log(
+        AGENT,
+        `Alert NOT DELIVERED — no channel is configured (${summary}). The condition ` +
+        `was detected and recorded in ops-state, but nothing was sent to anyone.`,
+      );
+    } else {
+      log(AGENT, `Alert DELIVERY FAILED — ${summary}`);
+    }
   } else {
     log(AGENT, 'Alert suppressed — no notification sent');
   }
@@ -345,7 +365,13 @@ async function main(): Promise<void> {
 
   log(
     AGENT,
-    `Cycle complete in ${durationMs}ms — status: ${finalStatus}, active: ${activeCount} (${criticalCount} critical, ${warningCount} warning), alerted: ${decision.shouldAlert}`,
+    `Cycle complete in ${durationMs}ms — status: ${finalStatus}, active: ${activeCount} ` +
+    `(${criticalCount} critical, ${warningCount} warning), ` +
+    // `alerted` now reports what was DELIVERED, not what was decided. It read
+    // `decision.shouldAlert` and so logged `alerted: true` on a host where every
+    // channel was unconfigured and nothing could possibly have been sent.
+    `alert_decision: ${decision.shouldAlert}, alert_delivered: ${anyDelivered(delivery)}` +
+    `${delivery.length > 0 ? ` [${describeDelivery(delivery)}]` : ''}`,
   );
 
   // ─── Exit Code ────────────────────────────────────────────────────────────
