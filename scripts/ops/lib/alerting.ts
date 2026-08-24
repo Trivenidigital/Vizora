@@ -68,8 +68,10 @@ export async function pingHeartbeat(
   agent: string,
   pingUrl: string | undefined,
   status: 'success' | 'fail' = 'success',
-): Promise<void> {
-  if (!pingUrl) return;
+): Promise<DeliveryResult> {
+  if (!pingUrl) {
+    return { channel: 'heartbeat', outcome: 'not_configured', detail: 'no ping URL' };
+  }
   const url = status === 'fail' ? `${pingUrl}/fail` : pingUrl;
   const controller = new AbortController();
   // clearTimeout MUST happen on every exit path, including thrown fetches
@@ -82,15 +84,55 @@ export async function pingHeartbeat(
     const res = await fetch(url, { method: 'POST', signal: controller.signal });
     if (!res.ok) {
       log(agent, `heartbeat ping returned ${res.status} (url=${url.replace(/[^/]+$/, '...')})`);
+      return { channel: 'heartbeat', outcome: 'failed', detail: `HTTP ${res.status}` };
     }
+    return { channel: 'heartbeat', outcome: 'sent' };
   } catch (err) {
-    log(
-      agent,
-      `heartbeat ping failed: ${err instanceof Error ? err.message : err}`,
-    );
+    const detail = err instanceof Error ? err.message : String(err);
+    log(agent, `heartbeat ping failed: ${detail}`);
+    return { channel: 'heartbeat', outcome: 'failed', detail };
   } finally {
     clearTimeout(timer);
   }
+}
+
+// ─── Delivery truth ─────────────────────────────────────────────────────────
+
+/**
+ * What actually happened to an alert, as opposed to what we decided to do.
+ *
+ * Every sender in this file used to return `void` with a silent
+ * `if (!configured) return;` at the top. That made "we decided to alert" and
+ * "an alert reached a human" indistinguishable to every caller — and
+ * `ops-reporter` logged `alerted: true` for cycles in which nothing was sent
+ * and nothing could have been, because on prod SLACK_WEBHOOK_URL, SMTP_HOST,
+ * SMTP_TO and OPS_ALERT_EMAIL are all empty. The log affirmed a delivery that
+ * never happened, which is worse than logging nothing.
+ *
+ * `not_configured` is deliberately NOT an error: an unconfigured channel is a
+ * legitimate deployment state. It is simply not a success, and must never be
+ * recorded as one.
+ */
+export type DeliveryOutcome = 'sent' | 'not_configured' | 'failed';
+
+export interface DeliveryResult {
+  channel: 'slack' | 'email' | 'heartbeat';
+  outcome: DeliveryOutcome;
+  /** Why, for the operator-facing log line. Absent when outcome is 'sent'. */
+  detail?: string;
+}
+
+/** True only if at least one channel actually delivered. */
+export function anyDelivered(results: readonly DeliveryResult[]): boolean {
+  return results.some((r) => r.outcome === 'sent');
+}
+
+/** One-line, operator-readable summary of a delivery attempt. */
+export function describeDelivery(results: readonly DeliveryResult[]): string {
+  if (results.length === 0) return 'no channels attempted';
+  return results
+    .map((r) => `${r.channel}=${r.outcome}${r.detail ? ` (${r.detail})` : ''}`)
+    .join(', ');
 }
 
 // ─── Slack ──────────────────────────────────────────────────────────────────
@@ -109,9 +151,11 @@ export async function sendSlackAlert(
   previousStatus: SystemStatus | 'unknown',
   activeIncidents: Incident[],
   fixedCount: number,
-): Promise<void> {
+): Promise<DeliveryResult> {
   const webhookUrl = process.env.SLACK_WEBHOOK_URL || '';
-  if (!webhookUrl) return;
+  if (!webhookUrl) {
+    return { channel: 'slack', outcome: 'not_configured', detail: 'SLACK_WEBHOOK_URL unset' };
+  }
 
   const emoji =
     status === 'HEALTHY' ? ':large_green_circle:' :
@@ -198,9 +242,13 @@ export async function sendSlackAlert(
     });
     if (!res.ok) {
       log('alerting', `Slack webhook returned ${res.status}`);
+      return { channel: 'slack', outcome: 'failed', detail: `HTTP ${res.status}` };
     }
+    return { channel: 'slack', outcome: 'sent' };
   } catch (err) {
-    log('alerting', `Slack alert failed: ${err instanceof Error ? err.message : err}`);
+    const detail = err instanceof Error ? err.message : String(err);
+    log('alerting', `Slack alert failed: ${detail}`);
+    return { channel: 'slack', outcome: 'failed', detail };
   }
 }
 
@@ -218,9 +266,14 @@ export async function sendEmailAlert(
   status: SystemStatus,
   activeIncidents: Incident[],
   fixedCount: number,
-): Promise<void> {
+): Promise<DeliveryResult> {
   const host = process.env.SMTP_HOST || '';
-  if (!host) return;
+  if (!host) {
+    // Checked BEFORE the recipient, so an unset SMTP_HOST used to return here
+    // without logging anything at all — the recipient warning below was
+    // unreachable on prod, where both are empty.
+    return { channel: 'email', outcome: 'not_configured', detail: 'SMTP_HOST unset' };
+  }
 
   const port = parseInt(process.env.SMTP_PORT || '587', 10);
   const user = process.env.SMTP_USER || '';
@@ -234,7 +287,11 @@ export async function sendEmailAlert(
 
   if (!to) {
     log('alerting', 'OPS_ALERT_EMAIL and SMTP_TO are both unset — skipping email alert');
-    return;
+    return {
+      channel: 'email',
+      outcome: 'not_configured',
+      detail: 'OPS_ALERT_EMAIL and SMTP_TO both unset',
+    };
   }
 
   const criticals = activeIncidents.filter(i => i.severity === 'critical');
@@ -303,8 +360,11 @@ export async function sendEmailAlert(
       subject: `[Vizora Ops] ${status} — ${criticals.length} critical, ${warnings.length} warnings`,
       html,
     });
+    return { channel: 'email', outcome: 'sent' };
   } catch (err) {
-    log('alerting', `Email alert failed: ${err instanceof Error ? err.message : err}`);
+    const detail = err instanceof Error ? err.message : String(err);
+    log('alerting', `Email alert failed: ${detail}`);
+    return { channel: 'email', outcome: 'failed', detail };
   }
 }
 
@@ -378,9 +438,11 @@ export async function sendInlineAlert(
   severity: 'critical' | 'warning',
   summary: string,
   details?: string,
-): Promise<void> {
+): Promise<DeliveryResult> {
   const webhookUrl = process.env.SLACK_WEBHOOK_URL || '';
-  if (!webhookUrl) return;
+  if (!webhookUrl) {
+    return { channel: 'slack', outcome: 'not_configured', detail: 'SLACK_WEBHOOK_URL unset' };
+  }
 
   const emoji = severity === 'critical' ? ':red_circle:' : ':large_yellow_circle:';
   const headerText = severity === 'critical' ? 'CRITICAL' : 'WARNING';
@@ -418,9 +480,13 @@ export async function sendInlineAlert(
     });
     if (!res.ok) {
       log(agent, `Inline Slack alert returned ${res.status}`);
+      return { channel: 'slack', outcome: 'failed', detail: `HTTP ${res.status}` };
     }
+    return { channel: 'slack', outcome: 'sent' };
   } catch (err) {
-    log(agent, `Inline Slack alert failed: ${err instanceof Error ? err.message : err}`);
+    const detail = err instanceof Error ? err.message : String(err);
+    log(agent, `Inline Slack alert failed: ${detail}`);
+    return { channel: 'slack', outcome: 'failed', detail };
   }
 }
 

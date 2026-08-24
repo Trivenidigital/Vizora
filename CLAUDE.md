@@ -643,7 +643,7 @@ Available at `http://localhost:3000/api/v1/docs` in development mode only.
 - **Middleware**: **3760 / 3760 tests pass** across **179 / 179 suites**, 1 snapshot, 0 fail (re-measured 2026-08-22 on `d2dbaf1e`).
 - **Realtime**: **554 / 554 tests pass** across **19 / 19 suites** (re-measured 2026-08-22 on `d2dbaf1e`). The historical Prisma-generate-in-test-env issue NO LONGER REPRODUCES.
 - **Web**: **1167 / 1167 tests pass** across **113 / 113 suites**, 0 skipped (verified 2026-08-03).
-- **Ops scripts**: **624 / 624 tests pass** via `pnpm test:ops` (node:test + tsx) — verified 2026-08-23.
+- **Ops scripts**: **637 / 637 tests pass** via `pnpm test:ops` (node:test + tsx) — verified 2026-08-24.
   Note `pnpm test:ops` runs under tsx, which strips types without checking them, and CI's
   `typecheck` job covers only `display` while `lint` covers only `middleware/src` + `realtime/src`.
   `scripts/` **is** now type-checked in CI by TWO configs, both in the `test` job:
