@@ -30,6 +30,7 @@ import { SanitizeInterceptor } from './modules/common/interceptors/sanitize.inte
 import { LoggingInterceptor } from './modules/common/interceptors/logging.interceptor';
 import { ResponseEnvelopeInterceptor } from './modules/common/interceptors/response-envelope.interceptor';
 import { SentryInterceptor } from './interceptors/sentry.interceptor';
+import { deviceNullOriginCors } from './common/cors/device-null-origin';
 import { AllExceptionsFilter } from './modules/common/filters/all-exceptions.filter';
 
 async function bootstrap() {
@@ -104,6 +105,14 @@ async function bootstrap() {
     contentSecurityPolicy: process.env.NODE_ENV === 'production',
     crossOriginEmbedderPolicy: false, // Allow embedding for display clients
   }));
+
+  // Packaged smart-TV clients (Tizen/webOS) load from file:// and therefore send
+  // `Origin: null`, which the origin allowlist below cannot express and which no
+  // dashboard origin should ever match. Installed FIRST because the global policy has no
+  // notion of the request path: if it handles the preflight it answers without an
+  // allow-origin header and the TV client is blocked. Exact-path allowlist, no
+  // credentials — see common/cors/device-null-origin.ts for why each of those matters.
+  app.use(deviceNullOriginCors());
 
   // CORS configuration - staging mirrors production restrictions
   const corsOrigins = process.env.CORS_ORIGIN?.split(',').map(o => o.trim()) || [];
