@@ -74,12 +74,11 @@ const COMPLIANCE_BADGES = [
 
 export default function SecuritySection() {
   return (
-    <section id="security" className="py-16 sm:py-20 px-6" aria-labelledby="securityTitle">
+    <section id="security" className="scroll-mt-20 py-16 sm:py-20 px-6" aria-labelledby="securityTitle">
       <div className="max-w-5xl mx-auto">
         <Reveal>
           <div className="text-center mb-14">
-            <span className="inline-block text-xs font-bold uppercase tracking-[0.15em] mb-4 px-3 py-1 rounded-full"
-              style={{ color: 'var(--mkt-mint-ink)', background: 'rgba(0,229,160,0.10)', border: '1px solid rgba(0,178,124,0.22)' }}>
+            <span className="mkt-mono mkt-kicker" style={{ marginBottom: '14px' }}>
               Security
             </span>
             <h2 id="securityTitle" className="eh-heading text-3xl sm:text-4xl font-bold mb-4">
