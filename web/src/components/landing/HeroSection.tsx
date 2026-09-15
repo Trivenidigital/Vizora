@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import Link from 'next/link';
 import { anchorProps } from './shared';
+import ProductTourDialog from './ProductTourDialog';
 
 interface HeroSectionProps {
   heroRef: RefObject<HTMLElement | null>;
@@ -25,6 +26,7 @@ const SCREENS: Array<[number, number, number]> = [
 
 export default function HeroSection({ heroRef }: HeroSectionProps) {
   const fibreRef = useRef<SVGSVGElement>(null);
+  const [tourOpen, setTourOpen] = useState(false);
 
   useEffect(() => {
     const svg = fibreRef.current;
@@ -164,8 +166,11 @@ export default function HeroSection({ heroRef }: HeroSectionProps) {
         .mkt-hero-trust span { display: flex; align-items: center; gap: 6px; }
         .mkt-hero-tick { color: var(--mkt-mint-ink); font-weight: 700; }
 
+        /* It is a <button> now, so the UA resets have to be undone for it to keep
+           reading as the chip it looks like. */
         .mkt-hero-chip { position: absolute; right: clamp(22px,3vw,46px); bottom: clamp(28px,4vw,54px); z-index: 5;
-          display: flex; align-items: center; gap: 13px; border-radius: 13px; padding: 11px 16px 11px 11px; text-align: left; }
+          display: flex; align-items: center; gap: 13px; border-radius: 13px; padding: 11px 16px 11px 11px;
+          text-align: left; cursor: pointer; font: inherit; color: inherit; }
         .mkt-hero-chip .mkt-mono { color: var(--mkt-muted); display: block; margin-bottom: 3px; }
         .mkt-hero-chip strong { display: block; font-family: var(--font-sora), sans-serif;
           font-size: .9rem; font-weight: 600; letter-spacing: -.02em; }
@@ -252,7 +257,12 @@ export default function HeroSection({ heroRef }: HeroSectionProps) {
           </div>
         </div>
 
-        <div className="mkt-chip mkt-hero-chip">
+        <button
+          type="button"
+          className="mkt-chip mkt-hero-chip"
+          onClick={() => setTourOpen(true)}
+          aria-haspopup="dialog"
+        >
           <span className="mkt-hero-orb" aria-hidden="true">
             <i>▶</i>
           </span>
@@ -260,7 +270,9 @@ export default function HeroSection({ heroRef }: HeroSectionProps) {
             <span className="mkt-mono">Watch the product tour</span>
             <strong>Dashboard, templates &amp; pairing · 1:45</strong>
           </span>
-        </div>
+        </button>
+
+        <ProductTourDialog open={tourOpen} onClose={() => setTourOpen(false)} />
       </section>
     </div>
   );

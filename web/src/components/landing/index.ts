@@ -1,6 +1,7 @@
 export { default as NavigationSection } from './NavigationSection';
 export { default as HeroSection } from './HeroSection';
 export { default as DemoVideoSection } from './DemoVideoSection';
+export { default as ProductTourDialog } from './ProductTourDialog';
 export { default as StatsSection } from './StatsSection';
 export { default as AIFeaturesSection } from './AIFeaturesSection';
 export { default as HowItWorksSection } from './HowItWorksSection';
