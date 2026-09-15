@@ -35,11 +35,11 @@ const FAQ_DATA = [
 
 export default function FAQSection() {
   return (
-    <section id="faq" className="scroll-mt-20 py-16 sm:py-20 px-6">
+    <section id="faq" className="scroll-mt-20 py-16 sm:py-20 px-6" aria-labelledby="faqTitle">
       <div className="max-w-3xl mx-auto">
         <Reveal>
           <div className="text-center mb-14">
-            <h2 className="eh-heading text-3xl sm:text-4xl font-bold mb-4">
+            <h2 id="faqTitle" className="eh-heading text-3xl sm:text-4xl font-bold mb-4">
               Frequently asked questions
             </h2>
             <p style={{ color: 'var(--mkt-ink-2)' }}>

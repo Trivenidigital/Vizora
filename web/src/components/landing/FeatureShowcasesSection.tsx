@@ -16,7 +16,7 @@ interface FeatureShowcasesSectionProps {
 
 export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureShowcasesSectionProps) {
   return (
-    <section id="features" className="scroll-mt-20 py-16 sm:py-20 px-6">
+    <section id="features" className="scroll-mt-20 py-16 sm:py-20 px-6" aria-labelledby="featuresTitle">
       <div className="max-w-6xl mx-auto">
         <Reveal>
           <div className="text-center mb-12">
@@ -24,7 +24,7 @@ export default function FeatureShowcasesSection({ activeFeatureTab }: FeatureSho
               style={{ color: 'var(--mkt-mint-ink)', background: 'rgba(0,229,160,0.08)', border: '1px solid rgba(0, 178, 124, 0.22)' }}>
               Platform
             </span>
-            <h2 className="eh-heading text-3xl sm:text-4xl font-bold mb-4">
+            <h2 id="featuresTitle" className="eh-heading text-3xl sm:text-4xl font-bold mb-4">
               Complete control over
               <br />
               <span className="eh-gradient">every screen</span>

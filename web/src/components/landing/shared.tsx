@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 /* ---- Scroll-triggered fade-in ---- */
@@ -126,6 +126,7 @@ export function AnimatedStat({ value, suffix = '' }: { value: number; suffix?: s
 export function FAQItem({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+  const id = useId();
 
   return (
     <div
@@ -133,6 +134,10 @@ export function FAQItem({ q, a }: { q: string; a: string }) {
       style={{ borderColor: 'var(--mkt-hair, #1B3D47)' }}
     >
       <button
+        type="button"
+        id={`${id}-q`}
+        aria-expanded={open}
+        aria-controls={`${id}-a`}
         onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between py-5 text-left group"
       >
@@ -156,6 +161,13 @@ export function FAQItem({ q, a }: { q: string; a: string }) {
       </button>
       <div
         ref={contentRef}
+        id={`${id}-a`}
+        role="region"
+        aria-labelledby={`${id}-q`}
+        // A collapsed answer is still in the DOM for the max-height animation.
+        // It holds no focusable content, so hiding it from the a11y tree is
+        // enough — nothing can be tabbed into an aria-hidden subtree here.
+        aria-hidden={!open}
         className="overflow-hidden transition-all duration-300 ease-out"
         style={{
           maxHeight: open ? `${contentRef.current?.scrollHeight || 300}px` : '0px',

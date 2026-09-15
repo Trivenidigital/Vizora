@@ -104,7 +104,7 @@ const AI_FEATURES = [
 
 export default function AIFeaturesSection() {
   return (
-    <section className="py-20 sm:py-28 px-6 eh-neural-grid" style={{ background: 'var(--mkt-page-2)' }}>
+    <section id="ai" className="py-20 sm:py-28 px-6 eh-neural-grid" aria-labelledby="aiTitle" style={{ background: 'var(--mkt-page-2)' }}>
       <div className="max-w-5xl mx-auto relative z-10">
         <Reveal>
           <div className="text-center mb-16">
@@ -115,7 +115,7 @@ export default function AIFeaturesSection() {
               <Sparkles size={12} />
               Intelligence Engine
             </span>
-            <h2 className="eh-heading text-3xl sm:text-4xl lg:text-[2.75rem] font-bold mb-5">
+            <h2 id="aiTitle" className="eh-heading text-3xl sm:text-4xl lg:text-[2.75rem] font-bold mb-5">
               AI that works <span className="eh-gradient">while you sleep</span>
             </h2>
             <p style={{ color: 'var(--mkt-ink-2)' }} className="max-w-xl mx-auto text-base sm:text-lg">

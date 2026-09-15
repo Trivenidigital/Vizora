@@ -72,7 +72,7 @@ const COMPLIANCE_BADGES = [
 
 export default function SecuritySection() {
   return (
-    <section className="py-16 sm:py-20 px-6">
+    <section id="security" className="py-16 sm:py-20 px-6" aria-labelledby="securityTitle">
       <div className="max-w-5xl mx-auto">
         <Reveal>
           <div className="text-center mb-14">
@@ -80,7 +80,7 @@ export default function SecuritySection() {
               style={{ color: 'var(--mkt-mint-ink)', background: 'rgba(0,229,160,0.10)', border: '1px solid rgba(0,178,124,0.22)' }}>
               Security
             </span>
-            <h2 className="eh-heading text-3xl sm:text-4xl font-bold mb-4">
+            <h2 id="securityTitle" className="eh-heading text-3xl sm:text-4xl font-bold mb-4">
               Security that <span className="eh-gradient">never sleeps</span>
             </h2>
             <p style={{ color: 'var(--mkt-ink-2)' }} className="max-w-lg mx-auto">

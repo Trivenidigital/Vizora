@@ -12,7 +12,7 @@ const STATS = [
 
 export default function StatsSection() {
   return (
-    <section className="py-14 px-6">
+    <section className="py-14 px-6" aria-label="Vizora at a glance">
       <div className="max-w-5xl mx-auto">
         <Reveal>
           <div

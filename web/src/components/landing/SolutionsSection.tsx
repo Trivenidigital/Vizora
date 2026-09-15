@@ -45,7 +45,7 @@ const INDUSTRIES = [
 
 export default function SolutionsSection() {
   return (
-    <section id="solutions" className="scroll-mt-20 py-16 sm:py-20 px-6">
+    <section id="solutions" className="scroll-mt-20 py-16 sm:py-20 px-6" aria-labelledby="solutionsTitle">
       <div className="max-w-5xl mx-auto">
         <Reveal>
           <div className="text-center mb-14">
@@ -53,7 +53,7 @@ export default function SolutionsSection() {
               style={{ color: 'var(--mkt-cyan-ink)', background: 'rgba(0,180,216,0.10)', border: '1px solid rgba(0,180,216,0.22)' }}>
               Solutions
             </span>
-            <h2 className="eh-heading text-3xl sm:text-4xl font-bold mb-4">
+            <h2 id="solutionsTitle" className="eh-heading text-3xl sm:text-4xl font-bold mb-4">
               Built for <span className="eh-gradient">your industry</span>
             </h2>
             <p style={{ color: 'var(--mkt-ink-2)' }} className="max-w-lg mx-auto">

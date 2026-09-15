@@ -11,7 +11,7 @@ interface FinalCTASectionProps {
 
 export default function FinalCTASection({ finalCtaRef }: FinalCTASectionProps) {
   return (
-    <section ref={finalCtaRef} className="py-16 sm:py-20 px-6">
+    <section ref={finalCtaRef} className="py-16 sm:py-20 px-6" aria-labelledby="finalCtaTitle">
       <Reveal>
         <div
           className="max-w-4xl mx-auto rounded-2xl p-10 sm:p-16 text-center relative overflow-hidden eh-grain"
@@ -48,7 +48,7 @@ export default function FinalCTASection({ finalCtaRef }: FinalCTASectionProps) {
             </span>
           </div>
 
-          <h2 className="relative eh-heading text-2xl sm:text-3xl font-bold mb-4">
+          <h2 id="finalCtaTitle" className="relative eh-heading text-2xl sm:text-3xl font-bold mb-4">
             Your screens are waiting
           </h2>
           <p className="relative mb-8 max-w-md mx-auto" style={{ color: 'var(--mkt-ink-2)' }}>
