@@ -2,8 +2,8 @@
 
 import type { RefObject } from 'react';
 import Link from 'next/link';
-import { Monitor, ShieldCheck, Globe, Lock } from 'lucide-react';
-import { scrollTo } from './shared';
+import { Monitor } from 'lucide-react';
+import { anchorProps } from './shared';
 
 interface FooterSectionProps {
   footerRef: RefObject<HTMLElement | null>;
@@ -34,18 +34,16 @@ export default function FooterSection({ footerRef }: FooterSectionProps) {
               AI-powered digital signage platform.
               Intelligent control for every screen.
             </p>
-            <div className="flex items-center gap-4">
-              {[
-                { label: 'SOC 2', icon: ShieldCheck },
-                { label: 'GDPR', icon: Globe },
-                { label: '256-bit', icon: Lock },
-              ].map((badge) => (
-                <div key={badge.label} className="flex items-center gap-1.5 text-[0.7rem]" style={{ color: 'var(--mkt-muted)' }}>
-                  <badge.icon size={12} style={{ color: 'var(--mkt-mint-ink)' }} />
-                  {badge.label}
-                </div>
-              ))}
-            </div>
+            {/* The SOC 2 / GDPR / 256-bit badge row that stood here claimed
+                certifications Vizora does not hold. A real support address is
+                worth more to a visitor than a badge that is not true. */}
+            <a
+              href="mailto:support@vizora.cloud"
+              className="text-sm transition-colors hover:text-[color:var(--mkt-ink)]"
+              style={{ color: 'var(--mkt-ink-2)' }}
+            >
+              support@vizora.cloud
+            </a>
           </div>
 
           {/* Product */}
@@ -53,19 +51,20 @@ export default function FooterSection({ footerRef }: FooterSectionProps) {
             <h4 className="text-xs font-bold uppercase tracking-[0.1em] mb-4" style={{ color: 'var(--mkt-muted)' }}>Product</h4>
             <ul className="space-y-2.5">
               {[
-                { label: 'Features', action: () => scrollTo('features') },
-                { label: 'Pricing', action: () => scrollTo('pricing') },
-                { label: 'Solutions', action: () => scrollTo('solutions') },
-                { label: 'FAQ', action: () => scrollTo('faq') },
+                { label: 'Features', id: 'features' },
+                { label: 'How it works', id: 'how' },
+                { label: 'Solutions', id: 'solutions' },
+                { label: 'Pricing', id: 'pricing' },
+                { label: 'FAQ', id: 'faq' },
               ].map((item) => (
-                <li key={item.label}>
-                  <button
-                    onClick={item.action}
+                <li key={item.id}>
+                  <a
+                    {...anchorProps(item.id)}
                     className="text-sm transition-colors hover:text-[color:var(--mkt-ink)]"
                     style={{ color: 'var(--mkt-ink-2)' }}
                   >
                     {item.label}
-                  </button>
+                  </a>
                 </li>
               ))}
             </ul>
@@ -86,6 +85,15 @@ export default function FooterSection({ footerRef }: FooterSectionProps) {
                   </Link>
                 </li>
               ))}
+              <li>
+                <a
+                  href="mailto:sales@vizora.cloud"
+                  className="text-sm transition-colors hover:text-[color:var(--mkt-ink)]"
+                  style={{ color: 'var(--mkt-ink-2)' }}
+                >
+                  Contact sales
+                </a>
+              </li>
             </ul>
           </div>
 

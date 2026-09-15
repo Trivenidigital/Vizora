@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   NavigationSection,
   HeroSection,
@@ -15,7 +15,6 @@ import {
   FinalCTASection,
   StickyBottomBar,
   FooterSection,
-  scrollTo,
 } from '@/components/landing';
 import type { PricingData } from '@/components/landing';
 
@@ -107,14 +106,9 @@ export default function Index() {
       });
   }, []);
 
-  const nav = useCallback((id: string) => {
-    scrollTo(id);
-    setMenuOpen(false);
-  }, []);
-
   return (
     <div className="mkt relative min-h-screen overflow-x-hidden selection:bg-[#00B27C]/20">
-      <NavigationSection scrolled={scrolled} menuOpen={menuOpen} setMenuOpen={setMenuOpen} nav={nav} />
+      <NavigationSection scrolled={scrolled} menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
       <main id="main-content">
         <HeroSection heroRef={heroRef} />
         <StatsSection />

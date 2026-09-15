@@ -49,7 +49,37 @@ export function Reveal({
 }
 
 export function scrollTo(id: string) {
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+  if (typeof window === 'undefined') return;
+  const el = document.getElementById(id);
+  if (!el) return;
+  const behavior: ScrollBehavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ? 'auto'
+    : 'smooth';
+  el.scrollIntoView({ behavior });
+  // Reflect the section in the URL so the position is shareable and the back
+  // button behaves — replaceState rather than pushState, because a smooth
+  // scroll is not a navigation the user expects to undo one step at a time.
+  window.history.replaceState(null, '', `#${id}`);
+}
+
+/**
+ * In-page links must be real `<a href="#id">`: they work with JS disabled, they
+ * are deep-linkable, and assistive tech announces them as links rather than as
+ * buttons that do something unspecified. The handler only upgrades the jump to
+ * a smooth scroll.
+ */
+export function anchorProps(
+  id: string,
+  after?: () => void,
+): Pick<React.ComponentProps<'a'>, 'href' | 'onClick'> {
+  return {
+    href: `#${id}`,
+    onClick: (e: React.MouseEvent<HTMLAnchorElement>) => {
+      e.preventDefault();
+      scrollTo(id);
+      after?.();
+    },
+  };
 }
 
 /* ---- Animated counter ---- */

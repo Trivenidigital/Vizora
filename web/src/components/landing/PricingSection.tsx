@@ -23,7 +23,7 @@ interface PricingSectionProps {
 
 export default function PricingSection({ billingCycle, setBillingCycle, pricing, setPricing }: PricingSectionProps) {
   return (
-    <section id="pricing" className="py-16 sm:py-20 px-6">
+    <section id="pricing" className="scroll-mt-20 py-16 sm:py-20 px-6">
       <div className="max-w-5xl mx-auto">
         <Reveal>
           <div className="text-center mb-10">

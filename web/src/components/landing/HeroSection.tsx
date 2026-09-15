@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
 import Link from 'next/link';
-import { scrollTo } from './shared';
+import { anchorProps } from './shared';
 
 interface HeroSectionProps {
   heroRef: RefObject<HTMLElement | null>;
@@ -232,13 +232,12 @@ export default function HeroSection({ heroRef }: HeroSectionProps) {
                 →
               </span>
             </Link>
-            <button
-              type="button"
-              onClick={() => scrollTo('features')}
+            <a
+              {...anchorProps('features')}
               className="eh-btn-ghost inline-flex items-center justify-center rounded-full px-[21px] py-[13px] text-[0.94rem]"
             >
               See the platform
-            </button>
+            </a>
           </div>
 
           <div className="mkt-hero-trust">

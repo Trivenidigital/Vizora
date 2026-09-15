@@ -35,7 +35,7 @@ const FAQ_DATA = [
 
 export default function FAQSection() {
   return (
-    <section id="faq" className="py-16 sm:py-20 px-6">
+    <section id="faq" className="scroll-mt-20 py-16 sm:py-20 px-6">
       <div className="max-w-3xl mx-auto">
         <Reveal>
           <div className="text-center mb-14">

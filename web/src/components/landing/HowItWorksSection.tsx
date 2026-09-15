@@ -133,7 +133,7 @@ const HOW_CSS = `
 
 export default function HowItWorksSection() {
   return (
-    <section id="how" className="py-16 sm:py-20 px-6" aria-labelledby="howTitle">
+    <section id="how" className="scroll-mt-20 py-16 sm:py-20 px-6" aria-labelledby="howTitle">
       <style dangerouslySetInnerHTML={{ __html: HOW_CSS }} />
 
       <div className="hiw-grid max-w-5xl mx-auto">
