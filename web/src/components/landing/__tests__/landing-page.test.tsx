@@ -76,11 +76,9 @@ describe('homepage composition', () => {
 
     expect(container.querySelector('img[src="/product/dashboard-fleet.png"]')).toBeInTheDocument();
 
-    // The demo SECTION was deliberately trimmed, and the testimonials never shipped.
+    // The demo SECTION was deliberately trimmed. (The testimonials block is
+    // pinned unmounted by marketing-sections.test.tsx; not repeated here.)
     expect(screen.queryByText(/See Vizora In Action/i)).not.toBeInTheDocument();
-    for (const claim of ['Sarah Chen', 'Marcus Williams', 'James Park']) {
-      expect(container.textContent).not.toContain(claim);
-    }
   });
 
   it('every in-page anchor resolves, and the header still offers both account links', async () => {
@@ -113,6 +111,18 @@ describe('homepage composition', () => {
 
     expect(pricing.scrollIntoView).toHaveBeenCalled();
     expect(window.location.hash).toBe('#pricing');
+  });
+
+  it('leaves a modified click (open in new tab) to the native link', async () => {
+    const user = userEvent.setup();
+    const { container } = await renderPage();
+    const link = container.querySelector<HTMLAnchorElement>('nav a[href="#faq"]')!;
+
+    await user.keyboard('{Control>}');
+    await user.click(link);
+    await user.keyboard('{/Control}');
+
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
   });
 });
 
@@ -210,6 +220,11 @@ describe('product tour dialog', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(container.querySelector('source[src="/videos/vizora-demo.mp4"]')).toBeInTheDocument();
 
+    // The player itself must be a tab stop inside the trap, or its native
+    // controls can never be reached by keyboard.
+    await user.tab();
+    expect(document.activeElement).toBe(container.querySelector('video'));
+
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(document.activeElement).toBe(chip);
@@ -237,7 +252,10 @@ describe('landmarks', () => {
 describe('claims audit stays applied', () => {
   it('renders none of the statements the product cannot support', async () => {
     const { container } = await renderPage();
-    for (const claim of ['50,000', '2,500', 'since 2024', 'SOC 2', '256-bit', 'SSO Supported', 'Sarah Chen', '4.9/5']) {
+    // Each of these fails when its fix is reverted (checked by mutation). The
+    // badge label and sub-label render as separate nodes, so the SSO badge is
+    // matched on the label alone rather than on "SSO Supported".
+    for (const claim of ['50,000', '2,500', 'since 2024', 'SOC 2', '256-bit', 'SSOSupported']) {
       expect(container.textContent).not.toContain(claim);
     }
   });

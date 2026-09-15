@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import Link from 'next/link';
 import { anchorProps } from './shared';
@@ -27,6 +27,10 @@ const SCREENS: Array<[number, number, number]> = [
 export default function HeroSection({ heroRef }: HeroSectionProps) {
   const fibreRef = useRef<SVGSVGElement>(null);
   const [tourOpen, setTourOpen] = useState(false);
+  // Stable identity: `useDialog` keys its effect on `onClose`, and this section
+  // re-renders on every scroll-driven state change in the page. An inline arrow
+  // would re-run the dialog effect (and its body scroll-lock write) each time.
+  const closeTour = useCallback(() => setTourOpen(false), []);
 
   useEffect(() => {
     const svg = fibreRef.current;
@@ -272,7 +276,7 @@ export default function HeroSection({ heroRef }: HeroSectionProps) {
           </span>
         </button>
 
-        <ProductTourDialog open={tourOpen} onClose={() => setTourOpen(false)} />
+        <ProductTourDialog open={tourOpen} onClose={closeTour} />
       </section>
     </div>
   );

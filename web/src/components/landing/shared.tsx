@@ -75,50 +75,14 @@ export function anchorProps(
   return {
     href: `#${id}`,
     onClick: (e: React.MouseEvent<HTMLAnchorElement>) => {
+      // A modified click (new tab / new window) is a deliberate request for
+      // the native link; only the plain click is upgraded to a smooth scroll.
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       e.preventDefault();
       scrollTo(id);
       after?.();
     },
   };
-}
-
-/* ---- Animated counter ---- */
-
-export function AnimatedStat({ value, suffix = '' }: { value: number; suffix?: string }) {
-  const [display, setDisplay] = useState(0);
-  const ref = useRef<HTMLSpanElement>(null);
-  const started = useRef(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !started.current) {
-          started.current = true;
-          const duration = 1800;
-          const start = performance.now();
-          const step = (now: number) => {
-            const progress = Math.min((now - start) / duration, 1);
-            const eased = 1 - Math.pow(1 - progress, 3);
-            setDisplay(Math.floor(eased * value));
-            if (progress < 1) requestAnimationFrame(step);
-          };
-          requestAnimationFrame(step);
-          observer.unobserve(el);
-        }
-      },
-      { threshold: 0.5 },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [value]);
-
-  return (
-    <span ref={ref} style={{ fontFamily: 'var(--font-mono), monospace' }}>
-      {display.toLocaleString()}{suffix}
-    </span>
-  );
 }
 
 /* ---- FAQ Accordion ---- */

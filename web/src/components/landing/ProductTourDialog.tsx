@@ -72,7 +72,12 @@ export default function ProductTourDialog({ open, onClose }: ProductTourDialogPr
           </button>
         </div>
 
+        {/* tabIndex: `useDialog`'s focus trap enumerates a[href]/button/input/
+            select/textarea/[tabindex]. A <video> matches none of those, so
+            without this the trap pinned Tab on the Close button and the native
+            controls were unreachable by keyboard. */}
         <video
+          tabIndex={0}
           controls
           autoPlay
           playsInline
