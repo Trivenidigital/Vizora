@@ -25,35 +25,15 @@ export default function FinalCTASection({ finalCtaRef }: FinalCTASectionProps) {
             style={{ background: 'radial-gradient(circle, rgba(0,229,160,0.1) 0%, transparent 70%)' }}
           />
 
-          {/* Avatar row */}
-          <div className="relative flex items-center justify-center mb-6">
-            <div className="flex -space-x-2">
-              {[
-                { initials: 'SC', gradient: 'linear-gradient(135deg, var(--mkt-mint), var(--mkt-cyan))' },
-                { initials: 'MW', gradient: 'linear-gradient(135deg, var(--mkt-cyan), var(--mkt-violet))' },
-                { initials: 'JP', gradient: 'linear-gradient(135deg, var(--mkt-violet), var(--mkt-mint))' },
-                { initials: 'LT', gradient: 'linear-gradient(135deg, var(--mkt-amber), var(--mkt-mint))' },
-              ].map((avatar) => (
-                <div
-                  key={avatar.initials}
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-[0.6rem] font-bold ring-2 ring-[color:var(--mkt-page)]"
-                  style={{ background: avatar.gradient, color: 'var(--mkt-ink)' }}
-                >
-                  {avatar.initials}
-                </div>
-              ))}
-            </div>
-            <span className="ml-3 text-sm font-medium" style={{ color: 'var(--mkt-muted)' }}>
-              +2,500 organizations
-            </span>
-          </div>
-
+          {/* The avatar row that stood here spelled out the initials of the
+              fabricated testimonial names, beside an organization count
+              nothing could substantiate. */}
           <h2 id="finalCtaTitle" className="relative eh-heading text-2xl sm:text-3xl font-bold mb-4">
             Your screens are waiting
           </h2>
           <p className="relative mb-8 max-w-md mx-auto" style={{ color: 'var(--mkt-ink-2)' }}>
-            Join thousands of organizations using Vizora to power their digital signage.
-            Deploy your first screen in under 5 minutes.
+            Pair a screen with a code, assign a playlist, and it is live. Your first screen is up in
+            about five minutes.
           </p>
           <div className="relative">
             <Link

@@ -5,7 +5,6 @@ import {
   FileCheck,
   Users,
   Eye,
-  Brain,
   Globe,
   Lock,
 } from 'lucide-react';
@@ -46,7 +45,7 @@ const SECURITY_FEATURES = [
   {
     icon: Users,
     title: 'Role-Based Access',
-    desc: 'Granular permissions per role. Admins, editors, and viewers see only what they need.',
+    desc: 'Granular permissions per role. Admins, managers, and viewers see only what they need.',
     accent: ACCENTS.violet,
   },
   {
@@ -56,18 +55,21 @@ const SECURITY_FEATURES = [
     accent: ACCENTS.mint,
   },
   {
-    icon: Brain,
-    title: 'Privacy-First AI',
-    desc: 'All AI processing respects data boundaries. Edge computing keeps sensitive data on-device. No data leaves your network without permission.',
+    icon: Lock,
+    title: 'Hardened Requests',
+    desc: 'Rate limiting, CSRF protection and strict security headers on every request.',
     accent: ACCENTS.cyan,
   },
 ];
 
+/** Only what the platform actually ships. The certification, encryption-bit
+ *  and single-sign-on badges these replace were claims nothing in the product
+ *  backed — Google sign-in is not SSO. */
 const COMPLIANCE_BADGES = [
-  { label: 'SOC 2 Type II', sub: 'Compliant', icon: ShieldCheck },
-  { label: 'GDPR', sub: 'Ready', icon: Globe },
-  { label: '256-bit', sub: 'Encryption', icon: Lock },
-  { label: 'SSO', sub: 'Supported', icon: Users },
+  { label: 'HTTPS', sub: 'TLS on every request', icon: Lock },
+  { label: 'Data export', sub: 'Self-serve export & deletion', icon: Globe },
+  { label: 'Google sign-in', sub: 'Supported', icon: Users },
+  { label: 'Audit log', sub: 'User, time and IP', icon: Eye },
 ];
 
 export default function SecuritySection() {
@@ -118,7 +120,7 @@ export default function SecuritySection() {
               }}
             >
               <h3 className="text-sm font-bold uppercase tracking-[0.1em] mb-6" style={{ color: 'var(--mkt-muted)' }}>
-                Compliance & Certifications
+                Built in
               </h3>
               <div className="grid grid-cols-2 gap-5">
                 {COMPLIANCE_BADGES.map((badge) => (
@@ -139,7 +141,7 @@ export default function SecuritySection() {
               <div className="mt-6 pt-5" style={{ borderTop: '1px solid var(--mkt-hair)' }}>
                 <div className="flex items-baseline gap-2">
                   <span className="text-2xl font-bold" style={{ color: 'var(--mkt-mint-ink)', fontFamily: 'var(--font-mono), monospace' }}>99.9%</span>
-                  <span className="text-sm" style={{ color: 'var(--mkt-muted)' }}>SLA Available</span>
+                  <span className="text-sm" style={{ color: 'var(--mkt-muted)' }}>Uptime SLA on Pro and Enterprise</span>
                 </div>
               </div>
             </div>

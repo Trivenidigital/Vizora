@@ -213,7 +213,8 @@ export default function PricingSection({ billingCycle, setBillingCycle, pricing,
 
         <Reveal>
           <p className="text-center text-xs mt-8" style={{ color: 'var(--mkt-muted)' }}>
-            All plans include SSL encryption, 99.9% SLA, and email support.
+            Every plan runs over HTTPS with email support. The 99.9% uptime SLA applies to Pro and
+            Enterprise.
           </p>
         </Reveal>
       </div>

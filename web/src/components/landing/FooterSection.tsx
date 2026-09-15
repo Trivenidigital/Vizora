@@ -34,9 +34,10 @@ export default function FooterSection({ footerRef }: FooterSectionProps) {
               AI-powered digital signage platform.
               Intelligent control for every screen.
             </p>
-            {/* The SOC 2 / GDPR / 256-bit badge row that stood here claimed
-                certifications Vizora does not hold. A real support address is
-                worth more to a visitor than a badge that is not true. */}
+            {/* The compliance badge row that stood here claimed certifications
+                and an encryption standard Vizora does not hold. A real support
+                address is worth more to a visitor than a badge that is not
+                true. */}
             <a
               href="mailto:support@vizora.cloud"
               className="text-sm transition-colors hover:text-[color:var(--mkt-ink)]"

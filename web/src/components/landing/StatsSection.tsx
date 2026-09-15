@@ -1,13 +1,26 @@
 'use client';
 
-import { Tv, Activity, Users, Sparkles } from 'lucide-react';
-import { Reveal, AnimatedStat } from './shared';
+import { Tv, Activity, CalendarClock, MonitorSmartphone } from 'lucide-react';
+import { Reveal } from './shared';
 
+/**
+ * Every figure here is checkable against the product: the trial length and its
+ * screen quota come from the free tier, the SLA figure is the one the SLA page
+ * actually commits to (Pro and Enterprise — Free and Basic are best-effort),
+ * and the player count is the four platforms that have a client.
+ *
+ * The band previously counted screens managed, organizations onboarded and "AI
+ * systems", none of which any part of the system could substantiate.
+ */
 const STATS = [
-  { value: 50000, suffix: '+', label: 'Screens Managed', icon: Tv },
-  { value: 99.9, suffix: '%', label: 'Platform Uptime', icon: Activity },
-  { value: 2500, suffix: '+', label: 'Organizations', icon: Users },
-  { value: 6, suffix: '', label: 'AI Systems', icon: Sparkles },
+  { value: '30 days', label: 'Free trial, no card required', icon: CalendarClock },
+  { value: '5', label: 'Screens on the free trial', icon: Tv },
+  { value: '99.9%', label: 'Uptime SLA on Pro and Enterprise', icon: Activity },
+  {
+    value: '4',
+    label: 'Player platforms: Android TV, Windows, macOS, Linux',
+    icon: MonitorSmartphone,
+  },
 ];
 
 export default function StatsSection() {
@@ -26,11 +39,7 @@ export default function StatsSection() {
               <div key={stat.label} className="text-center">
                 <stat.icon size={18} className="mx-auto mb-3" style={{ color: 'var(--mkt-mint)', opacity: 0.7 }} />
                 <div className="text-2xl sm:text-3xl font-bold mb-1" style={{ color: 'var(--mkt-ink)' }}>
-                  {typeof stat.value === 'number' && stat.value >= 100 ? (
-                    <AnimatedStat value={stat.value} suffix={stat.suffix} />
-                  ) : (
-                    <span style={{ fontFamily: 'var(--font-mono), monospace' }}>{stat.value}{stat.suffix}</span>
-                  )}
+                  <span style={{ fontFamily: 'var(--font-mono), monospace' }}>{stat.value}</span>
                 </div>
                 <div className="text-xs font-medium" style={{ color: 'var(--mkt-muted)' }}>
                   {stat.label}

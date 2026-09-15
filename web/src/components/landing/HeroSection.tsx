@@ -219,7 +219,7 @@ export default function HeroSection({ heroRef }: HeroSectionProps) {
         </div>
 
         <div className="mkt-hero-copy">
-          <span className="mkt-hero-micro mkt-mono">50,000+ screens orchestrated · since 2024</span>
+          <span className="mkt-hero-micro mkt-mono">Android TV · Windows · macOS · Linux players</span>
 
           <h1 id="heroTitle" className="eh-heading">
             Publish. Schedule.
