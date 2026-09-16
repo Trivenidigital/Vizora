@@ -2,54 +2,67 @@
 
 import { Reveal, FAQItem } from './shared';
 
+/**
+ * Every answer here is written from shipped behavior: pairing by code,
+ * Android TV + desktop players, cached offline playback, per-display
+ * timezone schedules with the next-ten-runs preview, the trial terms in the
+ * billing constants, and the security measures the middleware enforces.
+ */
 const FAQ_DATA = [
   {
-    q: 'How long does setup take?',
-    a: 'Most teams go from sign-up to their first live screen in under 5 minutes. Upload your content, pair a device using a simple code, and push your playlist. No technician or special IT knowledge required.',
+    q: 'How long does it take to get a screen live?',
+    a: 'About five minutes. Install the player, enter the pairing code the screen shows, and assign a playlist. The screen joins your workspace and starts reporting its status.',
   },
   {
-    q: 'What hardware do I need to run Vizora?',
-    a: 'Vizora works with any screen or TV. Our Electron app runs on Windows, macOS, and Linux devices, while our Android TV app supports smart displays and media players. All you need is a screen and an internet connection.',
+    q: 'What hardware do I need?',
+    a: 'Any screen you can plug a player into. Vizora has an Android TV app and desktop players for Windows, macOS and Linux — a TV and an internet connection is enough.',
   },
   {
-    q: 'How does real-time monitoring work?',
-    a: "Vizora uses persistent WebSocket connections — not polling — to maintain a live connection with every display. When a screen goes offline, changes content, or encounters an error, your dashboard updates within milliseconds. This is the same technology that powers live chat and trading platforms.",
+    q: 'What happens if a screen loses its connection?',
+    a: 'It keeps playing. Players cache their content, so an offline screen continues with its last playlist; when it reconnects it picks up whatever you scheduled in the meantime. The dashboard always shows when each screen last checked in.',
   },
   {
-    q: 'Is Vizora secure enough for enterprise use?',
-    a: "Absolutely. Vizora includes CSRF protection, XSS sanitization on all API responses, dual JWT authentication (separate secrets for users and devices), role-based access control, full audit logging, and rate limiting. Files are validated at the binary level to prevent MIME spoofing.",
+    q: 'Can I schedule in each location’s local time?',
+    a: 'Yes. Schedules are timezone-aware per display, so the breakfast board flips at six wherever the café actually is — and you can preview the next ten runs of any schedule before committing it.',
   },
   {
-    q: 'Can I manage screens across different timezones?',
-    a: "Yes. Vizora's scheduling engine is fully timezone-aware. You can set schedules in each location's local time, and the system automatically handles timezone conversions. Preview the next 10 occurrences of any schedule to verify timing before publishing.",
+    q: 'How does billing work?',
+    a: 'Per screen, per month. Start with a 30-day free trial for up to 5 screens with no credit card. Basic covers up to 50 screens; Pro covers up to 100 and adds API access. Beyond that, talk to us.',
   },
   {
-    q: 'What does the free trial include?',
-    a: 'The free trial gives you 5 screens for 30 days with no credit card required. You get full access to content uploads, basic scheduling, and the real-time monitoring dashboard. When you\'re ready to scale, choose Basic, Pro, or contact us for Enterprise.',
-  },
-  {
-    q: 'How does Vizora use AI?',
-    a: "Vizora integrates AI across the platform — from content generation and smart scheduling to predictive device monitoring and audience-aware content adaptation. Our AI engine continuously optimizes your signage network, suggesting the best times to display content, detecting device anomalies before they cause downtime, and generating performance reports automatically. All AI features are included in Pro plans and above.",
+    q: 'Is my content and data secure?',
+    a: 'Users and screens authenticate with separate credentials, uploads are validated by their bytes rather than their file extension, access is role-scoped (admin, manager, viewer), and every change lands in an audit log with user, time and IP.',
   },
 ];
 
+const CSS = `
+.lw-faq{padding:clamp(56px,7vw,104px) 0}
+.lwx-head{text-align:center;max-width:40rem;margin:0 auto 40px}
+.lwx-head h2{font-size:clamp(1.9rem,3.4vw,2.9rem);margin:14px 0 10px}
+.lwx-head p{color:var(--lw-ink-2)}
+.lwx-head .lw-kicker{justify-content:center}
+.lwx-list{max-width:46rem;margin-inline:auto}
+.lwx-contact{text-align:center;color:var(--lw-muted);font-size:.88rem;margin-top:30px}
+.lwx-contact a{color:var(--lw-forest);font-weight:600}
+`;
+
 export default function FAQSection() {
   return (
-    <section id="faq" className="scroll-mt-20 py-16 sm:py-20 px-6" aria-labelledby="faqTitle">
-      <div className="max-w-3xl mx-auto">
+    <section id="faq" className="lw-faq scroll-mt-20" aria-labelledby="faqTitle">
+      <style dangerouslySetInnerHTML={{ __html: CSS }} />
+      <div className="lw-wrap">
         <Reveal>
-          <div className="text-center mb-14">
-            <h2 id="faqTitle" className="eh-heading text-3xl sm:text-4xl font-bold mb-4">
-              Frequently asked questions
+          <div className="lwx-head">
+            <span className="lw-mono lw-kicker">Useful questions</span>
+            <h2 id="faqTitle" className="lw-h2">
+              Questions, answered.
             </h2>
-            <p style={{ color: 'var(--mkt-ink-2)' }}>
-              Everything you need to know about Vizora.
-            </p>
+            <p>The short version of how Vizora actually behaves.</p>
           </div>
         </Reveal>
 
         <Reveal>
-          <div>
+          <div className="lwx-list">
             {FAQ_DATA.map((item) => (
               <FAQItem key={item.q} q={item.q} a={item.a} />
             ))}
@@ -57,11 +70,8 @@ export default function FAQSection() {
         </Reveal>
 
         <Reveal>
-          <p className="text-center text-sm mt-8" style={{ color: 'var(--mkt-muted)' }}>
-            Still have questions?{' '}
-            <a href="mailto:support@vizora.cloud" className="transition-colors hover:text-[color:var(--mkt-mint-ink)]" style={{ color: 'var(--mkt-muted)' }}>
-              Contact us &rarr;
-            </a>
+          <p className="lwx-contact">
+            Something else on your mind? <a href="mailto:support@vizora.cloud">Write to support</a>
           </p>
         </Reveal>
       </div>

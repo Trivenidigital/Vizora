@@ -14,10 +14,11 @@ const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mon
 
 export const metadata = {
   title: {
-    default: 'Vizora — AI-Powered Digital Signage Platform',
+    default: 'Vizora — Digital signage for the places you run',
     template: '%s | Vizora',
   },
-  description: 'AI-driven digital signage that runs itself. Generate content, optimize schedules, predict device issues, and manage thousands of screens autonomously.',
+  description:
+    'Create and schedule content, organize playlists, and manage every signage screen across your locations — cafés, hotels, retail and more — from one dashboard.',
   icons: {
     icon: '/favicon.ico',
   },

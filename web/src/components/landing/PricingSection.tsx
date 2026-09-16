@@ -21,38 +21,66 @@ interface PricingSectionProps {
   setPricing: Dispatch<SetStateAction<PricingData | null>>;
 }
 
+/** Feature bullets are limited to what the plans actually grant. */
+const FREE_FEATURES = ['Up to 5 screens', '30 days, no credit card', 'Content upload & library', 'Scheduling', '1 GB storage'];
+const BASIC_FEATURES = ['Up to 50 screens', 'Analytics dashboard', 'Advanced scheduling', 'Email support', '25 GB storage'];
+const PRO_FEATURES = ['Up to 100 screens', 'Everything in Basic', 'API access', 'Priority support', '100 GB storage'];
+const ENTERPRISE_FEATURES = ['Unlimited screens', 'Volume pricing', '99.9% uptime SLA', 'Priority support'];
+
+const CSS = `
+.lw-pricing{padding:clamp(56px,7vw,104px) 0;background:linear-gradient(180deg,transparent,var(--lw-paper-2) 30%,var(--lw-paper-2) 70%,transparent)}
+.lwr-head{text-align:center;max-width:42rem;margin:0 auto 30px}
+.lwr-head h2{font-size:clamp(1.9rem,3.4vw,2.9rem);margin:14px 0 10px}
+.lwr-head p{color:var(--lw-ink-2)}
+.lwr-head .lw-kicker{justify-content:center}
+.lwr-toggle{display:inline-flex;align-items:center;gap:4px;padding:4px;border-radius:999px;
+  background:var(--lw-card);border:1px solid var(--lw-hair)}
+.lwr-toggle button{border-radius:999px;padding:7px 16px;font-size:.86rem;font-weight:600;
+  color:var(--lw-ink-2);display:flex;align-items:center;gap:8px;transition:background .2s,color .2s}
+.lwr-toggle button[aria-pressed="true"]{background:var(--lw-forest);color:var(--lw-on-forest)}
+.lwr-save{font-size:.62rem;font-weight:700;padding:2px 7px;border-radius:999px;
+  background:var(--lw-brass);color:#2d2208}
+.lwr-cur{margin-top:12px;display:flex;justify-content:center;gap:8px;align-items:center;color:var(--lw-muted)}
+.lwr-cur button{font-size:.74rem;font-weight:600;padding:3px 10px;border-radius:999px;color:var(--lw-muted)}
+.lwr-cur button[aria-pressed="true"]{color:var(--lw-forest);background:rgba(31,66,48,.1)}
+.lwr-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:start;margin-top:34px}
+.lwr-card{padding:24px;display:flex;flex-direction:column;position:relative}
+.lwr-card h3{font-family:var(--lw-serif);font-weight:520;font-size:1.35rem;letter-spacing:-.01em}
+.lwr-kind{color:var(--lw-muted);font-size:.76rem;margin:2px 0 18px}
+.lwr-price{display:flex;align-items:baseline;gap:5px;margin-bottom:20px}
+.lwr-price b{font-family:var(--font-mono),monospace;font-weight:600;font-size:2.6rem;letter-spacing:-.03em}
+.lwr-price span{color:var(--lw-muted);font-size:.8rem}
+.lwr-feats{display:flex;flex-direction:column;gap:10px;margin-bottom:24px}
+.lwr-feats li{display:flex;gap:9px;align-items:flex-start;font-size:.86rem;color:var(--lw-ink-2)}
+.lwr-pro{border:1px solid rgba(31,66,48,.35);box-shadow:0 22px 48px rgba(31,66,48,.14)}
+.lwr-pop{position:absolute;top:-11px;left:50%;transform:translateX(-50%);
+  font-family:var(--font-mono),monospace;font-size:.6rem;letter-spacing:.16em;text-transform:uppercase;
+  background:var(--lw-brass);color:#2d2208;font-weight:700;border-radius:999px;padding:4px 12px}
+.lwr-note{text-align:center;color:var(--lw-muted);font-size:.76rem;margin-top:26px}
+@media (max-width:1023px){.lwr-grid{grid-template-columns:1fr 1fr}}
+@media (max-width:560px){.lwr-grid{grid-template-columns:1fr}}
+`;
+
 export default function PricingSection({ billingCycle, setBillingCycle, pricing, setPricing }: PricingSectionProps) {
   return (
-    <section id="pricing" className="scroll-mt-20 py-16 sm:py-20 px-6" aria-labelledby="pricingTitle">
-      <div className="max-w-5xl mx-auto">
+    <section id="pricing" className="lw-pricing scroll-mt-20" aria-labelledby="pricingTitle">
+      <style dangerouslySetInnerHTML={{ __html: CSS }} />
+      <div className="lw-wrap">
         <Reveal>
-          <div className="text-center mb-10">
-            <span className="mkt-mono mkt-kicker" style={{ marginBottom: '14px' }}>
-              Pricing
-            </span>
-            <h2 id="pricingTitle" className="eh-heading text-3xl sm:text-4xl font-bold mb-4">
-              Simple per-screen pricing
+          <div className="lwr-head">
+            <span className="lw-mono lw-kicker">Pricing</span>
+            <h2 id="pricingTitle" className="lw-h2">
+              Simple, per screen.
             </h2>
-            <p style={{ color: 'var(--mkt-ink-2)' }} className="max-w-lg mx-auto mb-8">
-              Start with a 30-day free trial. Scale with transparent per-screen pricing.
+            <p style={{ marginBottom: '26px' }}>
+              Start with a 30-day free trial and pay only for the screens you actually run.
             </p>
 
-            {/* Billing toggle */}
-            <div
-              role="group"
-              aria-label="Billing period"
-              className="inline-flex items-center gap-3 p-1 rounded-full"
-              style={{ background: 'rgba(255,255,255,0.7)', border: '1px solid var(--mkt-hair)' }}
-            >
+            <div className="lwr-toggle" role="group" aria-label="Billing period">
               <button
                 type="button"
                 aria-pressed={billingCycle === 'monthly'}
                 onClick={() => setBillingCycle('monthly')}
-                className="px-4 py-1.5 rounded-full text-sm font-medium transition-all"
-                style={billingCycle === 'monthly' ? {
-                  background: 'var(--mkt-ink)',
-                  color: '#EAF3F2',
-                } : { color: 'var(--mkt-ink-2)' }}
               >
                 Monthly
               </button>
@@ -60,37 +88,51 @@ export default function PricingSection({ billingCycle, setBillingCycle, pricing,
                 type="button"
                 aria-pressed={billingCycle === 'annual'}
                 onClick={() => setBillingCycle('annual')}
-                className="px-4 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-2"
-                style={billingCycle === 'annual' ? {
-                  background: 'var(--mkt-ink)',
-                  color: '#EAF3F2',
-                } : { color: 'var(--mkt-ink-2)' }}
               >
                 Annual
-                <span className="text-[0.65rem] font-bold px-1.5 py-0.5 rounded-full"
-                  style={{ background: 'var(--mkt-amber)', color: '#3D2600' }}>
-                  Save 20%
-                </span>
+                <span className="lwr-save">Save 20%</span>
               </button>
             </div>
             {pricing && (
-              <div role="group" aria-label="Currency" className="mt-3 flex items-center justify-center gap-2">
+              <div role="group" aria-label="Currency" className="lwr-cur">
                 <button
                   type="button"
                   aria-pressed={pricing.region === 'US'}
-                  onClick={() => setPricing(prev => prev ? { ...prev, region: 'US', currency: 'USD', symbol: '$', basic: { monthly: 6, annual: 5 }, pro: { monthly: 8, annual: 7 } } : prev)}
-                  className="text-xs font-medium px-2 py-0.5 rounded-full transition-all"
-                  style={pricing.region === 'US' ? { color: 'var(--mkt-mint-ink)', background: 'rgba(0,178,124,0.12)' } : { color: 'var(--mkt-muted)' }}
+                  onClick={() =>
+                    setPricing((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            region: 'US',
+                            currency: 'USD',
+                            symbol: '$',
+                            basic: { monthly: 6, annual: 5 },
+                            pro: { monthly: 8, annual: 7 },
+                          }
+                        : prev,
+                    )
+                  }
                 >
                   USD
                 </button>
-                <span style={{ color: 'var(--mkt-muted)' }}>|</span>
+                <span aria-hidden="true">|</span>
                 <button
                   type="button"
                   aria-pressed={pricing.region === 'IN'}
-                  onClick={() => setPricing(prev => prev ? { ...prev, region: 'IN', currency: 'INR', symbol: '\u20B9', basic: { monthly: 399, annual: 317 }, pro: { monthly: 599, annual: 483 } } : prev)}
-                  className="text-xs font-medium px-2 py-0.5 rounded-full transition-all"
-                  style={pricing.region === 'IN' ? { color: 'var(--mkt-mint-ink)', background: 'rgba(0,178,124,0.12)' } : { color: 'var(--mkt-muted)' }}
+                  onClick={() =>
+                    setPricing((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            region: 'IN',
+                            currency: 'INR',
+                            symbol: '₹',
+                            basic: { monthly: 399, annual: 317 },
+                            pro: { monthly: 599, annual: 483 },
+                          }
+                        : prev,
+                    )
+                  }
                 >
                   INR
                 </button>
@@ -99,119 +141,106 @@ export default function PricingSection({ billingCycle, setBillingCycle, pricing,
           </div>
         </Reveal>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
-          {/* Free */}
+        <div className="lwr-grid">
           <Reveal delay={0}>
-            <div className="eh-card rounded-xl p-5 sm:p-6">
-              <h3 className="eh-heading text-lg font-semibold mb-1">Free Trial</h3>
-              <p className="text-xs mb-5" style={{ color: 'var(--mkt-muted)' }}>Perfect for getting started</p>
-              <div className="flex items-baseline gap-1 mb-6">
-                <span className="text-4xl sm:text-5xl font-bold" style={{ fontFamily: 'var(--font-mono), monospace' }}>$0</span>
-                <span className="text-sm" style={{ color: 'var(--mkt-muted)' }}>/30 days</span>
+            <div className="lw-card-surface lwr-card">
+              <h3>Free trial</h3>
+              <p className="lwr-kind">Kick the tyres properly</p>
+              <div className="lwr-price">
+                <b>$0</b>
+                <span>/30 days</span>
               </div>
-              <ul className="space-y-3 mb-8">
-                {['Up to 5 screens', '30-day free trial', 'Content upload & library', 'Basic scheduling', '1 GB storage'].map((f) => (
-                  <li key={f} className="flex items-start gap-2.5 text-sm" style={{ color: 'var(--mkt-ink-2)' }}>
-                    <Check size={16} className="mt-0.5 shrink-0" style={{ color: 'var(--mkt-mint)' }} />
+              <ul className="lwr-feats">
+                {FREE_FEATURES.map((f) => (
+                  <li key={f}>
+                    <Check size={15} className="mt-0.5 shrink-0" style={{ color: 'var(--lw-forest)' }} />
                     {f}
                   </li>
                 ))}
               </ul>
-              <Link href="/register" className="eh-btn-ghost block w-full text-center text-sm font-medium py-2.5 rounded-lg">
-                Start Free
+              <Link href="/register" className="lw-btn lw-btn-ghost w-full !py-2.5 text-sm mt-auto">
+                Start free
               </Link>
             </div>
           </Reveal>
 
-          {/* Basic */}
-          <Reveal delay={80}>
-            <div className="eh-card rounded-xl p-5 sm:p-6">
-              <h3 className="eh-heading text-lg font-semibold mb-1">Basic</h3>
-              <p className="text-xs mb-5" style={{ color: 'var(--mkt-muted)' }}>Up to 50 screens</p>
-              <div className="flex items-baseline gap-1 mb-6">
-                <span className="text-4xl sm:text-5xl font-bold" style={{ fontFamily: 'var(--font-mono), monospace' }}>
-                  {pricing ? `${pricing.symbol}${billingCycle === 'monthly' ? pricing.basic.monthly : pricing.basic.annual}` : `$${billingCycle === 'monthly' ? '6' : '5'}`}
-                </span>
-                <span className="text-sm" style={{ color: 'var(--mkt-muted)' }}>/screen/mo</span>
+          <Reveal delay={70}>
+            <div className="lw-card-surface lwr-card">
+              <h3>Basic</h3>
+              <p className="lwr-kind">Up to 50 screens</p>
+              <div className="lwr-price">
+                <b>
+                  {pricing
+                    ? `${pricing.symbol}${billingCycle === 'monthly' ? pricing.basic.monthly : pricing.basic.annual}`
+                    : `$${billingCycle === 'monthly' ? '6' : '5'}`}
+                </b>
+                <span>/screen/mo</span>
               </div>
-              <ul className="space-y-3 mb-8">
-                {['Up to 50 screens', 'Analytics dashboard', 'Email support', 'Advanced scheduling', '25 GB storage'].map((f) => (
-                  <li key={f} className="flex items-start gap-2.5 text-sm" style={{ color: 'var(--mkt-ink-2)' }}>
-                    <Check size={16} className="mt-0.5 shrink-0" style={{ color: 'var(--mkt-mint)' }} />
+              <ul className="lwr-feats">
+                {BASIC_FEATURES.map((f) => (
+                  <li key={f}>
+                    <Check size={15} className="mt-0.5 shrink-0" style={{ color: 'var(--lw-forest)' }} />
                     {f}
                   </li>
                 ))}
               </ul>
-              <Link href="/register" className="eh-btn-ghost block w-full text-center text-sm font-medium py-2.5 rounded-lg">
+              <Link href="/register" className="lw-btn lw-btn-ghost w-full !py-2.5 text-sm mt-auto">
                 Start with Basic
               </Link>
             </div>
           </Reveal>
 
-          {/* Pro -- Featured */}
-          <Reveal delay={120}>
-            <div
-              className="relative eh-card rounded-xl p-5 sm:p-6"
-              style={{
-                background: 'var(--mkt-surface)',
-                borderColor: 'rgba(0,178,124,0.4)',
-                boxShadow: '0 18px 44px rgba(0,178,124,0.13)',
-              }}
-            >
-              <span
-                className="absolute -top-3 left-1/2 -translate-x-1/2 text-[0.7rem] font-bold px-3.5 py-1 rounded-full"
-                style={{ background: 'var(--mkt-amber)', color: '#3D2600' }}
-              >
-                Most Popular
-              </span>
-              <h3 className="eh-heading text-lg font-semibold mb-1">Pro</h3>
-              <p className="text-xs mb-5" style={{ color: 'var(--mkt-muted)' }}>Up to 100 screens</p>
-              <div className="flex items-baseline gap-1 mb-6">
-                <span className="text-4xl sm:text-5xl font-bold" style={{ fontFamily: 'var(--font-mono), monospace', color: 'var(--mkt-mint-ink)' }}>
-                  {pricing ? `${pricing.symbol}${billingCycle === 'monthly' ? pricing.pro.monthly : pricing.pro.annual}` : `$${billingCycle === 'monthly' ? '8' : '7'}`}
-                </span>
-                <span className="text-sm" style={{ color: 'var(--mkt-muted)' }}>/screen/mo</span>
+          <Reveal delay={110}>
+            <div className="lw-card-surface lwr-card lwr-pro">
+              <span className="lwr-pop">Most popular</span>
+              <h3>Pro</h3>
+              <p className="lwr-kind">Up to 100 screens</p>
+              <div className="lwr-price">
+                <b style={{ color: 'var(--lw-forest)' }}>
+                  {pricing
+                    ? `${pricing.symbol}${billingCycle === 'monthly' ? pricing.pro.monthly : pricing.pro.annual}`
+                    : `$${billingCycle === 'monthly' ? '8' : '7'}`}
+                </b>
+                <span>/screen/mo</span>
               </div>
-              <ul className="space-y-3 mb-8">
-                {['Up to 100 screens', 'AI-powered features included', 'API access', 'Priority support', 'Advanced scheduling', '100 GB storage'].map((f) => (
-                  <li key={f} className="flex items-start gap-2.5 text-sm" style={{ color: 'var(--mkt-ink)' }}>
-                    <Check size={16} className="mt-0.5 shrink-0" style={{ color: 'var(--mkt-cyan-ink)' }} />
+              <ul className="lwr-feats">
+                {PRO_FEATURES.map((f) => (
+                  <li key={f}>
+                    <Check size={15} className="mt-0.5 shrink-0" style={{ color: 'var(--lw-forest)' }} />
                     {f}
                   </li>
                 ))}
               </ul>
-              <Link href="/register" className="eh-btn-neon block w-full text-center text-sm font-bold py-3 rounded-lg">
+              <Link href="/register" className="lw-btn lw-btn-forest w-full !py-2.5 text-sm mt-auto">
                 Go Pro
               </Link>
-              <p className="text-[0.65rem] text-center mt-2" style={{ color: 'var(--mkt-muted)' }}>30-day free trial included</p>
             </div>
           </Reveal>
 
-          {/* Enterprise */}
-          <Reveal delay={160}>
-            <div className="eh-card rounded-xl p-5 sm:p-6">
-              <h3 className="eh-heading text-lg font-semibold mb-1">Enterprise</h3>
-              <p className="text-xs mb-5" style={{ color: 'var(--mkt-muted)' }}>For large organizations</p>
-              <div className="flex items-baseline gap-1 mb-6">
-                <span className="text-4xl sm:text-5xl font-bold" style={{ fontFamily: 'var(--font-sora), sans-serif' }}>Custom</span>
+          <Reveal delay={150}>
+            <div className="lw-card-surface lwr-card">
+              <h3>Enterprise</h3>
+              <p className="lwr-kind">For large estates</p>
+              <div className="lwr-price">
+                <b style={{ fontFamily: 'var(--lw-serif)', fontWeight: 500 }}>Custom</b>
               </div>
-              <ul className="space-y-3 mb-8">
-                {['Unlimited screens', 'Advanced AI + custom models', 'SLA & dedicated support', 'SSO integration', 'Custom integrations', 'On-prem option'].map((f) => (
-                  <li key={f} className="flex items-start gap-2.5 text-sm" style={{ color: 'var(--mkt-ink-2)' }}>
-                    <Check size={16} className="mt-0.5 shrink-0" style={{ color: 'var(--mkt-mint)' }} />
+              <ul className="lwr-feats">
+                {ENTERPRISE_FEATURES.map((f) => (
+                  <li key={f}>
+                    <Check size={15} className="mt-0.5 shrink-0" style={{ color: 'var(--lw-forest)' }} />
                     {f}
                   </li>
                 ))}
               </ul>
-              <a href="mailto:sales@vizora.cloud" className="eh-btn-ghost block w-full text-center text-sm font-medium py-2.5 rounded-lg">
-                Talk to Sales
+              <a href="mailto:sales@vizora.cloud" className="lw-btn lw-btn-ghost w-full !py-2.5 text-sm mt-auto">
+                Talk to sales
               </a>
             </div>
           </Reveal>
         </div>
 
         <Reveal>
-          <p className="text-center text-xs mt-8" style={{ color: 'var(--mkt-muted)' }}>
+          <p className="lwr-note">
             Every plan runs over HTTPS with email support. The 99.9% uptime SLA applies to Pro and
             Enterprise.
           </p>
