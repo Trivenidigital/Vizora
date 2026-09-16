@@ -20,7 +20,7 @@ const HERO_CSS = `
 .lw-hero{padding:118px 0 30px}
 .lw-hero-grid{display:grid;grid-template-columns:minmax(360px,44fr) 56fr;gap:clamp(28px,4vw,64px);align-items:center}
 .lw-hero-copy{max-width:34rem}
-.lw-hero h1{font-size:clamp(2.6rem,5.4vw,4.35rem);margin:18px 0 20px}
+.lw-hero h1{font-size:clamp(2.35rem,4.5vw,3.7rem);margin:18px 0 20px}
 .lw-hero-sub{color:var(--lw-ink-2);font-size:clamp(1rem,1.15vw,1.13rem);line-height:1.65;max-width:30rem;margin-bottom:28px}
 .lw-hero-cta{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 .lw-hero-trust{color:var(--lw-muted);font-size:.82rem;display:flex;gap:7px;align-items:center;flex-wrap:wrap}
