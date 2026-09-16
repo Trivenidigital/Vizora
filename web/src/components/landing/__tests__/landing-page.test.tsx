@@ -1,17 +1,16 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import fs from 'node:fs';
-import path from 'node:path';
 
 import Index from '@/app/page';
 
 /**
- * Behavioural invariants for the marketing homepage.
+ * Behavioural invariants for the "Little Worlds" marketing homepage.
  *
- * `marketing-sections.test.tsx` pins what must NOT be published; this file pins
- * what the page must DO — that every in-page link is a real anchor pointing at
- * something that exists, that the disclosure widgets report their own state,
- * and that the claims audit stays applied.
+ * `marketing-sections.test.tsx` pins what must NOT be published and what the
+ * shared token scopes must keep; this file pins what the page must DO — that
+ * every in-page link is a real anchor pointing at something that exists, that
+ * the three interactive surfaces (place explorer, pricing, product tour)
+ * report their own state, and that the claims audit stays applied.
  */
 
 jest.mock('next/image', () => ({
@@ -29,6 +28,11 @@ jest.mock('next/image', () => ({
 
 // jsdom implements neither of these; the page calls both on every anchor click.
 Element.prototype.scrollIntoView = jest.fn();
+
+// Every test here renders the entire homepage, several of them twice over a
+// user interaction. Jest's 5s default is the same order of magnitude as one
+// cold render of it, which makes the default a coin toss rather than a bound.
+jest.setTimeout(15000);
 
 const IN_PRICING = {
   region: 'IN',
@@ -52,36 +56,47 @@ beforeEach(() => {
 });
 
 /**
+ * The whole page is one render — nav, the CSS-3D diorama, four content
+ * sections, pricing and the footer — so on a cold worker in a full-suite run it
+ * can outlast the 1s default `findBy` window. The wait is generous for that
+ * reason only; a genuine regression still fails, just later.
+ */
+const WAIT = { timeout: 5000 };
+
+/**
  * Render and wait for the geo-pricing fetch to land. The currency group only
  * exists once it has, so awaiting it both settles the pending state update and
  * leaves every test looking at the same, fully-resolved page.
  */
 const renderPage = async () => {
   const utils = render(<Index />);
-  await screen.findByRole('group', { name: 'Currency' });
+  await screen.findByRole('group', { name: 'Currency' }, WAIT);
   return utils;
 };
 
 describe('homepage composition', () => {
-  it('mounts the sections the page is meant to ship, and none of the trimmed ones', async () => {
+  it('mounts every narrated section under the page landmarks', async () => {
     const { container } = await renderPage();
 
-    const how = container.querySelector('#how')!;
-    expect(how).toBeInTheDocument();
-    expect(within(how as HTMLElement).getByRole('heading', { name: /Four layers/i })).toBeInTheDocument();
-
-    for (const id of ['features', 'solutions', 'pricing', 'faq']) {
+    for (const id of ['places', 'how-it-works', 'product', 'pricing', 'faq', 'start']) {
       expect(container.querySelector(`#${id}`)).toBeInTheDocument();
     }
 
-    expect(container.querySelector('img[src="/product/dashboard-fleet.png"]')).toBeInTheDocument();
-
-    // The demo SECTION was deliberately trimmed. (The testimonials block is
-    // pinned unmounted by marketing-sections.test.tsx; not repeated here.)
-    expect(screen.queryByText(/See Vizora In Action/i)).not.toBeInTheDocument();
+    expect(container.querySelector('main#main-content')).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Primary' })).toBeInTheDocument();
+    expect(screen.getByRole('contentinfo')).toBeInTheDocument();
   });
 
-  it('every in-page anchor resolves, and the header still offers both account links', async () => {
+  it('states the promise once, in a single h1', async () => {
+    await renderPage();
+
+    const headings = screen.getAllByRole('heading', { level: 1 });
+    expect(headings).toHaveLength(1);
+    expect(headings[0].textContent).toContain('Your world.');
+    expect(headings[0].textContent).toContain('Perfectly in sync.');
+  });
+
+  it('every in-page anchor resolves, and the account routes stay reachable', async () => {
     const { container } = await renderPage();
 
     const anchors = Array.from(container.querySelectorAll<HTMLAnchorElement>('a[href^="#"]'));
@@ -93,11 +108,16 @@ describe('homepage composition', () => {
     expect(dangling).toEqual([]);
 
     const header = container.querySelector('nav')!;
-    expect(header.querySelector('a[href="/register"]')).toBeInTheDocument();
     expect(header.querySelector('a[href="/login"]')).toBeInTheDocument();
+    expect(header.querySelector('a[href="/register"]')).toBeInTheDocument();
 
-    expect(container.querySelector('a[href="mailto:sales@vizora.cloud"]')).toBeInTheDocument();
     expect(container.querySelector('a[href="mailto:support@vizora.cloud"]')).toBeInTheDocument();
+    expect(container.querySelector('a[href="mailto:sales@vizora.cloud"]')).toBeInTheDocument();
+
+    const footer = screen.getByRole('contentinfo');
+    for (const href of ['/privacy', '/terms', '/refund', '/sla', '/dashboard']) {
+      expect(footer.querySelector(`a[href="${href}"]`)).toBeInTheDocument();
+    }
   });
 
   it('clicking an in-page anchor scrolls its target and puts the section in the URL', async () => {
@@ -126,12 +146,85 @@ describe('homepage composition', () => {
   });
 });
 
+describe('hero place explorer', () => {
+  it('offers the three places the page narrates', async () => {
+    await renderPage();
+
+    const group = screen.getByRole('group', { name: 'Explore a place' });
+    expect(within(group).getAllByRole('button').map((b) => b.textContent?.trim())).toEqual([
+      'Caféexplore',
+      'Hotelexplore',
+      'Retailexplore',
+    ]);
+  });
+
+  it('hands the chosen place to the Places section and jumps to it', async () => {
+    const user = userEvent.setup();
+    const { container } = await renderPage();
+
+    const group = screen.getByRole('group', { name: 'Explore a place' });
+    await user.click(within(group).getByRole('button', { name: /Retail/ }));
+
+    expect(window.location.hash).toBe('#places');
+
+    const places = container.querySelector('#places')!;
+    expect(within(places as HTMLElement).getByRole('button', { name: /Noble & Co\./ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+});
+
+describe('places explorer', () => {
+  const placesSection = (container: HTMLElement) =>
+    within(container.querySelector('#places') as HTMLElement);
+
+  it('resets to the first screen of a newly picked location and previews it', async () => {
+    const user = userEvent.setup();
+    const { container } = await renderPage();
+    const places = placesSection(container);
+
+    await user.click(places.getByRole('button', { name: /Horizon Hotel/ }));
+
+    expect(places.getByRole('button', { name: /Horizon Hotel/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(places.getByRole('button', { name: /Riverside Café/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(places.getByRole('button', { name: /Lobby welcome/ })).toHaveAttribute('aria-pressed', 'true');
+
+    expect(container.querySelector('.lwp-preview')!.textContent).toContain('Welcome');
+  });
+
+  it('previews the screen that was picked, with its schedule', async () => {
+    const user = userEvent.setup();
+    const { container } = await renderPage();
+    const places = placesSection(container);
+
+    await user.click(places.getByRole('button', { name: /Horizon Hotel/ }));
+    await user.click(places.getByRole('button', { name: /Events board/ }));
+
+    expect(places.getByRole('button', { name: /Events board/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(places.getByRole('button', { name: /Lobby welcome/ })).toHaveAttribute('aria-pressed', 'false');
+
+    const preview = container.querySelector('.lwp-preview')!;
+    expect(preview.textContent).toContain('Today’s events');
+
+    const rows = Array.from(preview.querySelectorAll('.lwp-sched-row')).map((r) => r.textContent);
+    expect(rows).toEqual(['08:00Today’s events', '20:00Tomorrow preview']);
+  });
+
+  it('labels the workspace as synthetic, so it cannot read as customer telemetry', async () => {
+    await renderPage();
+    expect(
+      screen.getByText(/Illustrative workspace — synthetic example data/i),
+    ).toBeInTheDocument();
+  });
+});
+
 describe('geo-aware pricing', () => {
   it('renders the fetched region and keeps the currency and cycle toggles in sync', async () => {
     const user = userEvent.setup();
     render(<Index />);
 
-    expect(await screen.findByText('₹599')).toBeInTheDocument();
+    expect(await screen.findByText('₹599', undefined, WAIT)).toBeInTheDocument();
 
     const monthly = screen.getByRole('button', { name: /^Monthly$/ });
     const annual = screen.getByRole('button', { name: /Annual/ });
@@ -157,7 +250,7 @@ describe('geo-aware pricing', () => {
     // The currency group only renders once `pricing` is populated, so awaiting
     // it proves the catch branch ran rather than that the render-time default
     // happens to print the same number.
-    expect(await screen.findByRole('group', { name: 'Currency' })).toBeInTheDocument();
+    expect(await screen.findByRole('group', { name: 'Currency' }, WAIT)).toBeInTheDocument();
     expect(screen.getByText('$8')).toBeInTheDocument();
   });
 });
@@ -178,7 +271,7 @@ describe('mobile menu', () => {
     expect(burger).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('button', { name: 'Close menu' })).toBe(burger);
 
-    await user.click(within(menu as HTMLElement).getByRole('link', { name: 'Features' }));
+    await user.click(within(menu as HTMLElement).getByRole('link', { name: 'Places' }));
     expect(container.querySelector('#mobile-menu')).not.toBeInTheDocument();
 
     await user.click(burger);
@@ -204,6 +297,18 @@ describe('FAQ accordion', () => {
     expect(question).toHaveAttribute('aria-expanded', 'true');
     expect(answer).toHaveAttribute('aria-hidden', 'false');
   });
+
+  it('answers the offline question honestly — cached playback, not a promise of uptime', async () => {
+    const user = userEvent.setup();
+    const { container } = await renderPage();
+
+    const faq = container.querySelector('#faq')!;
+    const question = within(faq as HTMLElement).getByRole('button', { name: /loses its connection/i });
+    await user.click(question);
+
+    const answer = container.querySelector(`#${CSS.escape(question.getAttribute('aria-controls')!)}`)!;
+    expect(answer.textContent).toContain('keeps playing');
+  });
 });
 
 describe('product tour dialog', () => {
@@ -214,7 +319,8 @@ describe('product tour dialog', () => {
     // The asset is 48 MB — it must not be in the tree before the chip is pressed.
     expect(container.querySelector('video')).not.toBeInTheDocument();
 
-    const chip = screen.getByRole('button', { name: /product tour/i });
+    const product = container.querySelector('#product')!;
+    const chip = within(product as HTMLElement).getByRole('button', { name: /Watch the tour/ });
     await user.click(chip);
 
     expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -232,12 +338,8 @@ describe('product tour dialog', () => {
 });
 
 describe('landmarks', () => {
-  it('names every section and exposes the page landmarks', async () => {
+  it('names every section on the page', async () => {
     const { container } = await renderPage();
-
-    expect(container.querySelector('main#main-content')).toBeInTheDocument();
-    expect(screen.getAllByRole('navigation').length).toBeGreaterThan(0);
-    expect(screen.getByRole('contentinfo')).toBeInTheDocument();
 
     const unnamed = Array.from(container.querySelectorAll('section')).filter((section) => {
       if (section.getAttribute('aria-label')?.trim()) return false;
@@ -252,20 +354,25 @@ describe('landmarks', () => {
 describe('claims audit stays applied', () => {
   it('renders none of the statements the product cannot support', async () => {
     const { container } = await renderPage();
-    // Each of these fails when its fix is reverted (checked by mutation). The
-    // badge label and sub-label render as separate nodes, so the SSO badge is
-    // matched on the label alone rather than on "SSO Supported".
-    for (const claim of ['50,000', '2,500', 'since 2024', 'SOC 2', '256-bit', 'SSOSupported']) {
+    // Every string here is live somewhere it could leak back from: the counts,
+    // the certification and the encryption badge all still render on the auth
+    // screens, and the last two are the placeholder captions the diorama work
+    // used while the scene was being built. The SSO badge label and its
+    // sub-label rendered as separate nodes, hence the concatenated form.
+    for (const claim of [
+      '50,000',
+      '2,500',
+      'since 2024',
+      'SOC 2',
+      '256-bit',
+      'SSOSupported',
+      'AI-powered',
+      'Sarah Chen',
+      '4.9/5',
+      'Blender render',
+      'diorama render',
+    ]) {
       expect(container.textContent).not.toContain(claim);
     }
-  });
-
-  it('scopes the reduced-motion reveal override to .mkt', () => {
-    const css = fs.readFileSync(
-      path.join(__dirname, '..', '..', '..', 'app', 'globals.css'),
-      'utf8',
-    );
-    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.mkt \.eh-reveal/);
-    expect(css).toMatch(/\.mkt \.eh-reveal \{[^}]*transition: none !important/);
   });
 });
