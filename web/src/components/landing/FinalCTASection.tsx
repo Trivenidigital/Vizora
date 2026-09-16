@@ -1,65 +1,51 @@
 'use client';
 
-import type { RefObject } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Check } from 'lucide-react';
-import { Reveal } from './shared';
 
-interface FinalCTASectionProps {
-  finalCtaRef: RefObject<HTMLElement | null>;
-}
+const CSS = `
+.lw-final{padding:clamp(48px,6vw,90px) 0 clamp(56px,7vw,104px)}
+.lwf-panel{background:linear-gradient(160deg,var(--lw-forest) 0%,var(--lw-forest-deep) 100%);
+  border-radius:26px;padding:clamp(40px,6vw,84px) clamp(24px,5vw,72px);text-align:center;
+  color:var(--lw-on-forest);position:relative;overflow:hidden;
+  box-shadow:0 34px 70px rgba(20,44,32,.32)}
+.lwf-panel::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(60% 90% at 50% 0%,rgba(242,239,228,.1),transparent 60%)}
+.lwf-panel h2{font-family:var(--lw-serif);font-weight:480;letter-spacing:-.015em;
+  font-size:clamp(2rem,4vw,3.2rem);color:var(--lw-on-forest);margin-bottom:14px;position:relative}
+.lwf-panel p{max-width:34rem;margin:0 auto 28px;line-height:1.65;color:rgba(242,239,228,.82);position:relative}
+.lwf-cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;position:relative}
+.lwf-btn-ivory{background:var(--lw-paper);color:var(--lw-forest);box-shadow:0 12px 30px rgba(0,0,0,.25)}
+.lwf-btn-ivory:hover{background:#fffdf4}
+.lwf-btn-line{border:1px solid rgba(242,239,228,.4);color:var(--lw-on-forest)}
+.lwf-btn-line:hover{border-color:rgba(242,239,228,.75);background:rgba(242,239,228,.08)}
+.lwf-trust{margin-top:18px;font-size:.8rem;color:rgba(242,239,228,.62);position:relative}
+`;
 
-export default function FinalCTASection({ finalCtaRef }: FinalCTASectionProps) {
+export default function FinalCTASection() {
   return (
-    <section ref={finalCtaRef} className="py-16 sm:py-20 px-6" aria-labelledby="finalCtaTitle">
-      <Reveal>
-        <div
-          className="max-w-4xl mx-auto rounded-2xl p-10 sm:p-16 text-center relative overflow-hidden eh-grain"
-          style={{
-            background: 'linear-gradient(135deg, rgba(0,229,160,0.11) 0%, rgba(0,180,216,0.07) 100%)',
-            border: '1px solid rgba(0,178,124,0.22)',
-          }}
-        >
-          <div
-            className="absolute top-[-50%] left-[50%] -translate-x-1/2 w-[500px] h-[500px] rounded-full pointer-events-none"
-            style={{ background: 'radial-gradient(circle, rgba(0,229,160,0.1) 0%, transparent 70%)' }}
-          />
-
-          {/* The avatar row that stood here spelled out the initials of the
-              fabricated testimonial names, beside an organization count
-              nothing could substantiate. */}
-          <h2 id="finalCtaTitle" className="relative eh-heading text-2xl sm:text-3xl font-bold mb-4">
-            Your screens are waiting
-          </h2>
-          <p className="relative mb-8 max-w-md mx-auto" style={{ color: 'var(--mkt-ink-2)' }}>
-            Pair a screen with a code, assign a playlist, and it is live. Your first screen is up in
-            about five minutes.
+    <section id="start" className="lw-final scroll-mt-20" aria-labelledby="finalCtaTitle">
+      <style dangerouslySetInnerHTML={{ __html: CSS }} />
+      <div className="lw-wrap">
+        <div className="lwf-panel">
+          <h2 id="finalCtaTitle">Start with your screens.</h2>
+          <p>
+            Create a workspace, pair your first screen with the code it shows, and put something
+            real on it — the whole first run takes about five minutes.
           </p>
-          <div className="relative">
-            <Link
-              href="/register"
-              className="eh-btn-neon inline-flex items-center gap-2 px-10 py-3.5 rounded-lg text-base font-semibold"
-              style={{ boxShadow: '0 10px 30px rgba(0,178,124,0.26), 0 18px 60px rgba(0,178,124,0.14)' }}
-            >
-              Get Started Free <ArrowRight size={16} />
+          <div className="lwf-cta">
+            <Link href="/register" className="lw-btn lwf-btn-ivory">
+              Start free
+              <span aria-hidden="true" style={{ opacity: 0.6 }}>
+                →
+              </span>
             </Link>
+            <a href="mailto:sales@vizora.cloud" className="lw-btn lwf-btn-line">
+              Talk to us
+            </a>
           </div>
-          <div className="relative flex items-center justify-center gap-6 text-xs mt-6" style={{ color: 'var(--mkt-muted)' }}>
-            <span className="flex items-center gap-1.5">
-              <Check size={13} style={{ color: 'var(--mkt-mint-ink)' }} />
-              30-day free trial
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Check size={13} style={{ color: 'var(--mkt-mint-ink)' }} />
-              5-minute setup
-            </span>
-            <span className="hidden sm:flex items-center gap-1.5">
-              <Check size={13} style={{ color: 'var(--mkt-mint-ink)' }} />
-              No credit card
-            </span>
-          </div>
+          <p className="lwf-trust">30-day free trial · up to 5 screens · no credit card required</p>
         </div>
-      </Reveal>
+      </div>
     </section>
   );
 }
