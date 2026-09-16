@@ -51,13 +51,14 @@ const STEPS: Array<{ n: string; title: string; copy: string; art: ReactNode }> =
     copy: 'Daypart by each location’s own local time and preview the next ten runs before you commit — so the breakfast board never plays at dinner.',
     art: (
       <div className="lwq-art lwq-sched">
-        <span className="lwq-slot" style={{ ['--w' as never]: '34%', background: 'var(--lw-brass)' }}>
+        {/* ink-variant fills: the label stays readable on every chip */}
+        <span className="lwq-slot" style={{ ['--w' as never]: '34%', background: 'var(--lw-brass-ink)' }}>
           06–11
         </span>
         <span className="lwq-slot" style={{ ['--w' as never]: '40%', background: 'var(--lw-forest)' }}>
           11–17
         </span>
-        <span className="lwq-slot" style={{ ['--w' as never]: '26%', background: 'var(--lw-coral)' }}>
+        <span className="lwq-slot" style={{ ['--w' as never]: '26%', background: 'var(--lw-coral-ink)' }}>
           17–22
         </span>
       </div>

@@ -16,9 +16,9 @@ const CSS = `
 .lwf-cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;position:relative}
 .lwf-btn-ivory{background:var(--lw-paper);color:var(--lw-forest);box-shadow:0 12px 30px rgba(0,0,0,.25)}
 .lwf-btn-ivory:hover{background:#fffdf4}
-.lwf-btn-line{border:1px solid rgba(242,239,228,.4);color:var(--lw-on-forest)}
+.lwf-btn-line{border:1px solid rgba(242,239,228,.55);color:var(--lw-on-forest)}
 .lwf-btn-line:hover{border-color:rgba(242,239,228,.75);background:rgba(242,239,228,.08)}
-.lwf-trust{margin-top:18px;font-size:.8rem;color:rgba(242,239,228,.62);position:relative}
+.lwf-trust{margin-top:18px;font-size:.8rem;color:rgba(242,239,228,.74);position:relative}
 `;
 
 export default function FinalCTASection() {

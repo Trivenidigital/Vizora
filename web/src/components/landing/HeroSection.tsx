@@ -10,10 +10,11 @@ interface HeroSectionProps {
   onExplore: (place: WorldPlace) => void;
 }
 
-const PLACES: Array<{ id: WorldPlace; label: string }> = [
-  { id: 'cafe', label: 'Café' },
-  { id: 'hotel', label: 'Hotel' },
-  { id: 'retail', label: 'Retail' },
+/* Dot hues match the Places section's location swatches. */
+const PLACES: Array<{ id: WorldPlace; label: string; dot: string }> = [
+  { id: 'cafe', label: 'Café', dot: 'var(--lw-brass)' },
+  { id: 'hotel', label: 'Hotel', dot: 'var(--lw-forest)' },
+  { id: 'retail', label: 'Retail', dot: 'var(--lw-coral)' },
 ];
 
 const HERO_CSS = `
@@ -31,7 +32,7 @@ const HERO_CSS = `
 .lw-place-btn{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:8px 15px;
   font-size:.82rem;font-weight:600;color:var(--lw-ink-2);border:1px solid transparent;
   transition:color .2s,border-color .2s,background .2s}
-.lw-place-btn i{width:7px;height:7px;border-radius:50%;background:var(--lw-coral);flex:none}
+.lw-place-btn i{width:7px;height:7px;border-radius:50%;flex:none}
 .lw-place-btn:hover,.lw-place-btn:focus-visible,.lw-place-btn[data-on="true"]{
   color:var(--lw-ink);border-color:var(--lw-hair);background:rgba(255,253,244,.75)}
 .lw-place-btn small{font-family:var(--font-mono),monospace;font-size:.56rem;letter-spacing:.14em;
@@ -42,6 +43,14 @@ const HERO_CSS = `
   .lw-hero-grid{grid-template-columns:1fr;gap:20px}
   .lw-hero-copy{max-width:38rem}
   .lw-hero-scene{max-width:640px;margin-inline:auto;width:100%}
+}
+@media (max-width:420px){
+  .lw-hero-places{gap:6px}
+  .lw-place-btn{padding:8px 11px}
+  .lw-place-btn small{display:none}
+}
+@media (max-width:360px){
+  .lw-hero h1{font-size:2rem}
 }
 `;
 
@@ -98,7 +107,7 @@ export default function HeroSection({ onExplore }: HeroSectionProps) {
                 onBlur={() => setPreview(null)}
                 onClick={() => onExplore(p.id)}
               >
-                <i aria-hidden="true" />
+                <i aria-hidden="true" style={{ background: p.dot }} />
                 {p.label}
                 <small aria-hidden="true">explore</small>
               </button>

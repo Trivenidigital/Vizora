@@ -26,7 +26,7 @@ const LEGAL_LINKS = [
 
 const CSS = `
 .lw-foot{border-top:1px solid var(--lw-hair);background:var(--lw-paper-2);padding:52px 0 34px}
-.lwt-grid{display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:34px;margin-bottom:40px}
+.lwt-grid{display:grid;grid-template-columns:1.5fr repeat(3,1fr);gap:34px;margin-bottom:40px}
 .lwt-word{font-family:var(--lw-serif);font-size:1.4rem;font-weight:500;color:var(--lw-forest);
   text-transform:lowercase;letter-spacing:-.01em}
 .lwt-tag{color:var(--lw-ink-2);font-size:.9rem;line-height:1.6;margin:10px 0 14px;max-width:22rem}
@@ -60,7 +60,7 @@ export default function FooterSection() {
           </div>
 
           <div className="lwt-col">
-            <h4 className="lwt-h">Product</h4>
+            <h3 className="lwt-h">Product</h3>
             <ul>
               {PRODUCT_LINKS.map((item) => (
                 <li key={item.id}>
@@ -73,7 +73,7 @@ export default function FooterSection() {
           </div>
 
           <div className="lwt-col">
-            <h4 className="lwt-h">Account</h4>
+            <h3 className="lwt-h">Account</h3>
             <ul>
               {ACCOUNT_LINKS.map((l) => (
                 <li key={l.href}>
@@ -91,7 +91,7 @@ export default function FooterSection() {
           </div>
 
           <div className="lwt-col">
-            <h4 className="lwt-h">Legal</h4>
+            <h3 className="lwt-h">Legal</h3>
             <ul>
               {LEGAL_LINKS.map((l) => (
                 <li key={l.href}>

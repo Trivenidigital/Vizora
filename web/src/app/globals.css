@@ -808,6 +808,22 @@ body:has(.mkt) .consent-bar {
   --consent-on-fill: #04241B;
 }
 
+/* On the Little Worlds homepage the same bar follows the warm palette —
+   otherwise the emerald pill is the most saturated object on first paint.
+   Same mechanism as above; `.lw` only ever appears alongside `.mkt`. */
+body:has(.lw) .consent-bar {
+  --consent-surface: #fdfbf5;
+  --consent-ink: #23261f;
+  --consent-ink-2: #4b5045;
+  --consent-hair: rgba(35, 38, 31, 0.14);
+  --consent-hair-strong: rgba(35, 38, 31, 0.34);
+  --consent-accent: #1f4230;
+  --consent-accent-hover: #142c20;
+  --consent-fill: #1f4230;
+  --consent-fill-hover: #142c20;
+  --consent-on-fill: #f2efe4;
+}
+
 /* ── Electric Horizon Global Utilities ── */
 
 .eh-reveal {

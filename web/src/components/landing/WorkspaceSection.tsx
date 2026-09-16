@@ -36,8 +36,11 @@ const CSS = `
 .lww-head h2{font-size:clamp(1.9rem,3.4vw,2.9rem);margin:14px 0 12px}
 .lww-head p{color:var(--lw-ink-2);line-height:1.65;max-width:34rem}
 .lww-grid{display:grid;grid-template-columns:56fr 44fr;gap:clamp(26px,4vw,56px);align-items:center}
-.lww-shot{border-radius:16px;overflow:hidden;border:1px solid var(--lw-hair);
-  box-shadow:0 30px 70px rgba(35,38,31,.16)}
+/* The capture is the app's real dark theme — seated in a deep-forest bezel it
+   reads as a framed device view rather than a palette clash on the ivory page. */
+.lww-shot{border-radius:18px;overflow:hidden;padding:10px;background:var(--lw-forest-deep);
+  box-shadow:0 30px 70px rgba(20,44,32,.28)}
+.lww-shot img{border-radius:10px}
 .lww-cap{margin-top:10px;color:var(--lw-muted);font-size:.72rem}
 .lww-list{display:flex;flex-direction:column;gap:20px}
 .lww-item h3{font-family:var(--lw-serif);font-weight:520;font-size:1.18rem;letter-spacing:-.01em;margin-bottom:5px}

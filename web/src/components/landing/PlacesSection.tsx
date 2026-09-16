@@ -306,7 +306,7 @@ const CSS = `
 .lwp-board{background:var(--lw-screen);border:3px solid #2c2f28;border-radius:10px;
   box-shadow:0 0 0 1px rgba(255,255,255,.5),0 16px 34px rgba(35,38,31,.14),0 0 26px rgba(176,138,62,.18);
   padding:16px 18px;display:flex;flex-direction:column;gap:6px;color:var(--lw-forest);
-  aspect-ratio:16/10;justify-content:flex-start}
+  aspect-ratio:16/10;justify-content:space-between}
 .lwp-board-portrait{aspect-ratio:10/13;max-width:210px}
 .lwp-b-kicker{font-family:var(--font-mono),monospace;font-size:.56rem;letter-spacing:.15em;
   text-transform:uppercase;color:var(--lw-brass-ink)}
@@ -319,7 +319,7 @@ const CSS = `
 .lwp-b-band{height:12px;border-radius:3px;margin:4px 0;
   background:linear-gradient(90deg,var(--lw-forest) 0 36%,var(--lw-brass) 36% 56%,var(--lw-stone) 56%)}
 .lwp-b-band-coral{background:linear-gradient(90deg,var(--lw-coral) 0 46%,var(--lw-stone) 46%)}
-.lwp-b-foot{margin-top:auto;color:var(--lw-muted);font-size:.7rem}
+.lwp-b-foot{color:var(--lw-muted);font-size:.7rem}
 
 .lwp-sched{border-top:1px solid var(--lw-hair-2);padding-top:10px}
 .lwp-sched-row{display:flex;gap:12px;align-items:baseline;font-size:.82rem;color:var(--lw-ink-2);padding:3px 0}
@@ -350,6 +350,16 @@ export default function PlacesSection({
 }) {
   const current = PLACES.find((p) => p.id === place) ?? PLACES[0];
   const [screenId, setScreenId] = useState(current.screens[0].id);
+  // The place can change from OUTSIDE this section (the hero's explore
+  // buttons call onExplore → setPlace). Track the transition during render so
+  // the screen selection resets exactly as an in-panel pick would — two
+  // locations share a screen id ("window"), so a stale id would otherwise
+  // carry a selection across places.
+  const [seenPlace, setSeenPlace] = useState(place);
+  if (seenPlace !== place) {
+    setSeenPlace(place);
+    setScreenId(current.screens[0].id);
+  }
   const screen = current.screens.find((s) => s.id === screenId) ?? current.screens[0];
 
   const pick = (p: Place) => {
@@ -374,8 +384,10 @@ export default function PlacesSection({
 
         <div className="lw-card-surface lwp-panel">
           <div className="lwp-col">
-            <span className="lw-mono lwp-step">01 · Explore a location</span>
-            <div className="lwp-loc">
+            <span className="lw-mono lwp-step" id="lwp-step-loc" aria-hidden="true">
+              01 · Explore a location
+            </span>
+            <div className="lwp-loc" role="group" aria-label="Explore a location">
               {PLACES.map((p) => (
                 <button key={p.id} type="button" aria-pressed={p.id === current.id} onClick={() => pick(p)}>
                   <span className="lwp-loc-swatch" style={{ background: 'var(--lw-paper-2)' }}>
@@ -403,8 +415,10 @@ export default function PlacesSection({
           </div>
 
           <div className="lwp-col">
-            <span className="lw-mono lwp-step">02 · Reveal its screens</span>
-            <div className="lwp-scr">
+            <span className="lw-mono lwp-step" aria-hidden="true">
+              02 · Reveal its screens
+            </span>
+            <div className="lwp-scr" role="group" aria-label={`Screens at ${current.name}`}>
               {current.screens.map((s) => (
                 <button
                   key={s.id}

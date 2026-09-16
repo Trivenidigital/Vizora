@@ -127,12 +127,12 @@ function Shadow({ x, y, w, h, o = 0.22 }: { x: number; y: number; w: number; h: 
 function Plinth({ x, y, w, d }: { x: number; y: number; w: number; d: number }) {
   return (
     <div style={{ position: 'absolute', left: 0, top: 0, transformStyle: 'preserve-3d' }}>
-      <Shadow x={x - 18} y={y - 12} w={w + 36} h={d + 26} o={0.2} />
+      <Shadow x={x - 28} y={y - 16} w={w + 56} h={d + 38} o={0.34} />
       <div
         style={{
           ...flat(x, y, w, d, 2),
           borderRadius: '50%',
-          background: 'linear-gradient(135deg, #d9cfb8, #c9bda1)',
+          background: 'linear-gradient(135deg, #cfc3a6, #bdae8d)',
         }}
       />
       <div
@@ -186,8 +186,9 @@ function Plant({ x, y, s = 1 }: { x: number; y: number; s?: number }) {
 const screenShell: CSSProperties = {
   position: 'absolute',
   borderRadius: 4,
-  background: 'var(--lw-screen, #fffdf4)',
-  border: '2px solid #2c2f28',
+  /* Lit like a display, not like the wall it hangs on. */
+  background: 'linear-gradient(165deg, #ffffff 0%, #fdf8ea 52%, #f1e7d1 100%)',
+  border: '2.5px solid #23261f',
   boxShadow: '0 0 0 1px rgba(255,255,255,.4), 0 0 18px rgba(176,138,62,.35)',
   overflow: 'hidden',
   display: 'flex',
@@ -293,8 +294,15 @@ function Cafe() {
         front="repeating-linear-gradient(90deg,#c9a86b 0 9px,#b8945a 9px 18px)"
         side="#a37f47"
       />
-      {/* espresso machine hint on the counter */}
+      {/* espresso machine hint + warm screen-light pool on the counter */}
       <Box x={132} y={74} w={26} d={16} h={14} radius={3} top="#f1ece0" front="#d8d2c2" side="#b9b2a0" />
+      <div
+        style={{
+          ...flat(66, 74, 104, 26, 33),
+          borderRadius: '50%',
+          background: 'radial-gradient(50% 50% at 50% 50%, rgba(176,138,62,.28) 0%, transparent 70%)',
+        }}
+      />
       {/* café table + stool */}
       <div style={{ ...flat(34, 112, 34, 24, 22), borderRadius: '50%', background: 'radial-gradient(60% 60% at 42% 36%, #f6f0e2, #d9cdb2)' }} />
       <div style={{ ...wallY(49, 134, 4, 22), background: '#8f7a55' }} />
@@ -333,7 +341,7 @@ function Hotel() {
       <div
         style={{
           ...wallY(10, 52, 44, 112),
-          transform: 'translateZ(0) rotateX(-90deg) rotateY(34deg)',
+          transform: 'translateZ(0) rotateX(-90deg) rotateY(48deg)',
           transformOrigin: 'bottom right',
           background: 'linear-gradient(180deg,#efe6d0,#ddd1b2)',
           borderRadius: '8px 0 0 0',
@@ -342,9 +350,9 @@ function Hotel() {
       <div
         style={{
           ...wallY(198, 52, 44, 112),
-          transform: 'translateZ(0) rotateX(-90deg) rotateY(-34deg)',
+          transform: 'translateZ(0) rotateX(-90deg) rotateY(-48deg)',
           transformOrigin: 'bottom left',
-          background: 'linear-gradient(180deg,#e9dfc7,#d5c8a6)',
+          background: 'linear-gradient(180deg,#ddd0ae,#cfc09c)',
           borderRadius: '0 8px 0 0',
         }}
       />
@@ -447,10 +455,19 @@ function Retail() {
 /* ---------- scene ---------- */
 
 const SCENE_CSS = `
-.lws-fit{container-type:inline-size;width:100%;aspect-ratio:740/392;position:relative}
+.lws-fit{container-type:inline-size;width:100%;aspect-ratio:740/392;position:relative;overflow:hidden}
+/* Coarse viewport-stepped fallback for engines without CSS trig (pre-2023):
+   never lets the 740px canvas blow out the layout, merely crops less
+   gracefully. Overridden below wherever tan/atan2 are supported. */
 .lws-scale{position:absolute;inset:0;width:740px;height:392px;transform-origin:top left;
+  transform:scale(.45)}
+@media (min-width:480px){.lws-scale{transform:scale(.62)}}
+@media (min-width:680px){.lws-scale{transform:scale(.84)}}
+@media (min-width:1200px){.lws-scale{transform:scale(.9)}}
+@supports (transform:scale(tan(atan2(1px,1px)))){
   /* atan2(length,length) -> angle whose tan is their unitless ratio */
-  transform:scale(tan(atan2(100cqw,740px)))}
+  .lws-scale{transform:scale(tan(atan2(100cqw,740px)))}
+}
 .lws-stage{position:absolute;inset:0;perspective:1750px;perspective-origin:50% 30%}
 .lws-world{position:absolute;left:10px;top:-20px;width:720px;height:430px;transform-style:preserve-3d;
   transform:rotateX(55deg) rotateZ(-20deg)}
@@ -460,10 +477,14 @@ const SCENE_CSS = `
 .lws-world[data-active="hotel"] .lws-v[data-v="hotel"],
 .lws-world[data-active="retail"] .lws-v[data-v="retail"]{opacity:1;transform:translateZ(14px)}
 
-/* sync thread lying on the ground, joining the three plinths */
-.lws-thread{position:absolute;left:0;top:0;width:720px;height:430px;transform:translateZ(1px)}
-.lws-thread path{fill:none;stroke:#1f4230;stroke-width:2;stroke-dasharray:1 7;stroke-linecap:round;opacity:.75}
+/* sync thread lying on the ground, joining the three plinths — the one
+   element that says "one system, many places", so it must actually read */
+.lws-thread{position:absolute;left:0;top:0;width:720px;height:430px;transform:translateZ(1px);
+  filter:drop-shadow(0 1px 0 rgba(255,255,255,.85))}
+.lws-thread path{fill:none;stroke:#1f4230;stroke-width:2.5;stroke-dasharray:6 6;
+  stroke-linecap:round;opacity:.9;animation:lws-thread-flow 2.6s linear infinite}
 .lws-thread circle{fill:#d96a4c;stroke:#f5f1e8;stroke-width:2}
+@keyframes lws-thread-flow{to{stroke-dashoffset:-12}}
 
 /* screen micro-typography (decorative; aria-hidden at the mount) */
 .lws-scr-k{font-family:var(--font-mono),monospace;font-size:4.4px;letter-spacing:.14em;
@@ -484,7 +505,16 @@ const SCENE_CSS = `
 .lws-wallface>div{animation:lws-glow 5.5s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){
   .lws-wallface>div{animation:none}
+  .lws-thread path{animation:none}
   .lws-v{transition:none}
+}
+
+/* Small screens: drop the micro-copy noise, enlarge the massing — the
+   three-place story survives, the 2px type does not. */
+@media (max-width:640px){
+  .lws-scr-k,.lws-scr-row{display:none}
+  .lws-scr-t{font-size:8px}
+  .lws-world{transform:rotateX(52deg) rotateZ(-18deg) scale(1.12)}
 }
 `;
 

@@ -211,6 +211,27 @@ describe('places explorer', () => {
     expect(rows).toEqual(['08:00Today’s events', '20:00Tomorrow preview']);
   });
 
+  it('resets the screen even when the place changes from the HERO, across a colliding id', async () => {
+    // "window" is a screen id in BOTH retail and café. A hero-driven place
+    // change arrives as a prop (never through the in-panel pick handler), so
+    // without the render-time reset the stale retail selection would resolve
+    // against café's own "window" screen instead of its first one.
+    const user = userEvent.setup();
+    const { container } = await renderPage();
+    const places = placesSection(container);
+
+    await user.click(places.getByRole('button', { name: /Noble & Co\./ }));
+    await user.click(places.getByRole('button', { name: /Window portrait/ }));
+    expect(places.getByRole('button', { name: /Window portrait/ })).toHaveAttribute('aria-pressed', 'true');
+
+    const heroGroup = screen.getByRole('group', { name: 'Explore a place' });
+    await user.click(within(heroGroup).getByRole('button', { name: /Café/ }));
+
+    expect(places.getByRole('button', { name: /Menu board/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(places.getByRole('button', { name: /Window board/ })).toHaveAttribute('aria-pressed', 'false');
+    expect(container.querySelector('.lwp-preview')!.textContent).toContain('Morning Menu');
+  });
+
   it('labels the workspace as synthetic, so it cannot read as customer telemetry', async () => {
     await renderPage();
     expect(

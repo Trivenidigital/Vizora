@@ -10,4 +10,7 @@ export const fraunces = Fraunces({
   subsets: ['latin'],
   variable: '--font-fraunces',
   display: 'swap',
+  // Without declaring the extra axes, next/font serves a wght-only instance
+  // and the `font-variation-settings` for opsz/SOFT in globals.css are inert.
+  axes: ['SOFT', 'opsz'],
 });
