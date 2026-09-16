@@ -1,0 +1,99 @@
+# Claude Code execution brief: complete Vizora homepage redesign
+
+## Assignment and ownership
+
+You are the implementation owner. Perform a complete production-quality redesign of Vizora's public homepage. The user explicitly authorizes replacing its entire structure and content. Do not preserve old sections, copy, layouts, hero, navigation arrangement or visual patterns merely because they already exist. This is a full rebuild, not a reskin.
+
+Use **Claude Fable 5**, model ID **claude-fable-5**, with high effort. Confirm the actual model before implementation. If that model is unavailable to this account, report the error and request a model decision; do not silently substitute.
+
+Claude Code must perform all implementation, including code, styling, asset integration, tests and fixes. Astra is the design director and reviewer. The user's minimum is 95% of development performed by Claude Code; this handoff assigns 100% of implementation to you.
+
+Repository: https://github.com/Trivenidigital/Vizora
+
+Preferred checkout: **C:\Projects\Vizora on Advita-PC**.
+
+Read applicable repository guidance. Inspect Git status and remote state, preserve uncommitted work, and use an isolated worktree/branch based on the appropriate current GitHub state. Do not reset or overwrite other work. Keep this task independent of Gecko-Alpha.
+
+## Scope
+
+Rebuild the public homepage end to end: information architecture, navigation, copy, hero, visual storytelling, product explanation, feature presentation, conversion path and footer. Adapt homepage-specific components and styling freely. Remove obsolete homepage components where safe.
+
+The authenticated dashboard is not included in this first implementation. Its visual language can inform product previews, but do not expand this assignment into changing every application route. Preserve working signup/login destinations, public legal routes, actual pricing integration, consent behavior, metadata and necessary backend contracts.
+
+## Creative direction
+
+Use **Little Worlds + Studio** as the starting direction recommended by Astra. The user has authorized the redesign without explicitly choosing a numbered concept. Treat this as a strong starting brief with room for your own design judgment, not a requirement to reproduce the concept pixel for pixel.
+
+Create a premium, warm, dimensional product identity:
+
+- Ivory and limestone backgrounds, deep forest green, ink text, restrained brass/coral accents.
+- Editorial display type for a few key headlines, highly legible sans-serif type for copy and controls.
+- An original 3D scene showing a miniature café, boutique hotel and retail shop, with digital signage visibly serving each space.
+- Convincing depth through geometry, lighting, shadows, material texture and spatial composition. A few floating flat rectangles or generic gradient blobs do not satisfy the 3D direction.
+- A calm, well-spaced page with strong typography, deliberate visual rhythm and clear hierarchy. Give each section a distinct role.
+- Emphasize the relationship between real places, their screens and the content users manage.
+
+Suggested headline territory: “Your world. Perfectly in sync.” You may improve all copy. Explain the product directly: Vizora lets businesses create/manage content, organize playlists, schedule playback, and manage signage screens across locations.
+
+The original generated concept board may be supplied alongside this brief as **06-little-worlds.png**. It is a visual reference, not a production asset or a webpage to paste into the site. The original Studio board, **01-studio.png**, is a secondary reference if available. If references are absent, the detailed direction above is sufficient to proceed.
+
+## Rebuild the content narrative
+
+Devise and implement a coherent new narrative. This proposed sequence is guidance, not a mandated reproduction:
+
+1. **Hero: places brought to life.** Plain-language value proposition, distinct 3D scene, primary signup action, secondary action that leads to a real product explanation.
+2. **Explore your setting.** Café, hotel and retail interaction with specific grounded examples: changing menus, welcoming guests, seasonal promotions. Show what happens on a screen.
+3. **From content to playback.** A focused Create / Organize / Schedule / Display sequence with an illustrative live HTML product preview. Illustrative states must not masquerade as real customer telemetry.
+4. **A workspace that makes sense.** Explain a small number of verified strengths using useful visual examples. Confirm capabilities against the repository; remove unsupported claims.
+5. **Start with your screens.** Present the actual onboarding path and verified pricing if pricing remains useful to conversion. Fetch from the existing pricing source rather than hardcoding fictional commercial terms.
+6. **Useful questions and a clear final action.** Write concise original FAQ copy from verified behavior. Include functioning footer/legal links.
+
+Avoid fictional testimonials, customer logos/counts, guaranteed results, invented uptime, unsupported AI features, fake reviews or made-up free-trial terms. You have full freedom to replace existing marketing copy, not to invent product capabilities.
+
+## Interaction and implementation quality
+
+Choose the lightest implementation that achieves a compelling dimensional experience. If using Three.js/react-three-fiber or another renderer, justify the dependency through the result. If an existing renderer is available, reuse it appropriately. Real-time 3D, prerendered assets plus restrained motion, or a hybrid are acceptable if the final experience is excellent. Report precisely which approach you implement.
+
+- Keep headings, buttons, navigation, pricing and controls as semantic live HTML.
+- Do not make the whole homepage a canvas or flattened screenshot.
+- Do not crop a reference board into a fake hero. Build a dedicated scene or source/create standalone appropriate assets.
+- Use deliberate motion: gentle scene response, clear selected states, restrained section transitions. Keep native scrolling and avoid forced long scroll sequences.
+- Provide static and reduced-motion fallbacks; touch users must not depend on hover.
+- Reserve image/scene dimensions to prevent layout shifts. Load below-fold assets lazily. Defer heavy 3D work where appropriate.
+- Ensure readable contrast, visible focus, logical headings, keyboard controls, accessible mobile navigation and descriptive alternative text.
+- All CTAs must lead somewhere real. No inert demo buttons or placeholder links.
+- Keep styles scoped so shared application pages do not regress.
+- Use appropriately licensed local/self-hosted assets when possible; record asset provenance.
+
+## Execution workflow
+
+Do the implementation, not only a proposal. Start by briefly recording repository findings, the chosen approach and a concise new page outline, then proceed through the authorized rebuild without waiting for approval of routine design or engineering decisions.
+
+1. Verify checkout and model; read repository guidance and inspect existing routing, pricing, assets and test/build scripts.
+2. Implement the entire new homepage and responsive states.
+3. Launch a local preview using repository conventions and take actual rendered screenshots.
+4. Inspect and refine the result yourself. Fix crowding, weak hierarchy, text wrapping, cropping, mobile navigation, image quality and performance issues before handing it over.
+5. Run relevant lint/type/build checks and meaningful interaction tests. Verify signup/login links, navigation, FAQ behavior, pricing behavior when included, keyboard access, reduced motion and narrow screens. Distinguish pre-existing failures from new ones using evidence.
+6. Prepare the reviewer handoff below. Wait for Astra's review; you will implement the requested corrections.
+
+Do not deploy or merge as part of this assignment. Deliver a local preview and reviewable branch/diff; a draft PR is acceptable when repository workflow supports it.
+
+## Required reviewer handoff
+
+Create a concise `REDESIGN-REVIEW.md` in the worktree's appropriate task/documentation location, with:
+
+- Actual model used and confirmation that Claude Code authored the implementation.
+- Branch/worktree path, base commit and changed-file summary.
+- New section outline and reasons for material design decisions.
+- Preview URL and startup command.
+- Desktop (1440px), tablet (768px) and mobile (390px) full-page screenshots, plus a 320px overflow check. Include paths or accessible links.
+- A short interaction recording if supported; otherwise describe and capture meaningful interactive states.
+- Exact verification commands with results, and any unverified behavior or blockers.
+- Whether the scene is interactive 3D, prerendered or hybrid; asset sources, runtime dependencies and performance observations.
+- Any product claims requiring confirmation.
+
+## Astra review rubric
+
+The review will assess whether the page is a genuinely new structure and content narrative; whether the 3D scene explains Vizora; whether typography/composition feel designed rather than templated; whether mobile works as well as desktop; whether interactions and CTAs work; whether copy is accurate; whether accessibility and loading behavior are sound; and whether unrelated application pages remain intact.
+
+Completion means a finished, visually inspected, tested homepage with evidence ready for review—not merely changed files or a passing build.

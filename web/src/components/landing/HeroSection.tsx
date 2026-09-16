@@ -1,283 +1,111 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { RefObject } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { anchorProps } from './shared';
-import ProductTourDialog from './ProductTourDialog';
+import WorldsScene, { type WorldPlace } from './WorldsScene';
 
 interface HeroSectionProps {
-  heroRef: RefObject<HTMLElement | null>;
+  /** Jump to the Places section with this place selected. */
+  onExplore: (place: WorldPlace) => void;
 }
 
-const RAIL = ['01 — Content automation', '02 — Smart scheduling', '03 — Fleet operations'];
-const TRUST = ['30-day free trial', 'No credit card required', '5-minute setup'];
-
-/* Signal-fibre generator constants — ported from design-samples/05-homepage.html */
-const SVG_NS = 'http://www.w3.org/2000/svg';
-const FIBRE_COUNT = 38;
-const ORIGIN = { x: 470, y: -120 };
-/* [x, y, rotation] of the three lit screens the fibres terminate on */
-const SCREENS: Array<[number, number, number]> = [
-  [324, 470, -7],
-  [546, 558, 0],
-  [768, 470, 7],
+const PLACES: Array<{ id: WorldPlace; label: string }> = [
+  { id: 'cafe', label: 'Café' },
+  { id: 'hotel', label: 'Hotel' },
+  { id: 'retail', label: 'Retail' },
 ];
 
-export default function HeroSection({ heroRef }: HeroSectionProps) {
-  const fibreRef = useRef<SVGSVGElement>(null);
-  const [tourOpen, setTourOpen] = useState(false);
-  // Stable identity: `useDialog` keys its effect on `onClose`, and this section
-  // re-renders on every scroll-driven state change in the page. An inline arrow
-  // would re-run the dialog effect (and its body scroll-lock write) each time.
-  const closeTour = useCallback(() => setTourOpen(false), []);
+const HERO_CSS = `
+.lw-hero{padding:118px 0 30px}
+.lw-hero-grid{display:grid;grid-template-columns:minmax(360px,44fr) 56fr;gap:clamp(28px,4vw,64px);align-items:center}
+.lw-hero-copy{max-width:34rem}
+.lw-hero h1{font-size:clamp(2.6rem,5.4vw,4.35rem);margin:18px 0 20px}
+.lw-hero-sub{color:var(--lw-ink-2);font-size:clamp(1rem,1.15vw,1.13rem);line-height:1.65;max-width:30rem;margin-bottom:28px}
+.lw-hero-cta{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.lw-hero-trust{color:var(--lw-muted);font-size:.82rem;display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.lw-hero-trust b{color:var(--lw-brass-ink);font-weight:700}
 
-  useEffect(() => {
-    const svg = fibreRef.current;
-    if (!svg) return;
+.lw-hero-scene{position:relative}
+.lw-hero-places{display:flex;justify-content:center;gap:clamp(10px,2vw,26px);margin-top:2px;flex-wrap:wrap}
+.lw-place-btn{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:8px 15px;
+  font-size:.82rem;font-weight:600;color:var(--lw-ink-2);border:1px solid transparent;
+  transition:color .2s,border-color .2s,background .2s}
+.lw-place-btn i{width:7px;height:7px;border-radius:50%;background:var(--lw-coral);flex:none}
+.lw-place-btn:hover,.lw-place-btn:focus-visible,.lw-place-btn[data-on="true"]{
+  color:var(--lw-ink);border-color:var(--lw-hair);background:rgba(255,253,244,.75)}
+.lw-place-btn small{font-family:var(--font-mono),monospace;font-size:.56rem;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--lw-muted)}
 
-    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+@media (max-width:1023px){
+  .lw-hero{padding-top:96px}
+  .lw-hero-grid{grid-template-columns:1fr;gap:20px}
+  .lw-hero-copy{max-width:38rem}
+  .lw-hero-scene{max-width:640px;margin-inline:auto;width:100%}
+}
+`;
 
-    const defs = document.createElementNS(SVG_NS, 'defs');
-    defs.innerHTML = `
-      <linearGradient id="pulse" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="#00E5A0" stop-opacity="0"/>
-        <stop offset="45%" stop-color="#00E5A0" stop-opacity="1"/>
-        <stop offset="100%" stop-color="#00B4D8" stop-opacity="0"/>
-      </linearGradient>
-      <filter id="tipGlow" x="-260%" y="-260%" width="620%" height="620%">
-        <feGaussianBlur stdDeviation="7" result="b"/>
-        <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-      </filter>
-      <filter id="softGlow" x="-120%" y="-120%" width="340%" height="340%"><feGaussianBlur stdDeviation="14"/></filter>`;
-    svg.appendChild(defs);
-
-    const gGlow = document.createElementNS(SVG_NS, 'g');
-    const gLine = document.createElementNS(SVG_NS, 'g');
-    const gPulse = document.createElementNS(SVG_NS, 'g');
-    const gTip = document.createElementNS(SVG_NS, 'g');
-    gTip.setAttribute('filter', 'url(#tipGlow)');
-    svg.append(gGlow, gLine, gPulse, gTip);
-
-    const bloom = document.createElementNS(SVG_NS, 'ellipse');
-    bloom.setAttribute('cx', '546');
-    bloom.setAttribute('cy', '505');
-    bloom.setAttribute('rx', '282');
-    bloom.setAttribute('ry', '108');
-    bloom.setAttribute('fill', 'rgba(0,229,160,.16)');
-    bloom.setAttribute('filter', 'url(#softGlow)');
-    gGlow.appendChild(bloom);
-
-    for (let i = 0; i < FIBRE_COUNT; i++) {
-      const t = i / (FIBRE_COUNT - 1);
-      const sway = Math.sin(t * Math.PI * 2.1) * 16;
-      const tx = 268 + 556 * t + sway * 0.7;
-      const ty = 430 + 128 * Math.sin(t * Math.PI) + Math.cos(t * 13) * 9;
-      const x0 = ORIGIN.x + (t - 0.5) * 54;
-      const c1x = x0 + (t - 0.5) * 46;
-      const c1y = 150 + t * 70;
-      const c2x = tx - 148 + sway * 1.4;
-      const c2y = ty - 232 + Math.sin(t * 6) * 24;
-      const d = `M${x0.toFixed(1)},${ORIGIN.y} C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)}`;
-      const offset = (i * 0.11).toFixed(2);
-
-      const core = document.createElementNS(SVG_NS, 'path');
-      core.setAttribute('d', d);
-      core.setAttribute('fill', 'none');
-      core.setAttribute('stroke', 'rgba(58,96,110,.30)');
-      core.setAttribute('stroke-width', (1.05 + (i % 3) * 0.35).toFixed(2));
-      core.setAttribute('stroke-linecap', 'round');
-      gLine.appendChild(core);
-
-      const hi = document.createElementNS(SVG_NS, 'path');
-      hi.setAttribute('d', d);
-      hi.setAttribute('fill', 'none');
-      hi.setAttribute('stroke', 'rgba(255,255,255,.95)');
-      hi.setAttribute('stroke-width', '.85');
-      hi.setAttribute('stroke-linecap', 'round');
-      hi.setAttribute('transform', 'translate(-1.1,-1.1)');
-      gLine.appendChild(hi);
-
-      const p = document.createElementNS(SVG_NS, 'path');
-      p.setAttribute('d', d);
-      p.setAttribute('fill', 'none');
-      p.setAttribute('stroke', 'url(#pulse)');
-      p.setAttribute('stroke-width', '2.1');
-      p.setAttribute('stroke-linecap', 'round');
-      p.setAttribute('stroke-dasharray', '120 1400');
-      if (!still) p.style.animation = `mkt-fibre-flow 4.6s linear ${offset}s infinite`;
-      gPulse.appendChild(p);
-
-      const dot = document.createElementNS(SVG_NS, 'circle');
-      dot.setAttribute('cx', tx.toFixed(1));
-      dot.setAttribute('cy', ty.toFixed(1));
-      dot.setAttribute('r', (1.9 + (i % 4) * 0.55).toFixed(2));
-      dot.setAttribute('fill', i % 3 ? '#00E5A0' : '#7BE9FF');
-      if (still) {
-        dot.setAttribute('opacity', '.9');
-      } else {
-        dot.style.animation = `mkt-fibre-breathe 4.6s ease-in-out ${(i * 0.11 + 0.9).toFixed(2)}s infinite`;
-      }
-      gTip.appendChild(dot);
-    }
-
-    SCREENS.forEach(([x, y, rot], idx) => {
-      const g = document.createElementNS(SVG_NS, 'g');
-      g.setAttribute('transform', `translate(${x},${y}) rotate(${rot})`);
-      g.innerHTML = `
-        <rect x="-21" y="-14" width="42" height="27" rx="3.5" fill="rgba(255,255,255,.82)" stroke="rgba(0,178,124,.5)" stroke-width="1"/>
-        <rect x="-16" y="-9" width="32" height="17" rx="2" fill="rgba(0,229,160,.2)"/>
-        <path d="M-6 13 h12 M0 13 v5" stroke="rgba(10,34,46,.28)" stroke-width="1.2" stroke-linecap="round"/>`;
-      if (!still) {
-        g.style.animation = `mkt-fibre-breathe 4.6s ease-in-out ${(1.1 + idx * 0.5).toFixed(2)}s infinite`;
-      }
-      gTip.appendChild(g);
-    });
-
-    return () => {
-      while (svg.firstChild) svg.removeChild(svg.firstChild);
-    };
-  }, []);
+export default function HeroSection({ onExplore }: HeroSectionProps) {
+  const [preview, setPreview] = useState<WorldPlace | null>(null);
 
   return (
-    <div className="mkt-hero-wrap">
-      <style>{`
-        .mkt-hero-wrap { padding: 84px clamp(10px,1.4vw,20px) 0; }
-        .mkt-hero { position: relative; overflow: hidden; height: min(86vh,900px); min-height: 660px; }
-
-        .mkt-hero-rail { position: absolute; left: clamp(22px,3vw,46px); top: 13%; z-index: 4;
-          display: flex; flex-direction: column; gap: 13px; }
-        .mkt-hero-rail span { color: var(--mkt-muted); display: flex; align-items: center; gap: 10px; }
-        .mkt-hero-rail span::before { content: ''; width: 16px; height: 1px; background: currentColor; opacity: .55; }
-
-        .mkt-hero-statement { position: absolute; right: clamp(22px,3.4vw,52px); top: 12.5%; z-index: 4;
-          max-width: 33ch; text-align: right; color: var(--mkt-ink-2);
-          font-size: clamp(.92rem,1.05vw,1.05rem); line-height: 1.6; }
-
-        .mkt-hero-stage { position: absolute; inset: 0; z-index: 1; display: grid; place-items: center; pointer-events: none; }
-        .mkt-hero-stage svg { width: min(97%,1080px); height: 100%; overflow: visible; }
-
-        .mkt-hero-copy { position: absolute; left: clamp(22px,3vw,46px); bottom: clamp(28px,4vw,54px); z-index: 5;
-          max-width: min(90%,660px); }
-        .mkt-hero-micro { display: inline-block; color: var(--mkt-muted); margin-bottom: 15px;
-          border: 1px solid var(--mkt-hair); border-radius: 999px; padding: 6px 13px; background: rgba(255,255,255,.5); }
-        .mkt-hero h1 { font-size: clamp(2.4rem,5.2vw,4.3rem); font-weight: 600; margin-bottom: 22px; }
-        /* Hero-only ramp. The shared .eh-gradient stays two-stop for the nav/footer
-           wordmarks, where this blue-violet terminal stop reads wrong at small size. */
-        .mkt-hero h1 .eh-gradient { background-image: linear-gradient(120deg,#00A171 0%,#00A6CC 60%,#4F86D4 100%); }
-        .mkt-hero-cta { display: flex; gap: 11px; flex-wrap: wrap; margin-bottom: 16px; }
-        .mkt-hero-trust { display: flex; gap: 18px; flex-wrap: wrap; font-size: .8rem; color: var(--mkt-muted); }
-        .mkt-hero-trust span { display: flex; align-items: center; gap: 6px; }
-        .mkt-hero-tick { color: var(--mkt-mint-ink); font-weight: 700; }
-
-        /* It is a <button> now, so the UA resets have to be undone for it to keep
-           reading as the chip it looks like. */
-        .mkt-hero-chip { position: absolute; right: clamp(22px,3vw,46px); bottom: clamp(28px,4vw,54px); z-index: 5;
-          display: flex; align-items: center; gap: 13px; border-radius: 13px; padding: 11px 16px 11px 11px;
-          text-align: left; cursor: pointer; font: inherit; color: inherit; }
-        .mkt-hero-chip .mkt-mono { color: var(--mkt-muted); display: block; margin-bottom: 3px; }
-        .mkt-hero-chip strong { display: block; font-family: var(--font-sora), sans-serif;
-          font-size: .9rem; font-weight: 600; letter-spacing: -.02em; }
-        .mkt-hero-orb { width: 42px; height: 42px; border-radius: 50%; flex: none; position: relative; overflow: hidden;
-          display: grid; place-items: center;
-          background: radial-gradient(circle at 32% 30%,#B9FFE6 0%,#00E5A0 38%,#00B4D8 78%,#0A6A87 100%);
-          box-shadow: 0 0 0 3px rgba(0,229,160,.15), 0 0 20px rgba(0,229,160,.32); }
-        .mkt-hero-orb::after { content: ''; position: absolute; inset: 0; mix-blend-mode: overlay;
-          background: repeating-linear-gradient(0deg,rgba(255,255,255,.22) 0 1px,transparent 1px 3px); }
-        .mkt-hero-orb i { position: relative; z-index: 2; color: #04241B; font-size: .6rem; font-style: normal; padding-left: 2px; }
-
-        @media (max-width: 1080px) {
-          .mkt-hero { height: auto; min-height: 0; padding: 96px 24px 34px;
-            display: flex; flex-direction: column; gap: 26px; }
-          .mkt-hero-rail, .mkt-hero-statement, .mkt-hero-copy, .mkt-hero-chip { position: static; }
-          .mkt-hero-copy { max-width: none; order: 1; }
-          .mkt-hero-stage { position: relative; inset: auto; height: 250px; opacity: .9; order: 2; }
-          .mkt-hero-stage svg { width: 100%; }
-          .mkt-hero-statement { text-align: left; max-width: none; order: 3; }
-          .mkt-hero-rail { flex-direction: row; flex-wrap: wrap; gap: 10px 20px; order: 4; }
-          .mkt-hero-chip { order: 5; width: max-content; max-width: 100%; }
-        }
-
-        @keyframes mkt-fibre-flow { from { stroke-dashoffset: 1520 } to { stroke-dashoffset: -140 } }
-        @keyframes mkt-fibre-breathe { 0%,72%,100% { opacity: .42 } 84% { opacity: 1 } }
-        @media (prefers-reduced-motion: reduce) {
-          #fibre * { animation: none !important }
-          #fibre circle { opacity: .9 !important }
-        }
-      `}</style>
-
-      <section ref={heroRef} className="mkt-canvas mkt-hero" aria-labelledby="heroTitle">
-        <div className="mkt-hero-rail mkt-mono" aria-hidden="true">
-          {RAIL.map((label) => (
-            <span key={label}>{label}</span>
-          ))}
-        </div>
-
-        <p className="mkt-hero-statement">
-          We build the control layer that brings clarity, precision and reliability to every
-          screen your business runs.
-        </p>
-
-        <div className="mkt-hero-stage" aria-hidden="true">
-          <svg ref={fibreRef} id="fibre" viewBox="0 0 1000 760" preserveAspectRatio="xMidYMid meet" />
-        </div>
-
-        <div className="mkt-hero-copy">
-          <span className="mkt-hero-micro mkt-mono">Android TV · Windows · macOS · Linux players</span>
-
-          <h1 id="heroTitle" className="eh-heading">
-            Publish. Schedule.
+    <section className="lw-hero" aria-labelledby="heroTitle">
+      <style dangerouslySetInnerHTML={{ __html: HERO_CSS }} />
+      <div className="lw-wrap lw-hero-grid">
+        <div className="lw-hero-copy">
+          <span className="lw-mono lw-kicker">Screens bring people together</span>
+          <h1 id="heroTitle" className="lw-display">
+            Your world.
             <br />
-            <span className="eh-gradient">Everywhere.</span>
+            <em>Perfectly in sync.</em>
           </h1>
-
-          <div className="mkt-hero-cta">
-            <Link
-              href="/register"
-              className="eh-btn-neon inline-flex items-center justify-center gap-2 rounded-full px-6 py-3.5 text-[0.94rem]"
-            >
-              Start Free — 5 Minutes to Live{' '}
-              <span aria-hidden="true" style={{ opacity: 0.5 }}>
+          <p className="lw-hero-sub">
+            Vizora runs the screens in the places you run. Make the content once, schedule when it
+            plays, and every screen — café menu, hotel lobby, shop window — stays exactly on
+            script.
+          </p>
+          <div className="lw-hero-cta">
+            <Link href="/register" className="lw-btn lw-btn-forest">
+              Start free
+              <span aria-hidden="true" style={{ opacity: 0.6 }}>
                 →
               </span>
             </Link>
-            <a
-              {...anchorProps('features')}
-              className="eh-btn-ghost inline-flex items-center justify-center rounded-full px-[21px] py-[13px] text-[0.94rem]"
-            >
-              See the platform
+            <a {...anchorProps('how-it-works')} className="lw-btn lw-btn-ghost">
+              See how it works
             </a>
           </div>
+          <p className="lw-hero-trust">
+            <b aria-hidden="true">✓</b> 30-day free trial
+            <span aria-hidden="true">·</span> up to 5 screens
+            <span aria-hidden="true">·</span> no credit card
+          </p>
+        </div>
 
-          <div className="mkt-hero-trust">
-            {TRUST.map((item) => (
-              <span key={item}>
-                <b className="mkt-hero-tick" aria-hidden="true">
-                  ✓
-                </b>{' '}
-                {item}
-              </span>
+        <div className="lw-hero-scene">
+          <div aria-hidden="true" onMouseLeave={() => setPreview(null)}>
+            <WorldsScene active={preview} />
+          </div>
+          <div className="lw-hero-places" role="group" aria-label="Explore a place">
+            {PLACES.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className="lw-place-btn"
+                data-on={preview === p.id}
+                onMouseEnter={() => setPreview(p.id)}
+                onFocus={() => setPreview(p.id)}
+                onBlur={() => setPreview(null)}
+                onClick={() => onExplore(p.id)}
+              >
+                <i aria-hidden="true" />
+                {p.label}
+                <small aria-hidden="true">explore</small>
+              </button>
             ))}
           </div>
         </div>
-
-        <button
-          type="button"
-          className="mkt-chip mkt-hero-chip"
-          onClick={() => setTourOpen(true)}
-          aria-haspopup="dialog"
-        >
-          <span className="mkt-hero-orb" aria-hidden="true">
-            <i>▶</i>
-          </span>
-          <span>
-            <span className="mkt-mono">Watch the product tour</span>
-            <strong>Dashboard, templates &amp; pairing · 1:45</strong>
-          </span>
-        </button>
-
-        <ProductTourDialog open={tourOpen} onClose={closeTour} />
-      </section>
-    </div>
+      </div>
+    </section>
   );
 }

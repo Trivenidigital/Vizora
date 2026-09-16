@@ -1,0 +1,16 @@
+{
+  "topic": "redesign",
+  "task_text": "Complete Vizora homepage redesign from light Electric Horizon to Little Worlds + Studio visual direction. Full rebuild of information architecture, copy, hero, 3D scene (café/hotel/retail dioramas), and conversion narrative. Preserve semantic HTML, real routes, geo-pricing, accessibility.",
+  "completed_at": "2026-09-16T03:45:00Z",
+  "drift_check_tag": "extends-Hermes",
+  "net_new_step_count": 5,
+  "hermes_step_count": 1,
+  "files_to_read_first": [
+    "web/src/app/page.tsx",
+    "CLAUDE.md (sections: 'Content system', 'Marketing `.mkt` scope', 'MCP Server')",
+    "schema.prisma (roles: admin/manager/viewer; players: four platform types)",
+    "web/src/app/sla/page.tsx (verified SLA coverage)",
+    "middleware/src/modules/auth/auth.service.ts (30-day trial, 5-screen limit)"
+  ],
+  "verdict": "Marketing UI redesign extends existing Electric Horizon codebase. No agent/MCP involvement. Hermes-first check: [1] pricing API `/api/geo-pricing` already exists (consume as-is), [2-5] all other steps are net-new UI/UX work (components, 3D assets, CSS, copy). Drift-check: read auth.service.ts + sla/page.tsx to verify trial/SLA claims before including in copy. Decision: prerendered 3D assets (Blender) + CSS composition for best fidelity-to-effort ratio on solo development."
+}

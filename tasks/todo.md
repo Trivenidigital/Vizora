@@ -1,5 +1,110 @@
 # Vizora - Task Tracker
 
+## Active Workstream: FULL homepage redesign — Little Worlds + Studio (2026-09-16)
+
+**Supersedes** the 2026-09-15 residual-gaps workstream below (kept as the record of
+iteration 1 — its 8 commits stay on this branch and their verified substrate carries
+forward: real anchors, accessible menu, dialog focus trap, claims audit, live
+geo-pricing contract, reduced-motion + landmark discipline).
+
+**Corrected scope (operator, 2026-09-16):** replace the whole public homepage
+structure and content. Direction: Little Worlds + Studio — ivory/limestone, deep
+forest green, ink, restrained brass/coral, editorial serif display type + legible
+sans. Centerpiece: a code-native dimensional café/hotel/retail signage scene making
+place → screens → content immediately legible. No invented AI capability, customer
+counts, testimonials, compliance/uptime claims, or fictional telemetry presented as
+real. Keep real routes, consent behavior, geo-pricing API, verified product facts.
+Dashboard out of scope. No merge/deploy/PR.
+
+**Reference artifacts:** `tasks/redesign-reference/brief.txt` +
+`tasks/redesign-reference/06-little-worlds.png` (visual reference only — never a
+production asset).
+
+**Model note:** iteration 1 ran on `claude-fable-5-1` (substitution); this pass runs
+on the exact requested `claude-fable-5`. Recorded in REDESIGN-REVIEW.md.
+
+**New IA:** nav · hero ("Your world. Perfectly in sync." + diorama scene) ·
+#places (locations → screens → now-playing preview, illustrative demo workspace) ·
+#how-it-works (Create → Organize → Schedule → Display, verified copy) ·
+#product (real capture + verified strengths + 1:45 tour dialog) · #pricing (real
+geo API, restyled) · #faq (rewritten from verified behavior) · final CTA · footer.
+Deleted as obsolete: Stats, AIFeatures, Solutions, Security, FeatureShowcases,
+HowItWorks(layer stack), DemoVideo, Testimonials, MidPageCTA, StickyBottomBar.
+
+## Closed Workstream (iteration 1): Homepage light redesign — residual gaps vs the approved brief (2026-09-15)
+
+**Branch:** `feat/homepage-light-redesign` (worktree `C:\projects\vizora-homepage-redesign-20260915`, from main `a8df6c16`)
+
+**Drift-check result:** the approved direction (`design-samples/05-homepage.html` + `HANDOFF.md`,
+branch `design/homepage-direction-samples`, 2026-08-02) is ALREADY merged into main and deployed:
+`81eba613` (rebrand to light Electric Horizon — hero, fibre object, `.mkt` tokens, HowItWorks
+mounted, nav/stats/pricing/FAQ/footer recoloured) and `fa882d2e` (#257 — real product capture
+replaces the CSS mock, cookie bar context-aware, dark sections light-scoped). The design branch is
+an ancestor of main (`git merge-base --is-ancestor` → true). So this workstream does NOT re-port
+the design; it closes the gaps between what shipped and what the brief requires.
+
+**New primitives introduced:** one small client component (product-tour `<dialog>`), one focused
+test file. No runtime service code, DB, API, env var, PM2 or Hermes change.
+
+**Hermes-first analysis:** not applicable — static marketing UI, no agent/provider path.
+
+**Gaps found (brief requirement → current state → action)**
+- [x] Section anchors are `<button onClick=scrollTo>` (nav, mobile menu, footer, hero ghost) →
+      real `<a href="#id">` via `anchorProps` (`shared.tsx`); modified clicks stay native.
+- [x] Mobile menu toggle: `aria-expanded`/`aria-controls`/label toggle/Escape; CTA in mobile header.
+- [x] Nav links centred (3-col grid at `md+`).
+- [x] Hero "product tour" chip → `<button>` opening `ProductTourDialog` (`useDialog` trap; the
+      48 MB video is only in the DOM while open; `<video tabIndex={0}>` so the controls are a tab stop).
+- [x] Pricing toggles `aria-pressed` + `role="group"`; geo-pricing behaviour untouched.
+- [x] FAQ `aria-expanded`/`aria-controls`/`aria-hidden`.
+- [x] Every section is a named landmark; `#ai`/`#security` ids + `scroll-mt-20`.
+- [x] `.mkt .eh-reveal` reduced-motion rule (scoped; dashboard untouched).
+- [x] Footer: `support@vizora.cloud`, `Contact sales` mailto, "How it works" anchor.
+- [x] Skip link WAS covered by the `fixed z-50` nav (elementFromPoint → NAV at all 3 widths) →
+      `focus:z-[60]` in `layout.tsx`; re-measured on top at 1440/834/390.
+- [x] Claims fact-checked against the codebase (subagent audit + own re-check): "50,000+ screens",
+      "2,500+ organizations", "since 2024", "SOC 2 Type II", "256-bit", "SSO Supported", "Privacy-
+      First AI / edge computing", "all plans 99.9% SLA", "editors" role → NO EVIDENCE or
+      CONTRADICTED. Replaced with: 30-day / 5-screen trial (`auth.service.ts:90-91`, `plans.ts`),
+      99.9% SLA on Pro+Enterprise only (`web/src/app/sla/page.tsx:35,176`), roles
+      admin/manager/viewer (`schema.prisma:95`), Google sign-in, data export, HTTPS, audit log,
+      rate-limit/CSRF/headers, four player platforms. **Left for the operator (positioning, not
+      fact):** the six-system AI section (0 of 6 exist in code — AI Designer is a "launching soon"
+      stub, no openai/anthropic dependency), the FAQ "How does Vizora use AI?", the Enterprise card
+      bullets ("SSO integration" is backlog item F2 TODO), the nav "AI-Powered" badge and the
+      site `<title>`.
+- [x] Section eyebrows: bordered pills → the mockup's plain mono `.mkt-kicker` (self-critique pass).
+- [x] Tests: `landing-page.test.tsx` — 12 tests; negative controls run for burger `aria-expanded`,
+      tour `<source src>`, hero claim, video `tabIndex`, modifier-click guard (each red when reverted).
+- [x] Baselines and post-change runs (below).
+- [x] Browser QA (Playwright, production `next start`) at 1440×900 / 834×1100 / 390×844.
+- [x] Review passes: functional/a11y (APPROVE-WITH-FIXES → all four fixes applied: video tab
+      stop, memoised onClose, modifier-click passthrough, vacuous claim strings dropped; `#ai`/
+      `#security` scroll margin; dead `AnimatedStat` removed). Visual/responsive
+      (APPROVE-WITH-FIXES → applied: every section on the mockup's 1320px `.mkt-wrap`; solid H2s
+      (gradient only on the hero's "Everywhere."); hairline stats band without icons; tour dialog
+      portalled to `body` so the fixed nav/cookie bar sit under the scrim; nav = plain Login +
+      ink pill CTA, "AI-Powered" chip dropped (not in mockup), bordered burger; FAQ kicker; mono
+      "Most Popular"; final-CTA glow + grain removed; stacked layer reserve 144→172px).
+      Not applied: the ⌘K badge (root-layout app chrome, out of scope) and the AI section's
+      neural-grid texture (section flagged for the operator as a whole).
+
+**Evidence**
+- Design already on main: `git merge-base --is-ancestor design/homepage-direction-samples main` →
+  true; `81eba613` + `fa882d2e` (#257) are the port; deployed 2026-08-02 (memory).
+- Web jest baseline (main `a8df6c16`): 122 suites / 1307 tests pass. After: 123 / 1319 pass.
+- `npx nx build @vizora/web` (prod env, `NODE_OPTIONS=--max-old-space-size=4096`): EXIT 0 before
+  and after.
+- Browser QA (`C:\projects\vizora-homepage-qa-20260915\qa.mjs` → `shots-final\report.json`):
+  doc + wrapper `scrollWidth - clientWidth` = 0 at all three widths; layer-object clearance
+  tablet 33px / mobile 15px; skip link on top; menu/pricing/FAQ/tour/reduced-motion all as
+  expected; the only console errors are two pre-existing 401s from
+  `GET /api/v1/organizations/current` issued by `CustomizationProvider` in the ROOT layout on
+  every page (not touched by this branch).
+- Instrument note: a first focus-ring probe read `outline 0px` on `.eh-btn-ghost` and the feature
+  tabs; that was the probe reading mid-`transition: all 0.2s`. Re-probed with a 450 ms settle →
+  2px `#00745B` ring on every stop at 1440 and 390.
+
 ## Active Workstream: C4 Test Count Truth Pass 80 (2026-06-03)
 
 **Branch:** `fix/readiness-pass80`

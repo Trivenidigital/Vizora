@@ -1,5 +1,9 @@
 export { default as NavigationSection } from './NavigationSection';
 export { default as HeroSection } from './HeroSection';
+export { default as LittleWorldsHero } from './LittleWorldsHero';
+export { default as LocationShowcase } from './LocationShowcase';
+export { default as ContentToPlayback } from './ContentToPlayback';
+export { default as CapabilitiesShowcase } from './CapabilitiesShowcase';
 export { default as DemoVideoSection } from './DemoVideoSection';
 export { default as ProductTourDialog } from './ProductTourDialog';
 export { default as StatsSection } from './StatsSection';

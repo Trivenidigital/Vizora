@@ -3,13 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   NavigationSection,
-  HeroSection,
-  StatsSection,
-  HowItWorksSection,
-  AIFeaturesSection,
-  FeatureShowcasesSection,
-  SolutionsSection,
-  SecuritySection,
+  LittleWorldsHero,
+  LocationShowcase,
+  ContentToPlayback,
+  CapabilitiesShowcase,
   PricingSection,
   FAQSection,
   FinalCTASection,
@@ -107,16 +104,14 @@ export default function Index() {
   }, []);
 
   return (
-    <div className="mkt relative min-h-screen overflow-x-hidden selection:bg-[#00B27C]/20">
+    <div className="mkt lw relative min-h-screen overflow-x-hidden selection:bg-[#1f4230]/15">
       <NavigationSection scrolled={scrolled} menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
       <main id="main-content">
-        <HeroSection heroRef={heroRef} />
-        <StatsSection />
-        <HowItWorksSection />
-        <FeatureShowcasesSection activeFeatureTab={activeFeatureTab} />
-        <AIFeaturesSection />
-        <SolutionsSection />
-        <SecuritySection />
+        {/* Little Worlds + Studio Redesign */}
+        <LittleWorldsHero heroRef={heroRef} />
+        <LocationShowcase />
+        <ContentToPlayback />
+        <CapabilitiesShowcase />
         <PricingSection billingCycle={billingCycle} setBillingCycle={setBillingCycle} pricing={pricing} setPricing={setPricing} />
         <FAQSection />
         <FinalCTASection finalCtaRef={finalCtaRef} />

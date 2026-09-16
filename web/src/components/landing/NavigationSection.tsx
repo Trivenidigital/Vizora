@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, X, Monitor } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
 import { anchorProps } from './shared';
 
 interface NavigationSectionProps {
@@ -12,8 +12,8 @@ interface NavigationSectionProps {
 }
 
 const NAV_ITEMS = [
-  { id: 'features', label: 'Features' },
-  { id: 'solutions', label: 'Solutions' },
+  { id: 'places', label: 'Places' },
+  { id: 'how-it-works', label: 'How it works' },
   { id: 'pricing', label: 'Pricing' },
   { id: 'faq', label: 'FAQ' },
 ];
@@ -34,90 +34,70 @@ export default function NavigationSection({ scrolled, menuOpen, setMenuOpen }: N
     <nav
       aria-label="Primary"
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? 'border-b shadow-lg shadow-[color:rgba(10,34,46,0.08)]'
-          : 'bg-transparent border-b border-transparent'
+        scrolled ? 'border-b' : 'bg-transparent border-b border-transparent'
       }`}
-      style={scrolled ? {
-        background: 'rgba(233, 238, 239, 0.9)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
-        borderColor: 'var(--mkt-hair)',
-      } : undefined}
+      style={
+        scrolled
+          ? {
+              background: 'rgba(245, 241, 232, 0.88)',
+              backdropFilter: 'blur(18px)',
+              WebkitBackdropFilter: 'blur(18px)',
+              borderColor: 'var(--lw-hair)',
+              boxShadow: '0 10px 30px rgba(35,38,31,0.06)',
+            }
+          : undefined
+      }
     >
-      {/* Below md: logo | (CTA + burger). At md+: a 3-column grid so the links
-          sit centred in the bar rather than drifting with the logo's width. */}
-      <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between md:grid md:grid-cols-[1fr_auto_1fr]">
-        <Link href="/" className="flex items-center gap-2 md:justify-self-start">
-          <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center"
-            style={{
-              background: 'linear-gradient(135deg, rgba(0,229,160,0.24), rgba(0,180,216,0.17))',
-              border: '1px solid rgba(0,178,124,0.32)',
-            }}
-          >
-            <Monitor size={14} style={{ color: 'var(--mkt-mint-ink)' }} />
-          </div>
-          <span className="text-lg font-bold tracking-[-0.03em] eh-gradient" style={{ fontFamily: 'var(--font-sora), sans-serif' }}>
-            VIZORA
-          </span>
-          <span
-            className="hidden sm:inline-flex text-[0.55rem] font-bold uppercase tracking-[0.08em] px-2 py-0.5 rounded-full"
-            style={{
-              color: 'var(--mkt-mint-ink)',
-              background: 'rgba(0,178,124,0.10)',
-              border: '1px solid rgba(0,178,124,0.22)',
-            }}
-          >
-            AI-Powered
-          </span>
+      {/* Below md: wordmark | (CTA + burger). At md+: a 3-column grid so the
+          links sit centred in the bar rather than drifting with logo width. */}
+      <div className="lw-wrap h-[68px] flex items-center justify-between md:grid md:grid-cols-[1fr_auto_1fr]">
+        <Link
+          href="/"
+          className="md:justify-self-start text-[1.45rem] font-medium lowercase"
+          style={{ fontFamily: 'var(--lw-serif)', color: 'var(--lw-forest)', letterSpacing: '-0.01em' }}
+        >
+          vizora
         </Link>
 
-        <div className="hidden md:flex items-center gap-8 md:justify-self-center">
+        <div className="hidden md:flex items-center gap-7 md:justify-self-center">
           {NAV_ITEMS.map((item) => (
-            <a
-              key={item.id}
-              {...anchorProps(item.id)}
-              className="eh-nav-link text-[0.85rem] font-medium"
-              style={{ color: 'var(--mkt-ink-2)' }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--mkt-ink)')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--mkt-ink-2)')}
-            >
+            <a key={item.id} {...anchorProps(item.id)} className="lw-link text-[0.88rem] font-medium">
               {item.label}
             </a>
           ))}
         </div>
 
-        <div className="hidden md:flex items-center gap-3 md:justify-self-end">
-          <Link
-            href="/login"
-            className="eh-btn-ghost text-[0.8rem] font-medium px-4 py-1.5 rounded-md"
-          >
-            Login
+        <div className="hidden md:flex items-center gap-5 md:justify-self-end">
+          <Link href="/login" className="lw-link text-[0.88rem] font-medium">
+            Sign in
           </Link>
-          <Link
-            href="/register"
-            className="eh-btn-neon text-[0.8rem] px-4 py-1.5 rounded-md"
-          >
-            Start Free Trial
+          <Link href="/register" className="lw-btn lw-btn-forest !py-2 !px-5 text-[0.84rem]">
+            Get started
+            <span aria-hidden="true" style={{ opacity: 0.6 }}>
+              →
+            </span>
           </Link>
         </div>
 
-        {/* Mobile: the primary CTA stays visible next to the burger. Login does
-            not — it lives in the menu, where it is not competing with it. */}
-        <div className="flex items-center gap-2 md:hidden">
-          <Link href="/register" className="eh-btn-neon text-[0.8rem] px-3.5 py-1.5 rounded-md">
-            Start Free Trial
+        <div className="flex items-center gap-3 md:hidden">
+          <Link href="/register" className="lw-btn lw-btn-forest !py-1.5 !px-4 text-[0.8rem]">
+            Get started
           </Link>
           <button
             type="button"
-            style={{ color: 'var(--mkt-ink-2)' }}
+            style={{
+              color: 'var(--lw-ink)',
+              border: '1px solid var(--lw-hair)',
+              borderRadius: '10px',
+              padding: '7px',
+              background: 'rgba(253,251,245,0.7)',
+            }}
             onClick={() => setMenuOpen(!menuOpen)}
             aria-expanded={menuOpen}
             aria-controls="mobile-menu"
             aria-label={menuOpen ? 'Close menu' : 'Open menu'}
           >
-            {menuOpen ? <X size={22} /> : <Menu size={22} />}
+            {menuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
         </div>
       </div>
@@ -125,26 +105,30 @@ export default function NavigationSection({ scrolled, menuOpen, setMenuOpen }: N
       {menuOpen && (
         <div
           id="mobile-menu"
-          className="md:hidden px-6 py-4 space-y-3 border-t"
+          className="md:hidden lw-wrap py-4 space-y-1 border-t"
           style={{
-            background: 'rgba(233, 238, 239, 0.9)',
-            backdropFilter: 'blur(20px)',
-            borderColor: 'var(--mkt-hair)',
+            background: 'rgba(245, 241, 232, 0.96)',
+            backdropFilter: 'blur(18px)',
+            borderColor: 'var(--lw-hair)',
           }}
         >
           {NAV_ITEMS.map((item) => (
             <a
               key={item.id}
               {...anchorProps(item.id, () => setMenuOpen(false))}
-              className="block w-full text-left text-sm py-2"
-              style={{ color: 'var(--mkt-ink-2)' }}
+              className="block w-full text-left text-[0.95rem] py-2.5"
+              style={{ color: 'var(--lw-ink-2)' }}
             >
               {item.label}
             </a>
           ))}
-          <div className="flex gap-3 pt-2">
-            <Link href="/login" className="eh-btn-ghost text-sm px-4 py-1.5 rounded-md">Login</Link>
-            <Link href="/register" className="eh-btn-neon text-sm px-4 py-1.5 rounded-md">Start Free Trial</Link>
+          <div className="flex items-center gap-4 pt-3">
+            <Link href="/login" className="lw-link text-sm font-medium">
+              Sign in
+            </Link>
+            <Link href="/register" className="lw-btn lw-btn-forest !py-2 !px-5 text-sm flex-1 text-center">
+              Get started
+            </Link>
           </div>
         </div>
       )}
