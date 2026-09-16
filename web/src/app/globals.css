@@ -327,50 +327,56 @@ body {
    ══════════════════════════════════════════════════════════════════ */
 
 .mkt {
-  /* Little Worlds + Studio — warm, dimensional color palette */
-  --mkt-page: #F5F3F0;
-  --mkt-page-2: #FEFDFB;
-  --mkt-canvas-1: #F9F7F4;
-  --mkt-canvas-2: #F0EEEB;
+  --mkt-page: #E9EEEF;
+  --mkt-page-2: #E2EAEC;
+  --mkt-canvas-1: #DFE8EA;
+  --mkt-canvas-2: #CFDDE1;
   --mkt-surface: #FFFFFF;
-  --mkt-surface-2: #FDFBF9;
+  --mkt-surface-2: #F4F8F8;
 
-  --mkt-ink: #1B1B1B;
-  --mkt-ink-2: #6B6B6B;      /* body copy — 6.5:1 */
-  --mkt-muted: #9A9A9A;      /* micro labels — 4.8:1 */
-  --mkt-hair: rgba(27, 27, 27, 0.09);
-  --mkt-hair-2: rgba(27, 27, 27, 0.05);
+  --mkt-ink: #0A222E;
+  --mkt-ink-2: #3E5860;   /* body copy — 6.4:1 */
+  --mkt-muted: #4E656C;   /* micro labels — 5:1 */
+  --mkt-hair: rgba(10, 34, 46, 0.11);
+  --mkt-hair-2: rgba(10, 34, 46, 0.07);
 
-  /* Little Worlds accent palette */
-  --mkt-mint: #1B3D47;         /* forest green — primary accent */
-  --mkt-mint-hot: #2B5560;     /* forest green lighter — for hover/glow */
-  --mkt-mint-ink: #1B3D47;     /* forest green as text — 7.2:1 */
-  --mkt-cyan: #D4A574;         /* brass / warm gold — secondary accent */
-  --mkt-cyan-ink: #8B6F47;     /* brass as text — 5.9:1 */
-  --mkt-violet: #E8B4A8;       /* coral / warm accent */
-  --mkt-violet-ink: #B8857C;   /* coral as text — 5.1:1 */
-  --mkt-amber: #D4A574;        /* brass again for consistency */
-  --mkt-amber-ink: #8B6F47;
-  --mkt-rose: #E8B4A8;         /* coral for rose/accent */
+  --mkt-mint: #00B27C;      /* fills, buttons, dots */
+  --mkt-mint-hot: #00E5A0;  /* glows only — never text */
+  --mkt-mint-ink: #00745B;  /* mint as small text — 4.9:1 */
+  --mkt-cyan: #00B4D8;
+  --mkt-cyan-ink: #00697F;
+  --mkt-violet: #8B5CF6;
+  --mkt-violet-ink: #5B32C9;
+  --mkt-amber: #F59E0B;
+  --mkt-amber-ink: #8A5A00;
+  --mkt-rose: #E11D48;
 
   background: var(--mkt-page);
   color: var(--mkt-ink);
 
-  /* Base token reset — light warmth palette for marketing */
-  --background: #F5F3F0;
-  --background-secondary: #FEFDFB;
-  --background-tertiary: #F9F7F4;
-  --foreground: #1B1B1B;
-  --foreground-secondary: #6B6B6B;
-  --foreground-tertiary: #9A9A9A;
+  /* Base token reset — this is what makes `.mkt` usable on pages that were
+     never hardcoded dark. The legal and auth pages contain zero colour
+     literals; they read var(--background)/var(--surface)/etc. and are dark
+     only because ThemeProvider puts `.dark` on <html>. Re-declaring the
+     family here beats `.dark` for anything inside `.mkt`, without touching
+     ThemeProvider and without changing the dashboard.
+     Also why components shared with the dashboard (MfaEnrollFlow,
+     admin/backlog/page-client) need no edit: they read these tokens, so they
+     render light inside `.mkt` and stay dark everywhere else. */
+  --background: #E9EEEF;
+  --background-secondary: #E2EAEC;
+  --background-tertiary: #DCE5E7;
+  --foreground: #0A222E;
+  --foreground-secondary: #3E5860;
+  --foreground-tertiary: #4E656C;
   --surface: #FFFFFF;
-  --surface-secondary: #FDFBF9;
-  --surface-hover: #F9F7F4;
-  --border: #E8E6E3;
-  --border-light: #F0EEEB;
-  --border-dark: #D4D0CA;
-  --primary: #1B3D47;
-  --primary-light: #2B5560;
+  --surface-secondary: #F4F8F8;
+  --surface-hover: #E8EEEF;
+  --border: #D3DBDD;
+  --border-light: #E2EAEC;
+  --border-dark: #B7C4C7;
+  --primary: #00B27C;
+  --primary-light: #00CC8E;
 
   /*
    * The semantic families MUST be redeclared here.
@@ -430,30 +436,30 @@ body {
   color-scheme: light;
 }
 
-/* shared utilities, re-tuned for Little Worlds warm substrate — scoped, non-invasive */
+/* shared utilities, re-tuned for the light substrate — scoped, non-invasive */
 .mkt .eh-gradient {
-  background: linear-gradient(135deg, #1B3D47, #D4A574);
+  background: linear-gradient(135deg, #00A171, #0090B4);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 .mkt .eh-btn-neon {
   background: var(--mkt-mint);
-  color: #F5F3F0;
-  box-shadow: 0 8px 24px rgba(27, 61, 71, 0.2);
+  color: #04241B;
+  box-shadow: 0 8px 24px rgba(0, 178, 124, 0.26);
 }
 .mkt .eh-btn-neon:hover {
-  background: #2B5560;
-  box-shadow: 0 14px 34px rgba(27, 61, 71, 0.3);
+  background: #00A171;
+  box-shadow: 0 14px 34px rgba(0, 178, 124, 0.34);
 }
 .mkt .eh-btn-ghost {
   border: 1px solid var(--mkt-hair);
   color: var(--mkt-ink);
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.55);
 }
 .mkt .eh-btn-ghost:hover {
   color: var(--mkt-ink);
-  border-color: rgba(27, 27, 27, 0.15);
+  border-color: rgba(10, 34, 46, 0.2);
   background: #FFFFFF;
 }
 .mkt .eh-card,
@@ -593,6 +599,32 @@ body {
   --primary-ink: #1f4230;
   --focus-ring-color: var(--primary-ink);
   color-scheme: light;
+
+  /* Legacy `.mkt` token remap: components that survived iteration 1
+     (pricing internals, the FAQ disclosure, the tour dialog) read
+     `--mkt-*`. The wrapper carries BOTH classes and this block comes
+     later in the sheet, so these warm values win on the homepage while
+     the legal/auth pages (plain `.mkt`) keep the cool-grey originals. */
+  --mkt-page: #f5f1e8;
+  --mkt-page-2: #efe9dc;
+  --mkt-canvas-1: #efe9dc;
+  --mkt-canvas-2: #e4dccb;
+  --mkt-surface: #fdfbf5;
+  --mkt-surface-2: #f3eee1;
+  --mkt-ink: #23261f;
+  --mkt-ink-2: #4b5045;
+  --mkt-muted: #5f6456;
+  --mkt-hair: rgba(35, 38, 31, 0.14);
+  --mkt-hair-2: rgba(35, 38, 31, 0.08);
+  --mkt-mint: #1f4230;
+  --mkt-mint-hot: #2b5942;
+  --mkt-mint-ink: #1f4230;
+  --mkt-cyan: #1f4230;
+  --mkt-cyan-ink: #1f4230;
+  --mkt-violet: #77591f;
+  --mkt-violet-ink: #77591f;
+  --mkt-amber: #b08a3e;
+  --mkt-amber-ink: #77591f;
 }
 
 /* ---- shared primitives, re-tuned under .lw ---- */
