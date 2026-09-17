@@ -36,7 +36,7 @@ const FAQ_DATA = [
 ];
 
 const CSS = `
-.lw-faq{padding:clamp(56px,7vw,104px) 0}
+.lw-faq{padding:var(--lw-sec-y) 0}
 .lwx-head{text-align:center;max-width:40rem;margin:0 auto 40px}
 .lwx-head h2{font-size:clamp(1.9rem,3.4vw,2.9rem);margin:14px 0 10px}
 .lwx-head p{color:var(--lw-ink-2)}

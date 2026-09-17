@@ -80,7 +80,7 @@ const STEPS: Array<{ n: string; title: string; copy: string; art: ReactNode }> =
 ];
 
 const CSS = `
-.lw-pipe{padding:clamp(56px,7vw,104px) 0;background:linear-gradient(180deg,transparent,var(--lw-paper-2) 30%,var(--lw-paper-2) 70%,transparent)}
+.lw-pipe{padding:var(--lw-sec-y) 0;background:linear-gradient(180deg,transparent,var(--lw-paper-2) 30%,var(--lw-paper-2) 70%,transparent)}
 .lwq-head{max-width:44rem;margin-bottom:38px}
 .lwq-head h2{font-size:clamp(1.9rem,3.4vw,2.9rem);margin:14px 0 12px}
 .lwq-head p{color:var(--lw-ink-2);line-height:1.65;max-width:34rem}

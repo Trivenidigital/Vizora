@@ -28,7 +28,7 @@ const PRO_FEATURES = ['Up to 100 screens', 'Everything in Basic', 'API access', 
 const ENTERPRISE_FEATURES = ['Unlimited screens', 'Volume pricing', '99.9% uptime SLA', 'Priority support'];
 
 const CSS = `
-.lw-pricing{padding:clamp(56px,7vw,104px) 0;background:linear-gradient(180deg,transparent,var(--lw-paper-2) 30%,var(--lw-paper-2) 70%,transparent)}
+.lw-pricing{padding:var(--lw-sec-y) 0;background:linear-gradient(180deg,transparent,var(--lw-paper-2) 30%,var(--lw-paper-2) 70%,transparent)}
 .lwr-head{text-align:center;max-width:42rem;margin:0 auto 30px}
 .lwr-head h2{font-size:clamp(1.9rem,3.4vw,2.9rem);margin:14px 0 10px}
 .lwr-head p{color:var(--lw-ink-2)}

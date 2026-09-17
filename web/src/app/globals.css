@@ -578,6 +578,14 @@ body {
 
   --lw-serif: var(--font-fraunces), 'Iowan Old Style', Georgia, serif;
 
+  /* ONE vertical rhythm for every landing section's top AND bottom padding, so
+     the gap between two sections is exactly 2x this and changing the page's
+     breathing is a one-line edit. Each section used to carry its own
+     clamp(56px,7vw,104px), which put 202px between every pair at 1440.
+     Homepage-only: `.lw` is applied by the homepage wrapper alone, so the
+     legal/auth pages (plain `.mkt`) are untouched. */
+  --lw-sec-y: clamp(40px, 4.6vw, 68px);
+
   background: var(--lw-paper);
   color: var(--lw-ink);
 

@@ -31,11 +31,11 @@ const STRENGTHS: Array<{ title: string; copy: string }> = [
 ];
 
 const CSS = `
-.lw-work{padding:clamp(56px,7vw,104px) 0}
+.lw-work{padding:var(--lw-sec-y) 0}
 .lww-head{max-width:44rem;margin-bottom:34px}
 .lww-head h2{font-size:clamp(1.9rem,3.4vw,2.9rem);margin:14px 0 12px}
 .lww-head p{color:var(--lw-ink-2);line-height:1.65;max-width:34rem}
-.lww-grid{display:grid;grid-template-columns:56fr 44fr;gap:clamp(26px,4vw,56px);align-items:center}
+.lww-grid{display:grid;grid-template-columns:56fr 44fr;gap:clamp(26px,4vw,56px);align-items:start}
 /* The capture is the app's real dark theme — seated in a deep-forest bezel it
    reads as a framed device view rather than a palette clash on the ivory page. */
 .lww-shot{border-radius:18px;overflow:hidden;padding:10px;background:var(--lw-forest-deep);

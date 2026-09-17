@@ -270,7 +270,7 @@ const PLACES: Place[] = [
 ];
 
 const CSS = `
-.lw-places{padding:clamp(56px,7vw,104px) 0}
+.lw-places{padding:var(--lw-sec-y) 0}
 .lwp-head{max-width:46rem;margin-bottom:34px}
 .lwp-head h2{font-size:clamp(1.9rem,3.4vw,2.9rem);margin:14px 0 12px}
 .lwp-head p{color:var(--lw-ink-2);line-height:1.65;max-width:36rem}

@@ -3,9 +3,9 @@
 import Link from 'next/link';
 
 const CSS = `
-.lw-final{padding:clamp(48px,6vw,90px) 0 clamp(56px,7vw,104px)}
+.lw-final{padding:var(--lw-sec-y) 0}
 .lwf-panel{background:linear-gradient(160deg,var(--lw-forest) 0%,var(--lw-forest-deep) 100%);
-  border-radius:26px;padding:clamp(40px,6vw,84px) clamp(24px,5vw,72px);text-align:center;
+  border-radius:26px;padding:clamp(38px,4.8vw,68px) clamp(24px,5vw,72px);text-align:center;
   color:var(--lw-on-forest);position:relative;overflow:hidden;
   box-shadow:0 34px 70px rgba(20,44,32,.32)}
 .lwf-panel::after{content:'';position:absolute;inset:0;pointer-events:none;
