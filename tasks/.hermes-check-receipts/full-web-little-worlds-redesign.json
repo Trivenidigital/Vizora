@@ -1,0 +1,15 @@
+{
+  "topic": "full-web-little-worlds-redesign",
+  "task_text": "Plan the redesign of the entire Vizora web app (auth, legal, dashboard, analytics, settings, billing, admin, display pairing, emails) to match the Little Worlds homepage design system. Frontend theming/tokens/components only; no agent, cron, MCP or backend capability.",
+  "completed_at": "2026-09-17T15:04:09Z",
+  "drift_check_tag": "extends-Hermes",
+  "net_new_step_count": 8,
+  "hermes_step_count": 0,
+  "files_to_read_first": [
+    "docs/plans/2026-08-03-full-app-rebrand.md",
+    "web/src/app/globals.css",
+    "web/src/lib/customization.ts",
+    "web/src/components/providers/ThemeProvider.tsx"
+  ],
+  "verdict": "Static frontend design-system work. 8/8 steps net-new; red-flag re-check done: no step ingests, extracts, routes, approves, audits or messages, so the Hermes capability list does not intersect. In-tree drift-check FOUND a prior approved plan (2026-08-03 full-app rebrand) - this plan supersedes its target palette and scope and inherits its measurements and traps."
+}
