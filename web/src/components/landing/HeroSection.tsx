@@ -235,7 +235,9 @@ const HERO_CSS = `
   .lw-thread-d{display:none}
   .lw-thread-t{display:block}
   /* the scene box reserves room for on-scene labels that only >=1200px uses */
-  .lw-hero-places{margin-top:-8%}
+  /* scoped under the stage so it outranks the base .lw-hero-places rule,
+     which comes later in this stylesheet */
+  .lw-hero-stage .lw-hero-places{margin-top:-8%}
 }
 .lw-thread path{fill:none;stroke:#274c37;stroke-width:1.6;stroke-linecap:round;opacity:.82}
 .lw-thread .lw-flow{stroke:#3d7a55;stroke-width:2.6;stroke-dasharray:30 620;opacity:.95;
