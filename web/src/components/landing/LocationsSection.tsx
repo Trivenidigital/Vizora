@@ -94,7 +94,11 @@ export default function LocationsSection({ onView }: LocationsSectionProps) {
                       width={WORLD_ASSETS[l.id]!.width}
                       height={WORLD_ASSETS[l.id]!.height}
                       loading="lazy"
-                      sizes="(min-width:901px) 120px, (min-width:421px) 120px, 88vw"
+                      /* px only, deliberately: any vw clause makes next/image drop every
+                         srcset candidate below (smallest vw% x 640), so an "88vw" here
+                         forced a 118px thumbnail to download w=640+ — and Chrome then
+                         reused that larger cached file for the hero as well. */
+                      sizes="(max-width:420px) 300px, 120px"
                     />
                   ) : (
                     <MiniWorld place={l.id} />

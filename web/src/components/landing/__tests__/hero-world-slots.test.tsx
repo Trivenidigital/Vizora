@@ -129,6 +129,11 @@ describe('hero world slots — image mode', () => {
     expect(sizes('hotel')).toBe(
       '(min-width:1200px) 32vw, (min-width:800px) 350px, (min-width:641px) 44vw, 62vw',
     );
+    // Thumbnails: px only. Any vw clause makes next/image drop the small srcset
+    // candidates, and a 118px thumbnail then downloads w=640+.
+    for (const img of Array.from(container.querySelectorAll('#locations .lwl-thumb img'))) {
+      expect(img.getAttribute('data-sizes')).toBe('(max-width:420px) 300px, 120px');
+    }
   });
 
   it('keeps the place buttons live on top of the images', async () => {
