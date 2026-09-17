@@ -99,6 +99,38 @@ describe('hero world slots — image mode', () => {
     expect(matted).toEqual(['retail']);
   });
 
+  it('starts every pin on open ground just below its render, never on it', async () => {
+    const { container } = await renderPage();
+
+    // Measured opaque bottoms of the delivered set, % of image height. A slot is
+    // 4:3 of a 46%-wide column on a 1000x500 stage, i.e. 69% of stage height.
+    const BOTTOM: Record<string, number> = { cafe: 95.0, hotel: 97.7, retail: 97.7 };
+    const NAME: Record<string, RegExp> = { cafe: /Café/, hotel: /Hotel/, retail: /Retail/ };
+    const group = within(screen.getByRole('group', { name: 'Explore a place' }));
+    for (const slot of Array.from(container.querySelectorAll<HTMLElement>('.lw-slot'))) {
+      const place = slot.getAttribute('data-place')!;
+      const btn = group.getByRole('button', { name: NAME[place] }) as HTMLElement;
+      const renderBottom =
+        parseFloat(slot.style.getPropertyValue('--y')) + 69 * (BOTTOM[place] / 100);
+      const gap = parseFloat(btn.style.getPropertyValue('--y')) - renderBottom;
+      expect(gap).toBeGreaterThan(1.5);
+      expect(gap).toBeLessThan(4);
+    }
+  });
+
+  it('asks for the widths the slots actually render at', async () => {
+    const { container } = await renderPage();
+
+    const sizes = (place: string) =>
+      container.querySelector(`.lw-slot[data-place="${place}"] img`)!.getAttribute('data-sizes');
+    expect(sizes('cafe')).toBe(
+      '(min-width:1200px) 32vw, (min-width:800px) 350px, (min-width:641px) 44vw, 52vw',
+    );
+    expect(sizes('hotel')).toBe(
+      '(min-width:1200px) 32vw, (min-width:800px) 350px, (min-width:641px) 44vw, 62vw',
+    );
+  });
+
   it('keeps the place buttons live on top of the images', async () => {
     const user = userEvent.setup();
     const { container } = await renderPage();
