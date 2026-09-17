@@ -45,11 +45,13 @@ const HERO_CSS = `
   .lw-hero-scene{margin-right:calc(-1 * clamp(0px,(100vw - 1330px)/2,88px))}
 }
 
-@media (max-width:1023px){
+/* Single column below 1200px: the two-column scene column got as small as
+   560x383 at 1024, which is the cramped version this redesign exists to kill. */
+@media (max-width:1199px){
   .lw-hero{padding-top:96px}
   .lw-hero-grid{grid-template-columns:1fr;gap:20px}
   .lw-hero-copy{max-width:38rem}
-  .lw-hero-scene{max-width:720px;margin-inline:auto;width:100%}
+  .lw-hero-scene{max-width:760px;margin-inline:auto;width:100%}
 }
 @media (max-width:420px){
   .lw-hero-places{gap:6px}

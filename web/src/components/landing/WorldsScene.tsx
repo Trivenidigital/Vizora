@@ -93,15 +93,25 @@ function wallY(x: number, yBottom: number, w: number, h: number, z = 0): CSSProp
   };
 }
 
-/** A wall standing along x = xLine (depth d along y), facing +x. */
+/**
+ * A wall standing along x = xLine (depth d along y), facing +x, rising from
+ * z to z + h.
+ *
+ * The origin MUST be `bottom left` with the box shifted up by h. With
+ * `top left` (as this started out) the composed rotateX(-90) rotateY(-90)
+ * sends the element's height into NEGATIVE z — measured in a browser, a
+ * 60px-tall face spanned z 0 → -60 — so every side face hung below the deck
+ * instead of rising from it. Mostly that hid inside the plinth drum; where a
+ * prop sat near the tier rim it poked out as a dark spike.
+ */
 function wallX(xLine: number, yTop: number, d: number, h: number, z = 0): CSSProperties {
   return {
     position: 'absolute',
     left: xLine,
-    top: yTop,
+    top: yTop - h,
     width: d,
     height: h,
-    transformOrigin: 'top left',
+    transformOrigin: 'bottom left',
     transform: `translateZ(${z + DECK}px) rotateX(-90deg) rotateY(-90deg)`,
   };
 }
@@ -139,8 +149,8 @@ const M = {
 /* ---------- shadows ---------- */
 
 const CAST_BG =
-  'radial-gradient(34% 36% at 40% 40%, rgba(46,40,26,.52) 0%, rgba(46,40,26,.22) 62%, rgba(46,40,26,0) 80%),' +
-  'radial-gradient(50% 50% at 58% 62%, rgba(46,40,26,.28) 0%, rgba(46,40,26,0) 74%)';
+  'radial-gradient(32% 34% at 38% 38%, rgba(44,38,24,.74) 0%, rgba(44,38,24,.34) 58%, rgba(44,38,24,0) 80%),' +
+  'radial-gradient(50% 50% at 60% 64%, rgba(44,38,24,.42) 0%, rgba(44,38,24,.12) 56%, rgba(44,38,24,0) 76%)';
 
 /**
  * One element, two reads: a tight dark contact core directly beneath the
@@ -173,8 +183,8 @@ function GroundCast({ x, y, w, h }: { x: number; y: number; w: number; h: number
         transform: 'translateZ(0.4px)',
         borderRadius: '50%',
         background:
-          'radial-gradient(38% 40% at 42% 42%, rgba(46,40,26,.42) 0%, rgba(46,40,26,.17) 62%, rgba(46,40,26,0) 80%),' +
-          'radial-gradient(50% 50% at 58% 62%, rgba(46,40,26,.24) 0%, rgba(46,40,26,0) 76%)',
+          'radial-gradient(36% 38% at 41% 41%, rgba(44,38,24,.52) 0%, rgba(44,38,24,.2) 60%, rgba(44,38,24,0) 80%),' +
+          'radial-gradient(50% 50% at 60% 64%, rgba(44,38,24,.34) 0%, rgba(44,38,24,.1) 56%, rgba(44,38,24,0) 78%)',
       }}
     />
   );
@@ -241,6 +251,7 @@ function WallSlab({
   m,
   face,
   radius = 8,
+  glow,
   children,
 }: {
   x: number;
@@ -251,16 +262,21 @@ function WallSlab({
   m: Mat;
   face?: string;
   radius?: number;
+  /** Emitted-light wash from the screens on this wall, as background layers. */
+  glow?: string;
   children?: ReactNode;
 }) {
   return (
     <>
       <div
         style={{
-          ...flat(x + 4, yFront, w, 30, 0.5),
+          /* Inset well inside the wall and falling off on EVERY edge. Full
+             width with a linear ramp left hard-edged slivers either side of
+             the furniture, which read as stray pale planes on the deck. */
+          ...flat(x + 26, yFront, w - 52, 32, 0.5),
           background:
-            'linear-gradient(180deg, rgba(38,34,24,.26) 0%, rgba(38,34,24,.09) 46%, rgba(38,34,24,0) 100%)',
-          borderRadius: '2px 2px 40% 40%',
+            'radial-gradient(70% 104% at 50% 0%, rgba(44,38,24,.5) 0%, rgba(44,38,24,.2) 42%,' +
+            ' rgba(44,38,24,0) 100%)',
         }}
       />
       <div style={{ ...flat(x, yFront - t, w, t, h), background: m.top, borderRadius: radius }} />
@@ -275,10 +291,39 @@ function WallSlab({
           transformStyle: 'preserve-3d',
         }}
       >
+        {glow ? (
+          <div
+            style={{ position: 'absolute', inset: 0, transform: 'translateZ(0.4px)', background: glow }}
+          />
+        ) : null}
         {children}
       </div>
     </>
   );
+}
+
+/**
+ * Emitted-light wash for a wall, expressed as background layers positioned in
+ * percentages of the WALL. Bounded by the wall by construction, so no pale
+ * halo can leak past its edges onto the deck.
+ */
+function wallGlow(
+  wallW: number,
+  wallH: number,
+  screens: Array<[number, number, number, number]>,
+) {
+  return screens
+    .map(([x, y, w, h]) => {
+      const cx = ((x + w / 2) / wallW) * 100;
+      const cy = ((y + h / 2) / wallH) * 100;
+      const rx = ((w * 1.05) / wallW) * 100;
+      const ry = ((h * 0.9) / wallH) * 100;
+      return (
+        `radial-gradient(${rx.toFixed(1)}% ${ry.toFixed(1)}% at ${cx.toFixed(1)}% ${cy.toFixed(1)}%,` +
+        ' rgba(255,230,168,.62) 0%, rgba(255,230,168,.2) 46%, rgba(255,230,168,0) 76%)'
+      );
+    })
+    .join(',');
 }
 
 /* ---------- limestone plinth: a two-tier drum with a real rim ---------- */
@@ -381,45 +426,65 @@ function Plinth({ w, d, tx = 26, ty = 18 }: { w: number; d: number; tx?: number;
 
 /* ---------- foliage ---------- */
 
-const LEAVES: Array<[number, number, number, string, string]> = [
-  /* rotateZ, scale, lift, lit tone, shaded tone */
-  [-68, 0.8, 0, '#6b9470', '#33543c'],
-  [-30, 1.02, 3, '#7ba57f', '#3b6144'],
-  [6, 1.16, 6, '#8cb68c', '#456e4d'],
-  [36, 0.96, 3, '#6f9a74', '#345940'],
-  [70, 0.74, 0, '#5c8664', '#2b4a34'],
-  [-8, 0.58, 16, '#9cc599', '#4d7855'],
+const LEAVES: Array<[number, number, number, number, string, string]> = [
+  /* rotateZ, tilt out, scale, lift, lit tone, shaded tone */
+  [-84, 30, 0.74, 0, '#5f8a67', '#36583e'],
+  [-56, 24, 0.9, 3, '#6f9a74', '#3d6446'],
+  [-30, 18, 1.02, 7, '#82ab84', '#456e4d'],
+  [-8, 12, 0.86, 15, '#9ac496', '#527d59'],
+  [14, 16, 1.06, 9, '#8cb68c', '#4a744f'],
+  [38, 22, 0.96, 4, '#74a079', '#3f6747'],
+  [62, 27, 0.86, 7, '#67916e', '#39603f'],
+  [86, 32, 0.72, 1, '#5a8462', '#325339'],
+  [4, 8, 0.6, 22, '#a9d0a1', '#5d8961'],
 ];
 
-/** Potted plant read as foliage: six leaf planes at varied angle, size and tone. */
-function Plant({ x, y, s = 1 }: { x: number; y: number; s?: number }) {
+/* Rounded leaf silhouette — a soft point, not a blade. clip-path is safe here:
+   a leaf plane is a LEAF element, with no 3D children to flatten. */
+const LEAF_CLIP =
+  'polygon(50% 0%, 76% 16%, 94% 48%, 76% 84%, 50% 100%, 24% 84%, 6% 48%, 24% 16%)';
+
+/**
+ * Potted plant: pot, stem and nine leaf planes at varied angle, outward TILT,
+ * size, height and tone. The tilt matters — leaves standing perfectly upright
+ * read as a fan of blades edge-on; leaning them out builds a canopy.
+ * `tall` stretches the stem and lift for the lobby palms.
+ */
+function Plant({ x, y, s: sc = 1, tall = 1 }: { x: number; y: number; s?: number; tall?: number }) {
   return (
     <>
-      <Cast x={x - 12} y={y - 4} w={46 * s} h={28 * s} o={0.7} />
+      <Cast x={x - 13} y={y - 4} w={50 * sc} h={30 * sc} o={0.8} />
       <Box
         x={x}
         y={y}
-        w={24 * s}
-        d={16 * s}
-        h={13 * s}
+        w={24 * sc}
+        d={16 * sc}
+        h={13 * sc}
         radius={5}
         m={M.oak}
         top="radial-gradient(70% 70% at 40% 34%, #4a4034 0%, #2e281f 100%)"
       />
-      {LEAVES.map(([rot, sc, lift, lit, shade2], i) => (
+      <div
+        style={{
+          ...wallY(x + 10.8 * sc, y + 9 * sc, 2.4 * sc, 16 * sc * tall, 11 * sc),
+          background: 'linear-gradient(180deg,#6f9a74,#3d6446)',
+        }}
+      />
+      {LEAVES.map(([rot, tilt, lsc, lift, lit, shaded], i) => (
         <div
           key={`${rot}-${i}`}
           style={{
             position: 'absolute',
-            left: x + 11 * s - 13 * s * sc,
-            top: y + 8 * s,
-            width: 26 * s * sc,
-            height: 38 * s * sc,
+            left: x + 11 * sc - 11 * sc * lsc,
+            top: y + 8 * sc,
+            width: 22 * sc * lsc,
+            height: 27 * sc * lsc * (1 + (tall - 1) * 0.5),
             transformOrigin: 'bottom',
-            transform: `translateZ(${(11 + lift) * s + DECK}px) rotateZ(${rot}deg) rotateX(-90deg)`,
-            borderRadius: '54% 54% 34% 34%',
-            background: `linear-gradient(168deg, ${lit} 0%, ${shade2} 72%, rgba(24,48,30,.95) 100%)`,
-            boxShadow: 'inset 0 -5px 7px rgba(16,34,20,.3), 0 1px 2px rgba(16,34,20,.25)',
+            transform:
+              `translateZ(${(11 + lift * tall) * sc + DECK}px) ` +
+              `rotateZ(${rot}deg) rotateX(${-90 + tilt}deg)`,
+            clipPath: LEAF_CLIP,
+            background: `linear-gradient(162deg, ${lit} 0%, ${shaded} 88%)`,
           }}
         />
       ))}
@@ -445,9 +510,15 @@ const screenShell: CSSProperties = {
 };
 
 /**
- * A screen mounted on a wall face: light pool thrown onto the wall around it,
- * a dark bezel slab standing proud of the wall, and the lit face on top.
- * Coordinates are wall-local (0,0 = top-left of the wall face).
+ * A screen mounted on a wall face: a dark bezel slab standing proud of the
+ * wall and the lit face on top. Coordinates are wall-local (0,0 = top-left).
+ *
+ * The emitted-light wash is NOT painted here. It used to be a per-screen
+ * ellipse 1.9x the screen's size, which for any screen near a wall edge hung
+ * off the wall as a pale wedge on the deck beside it — and the wall cannot
+ * clip it, because `overflow` would flatten the wall's 3D children. The wash
+ * lives on `WallSlab`'s `glow` layer instead, inset to the wall, so it cannot
+ * escape by construction.
  */
 function Screen({
   x,
@@ -464,19 +535,6 @@ function Screen({
 }) {
   return (
     <>
-      <div
-        style={{
-          position: 'absolute',
-          left: x - w * 0.46,
-          top: y - h * 0.3,
-          width: w * 1.92,
-          height: h * 1.6,
-          transform: 'translateZ(0.4px)',
-          borderRadius: '50%',
-          background:
-            'radial-gradient(50% 50% at 50% 50%, rgba(255,230,168,.6) 0%, rgba(255,230,168,.18) 46%, rgba(255,230,168,0) 74%)',
-        }}
-      />
       <div
         style={{
           position: 'absolute',
@@ -527,6 +585,10 @@ function Cafe() {
         t={9}
         m={M.oak}
         radius={7}
+        glow={wallGlow(186, 142, [
+          [16, 34, 70, 94],
+          [100, 34, 70, 94],
+        ])}
         face={
           'repeating-linear-gradient(90deg, rgba(0,0,0,.09) 0 1.5px, rgba(255,255,255,0) 1.5px 13px),' +
           'linear-gradient(176deg, #e6d3ae 0%, #cbb287 62%, #b2996e 100%)'
@@ -572,9 +634,9 @@ function Cafe() {
         className="lws-awning"
         style={{
           position: 'absolute',
-          left: 34,
+          left: 40,
           top: 48,
-          width: 206,
+          width: 194,
           height: 34,
           transformOrigin: 'top',
           transform: `translateZ(${142 + DECK}px) rotateX(19deg)`,
@@ -585,14 +647,6 @@ function Cafe() {
       >
         <span className="lws-scallop" />
       </div>
-      {/* awning side return — one triangular panel closing the lit side */}
-      <div
-        style={{
-          ...wallX(240, 48, 34, 12, 131),
-          background: 'linear-gradient(180deg,#24462f,#14301f)',
-          clipPath: 'polygon(0 0, 100% 100%, 0 100%)',
-        }}
-      />
 
       {/* counter lamps. They stay UNDER the menu boards by construction: on this
           camera an object at depth y clears a board mounted at the wall line
@@ -780,7 +834,16 @@ function Hotel() {
       <Plinth w={HOTEL_W} d={HOTEL_D} />
 
       {/* curved alcove: arched back wall panel + two angled wings with thickness */}
-      <WallSlab x={56} yFront={56} w={170} h={144} t={10} m={M.ivory} radius={14}>
+      <WallSlab
+        x={56}
+        yFront={56}
+        w={170}
+        h={144}
+        t={10}
+        m={M.ivory}
+        radius={14}
+        glow={wallGlow(170, 144, [[22, 28, 128, 78]])}
+      >
         <div
           style={{
             position: 'absolute',
@@ -897,8 +960,8 @@ function Hotel() {
       <Box x={58} y={130} w={18} d={12} h={24} radius={3} m={M.oak} />
       <Box x={78} y={138} w={15} d={10} h={19} radius={3} m={M.walnut} />
 
-      <Plant x={28} y={112} s={1.3} />
-      <Plant x={238} y={104} s={0.85} />
+      <Plant x={26} y={112} s={1.25} tall={1.45} />
+      <Plant x={238} y={104} s={0.85} tall={1.2} />
     </div>
   );
 }
@@ -914,29 +977,93 @@ function Retail() {
       <Plinth w={RETAIL_W} d={RETAIL_D} />
 
       <WallSlab
-        x={38}
+        x={44}
         yFront={46}
-        w={186}
-        h={136}
+        w={170}
+        h={120}
         t={9}
         m={M.ivory}
         radius={8}
         face="linear-gradient(176deg,#f4edd9 0%,#e2d6b8 64%,#cfc09c 100%)"
       >
+        {/* lit alcove with a tailor's bust — the arch was reading as an empty dent */}
         <div
           style={{
             position: 'absolute',
-            left: 16,
-            top: 14,
-            width: 74,
-            height: 122,
+            left: 12,
+            top: 12,
+            width: 68,
+            height: 108,
             transform: 'translateZ(0.5px)',
-            borderRadius: '37px 37px 0 0',
-            background: 'linear-gradient(176deg,#d8cba8 0%,#c2b28c 100%)',
+            borderRadius: '34px 34px 0 0',
+            background:
+              'radial-gradient(72% 46% at 50% 26%, rgba(255,230,168,.4) 0%, rgba(255,230,168,0) 72%),' +
+              'linear-gradient(176deg,#d8cba8 0%,#c2b28c 100%)',
             boxShadow: 'inset 0 9px 18px rgba(38,34,24,.3), inset 5px 0 12px rgba(38,34,24,.14)',
           }}
-        />
+        >
+          <span
+            style={{
+              position: 'absolute',
+              left: 26,
+              top: 20,
+              width: 16,
+              height: 17,
+              borderRadius: '50%',
+              background: 'linear-gradient(166deg,#4d5146,#24271f)',
+            }}
+          />
+          <span
+            style={{
+              position: 'absolute',
+              left: 15,
+              top: 34,
+              width: 38,
+              height: 30,
+              borderRadius: '17px 17px 5px 5px',
+              background: 'linear-gradient(166deg,#3f4339,#1c1f19)',
+            }}
+          />
+          <span
+            style={{
+              position: 'absolute',
+              left: 22,
+              top: 63,
+              width: 24,
+              height: 6,
+              borderRadius: 2,
+              background: 'linear-gradient(180deg,#e0c68f,#96793f)',
+            }}
+          />
+        </div>
       </WallSlab>
+
+      {/* two wall shelves with folded stock */}
+      {[
+        [56, 'rgba(0,0,0,0)'],
+        [88, 'rgba(0,0,0,0)'],
+      ].map(([sz]) => (
+        <div key={`sh${sz}`} style={{ position: 'absolute', left: 0, top: 0, transformStyle: 'preserve-3d' }}>
+          <div
+            style={{
+              ...flat(126, 46, 50, 11, sz as number),
+              background: 'linear-gradient(146deg,#efe0bd,#d6c295)',
+              borderRadius: 2,
+            }}
+          />
+          <div
+            style={{
+              ...wallY(126, 57, 50, 3, (sz as number) - 3),
+              background: 'linear-gradient(176deg,#c8b287,#a48d5f)',
+              borderRadius: 1,
+            }}
+          />
+        </div>
+      ))}
+      <Box x={130} y={48} w={16} d={7} h={7} z0={56} radius={1} m={M.coral} />
+      <Box x={152} y={48} w={18} d={7} h={5} z0={56} radius={1} m={M.cream} />
+      <Box x={132} y={48} w={14} d={7} h={6} z0={88} radius={1} m={M.forest} />
+      <Box x={154} y={48} w={16} d={7} h={8} z0={88} radius={1} m={M.oak} />
 
       {/* slim dark metal shopfront frame — posts land on the tier, top bar
           meets the wall height so it reads as a frame, not scaffolding */}
@@ -1005,25 +1132,33 @@ function Retail() {
       {/* freestanding portrait totem — the shop's window screen */}
       <div
         style={{
-          ...flat(140, 138, 94, 34, 0.8),
+          ...flat(148, 138, 94, 34, 0.8),
           borderRadius: '50%',
           background:
             'radial-gradient(50% 50% at 50% 42%, rgba(255,232,178,.5) 0%, rgba(255,232,178,0) 72%)',
         }}
       />
-      <Cast x={146} y={126} w={78} h={40} />
-      <Box x={154} y={128} w={64} d={16} h={7} radius={3} m={M.charcoal} />
-      <div style={{ ...flat(156, 122, 60, 14, 7), background: '#2b2e26', borderRadius: 2 }} />
+      <Cast x={154} y={126} w={78} h={40} />
+      <Box x={162} y={128} w={64} d={16} h={7} radius={3} m={M.charcoal} />
+      <div style={{ ...flat(164, 122, 60, 14, 7), background: '#2b2e26', borderRadius: 2 }} />
       <div
         className="lws-wallface"
         style={{
-          ...wallY(154, 134, 64, 132, 7),
+          ...wallY(162, 134, 64, 132, 7),
           background: 'linear-gradient(176deg,#3a3e34,#1b1e17)',
           borderRadius: '5px 5px 0 0',
           transformStyle: 'preserve-3d',
-          boxShadow: '4px 5px 12px rgba(38,34,24,.4)',
+          boxShadow: '5px 6px 14px rgba(44,38,24,.5)',
         }}
       >
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            transform: 'translateZ(0.4px)',
+            background: wallGlow(64, 132, [[3, 4, 58, 120]]),
+          }}
+        />
         <Screen x={3} y={4} w={58} h={120}>
           <span className="lws-scr-k lws-scr-sm">Noble &amp; Co.</span>
           <span className="lws-scr-h lws-scr-h-s">
@@ -1038,7 +1173,7 @@ function Retail() {
         </Screen>
       </div>
 
-      <Plant x={216} y={96} s={1.05} />
+      <Plant x={220} y={100} s={1} tall={1.15} />
     </div>
   );
 }
@@ -1102,9 +1237,9 @@ const SCENE_CSS = `
 .lws-thread{position:absolute;left:0;top:0;width:100%;height:100%;transform:translateZ(1px);
   overflow:visible;filter:drop-shadow(0 1px 0 rgba(255,255,255,.85))}
 .lws-thread-m{display:none}
-.lws-thread path{fill:none;stroke:#1f4230;stroke-width:3.4;stroke-dasharray:8 8;
+.lws-thread path{fill:none;stroke:#1f4230;stroke-width:3.8;stroke-dasharray:9 8;
   stroke-linecap:round;animation:lws-thread-flow 2.6s linear infinite}
-.lws-thread circle{fill:#d96a4c;stroke:#f7f3ea;stroke-width:2.6}
+.lws-thread circle{fill:#d96a4c;stroke:#f7f3ea;stroke-width:2.8}
 
 /* awning scallop — semicircular teeth hanging off the front edge */
 .lws-scallop{position:absolute;left:0;bottom:-8px;width:100%;height:10px;
@@ -1166,12 +1301,12 @@ const SCENE_CSS = `
    triangle (hotel top-centre, café lower-left, retail lower-right) and its
    own thread path, so each plinth stays over half the viewport wide. */
 @media (max-width:640px){
-  .lws-fit{aspect-ratio:480/460}
-  .lws-scale{width:480px;height:460px;transform:scale(.58)}
-  .lws-world{left:40px;top:35px;width:400px;height:390px;
+  .lws-fit{aspect-ratio:540/560}
+  .lws-scale{width:540px;height:560px;transform:scale(.50)}
+  .lws-world{left:70px;top:55px;width:400px;height:450px;
     transform:rotateX(53deg) rotateZ(-20deg);
-    --cafe-x:-56px;--cafe-y:282px;--hotel-x:90px;--hotel-y:48px;--retail-x:92px;--retail-y:194px}
-  .lws-wash{left:-70px;top:-40px;width:540px;height:510px}
+    --cafe-x:-106px;--cafe-y:323px;--hotel-x:142px;--hotel-y:-5px;--retail-x:128px;--retail-y:350px}
+  .lws-wash{left:-90px;top:-60px;width:600px;height:620px}
   .lws-thread-d{display:none}
   .lws-thread-m{display:block}
   /* micro-copy is noise at this size — headline + imagery only */
@@ -1184,11 +1319,11 @@ const SCENE_CSS = `
   .lws-land{height:34px}
   .lws-coat{width:36px;height:48px}
 }
-@media (max-width:640px) and (min-width:400px){.lws-scale{transform:scale(.75)}}
-@media (max-width:640px) and (min-width:520px){.lws-scale{transform:scale(.98)}}
+@media (max-width:640px) and (min-width:400px){.lws-scale{transform:scale(.64)}}
+@media (max-width:640px) and (min-width:520px){.lws-scale{transform:scale(.85)}}
 @media (max-width:640px){
   @supports (transform:scale(tan(atan2(1px,1px)))){
-    .lws-scale{transform:scale(tan(atan2(100cqw,480px)))}
+    .lws-scale{transform:scale(tan(atan2(100cqw,540px)))}
   }
 }
 `;
@@ -1212,16 +1347,16 @@ export default function WorldsScene({ active = null }: WorldsSceneProps) {
           <Layer>
             <div className="lws-wash" />
             <svg className="lws-thread lws-thread-d" viewBox="0 0 660 520" aria-hidden="true">
-              <path d="M152 458 C 232 428, 252 284, 346 222 C 424 276, 444 406, 498 464" />
-              <circle cx="152" cy="458" r="4.6" />
-              <circle cx="346" cy="222" r="4.6" />
-              <circle cx="498" cy="464" r="4.6" />
+              <path d="M152 486 C 268 508, 330 460, 346 232 C 366 296, 352 420, 410 470" />
+              <circle cx="152" cy="486" r="5" />
+              <circle cx="346" cy="232" r="5" />
+              <circle cx="410" cy="470" r="5" />
             </svg>
-            <svg className="lws-thread lws-thread-m" viewBox="0 0 400 390" aria-hidden="true">
-              <path d="M80 464 C 168 476, 240 430, 268 380 C 296 330, 292 274, 262 240" />
-              <circle cx="80" cy="464" r="4.6" />
-              <circle cx="268" cy="380" r="4.6" />
-              <circle cx="262" cy="240" r="4.6" />
+            <svg className="lws-thread lws-thread-m" viewBox="0 0 400 450" aria-hidden="true">
+              <path d="M30 513 C 140 548, 250 545, 350 505 C 445 462, 455 240, 432 88" />
+              <circle cx="30" cy="513" r="5" />
+              <circle cx="350" cy="505" r="5" />
+              <circle cx="432" cy="88" r="5" />
             </svg>
           </Layer>
           {/* one perspective layer each, composited back to front */}
