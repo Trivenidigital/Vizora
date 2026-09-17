@@ -1326,24 +1326,13 @@ export function MiniWorld({ place }: { place: WorldPlace }) {
 
 /* ---------- scene ---------- */
 
-/**
- * Ground thread, cafe -> hotel -> retail, in STAGE coordinates (the 1000x450
- * desktop canvas / the 540x560 mobile one) rather than world coordinates.
- *
- * It is drawn by the hero in page space, NOT inside the 3D world, so that it
- * reads identically whether a place is rendering as a CSS vignette or as a
- * prerendered image. At this camera the ground is nearly flat on screen, so a
- * page-space curve through the same points is visually the same line.
- */
-export const THREAD_DESKTOP = 'M282 404 C 368 416, 452 368, 532 355 C 624 358, 692 406, 792 400';
-export const THREAD_MOBILE = 'M150 486 C 250 516, 350 500, 430 448 C 500 400, 500 280, 468 214';
 
 const SCENE_CSS = `
-.lws-fit{container-type:inline-size;width:100%;aspect-ratio:1000/450;position:relative;overflow:hidden}
+.lws-fit{container-type:inline-size;width:100%;aspect-ratio:1000/500;position:relative;overflow:hidden}
 /* Coarse viewport-stepped fallback for engines without CSS trig (pre-2023):
    never lets the logical canvas blow out the layout, merely crops less
    gracefully. Overridden below wherever tan/atan2 are supported. */
-.lws-scale{position:absolute;inset:0;width:1000px;height:450px;transform-origin:top left;
+.lws-scale{position:absolute;inset:0;width:1000px;height:500px;transform-origin:top left;
   transform:scale(.34)}
 @media (min-width:480px){.lws-scale{transform:scale(.45)}}
 @media (min-width:680px){.lws-scale{transform:scale(.64)}}

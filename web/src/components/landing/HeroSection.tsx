@@ -4,7 +4,7 @@ import { useState, type CSSProperties } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { anchorProps } from './shared';
-import WorldsScene, { THREAD_DESKTOP, THREAD_MOBILE, type WorldPlace } from './WorldsScene';
+import WorldsScene, { type WorldPlace } from './WorldsScene';
 import { WORLD_ASSETS } from './worldAssets';
 
 interface HeroSectionProps {
@@ -13,56 +13,142 @@ interface HeroSectionProps {
 }
 
 /**
+ * Opaque bounds of the DELIVERED renders, measured as a percentage of each
+ * image. They are not the 75% framing convention the slots were first built
+ * against: every plinth's front rim sits at 95-98% of image height, so the
+ * pins and the thread are derived from THESE numbers instead.
+ */
+const ASSET_BOUNDS: Record<WorldPlace, { bottom: number }> = {
+  cafe: { bottom: 95.0 },
+  hotel: { bottom: 97.7 },
+  retail: { bottom: 97.7 },
+};
+
+/* Stage is 1000 x 500 logical units; a slot is 4:3 of the stage WIDTH. */
+const SLOT_W = 46;
+const SLOT_H = SLOT_W * 0.75 * (1000 / 500);
+/** <=640px slot height, as % of the 540x560 mobile stage, for a width in %. */
+const mslotH = (w: number) => w * 0.75 * (540 / 560);
+/** Clear ground between a plinth's lowest pixel and its pin, as % of stage. */
+const PIN_GAP = 2.2;
+const MPIN_GAP = 2;
+/** Pin -> thread, far enough to clear the leader line and the label under it. */
+const THREAD_DROP = 13.5;
+/** 641-1199px: no labels on the scene, so the thread runs just under the plinths. */
+const THREAD_DROP_T = 3.5;
+const MTHREAD_DROP = 3;
+
+/**
  * Dot hues match the Places section's location swatches.
  *
- * `px`/`py` place the pin as a percentage of the SCENE BOX, at the front rim of
- * that vignette's plinth. `slot` is the aspect-reserved 4:3 box a prerendered
- * render drops into for the same place.
- *
- * The two are tied together by one convention, documented for the renders in
- * `web/public/landing/worlds/README.md`: an asset frames its plinth's front rim
- * at 75% of the image height. A 34%-wide slot is 42.5% of the stage tall to
- * that line, so `slot.top = py - 42.5` puts an image's plinth exactly where the
- * CSS vignette's is, and a mixed row stays on one ground line.
+ * Each place carries TWO pin positions because it has two renderings. `css`
+ * is tuned to where the CSS-3D vignette's plinth lands; `img` is DERIVED from
+ * the delivered render's opaque bounds. Whichever is in use for that place is
+ * the one the marker and the thread anchor to, so a mixed row — some image,
+ * some CSS — still puts every pin on its own plinth.
  */
-const PLACES: Array<{
+interface PlaceDef {
   id: WorldPlace;
   label: string;
   dot: string;
-  px: number;
-  py: number;
-  slot: { left: number; top: number; width: number };
-  /** Same idea for the <=640px cluster, which is a different arrangement. */
+  /** Pin for the CSS vignette, % of the scene box. */
+  css: { x: number; y: number };
+  /** Aspect-reserved 4:3 slot for a delivered render, % of the scene box. */
+  slot: { left: number; top: number };
+  /**
+   * <=640px: a 1-over-2 arrangement, NOT an overlapping cluster. Photoreal
+   * renders cannot overlap the way the CSS cluster did — the one in front hides
+   * the signage of the one behind — so the hotel sits centred on top and the
+   * cafe and retail share the row below with only minimal overlap.
+   */
   mslot: { left: number; top: number; width: number };
-}> = [
+  mcss: { x: number; y: number };
+}
+
+const PLACES: PlaceDef[] = [
   {
     id: 'cafe',
     label: 'Café',
     dot: 'var(--lw-brass)',
-    px: 28.2,
-    py: 76.9,
-    slot: { left: 11.2, top: 34.4, width: 34 },
-    mslot: { left: 12.3, top: 63.9, width: 40 },
+    css: { x: 28.2, y: 69.2 },
+    slot: { left: 6, top: 8 },
+    mslot: { left: 0, top: 50, width: 58 },
+    mcss: { x: 32.3, y: 85.6 },
   },
   {
     id: 'hotel',
     label: 'Hotel',
     dot: 'var(--lw-forest)',
-    px: 53.2,
-    py: 65.8,
-    slot: { left: 36.2, top: 23.3, width: 34 },
-    mslot: { left: 35.6, top: 22.2, width: 40 },
+    css: { x: 53.2, y: 59.2 },
+    slot: { left: 31.5, top: 0 },
+    mslot: { left: 15.5, top: 5, width: 69 },
+    mcss: { x: 55.6, y: 43.9 },
   },
   {
     id: 'retail',
     label: 'Retail',
     dot: 'var(--lw-coral)',
-    px: 79.2,
-    py: 75.8,
-    slot: { left: 62.2, top: 33.3, width: 34 },
-    mslot: { left: 53.8, top: 57.8, width: 40 },
+    css: { x: 79.2, y: 68.2 },
+    slot: { left: 57, top: 7 },
+    mslot: { left: 42, top: 49, width: 58 },
+    mcss: { x: 73.8, y: 79.5 },
   },
 ];
+
+/** Where this place's marker sits, given how it is actually being rendered. */
+function pinOf(p: PlaceDef, mobile: boolean) {
+  const asImage = Boolean(WORLD_ASSETS[p.id]);
+  if (!asImage) return mobile ? p.mcss : p.css;
+  const b = ASSET_BOUNDS[p.id].bottom / 100;
+  return mobile
+    ? {
+        x: p.mslot.left + p.mslot.width / 2,
+        y: p.mslot.top + mslotH(p.mslot.width) * b + MPIN_GAP,
+      }
+    : { x: p.slot.left + SLOT_W / 2, y: p.slot.top + SLOT_H * b + PIN_GAP };
+}
+
+/**
+ * The thread is DERIVED from the three pins rather than hand-drawn, so it
+ * follows whichever rendering each place is using and cannot drift out of
+ * alignment in mixed mode. Stage units, dipping between the anchors.
+ */
+function threadPath(
+  pts: Array<{ x: number; y: number }>,
+  w: number,
+  h: number,
+  drop: number,
+) {
+  const [a, b, c] = pts.map((q) => ({
+    x: (q.x / 100) * w,
+    y: ((q.y + drop) / 100) * h,
+  }));
+  const dip = h * 0.022;
+  return (
+    `M${a.x.toFixed(1)} ${a.y.toFixed(1)} ` +
+    `C ${(a.x + (b.x - a.x) * 0.36).toFixed(1)} ${(a.y + dip).toFixed(1)}, ` +
+    `${(b.x - (b.x - a.x) * 0.36).toFixed(1)} ${(b.y + dip).toFixed(1)}, ` +
+    `${b.x.toFixed(1)} ${b.y.toFixed(1)} ` +
+    `C ${(b.x + (c.x - b.x) * 0.36).toFixed(1)} ${(b.y + dip).toFixed(1)}, ` +
+    `${(c.x - (c.x - b.x) * 0.36).toFixed(1)} ${(c.y + dip).toFixed(1)}, ` +
+    `${c.x.toFixed(1)} ${c.y.toFixed(1)}`
+  );
+}
+
+const PINS_D = PLACES.map((p) => pinOf(p, false));
+const PINS_M = PLACES.map((p) => pinOf(p, true));
+const THREAD_D_PATH = threadPath(PINS_D, 1000, 500, THREAD_DROP);
+const THREAD_T_PATH = threadPath(PINS_D, 1000, 500, THREAD_DROP_T);
+const THREAD_M_PATH = threadPath(PINS_M, 540, 560, MTHREAD_DROP);
+const dot = (
+  q: { x: number; y: number },
+  w: number,
+  h: number,
+  drop: number,
+) => ({
+  cx: ((q.x / 100) * w).toFixed(1),
+  cy: (((q.y + drop) / 100) * h).toFixed(1),
+});
 
 const HERO_CSS = `
 .lw-hero{padding:118px 0 30px;position:relative}
@@ -91,11 +177,13 @@ const HERO_CSS = `
 /* Editorial margin note, top-right, like the board's. Decorative. */
 .lw-hero-note{display:none}
 @media (min-width:1280px){
-  .lw-hero-note{display:block;position:absolute;top:132px;right:clamp(20px,3.6vw,48px);
+  /* top is set so the note clears the retail render's arch even while that
+     place is active and lifted 12px; nothing may overlap it. */
+  .lw-hero-note{display:block;position:absolute;top:82px;right:clamp(20px,3.6vw,48px);
     text-align:left;color:var(--lw-ink-2);font-family:var(--lw-serif);font-size:.92rem;
     line-height:1.5;letter-spacing:-.005em;z-index:2;pointer-events:none}
   .lw-hero-note i{display:block;width:34px;height:1px;background:var(--lw-hair);
-    margin-top:12px}
+    margin-top:8px}
 }
 .lw-hero-cta{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
 .lw-hero-trust{color:var(--lw-muted);font-size:.82rem;display:flex;gap:7px;align-items:center;flex-wrap:wrap}
@@ -115,22 +203,40 @@ const HERO_CSS = `
    object-fit:contain means an asset is letterboxed, never stretched or
    cropped. A CSS filter here is safe — it lands on an img, not on a
    preserve-3d group. */
-.lw-slot{position:absolute;left:var(--x);top:var(--y);width:var(--w);aspect-ratio:4/3;
+.lw-slot{position:absolute;left:var(--x);top:var(--y);width:var(--w);aspect-ratio:4/3;z-index:1;
   pointer-events:none;transition:transform .5s cubic-bezier(.22,.7,.3,1),filter .4s ease}
 .lw-slot img{width:100%;height:100%;object-fit:contain;object-position:50% 50%}
+.lw-slot[data-place="hotel"]{z-index:0}
+/* The cafe and hotel renders carry lighter baked shadows than retail. CSS cannot
+   lighten retail's, so these only bring the other two a little closer — kept
+   faint so they never stack into something heavy with the active-state shadow. */
+.lw-slot[data-place="cafe"]::before,.lw-slot[data-place="hotel"]::before{content:"";position:absolute;
+  left:24%;top:84%;width:70%;height:15%;z-index:-1;border-radius:50%;pointer-events:none;
+  background:radial-gradient(50% 50% at 56% 46%,rgba(70,52,30,.2) 0%,rgba(70,52,30,.07) 55%,rgba(70,52,30,0) 78%)}
 .lw-slot[data-matte="ivory"] img{
   -webkit-mask-image:radial-gradient(62% 60% at 50% 52%,#000 62%,rgba(0,0,0,0) 100%);
   mask-image:radial-gradient(62% 60% at 50% 52%,#000 62%,rgba(0,0,0,0) 100%)}
 .lw-hero-stage[data-active="cafe"] .lw-slot[data-place="cafe"],
 .lw-hero-stage[data-active="hotel"] .lw-slot[data-place="hotel"],
 .lw-hero-stage[data-active="retail"] .lw-slot[data-place="retail"]{
-  transform:translateY(-10px);filter:drop-shadow(0 18px 26px rgba(44,38,24,.22))}
+  transform:translateY(-12px);filter:drop-shadow(0 20px 30px rgba(120,86,38,.3))}
 
 /* The sync thread lives in PAGE space over the stage, not inside the 3D world,
    so it is identical whether a place is CSS or a prerendered image. */
-.lw-thread{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
+/* Sized to the SCENE BOX (its own aspect ratio), not stretched over the stage:
+   below 1200px the stage also holds the pill row, and inset:0 with
+   preserveAspectRatio none dragged the thread down into that gap. */
+.lw-thread{position:absolute;left:0;top:0;width:100%;height:auto;aspect-ratio:1000/500;
+  pointer-events:none;z-index:0;
   overflow:visible;filter:drop-shadow(0 1px 0 rgba(255,255,255,.8))}
-.lw-thread-m{display:none}
+.lw-thread-m{display:none;aspect-ratio:540/560}
+.lw-thread-t{display:none}
+@media (min-width:641px) and (max-width:1199px){
+  .lw-thread-d{display:none}
+  .lw-thread-t{display:block}
+  /* the scene box reserves room for on-scene labels that only >=1200px uses */
+  .lw-hero-places{margin-top:-8%}
+}
 .lw-thread path{fill:none;stroke:#274c37;stroke-width:1.6;stroke-linecap:round;opacity:.82}
 .lw-thread .lw-flow{stroke:#3d7a55;stroke-width:2.6;stroke-dasharray:30 620;opacity:.95;
   animation:lw-thread-flow 6s linear infinite}
@@ -187,7 +293,7 @@ const HERO_CSS = `
    never exceed the viewport (checked: scrollWidth - clientWidth === 0). LEFT is
    a fixed nudge back over the copy column, which is empty there. */
 @media (min-width:1200px){
-  .lw-hero-scene{margin-right:calc(-1 * clamp(0px,(100vw - 1330px)/2,96px));margin-left:-34px}
+  .lw-hero-scene{margin-right:calc(-1 * clamp(0px,(100vw - 1260px)/2,100px));margin-left:-80px}
   /* A fixed width, NOT min(30rem,100%): inside a grid item a percentage width
      resolves against the CELL, which is ~349px at 1440, so the headline kept
      breaking onto three lines. */
@@ -247,9 +353,9 @@ export default function HeroSection({ onExplore }: HeroSectionProps) {
             Perfectly in sync.
           </h1>
           <p className="lw-hero-sub">
-            Vizora runs the screens in the places you run. Make the content once, schedule when it
-            plays, and every screen — café menu, hotel lobby, shop window — stays exactly on
-            script.
+            Vizora runs the screens in the places you run. Make the content
+            once, schedule when it plays, and every screen — café menu, hotel
+            lobby, shop window — stays exactly on script.
           </p>
           <div className="lw-hero-cta">
             <Link href="/register" className="lw-btn lw-btn-forest">
@@ -291,7 +397,7 @@ export default function HeroSection({ onExplore }: HeroSectionProps) {
                     {
                       '--x': `${p.slot.left}%`,
                       '--y': `${p.slot.top}%`,
-                      '--w': `${p.slot.width}%`,
+                      '--w': `${SLOT_W}%`,
                       '--mx': `${p.mslot.left}%`,
                       '--my': `${p.mslot.top}%`,
                       '--mw': `${p.mslot.width}%`,
@@ -304,44 +410,66 @@ export default function HeroSection({ onExplore }: HeroSectionProps) {
                     width={a.width}
                     height={a.height}
                     priority
-                    sizes="(min-width:1200px) 22vw, (min-width:641px) 26vw, 44vw"
+                    sizes={`(min-width:1200px) 32vw, (min-width:800px) 350px, (min-width:641px) 44vw, ${p.id === 'hotel' ? 62 : 52}vw`}
                   />
                 </div>
               );
             })}
             <svg
               className="lw-thread lw-thread-d"
-              viewBox="0 0 1000 450"
+              viewBox="0 0 1000 500"
               preserveAspectRatio="none"
               aria-hidden="true"
             >
-              <path d={THREAD_DESKTOP} />
-              <path className="lw-flow" d={THREAD_DESKTOP} />
-              <circle cx="282" cy="404" r="3" />
-              <circle cx="532" cy="355" r="3" />
-              <circle cx="792" cy="400" r="3" />
+              <path d={THREAD_D_PATH} />
+              <path className="lw-flow" d={THREAD_D_PATH} />
+              {PINS_D.map((q, i) => (
+                <circle key={i} {...dot(q, 1000, 500, THREAD_DROP)} r="3" />
+              ))}
             </svg>
             <svg
-              className="lw-thread lw-thread-m"
-              viewBox="0 0 540 560"
+              className="lw-thread lw-thread-t"
+              viewBox="0 0 1000 500"
               preserveAspectRatio="none"
               aria-hidden="true"
             >
-              <path d={THREAD_MOBILE} />
-              <path className="lw-flow" d={THREAD_MOBILE} />
-              <circle cx="150" cy="486" r="3" />
-              <circle cx="430" cy="448" r="3" />
-              <circle cx="468" cy="214" r="3" />
+              <path d={THREAD_T_PATH} />
+              <path className="lw-flow" d={THREAD_T_PATH} />
+              {PINS_D.map((q, i) => (
+                <circle key={i} {...dot(q, 1000, 500, THREAD_DROP_T)} r="3" />
+              ))}
             </svg>
-            <div className="lw-hero-places" role="group" aria-label="Explore a place">
-              {PLACES.map((p) => (
+            {imagePlaces.length === 0 ? (
+              <svg
+                className="lw-thread lw-thread-m"
+                viewBox="0 0 540 560"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <path d={THREAD_M_PATH} />
+                <path className="lw-flow" d={THREAD_M_PATH} />
+                {PINS_M.map((q, i) => (
+                  <circle key={i} {...dot(q, 540, 560, MTHREAD_DROP)} r="3" />
+                ))}
+              </svg>
+            ) : null}
+            <div
+              className="lw-hero-places"
+              role="group"
+              aria-label="Explore a place"
+            >
+              {PLACES.map((p, i) => (
                 <button
                   key={p.id}
                   type="button"
                   className="lw-place-btn"
                   data-on={preview === p.id}
                   style={
-                    { '--dot': p.dot, '--x': `${p.px}%`, '--y': `${p.py}%` } as CSSProperties
+                    {
+                      '--dot': p.dot,
+                      '--x': `${PINS_D[i].x}%`,
+                      '--y': `${PINS_D[i].y}%`,
+                    } as CSSProperties
                   }
                   onMouseEnter={() => setPreview(p.id)}
                   onFocus={() => setPreview(p.id)}
