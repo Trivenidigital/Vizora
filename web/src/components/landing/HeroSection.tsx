@@ -19,7 +19,7 @@ const PLACES: Array<{ id: WorldPlace; label: string; dot: string }> = [
 
 const HERO_CSS = `
 .lw-hero{padding:118px 0 30px}
-.lw-hero-grid{display:grid;grid-template-columns:minmax(360px,44fr) 56fr;gap:clamp(28px,4vw,64px);align-items:center}
+.lw-hero-grid{display:grid;grid-template-columns:minmax(360px,38fr) 62fr;gap:clamp(24px,3vw,48px);align-items:center}
 .lw-hero-copy{max-width:34rem}
 .lw-hero h1{font-size:clamp(2.35rem,4.5vw,3.7rem);margin:18px 0 20px}
 .lw-hero-sub{color:var(--lw-ink-2);font-size:clamp(1rem,1.15vw,1.13rem);line-height:1.65;max-width:30rem;margin-bottom:28px}
@@ -38,11 +38,18 @@ const HERO_CSS = `
 .lw-place-btn small{font-family:var(--font-mono),monospace;font-size:.56rem;letter-spacing:.14em;
   text-transform:uppercase;color:var(--lw-muted)}
 
+/* ≥1280px: let the diorama run past the text wrap toward the right edge. The
+   bleed is derived from the gutter OUTSIDE the 1280px wrap and capped, so it
+   can never exceed the viewport (checked: scrollWidth - clientWidth === 0). */
+@media (min-width:1280px){
+  .lw-hero-scene{margin-right:calc(-1 * clamp(0px,(100vw - 1330px)/2,88px))}
+}
+
 @media (max-width:1023px){
   .lw-hero{padding-top:96px}
   .lw-hero-grid{grid-template-columns:1fr;gap:20px}
   .lw-hero-copy{max-width:38rem}
-  .lw-hero-scene{max-width:640px;margin-inline:auto;width:100%}
+  .lw-hero-scene{max-width:720px;margin-inline:auto;width:100%}
 }
 @media (max-width:420px){
   .lw-hero-places{gap:6px}

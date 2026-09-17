@@ -6,18 +6,35 @@
  * digital signage visibly serving the space, joined by a forest "sync" thread.
  *
  * Deliberately NOT a canvas and NOT an image: every plane is a real element in
- * a `preserve-3d` world (the same technique the old layer-stack section used),
- * so it costs no runtime dependency, ships no binary asset, stays crisp at any
- * DPI and recolours with the token scope.
+ * a `preserve-3d` world, so it costs no runtime dependency, ships no binary
+ * asset, stays crisp at any DPI and recolours with the token scope.
  *
  * The whole scene is decorative (`aria-hidden` at the mount site). Semantics —
  * the place selector buttons and captions — live in the parent section.
  *
- * Geometry convention: the `.lws-world` element is the GROUND PLANE (x right,
- * y toward the viewer), tilted into view by rotateX/rotateZ on `.lws-tilt`.
- * A wall "stands up" by hinging on its bottom edge: `transform-origin: bottom;
- * rotateX(-90deg)` — after which its children lay out flat ON the wall, which
- * is how the signage screens are mounted.
+ * ── Geometry convention ────────────────────────────────────────────────────
+ * `.lws-world` is the GROUND PLANE (x right, y toward the viewer), tilted into
+ * view by rotateX/rotateZ. A wall "stands up" by hinging on its bottom edge
+ * (`transform-origin: bottom; rotateX(-90deg)`) — after which its children lay
+ * out flat ON the wall, which is how the signage screens are mounted.
+ *
+ * Every vignette stands on a limestone plinth, so `flat`/`wallY`/`wallX` bake
+ * the plinth deck height (`DECK`) into their translateZ. Interior coordinates
+ * are therefore plinth-relative and the plinth itself uses raw `disc()` z.
+ *
+ * ── Lighting model ─────────────────────────────────────────────────────────
+ * ONE warm key from the upper-left-front. Every solid gets three tones —
+ * top lightest, front (+y) mid, right side (+x) darkest — each a gradient, via
+ * `mat()`. Every object drops a `Cast` (tight contact core up-left, soft pool
+ * offset down-right, one element, two gradients).
+ *
+ * ── The flattening trap ────────────────────────────────────────────────────
+ * `opacity < 1`, `filter`, `overflow`, `mask` and `clip-path` on an element
+ * force `transform-style: flat` and collapse its 3D children onto its plane.
+ * So the active/inactive treatment uses NO opacity on any preserve-3d group:
+ * the active vignette lifts (`translateZ`), its screens glow harder and a
+ * highlight ring fades in. Those opacity/clip-path rules only ever land on
+ * LEAF elements, which have no 3D children to lose.
  */
 
 import type { CSSProperties, ReactNode } from 'react';
@@ -25,13 +42,33 @@ import type { CSSProperties, ReactNode } from 'react';
 export type WorldPlace = 'cafe' | 'hotel' | 'retail';
 
 interface WorldsSceneProps {
-  /** Highlighted vignette; the other two recede. `null` shows all equally. */
+  /** Highlighted vignette; the others keep their own light. `null` = all equal. */
   active?: WorldPlace | null;
 }
 
-/* ---------- tiny geometry helpers ---------- */
+/* ---------- geometry helpers ---------- */
 
-/** A plane lying flat on the ground. */
+/** Plinth deck height — drum + upper tier. Every interior prop stands on it. */
+const DECK = 31;
+
+/** A preserve-3d group that yaws about the world's z axis (z is untouched). */
+function Yaw({ x, y, deg, children }: { x: number; y: number; deg: number; children: ReactNode }) {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: 0,
+        top: 0,
+        transformStyle: 'preserve-3d',
+        transform: `translate(${x}px, ${y}px) rotate(${deg}deg)`,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** A plane lying flat on the deck. */
 function flat(x: number, y: number, w: number, h: number, z = 0): CSSProperties {
   return {
     position: 'absolute',
@@ -39,7 +76,7 @@ function flat(x: number, y: number, w: number, h: number, z = 0): CSSProperties 
     top: y,
     width: w,
     height: h,
-    transform: `translateZ(${z}px)`,
+    transform: `translateZ(${z + DECK}px)`,
   };
 }
 
@@ -52,12 +89,12 @@ function wallY(x: number, yBottom: number, w: number, h: number, z = 0): CSSProp
     width: w,
     height: h,
     transformOrigin: 'bottom',
-    transform: `translateZ(${z}px) rotateX(-90deg)`,
+    transform: `translateZ(${z + DECK}px) rotateX(-90deg)`,
   };
 }
 
 /** A wall standing along x = xLine (depth d along y), facing +x. */
-function wallX(xLine: number, yTop: number, d: number, h: number): CSSProperties {
+function wallX(xLine: number, yTop: number, d: number, h: number, z = 0): CSSProperties {
   return {
     position: 'absolute',
     left: xLine,
@@ -65,21 +102,98 @@ function wallX(xLine: number, yTop: number, d: number, h: number): CSSProperties
     width: d,
     height: h,
     transformOrigin: 'top left',
-    transform: `rotateX(-90deg) rotateY(-90deg)`,
+    transform: `translateZ(${z + DECK}px) rotateX(-90deg) rotateY(-90deg)`,
   };
 }
 
-/** A 3-face box standing on the ground: top, front (+y) and right (+x). */
+/* ---------- materials: one key light, three tones per solid ---------- */
+
+interface Mat {
+  top: string;
+  front: string;
+  side: string;
+}
+
+function mat(light: string, mid: string, dark: string, deep: string): Mat {
+  return {
+    top: `linear-gradient(146deg, ${light} 0%, ${mid} 100%)`,
+    front: `linear-gradient(176deg, ${mid} 0%, ${dark} 100%)`,
+    side: `linear-gradient(200deg, ${dark} 0%, ${deep} 100%)`,
+  };
+}
+
+const M = {
+  stone: mat('#f8f3e6', '#e9e0c9', '#d2c5a4', '#bbac86'),
+  ivory: mat('#f6efdd', '#ebe1c6', '#d6c9a8', '#c0b189'),
+  oak: mat('#e7d0a5', '#d2b381', '#b08f5e', '#937449'),
+  walnut: mat('#c49b64', '#a87f4c', '#8a6437', '#6d4d27'),
+  brass: mat('#f2dca6', '#dcbb6c', '#b89241', '#8e6c26'),
+  forest: mat('#3d6e52', '#2b5339', '#1c3b28', '#12281b'),
+  coral: mat('#f0947a', '#df7050', '#bc5334', '#973d23'),
+  charcoal: mat('#4d5146', '#34382e', '#23261f', '#15170f'),
+  slate: mat('#6a8494', '#4e6879', '#3a505e', '#2a3c47'),
+  cream: mat('#fdf8ea', '#f0e7d1', '#dbceb0', '#c4b693'),
+  steel: mat('#e9e6dd', '#d5d1c4', '#b6b2a3', '#97937f'),
+};
+
+/* ---------- shadows ---------- */
+
+const CAST_BG =
+  'radial-gradient(34% 36% at 40% 40%, rgba(46,40,26,.52) 0%, rgba(46,40,26,.22) 62%, rgba(46,40,26,0) 80%),' +
+  'radial-gradient(50% 50% at 58% 62%, rgba(46,40,26,.28) 0%, rgba(46,40,26,0) 74%)';
+
+/**
+ * One element, two reads: a tight dark contact core directly beneath the
+ * object and a soft pool thrown toward the lower-right, away from the key.
+ */
+function Cast({ x, y, w, h, o = 1 }: { x: number; y: number; w: number; h: number; o?: number }) {
+  return (
+    <div
+      style={{
+        ...flat(x, y, w, h, 0.4),
+        borderRadius: '50%',
+        background: CAST_BG,
+        /* Leaf element — no 3D children to flatten, so opacity is safe here. */
+        opacity: o,
+      }}
+    />
+  );
+}
+
+/** Same, but on the true ground plane (used under the plinths themselves). */
+function GroundCast({ x, y, w, h }: { x: number; y: number; w: number; h: number }) {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: x,
+        top: y,
+        width: w,
+        height: h,
+        transform: 'translateZ(0.4px)',
+        borderRadius: '50%',
+        background:
+          'radial-gradient(38% 40% at 42% 42%, rgba(46,40,26,.42) 0%, rgba(46,40,26,.17) 62%, rgba(46,40,26,0) 80%),' +
+          'radial-gradient(50% 50% at 58% 62%, rgba(46,40,26,.24) 0%, rgba(46,40,26,0) 76%)',
+      }}
+    />
+  );
+}
+
+/* ---------- solids ---------- */
+
+/** A 3-face box standing on the deck: top, front (+y) and right (+x). */
 function Box({
   x,
   y,
   w,
   d,
   h,
-  top,
+  m,
   front,
-  side,
+  top,
   radius = 3,
+  z0 = 0,
   children,
 }: {
   x: number;
@@ -87,367 +201,828 @@ function Box({
   w: number;
   d: number;
   h: number;
-  top: string;
-  front: string;
-  side: string;
+  m: Mat;
+  front?: string;
+  top?: string;
   radius?: number;
+  /** Height of the surface it stands on — a counter top, a table top. */
+  z0?: number;
   children?: ReactNode;
 }) {
   return (
-    <div style={{ position: 'absolute', left: 0, top: 0, transformStyle: 'preserve-3d' }}>
-      <div style={{ ...flat(x, y, w, d, h), background: top, borderRadius: radius }} />
+    <>
+      <div style={{ ...flat(x, y, w, d, z0 + h), background: top ?? m.top, borderRadius: radius }} />
       <div
         style={{
-          ...wallY(x, y + d, w, h),
-          background: front,
+          ...wallY(x, y + d, w, h, z0),
+          background: front ?? m.front,
           borderRadius: `0 0 ${radius}px ${radius}px`,
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,.3)',
         }}
       >
         {children}
       </div>
-      <div style={{ ...wallX(x + w, y, d, h), background: side, borderRadius: radius }} />
-    </div>
+      <div style={{ ...wallX(x + w, y, d, h, z0), background: m.side }} />
+    </>
   );
 }
 
-/** Soft elliptical contact shadow on the ground. */
-function Shadow({ x, y, w, h, o = 0.22 }: { x: number; y: number; w: number; h: number; o?: number }) {
+/**
+ * A wall with real thickness: front face (children mount here), top cap and
+ * the lit right-hand side face, plus the ambient-occlusion band it lays on the
+ * deck in front of itself.
+ */
+function WallSlab({
+  x,
+  yFront,
+  w,
+  h,
+  t = 9,
+  m,
+  face,
+  radius = 8,
+  children,
+}: {
+  x: number;
+  yFront: number;
+  w: number;
+  h: number;
+  t?: number;
+  m: Mat;
+  face?: string;
+  radius?: number;
+  children?: ReactNode;
+}) {
   return (
-    <div
-      style={{
-        ...flat(x, y, w, h, 0.5),
-        borderRadius: '50%',
-        background: `radial-gradient(50% 50% at 50% 50%, rgba(35,38,31,${o}) 0%, transparent 70%)`,
-      }}
-    />
-  );
-}
-
-/** Limestone plinth: shadow + darker base ellipse + lit top ellipse. */
-function Plinth({ x, y, w, d }: { x: number; y: number; w: number; d: number }) {
-  return (
-    <div style={{ position: 'absolute', left: 0, top: 0, transformStyle: 'preserve-3d' }}>
-      <Shadow x={x - 28} y={y - 16} w={w + 56} h={d + 38} o={0.34} />
+    <>
       <div
         style={{
-          ...flat(x, y, w, d, 2),
-          borderRadius: '50%',
-          background: 'linear-gradient(135deg, #cfc3a6, #bdae8d)',
+          ...flat(x + 4, yFront, w, 30, 0.5),
+          background:
+            'linear-gradient(180deg, rgba(38,34,24,.26) 0%, rgba(38,34,24,.09) 46%, rgba(38,34,24,0) 100%)',
+          borderRadius: '2px 2px 40% 40%',
         }}
       />
+      <div style={{ ...flat(x, yFront - t, w, t, h), background: m.top, borderRadius: radius }} />
+      <div style={{ ...wallX(x + w, yFront - t, t, h), background: m.side }} />
       <div
+        className="lws-wallface"
         style={{
-          ...flat(x + 2, y + 2, w - 4, d - 4, 14),
-          borderRadius: '50%',
-          background: 'radial-gradient(80% 70% at 42% 34%, #f7f2e6 0%, #e9e1cd 62%, #ddd2b8 100%)',
-          boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.55)',
+          ...wallY(x, yFront, w, h),
+          background: face ?? m.front,
+          borderRadius: `${radius}px ${radius}px 0 0`,
+          boxShadow: 'inset 0 -22px 30px rgba(38,34,24,.13), inset 1px 0 0 rgba(255,255,255,.35)',
+          transformStyle: 'preserve-3d',
         }}
-      />
-    </div>
+      >
+        {children}
+      </div>
+    </>
   );
 }
 
-/** Potted plant: pot box + two leaf blobs standing as crossed planes. */
-function Plant({ x, y, s = 1 }: { x: number; y: number; s?: number }) {
-  const leaf = (rot: number): CSSProperties => ({
+/* ---------- limestone plinth: a two-tier drum with a real rim ---------- */
+
+const DRUM_N = 7;
+const DRUM_STEP = 2.9;
+const TIER_N = 4;
+const TIER_STEP = 2.6;
+
+function shade(a: [number, number, number], b: [number, number, number], t: number) {
+  return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(',')})`;
+}
+
+const DRUM_LO: [number, number, number] = [162, 146, 116];
+const DRUM_HI: [number, number, number] = [223, 213, 186];
+
+const LIMESTONE =
+  'radial-gradient(118% 96% at 33% 24%, rgba(255,255,255,.78) 0%, rgba(255,255,255,0) 62%),' +
+  'radial-gradient(34% 28% at 70% 64%, rgba(178,163,126,.24) 0%, rgba(178,163,126,0) 72%),' +
+  'radial-gradient(24% 20% at 24% 72%, rgba(178,163,126,.2) 0%, rgba(178,163,126,0) 74%),' +
+  'radial-gradient(18% 16% at 58% 30%, rgba(178,163,126,.16) 0%, rgba(178,163,126,0) 78%),' +
+  'repeating-linear-gradient(48deg, rgba(186,172,138,.09) 0 2px, rgba(255,255,255,0) 2px 6px),' +
+  'linear-gradient(152deg, #f9f4e8 0%, #ece3cd 52%, #ddd2b5 100%)';
+
+function disc(x: number, y: number, w: number, h: number, z: number): CSSProperties {
+  return {
     position: 'absolute',
-    left: x - 1,
-    top: y + 7 * s,
-    width: 26 * s,
-    height: 34 * s,
-    transformOrigin: 'bottom',
-    transform: `translateZ(${10 * s}px) rotateZ(${rot}deg) rotateX(-90deg)`,
-    borderRadius: '50% 50% 42% 42%',
-    background: 'radial-gradient(60% 60% at 46% 34%, #57795d 0%, #33543c 68%, #274531 100%)',
-  });
+    left: x,
+    top: y,
+    width: w,
+    height: h,
+    transform: `translateZ(${z}px)`,
+    borderRadius: '50%',
+  };
+}
+
+/** Plinth footprint is w × d; the raised upper tier is inset by (tx, ty). */
+function Plinth({ w, d, tx = 26, ty = 18 }: { w: number; d: number; tx?: number; ty?: number }) {
+  const tw = w - tx * 2;
+  const td = d - ty * 2;
+  const drum = [];
+  for (let i = 0; i < DRUM_N; i += 1) {
+    const inset = i >= DRUM_N - 2 ? (i - (DRUM_N - 3)) * 1.4 : 0;
+    drum.push(
+      <div
+        key={`d${i}`}
+        style={{
+          ...disc(inset, inset, w - inset * 2, d - inset * 2, 1.5 + i * DRUM_STEP),
+          background: shade(DRUM_LO, DRUM_HI, i / (DRUM_N - 1)),
+        }}
+      />,
+    );
+  }
+  const drumTop = 1.5 + (DRUM_N - 1) * DRUM_STEP;
+  const tier = [];
+  for (let i = 0; i < TIER_N; i += 1) {
+    const inset = i >= TIER_N - 2 ? (i - (TIER_N - 3)) * 1.2 : 0;
+    tier.push(
+      <div
+        key={`t${i}`}
+        style={{
+          ...disc(tx + inset, ty + inset, tw - inset * 2, td - inset * 2, drumTop + 1 + i * TIER_STEP),
+          background: shade(DRUM_LO, DRUM_HI, 0.35 + (0.65 * i) / (TIER_N - 1)),
+        }}
+      />,
+    );
+  }
   return (
-    <div style={{ position: 'absolute', left: 0, top: 0, transformStyle: 'preserve-3d' }}>
-      <Shadow x={x - 6} y={y - 2} w={38 * s} h={22 * s} o={0.16} />
+    <>
+      <GroundCast x={-34} y={-14} w={w + 74} h={d + 52} />
+      {drum}
+      <div
+        style={{
+          ...disc(1, 1, w - 2, d - 2, drumTop + 0.6),
+          background: LIMESTONE,
+          boxShadow: 'inset 2px 3px 0 rgba(255,255,255,.7), inset -2px -3px 0 rgba(158,144,112,.32)',
+        }}
+      />
+      {tier}
+      <div
+        style={{
+          ...disc(tx + 1, ty + 1, tw - 2, td - 2, DECK - 0.4),
+          background: LIMESTONE,
+          boxShadow: 'inset 2px 3px 0 rgba(255,255,255,.72), inset -2px -3px 0 rgba(158,144,112,.3)',
+        }}
+      />
+      <div
+        className="lws-ring"
+        style={{
+          /* Sits ON the tier face, not straddling the drum, so it reads as a
+             rim light rather than a floating halo. */
+          ...disc(tx + 3, ty + 3, tw - 6, td - 6, DECK + 0.2),
+          border: '2.5px solid rgba(183,142,59,.9)',
+          boxShadow: '0 0 20px rgba(196,155,70,.7), inset 0 0 18px rgba(196,155,70,.38)',
+        }}
+      />
+    </>
+  );
+}
+
+/* ---------- foliage ---------- */
+
+const LEAVES: Array<[number, number, number, string, string]> = [
+  /* rotateZ, scale, lift, lit tone, shaded tone */
+  [-68, 0.8, 0, '#6b9470', '#33543c'],
+  [-30, 1.02, 3, '#7ba57f', '#3b6144'],
+  [6, 1.16, 6, '#8cb68c', '#456e4d'],
+  [36, 0.96, 3, '#6f9a74', '#345940'],
+  [70, 0.74, 0, '#5c8664', '#2b4a34'],
+  [-8, 0.58, 16, '#9cc599', '#4d7855'],
+];
+
+/** Potted plant read as foliage: six leaf planes at varied angle, size and tone. */
+function Plant({ x, y, s = 1 }: { x: number; y: number; s?: number }) {
+  return (
+    <>
+      <Cast x={x - 12} y={y - 4} w={46 * s} h={28 * s} o={0.7} />
       <Box
         x={x}
         y={y}
-        w={22 * s}
-        d={14 * s}
-        h={11 * s}
-        radius={4}
-        top="#cbb58c"
-        front="linear-gradient(180deg,#c0a97e,#a8905f)"
-        side="#96794d"
+        w={24 * s}
+        d={16 * s}
+        h={13 * s}
+        radius={5}
+        m={M.oak}
+        top="radial-gradient(70% 70% at 40% 34%, #4a4034 0%, #2e281f 100%)"
       />
-      <div style={leaf(0)} />
-      <div style={leaf(65)} />
-      <div style={leaf(-58)} />
-    </div>
+      {LEAVES.map(([rot, sc, lift, lit, shade2], i) => (
+        <div
+          key={`${rot}-${i}`}
+          style={{
+            position: 'absolute',
+            left: x + 11 * s - 13 * s * sc,
+            top: y + 8 * s,
+            width: 26 * s * sc,
+            height: 38 * s * sc,
+            transformOrigin: 'bottom',
+            transform: `translateZ(${(11 + lift) * s + DECK}px) rotateZ(${rot}deg) rotateX(-90deg)`,
+            borderRadius: '54% 54% 34% 34%',
+            background: `linear-gradient(168deg, ${lit} 0%, ${shade2} 72%, rgba(24,48,30,.95) 100%)`,
+            boxShadow: 'inset 0 -5px 7px rgba(16,34,20,.3), 0 1px 2px rgba(16,34,20,.25)',
+          }}
+        />
+      ))}
+    </>
   );
 }
 
-/* ---------- signage screen faces (mounted inside walls) ---------- */
+/* ---------- signage screens ---------- */
 
 const screenShell: CSSProperties = {
-  position: 'absolute',
-  borderRadius: 4,
+  borderRadius: 3,
   /* Lit like a display, not like the wall it hangs on. */
-  background: 'linear-gradient(165deg, #ffffff 0%, #fdf8ea 52%, #f1e7d1 100%)',
-  border: '2.5px solid #23261f',
-  boxShadow: '0 0 0 1px rgba(255,255,255,.4), 0 0 18px rgba(176,138,62,.35)',
+  background: 'linear-gradient(168deg, #ffffff 0%, #fdf8ea 54%, #f2e8d2 100%)',
   overflow: 'hidden',
   display: 'flex',
   flexDirection: 'column',
-  padding: '7%',
+  padding: '7% 6%',
   color: '#1f4230',
-  lineHeight: 1.25,
+  lineHeight: 1.2,
 };
 
-function MenuScreen({ style }: { style: CSSProperties }) {
+/**
+ * A screen mounted on a wall face: light pool thrown onto the wall around it,
+ * a dark bezel slab standing proud of the wall, and the lit face on top.
+ * Coordinates are wall-local (0,0 = top-left of the wall face).
+ */
+function Screen({
+  x,
+  y,
+  w,
+  h,
+  children,
+}: {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  children: ReactNode;
+}) {
   return (
-    <div style={{ ...screenShell, ...style }}>
-      <span className="lws-scr-k">Coffee</span>
-      <span className="lws-scr-t lws-scr-serif" style={{ fontSize: 8 }}>
-        Brighter days
-      </span>
-      <span className="lws-scr-row">
-        <i>Flat white</i>
-        <b>4.0</b>
-      </span>
-      <span className="lws-scr-row">
-        <i>Morning bun</i>
-        <b>3.5</b>
-      </span>
-    </div>
-  );
-}
-
-function WelcomeScreen({ style }: { style: CSSProperties }) {
-  return (
-    <div style={{ ...screenShell, ...style }}>
-      <span className="lws-scr-k">Horizon Hotel</span>
-      <span className="lws-scr-t lws-scr-serif">Welcome</span>
-      <span className="lws-scr-band" />
-      <span className="lws-scr-k" style={{ marginTop: 'auto' }}>
-        Breakfast · 6–10
-      </span>
-    </div>
-  );
-}
-
-function PromoScreen({ style }: { style: CSSProperties }) {
-  return (
-    <div style={{ ...screenShell, ...style }}>
-      <span className="lws-scr-k">Noble &amp; Co.</span>
-      <span className="lws-scr-t lws-scr-serif">
-        Style
-        <br />
-        Moves
-        <br />
-        People
-      </span>
-      <span className="lws-scr-band lws-scr-band-coral" />
-    </div>
+    <>
+      <div
+        style={{
+          position: 'absolute',
+          left: x - w * 0.46,
+          top: y - h * 0.3,
+          width: w * 1.92,
+          height: h * 1.6,
+          transform: 'translateZ(0.4px)',
+          borderRadius: '50%',
+          background:
+            'radial-gradient(50% 50% at 50% 50%, rgba(255,230,168,.6) 0%, rgba(255,230,168,.18) 46%, rgba(255,230,168,0) 74%)',
+        }}
+      />
+      <div
+        style={{
+          position: 'absolute',
+          left: x,
+          top: y,
+          width: w,
+          height: h,
+          transform: 'translateZ(3px)',
+          background: 'linear-gradient(158deg,#474b40 0%,#24271f 60%,#15170f 100%)',
+          borderRadius: 5,
+          boxShadow: '3px 4px 9px rgba(35,38,31,.45)',
+        }}
+      />
+      <div
+        className="lws-scr"
+        style={{
+          ...screenShell,
+          position: 'absolute',
+          left: x + 2.5,
+          top: y + 2.5,
+          width: w - 5,
+          height: h - 5,
+          transform: 'translateZ(4.4px)',
+        }}
+      >
+        {children}
+      </div>
+    </>
   );
 }
 
 /* ---------- the three vignettes ---------- */
 
+const CAFE_W = 272;
+const CAFE_D = 180;
+
 function Cafe() {
   return (
-    <div className="lws-v" data-v="cafe" style={{ position: 'absolute', left: 16, top: 212, transformStyle: 'preserve-3d' }}>
-      <Plinth x={0} y={0} w={236} d={150} />
-      {/* back wall with vertical timber slats + two menu screens */}
-      <div
-        className="lws-wallface"
-        style={{
-          ...wallY(20, 46, 198, 112),
-          background:
-            'repeating-linear-gradient(90deg, #efe7d2 0 10px, #e2d7ba 10px 12px)',
-          borderRadius: '6px 6px 0 0',
-          boxShadow: 'inset 0 -14px 22px rgba(35,38,31,.10)',
-        }}
-      >
-        <MenuScreen style={{ left: 18, top: 26, width: 50, height: 66 }} />
-        <MenuScreen style={{ left: 78, top: 26, width: 50, height: 66 }} />
-      </div>
-      {/* striped awning: hinged at the wall top, sloping gently forward */}
-      <div
-        style={{
-          position: 'absolute',
-          left: 12,
-          top: 46,
-          width: 214,
-          height: 30,
-          transformOrigin: 'top',
-          transform: 'translateZ(112px) rotateX(-24deg)',
-          background:
-            'repeating-linear-gradient(90deg, #1f4230 0 17px, #f3eee0 17px 34px)',
-          borderRadius: '0 0 9px 9px',
-          boxShadow: '0 12px 18px rgba(35,38,31,.2)',
-        }}
-      />
-      {/* counter */}
-      <Box
-        x={62}
-        y={72}
-        w={116}
-        d={32}
-        h={32}
-        radius={5}
-        top="linear-gradient(135deg,#e8d9b8,#d8c493)"
-        front="repeating-linear-gradient(90deg,#c9a86b 0 9px,#b8945a 9px 18px)"
-        side="#a37f47"
-      />
-      {/* espresso machine hint + warm screen-light pool on the counter */}
-      <Box x={132} y={74} w={26} d={16} h={14} radius={3} top="#f1ece0" front="#d8d2c2" side="#b9b2a0" />
-      <div
-        style={{
-          ...flat(66, 74, 104, 26, 33),
-          borderRadius: '50%',
-          background: 'radial-gradient(50% 50% at 50% 50%, rgba(176,138,62,.28) 0%, transparent 70%)',
-        }}
-      />
-      {/* café table + stool */}
-      <div style={{ ...flat(34, 112, 34, 24, 22), borderRadius: '50%', background: 'radial-gradient(60% 60% at 42% 36%, #f6f0e2, #d9cdb2)' }} />
-      <div style={{ ...wallY(49, 134, 4, 22), background: '#8f7a55' }} />
-      <Shadow x={30} y={108} w={44} h={30} o={0.14} />
-      {/* A-board on the ground */}
-      <div
-        style={{
-          ...wallY(184, 124, 26, 34),
-          transform: 'translateZ(0) rotateX(-78deg)',
-          background: '#2c2f28',
-          borderRadius: 3,
-          boxShadow: 'inset 0 0 0 2px #d8cfb8',
-        }}
-      />
-      <Plant x={202} y={62} s={1.05} />
-    </div>
-  );
-}
+    <div className="lws-v" data-v="cafe">
+      <Plinth w={CAFE_W} d={CAFE_D} />
 
-function Hotel() {
-  return (
-    <div className="lws-v" data-v="hotel" style={{ position: 'absolute', left: 246, top: 56, transformStyle: 'preserve-3d' }}>
-      <Plinth x={0} y={0} w={252} d={158} />
-      {/* niche: back wall + two angled wings for the curved-alcove read */}
-      <div
-        className="lws-wallface"
-        style={{
-          ...wallY(46, 36, 160, 126),
-          background: 'linear-gradient(180deg, #f4eddc 0%, #e7ddc4 100%)',
-          borderRadius: '10px 10px 0 0',
-          boxShadow: 'inset 0 -18px 26px rgba(35,38,31,.10)',
-        }}
-      >
-        <WelcomeScreen style={{ left: 30, top: 16, width: 100, height: 58 }} />
-      </div>
-      <div
-        style={{
-          ...wallY(10, 52, 44, 112),
-          transform: 'translateZ(0) rotateX(-90deg) rotateY(48deg)',
-          transformOrigin: 'bottom right',
-          background: 'linear-gradient(180deg,#efe6d0,#ddd1b2)',
-          borderRadius: '8px 0 0 0',
-        }}
-      />
-      <div
-        style={{
-          ...wallY(198, 52, 44, 112),
-          transform: 'translateZ(0) rotateX(-90deg) rotateY(-48deg)',
-          transformOrigin: 'bottom left',
-          background: 'linear-gradient(180deg,#ddd0ae,#cfc09c)',
-          borderRadius: '0 8px 0 0',
-        }}
-      />
-      {/* brass reception desk */}
-      <Box
-        x={78}
-        y={78}
-        w={98}
-        d={30}
-        h={30}
+      {/* timber-slat back wall with two portrait menu boards */}
+      <WallSlab
+        x={44}
+        yFront={48}
+        w={186}
+        h={142}
+        t={9}
+        m={M.oak}
         radius={7}
-        top="linear-gradient(135deg,#e9cf92,#d3af5e)"
-        front="repeating-linear-gradient(90deg,#c79a3f 0 6px,#b8892f 6px 12px)"
-        side="#9a7124"
-      />
-      {/* warm pool of lamplight on the desk top */}
-      <div
-        style={{
-          ...flat(86, 80, 82, 26, 31),
-          borderRadius: '50%',
-          background: 'radial-gradient(50% 50% at 50% 50%, rgba(255,226,150,.55) 0%, transparent 70%)',
-        }}
-      />
-      {/* rug */}
-      <div style={{ ...flat(86, 116, 84, 30, 1), borderRadius: '50%', background: 'radial-gradient(60% 60% at 50% 45%, #d6c5a0, #c4b088)', opacity: 0.8 }} />
-      {/* armchair */}
-      <Box x={186} y={100} w={30} d={24} h={18} radius={8} top="#405a6b" front="linear-gradient(180deg,#37505f,#2b4150)" side="#243745" />
-      {/* luggage */}
-      <Box x={52} y={112} w={16} d={10} h={20} radius={3} top="#8a6a3c" front="#7a5c31" side="#63481f" />
-      <Plant x={206} y={56} s={1.05} />
-    </div>
-  );
-}
-
-function Retail() {
-  return (
-    <div className="lws-v" data-v="retail" style={{ position: 'absolute', left: 476, top: 220, transformStyle: 'preserve-3d' }}>
-      <Plinth x={0} y={0} w={224} d={146} />
-      {/* back wall with tall arch + portrait screen */}
-      <div
-        className="lws-wallface"
-        style={{
-          ...wallY(30, 34, 168, 122),
-          background: 'linear-gradient(180deg,#f2ebd8,#e4d9bd)',
-          borderRadius: '8px 8px 0 0',
-          boxShadow: 'inset 0 -16px 24px rgba(35,38,31,.10)',
-        }}
+        face={
+          'repeating-linear-gradient(90deg, rgba(0,0,0,.09) 0 1.5px, rgba(255,255,255,0) 1.5px 13px),' +
+          'linear-gradient(176deg, #e6d3ae 0%, #cbb287 62%, #b2996e 100%)'
+        }
       >
-        {/* arch niche */}
-        <span
+        {/* shadow band the awning drops across the wall beneath it */}
+        <div
           style={{
             position: 'absolute',
-            left: 12,
-            top: 12,
-            width: 62,
-            height: 102,
-            borderRadius: '31px 31px 0 0',
-            background: 'linear-gradient(180deg,#e0d4b4,#d2c49e)',
-            boxShadow: 'inset 0 6px 12px rgba(35,38,31,.16)',
+            left: 0,
+            top: 0,
+            width: '100%',
+            height: 30,
+            transform: 'translateZ(0.5px)',
+            background: 'linear-gradient(180deg, rgba(38,34,24,.42) 0%, rgba(38,34,24,0) 100%)',
           }}
         />
-        <PromoScreen style={{ left: 104, top: 14, width: 50, height: 96 }} />
+        <Screen x={16} y={34} w={70} h={94}>
+          <span className="lws-latte" />
+          <span className="lws-scr-h lws-scr-h-m">Coffee</span>
+          <span className="lws-scr-k lws-scr-sm">Specialty</span>
+        </Screen>
+        <Screen x={100} y={34} w={70} h={94}>
+          <span className="lws-scr-k lws-scr-sm">Today</span>
+          <span className="lws-scr-h lws-scr-h-m">Menu</span>
+          <span className="lws-scr-row lws-scr-sm">
+            <i>Flat white</i>
+            <b>4.0</b>
+          </span>
+          <span className="lws-scr-row lws-scr-sm">
+            <i>Cortado</i>
+            <b>3.6</b>
+          </span>
+          <span className="lws-scr-row lws-scr-sm">
+            <i>Morning bun</i>
+            <b>3.5</b>
+          </span>
+        </Screen>
+      </WallSlab>
+
+      {/* striped awning hinged at the wall top, sloping forward, scalloped */}
+      <div
+        className="lws-awning"
+        style={{
+          position: 'absolute',
+          left: 34,
+          top: 48,
+          width: 206,
+          height: 34,
+          transformOrigin: 'top',
+          transform: `translateZ(${142 + DECK}px) rotateX(19deg)`,
+          background:
+            'repeating-linear-gradient(90deg, #1f4230 0 18px, #f4efe1 18px 36px)',
+          boxShadow: '0 14px 20px rgba(38,34,24,.24), inset 0 3px 0 rgba(255,255,255,.3)',
+        }}
+      >
+        <span className="lws-scallop" />
       </div>
-      {/* clothes rail standing in the arch line */}
-      <div style={{ ...wallY(48, 96, 3, 54), background: '#8a6a3c' }} />
-      <div style={{ ...wallY(96, 96, 3, 54), background: '#8a6a3c' }} />
-      <div style={{ ...wallY(44, 96, 62, 5), transform: 'translateZ(48px) rotateX(-90deg)', background: '#6d5426', borderRadius: 3 }} />
-      {['#d96a4c', '#f0e9d6', '#1f4230', '#c9b389'].map((c, i) => (
+      {/* awning side return — one triangular panel closing the lit side */}
+      <div
+        style={{
+          ...wallX(240, 48, 34, 12, 131),
+          background: 'linear-gradient(180deg,#24462f,#14301f)',
+          clipPath: 'polygon(0 0, 100% 100%, 0 100%)',
+        }}
+      />
+
+      {/* counter lamps. They stay UNDER the menu boards by construction: on this
+          camera an object at depth y clears a board mounted at the wall line
+          only while 0.809*zTop <= 0.54*(y-48) + 11 — a pendant tall enough to
+          hang would cross the boards instead of lighting the counter. */}
+      {[122, 176].map((px) => (
+        <div key={px} style={{ position: 'absolute', left: 0, top: 0, transformStyle: 'preserve-3d' }}>
+          <div style={{ ...wallY(px + 8, 112, 2.4, 12, 36), background: 'linear-gradient(180deg,#e0bd6f,#9b7729)' }} />
+          <div
+            style={{
+              ...wallY(px, 112, 19, 12, 46),
+              background: 'linear-gradient(180deg,#fff6dd,#e0bd6f)',
+              clipPath: 'polygon(21% 0, 79% 0, 100% 100%, 0 100%)',
+              boxShadow: '0 0 10px rgba(255,214,128,.55)',
+            }}
+          />
+          <div
+            className="lws-lamp"
+            style={{
+              ...flat(px - 12, 100, 44, 28, 36.6),
+              borderRadius: '50%',
+              background:
+                'radial-gradient(50% 50% at 50% 50%, rgba(255,210,122,.78) 0%, rgba(255,210,122,0) 72%)',
+            }}
+          />
+        </div>
+      ))}
+
+      {/* counter */}
+      <Cast x={58} y={98} w={156} h={54} />
+      <Box
+        x={70}
+        y={84}
+        w={126}
+        d={32}
+        h={36}
+        radius={4}
+        m={M.walnut}
+        top="linear-gradient(146deg,#f0e4c6,#d9c69c)"
+        front={
+          'repeating-linear-gradient(90deg, rgba(0,0,0,.12) 0 1.4px, rgba(255,255,255,0) 1.4px 11px),' +
+          'linear-gradient(176deg,#b9975f 0%,#96733f 100%)'
+        }
+      />
+      {/* warm pool the menu boards throw onto the counter top */}
+      <div
+        style={{
+          ...flat(74, 86, 118, 28, 36.4),
+          borderRadius: '50%',
+          background:
+            'radial-gradient(50% 50% at 46% 44%, rgba(255,226,152,.42) 0%, rgba(255,226,152,0) 72%)',
+        }}
+      />
+
+      {/* pastry case: translucent glass box — rgba backgrounds, never `opacity`,
+          which would flatten the case's own 3D faces */}
+      {[
+        [82, 93, '#e6ad63'],
+        [95, 94, '#dd8a4a'],
+        [108, 93, '#f3dcaa'],
+      ].map(([px, py, c]) => (
         <div
-          key={c}
+          key={`p${px}`}
           style={{
-            ...wallY(50 + i * 12, 96, 10, 34),
-            transform: 'translateZ(14px) rotateX(-90deg)',
-            background: c,
-            borderRadius: '2px 2px 4px 4px',
-            opacity: 0.94,
+            ...flat(px as number, py as number, 11, 7, 41),
+            borderRadius: '50%',
+            background: `radial-gradient(64% 62% at 38% 30%, ${c}, rgba(128,84,40,.95))`,
+            boxShadow: '0 1px 2px rgba(60,40,18,.4)',
           }}
         />
       ))}
-      <Shadow x={40} y={86} w={70} h={20} o={0.14} />
-      {/* display table with folded stacks */}
       <Box
-        x={112}
-        y={82}
-        w={78}
-        d={34}
+        x={78}
+        y={88}
+        w={46}
+        d={24}
         h={22}
-        radius={5}
-        top="linear-gradient(135deg,#efe6cf,#ddcfa9)"
-        front="#cbb98d"
-        side="#b3a077"
+        z0={36}
+        radius={2}
+        m={M.steel}
+        top="linear-gradient(146deg, rgba(255,255,255,.7), rgba(222,236,236,.3))"
+        front="linear-gradient(176deg, rgba(252,255,254,.36) 0%, rgba(186,204,202,.46) 100%)"
       />
-      <Box x={122} y={88} w={20} d={12} h={8} radius={2} top="#d96a4c" front="#c4573a" side="#a63d20" />
-      <Box x={150} y={88} w={20} d={12} h={8} radius={2} top="#f3eee0" front="#e0d8c2" side="#c9bfa4" />
-      <Plant x={12} y={64} s={0.9} />
+      <div
+        style={{
+          ...wallY(78, 112, 46, 22, 36),
+          border: '1px solid rgba(255,255,255,.8)',
+          borderBottom: '2px solid rgba(146,124,84,.55)',
+          borderRadius: 2,
+        }}
+      />
+
+      {/* espresso machine, standing on the counter top */}
+      <Box x={140} y={88} w={34} d={22} h={22} z0={36} radius={2} m={M.charcoal} />
+      <div style={{ ...flat(143, 90, 28, 6, 59), background: 'linear-gradient(90deg,#e4dfd1,#a8a394)', borderRadius: 2 }} />
+      <div style={{ ...wallY(146, 110, 10, 7, 38), background: '#0f110b', borderRadius: 1 }} />
+      <div style={{ ...wallY(159, 110, 10, 11, 42), background: 'linear-gradient(180deg,#dcbb6c,#8e6c26)', borderRadius: 1 }} />
+
+      {/* stools, forward of the counter front so the seats read */}
+      {[
+        [82, 124],
+        [116, 130],
+        [150, 124],
+      ].map(([px, py]) => (
+        <div key={`s${px}`} style={{ position: 'absolute', left: 0, top: 0, transformStyle: 'preserve-3d' }}>
+          <Cast x={px - 6} y={py + 6} w={34} h={22} o={0.8} />
+          <div style={{ ...wallY(px + 9, py + 14, 3.5, 24), background: 'linear-gradient(180deg,#6b6355,#3c372c)' }} />
+          <div
+            style={{
+              ...flat(px, py, 22, 15, 24),
+              borderRadius: '50%',
+              background: 'radial-gradient(64% 62% at 38% 30%, #d0a86f 0%, #8d6a3c 100%)',
+              boxShadow: '0 2px 4px rgba(46,40,26,.34)',
+            }}
+          />
+        </div>
+      ))}
+
+      {/* round table + two chairs */}
+      <Cast x={22} y={116} w={72} h={48} />
+      <div style={{ ...wallY(49, 150, 3.5, 24), background: 'linear-gradient(180deg,#8f7a55,#5c4d33)' }} />
+      <div
+        style={{
+          ...flat(32, 122, 38, 26, 24),
+          borderRadius: '50%',
+          background: 'radial-gradient(62% 60% at 38% 30%, #efe0bc 0%, #d4bd8d 68%, #b99e6b 100%)',
+          boxShadow: '0 3px 6px rgba(46,40,26,.34), inset 0 0 0 1.5px rgba(255,253,244,.5)',
+        }}
+      />
+      {[
+        [10, 118],
+        [64, 140],
+      ].map(([px, py]) => (
+        <div key={`c${px}`} style={{ position: 'absolute', left: 0, top: 0, transformStyle: 'preserve-3d' }}>
+          <Box x={px} y={py} w={18} d={14} h={13} radius={2} m={M.forest} />
+          <div
+            style={{
+              ...wallY(px, py + 2, 18, 17, 13),
+              background: 'linear-gradient(176deg,#2b5339,#1c3b28)',
+              borderRadius: '3px 3px 0 0',
+            }}
+          />
+        </div>
+      ))}
+
+      {/* A-board on the deck */}
+      <Cast x={196} y={134} w={62} h={38} o={0.9} />
+      <Yaw x={218} y={146} deg={-14}>
+        <div
+          style={{
+            ...wallY(-17, 0, 34, 44),
+            transform: `translateZ(${DECK}px) rotateX(-74deg)`,
+            transformOrigin: 'bottom',
+            background:
+              'linear-gradient(90deg,rgba(0,0,0,0) 16%,rgba(236,226,200,.9) 16% 84%,rgba(0,0,0,0) 84%) 0 22%/100% 6px no-repeat,' +
+              'linear-gradient(90deg,rgba(0,0,0,0) 24%,rgba(236,226,200,.62) 24% 76%,rgba(0,0,0,0) 76%) 0 46%/100% 3.5px no-repeat,' +
+              'linear-gradient(90deg,rgba(0,0,0,0) 24%,rgba(236,226,200,.62) 24% 76%,rgba(0,0,0,0) 76%) 0 62%/100% 3.5px no-repeat,' +
+              'linear-gradient(176deg,#3a3e34,#1c1f19)',
+            borderRadius: 2,
+            boxShadow: 'inset 0 0 0 2.5px rgba(222,212,186,.75)',
+          }}
+        />
+        <div
+          style={{
+            ...wallY(-17, 0, 34, 42),
+            transform: `translateZ(${DECK}px) rotateX(-106deg)`,
+            transformOrigin: 'bottom',
+            background: 'linear-gradient(176deg,#282b22,#14160f)',
+            borderRadius: 2,
+          }}
+        />
+      </Yaw>
+
+      <Plant x={208} y={106} s={1.2} />
+    </div>
+  );
+}
+
+const HOTEL_W = 280;
+const HOTEL_D = 186;
+
+function Hotel() {
+  return (
+    <div className="lws-v" data-v="hotel">
+      <Plinth w={HOTEL_W} d={HOTEL_D} />
+
+      {/* curved alcove: arched back wall panel + two angled wings with thickness */}
+      <WallSlab x={56} yFront={56} w={170} h={144} t={10} m={M.ivory} radius={14}>
+        <div
+          style={{
+            position: 'absolute',
+            left: 16,
+            top: 10,
+            width: 138,
+            height: 134,
+            transform: 'translateZ(0.5px)',
+            borderRadius: '69px 69px 0 0',
+            background: 'linear-gradient(176deg,#e6dbbe 0%,#d6c9a5 100%)',
+            boxShadow: 'inset 0 7px 14px rgba(38,34,24,.2), inset 0 0 0 1px rgba(255,255,255,.4)',
+          }}
+        />
+        <Screen x={22} y={28} w={128} h={78}>
+          <span className="lws-land" />
+          <span className="lws-scr-h lws-scr-h-l lws-scr-over">Welcome</span>
+          <span className="lws-scr-k lws-scr-over2 lws-scr-sm">Breakfast 6–10 · Spa until 9</span>
+        </Screen>
+      </WallSlab>
+      <Yaw x={58} y={58} deg={-38}>
+        <div style={{ ...flat(-40, -9, 40, 9, 112), background: M.ivory.top, borderRadius: 6 }} />
+        <div
+          style={{
+            ...wallY(-40, 0, 40, 112),
+            background: 'linear-gradient(176deg,#f4ecd7 0%,#e0d4b6 100%)',
+            borderRadius: '10px 0 0 0',
+            boxShadow: 'inset -10px -18px 26px rgba(38,34,24,.14), inset 1px 0 0 rgba(255,255,255,.5)',
+          }}
+        />
+      </Yaw>
+      <Yaw x={224} y={58} deg={38}>
+        <div style={{ ...flat(0, -9, 38, 9, 112), background: M.ivory.side, borderRadius: 6 }} />
+        <div
+          style={{
+            ...wallY(0, 0, 38, 112),
+            background: 'linear-gradient(176deg,#d6c8a3 0%,#bdad85 100%)',
+            borderRadius: '0 10px 0 0',
+            boxShadow: 'inset 10px -18px 26px rgba(38,34,24,.2)',
+          }}
+        />
+      </Yaw>
+
+      {/* fluted brass reception desk */}
+      <Cast x={78} y={108} w={140} h={54} />
+      <Box
+        x={92}
+        y={94}
+        w={108}
+        d={34}
+        h={34}
+        radius={6}
+        m={M.brass}
+        top="linear-gradient(146deg,#f4e0ab,#d8b667)"
+        front={
+          'repeating-linear-gradient(90deg, rgba(255,255,255,.28) 0 1.4px, rgba(0,0,0,.14) 1.4px 3px, rgba(255,255,255,0) 3px 7px),' +
+          'linear-gradient(176deg,#d3ac5b 0%,#a8801f 100%)'
+        }
+      />
+      <div
+        style={{
+          ...flat(98, 96, 96, 30, 34.4),
+          borderRadius: '50%',
+          background:
+            'radial-gradient(50% 50% at 46% 42%, rgba(255,228,158,.6) 0%, rgba(255,228,158,0) 72%)',
+        }}
+      />
+      {/* two table lamps */}
+      {[100, 178].map((px) => (
+        <div key={`l${px}`} style={{ position: 'absolute', left: 0, top: 0, transformStyle: 'preserve-3d' }}>
+          <div style={{ ...wallY(px + 8, 110, 3.5, 11, 34), background: '#9b7729' }} />
+          <div
+            style={{
+              ...wallY(px, 110, 20, 15, 45),
+              background: 'linear-gradient(180deg,#fff6dd,#e7cb8c)',
+              clipPath: 'polygon(20% 0, 80% 0, 100% 100%, 0 100%)',
+              boxShadow: '0 0 12px rgba(255,214,128,.6)',
+            }}
+          />
+          <div
+            className="lws-lamp"
+            style={{
+              ...flat(px - 14, 100, 48, 32, 35),
+              borderRadius: '50%',
+              background:
+                'radial-gradient(50% 50% at 50% 50%, rgba(255,214,128,.8) 0%, rgba(255,214,128,0) 72%)',
+            }}
+          />
+        </div>
+      ))}
+
+      {/* rug, armchair, luggage */}
+      <div
+        style={{
+          ...flat(86, 138, 104, 36, 0.9),
+          borderRadius: '50%',
+          background:
+            'radial-gradient(60% 58% at 46% 40%, #cdb98f 0%, #b9a171 66%, #a68d5c 100%)',
+          boxShadow: 'inset 0 0 0 2.5px rgba(255,253,244,.65), 0 1px 2px rgba(46,40,26,.18)',
+        }}
+      />
+      <Cast x={196} y={126} w={54} h={34} o={0.8} />
+      <Box x={204} y={122} w={34} d={26} h={15} radius={5} m={M.slate} />
+      <div
+        style={{
+          ...wallY(204, 126, 34, 22, 15),
+          background: 'linear-gradient(176deg,#587284,#3a505e)',
+          borderRadius: '7px 7px 0 0',
+        }}
+      />
+      <div style={{ ...wallX(238, 122, 26, 12, 15), background: '#2a3c47', borderRadius: 3 }} />
+      <Cast x={50} y={132} w={58} h={30} o={0.8} />
+      <Box x={58} y={130} w={18} d={12} h={24} radius={3} m={M.oak} />
+      <Box x={78} y={138} w={15} d={10} h={19} radius={3} m={M.walnut} />
+
+      <Plant x={28} y={112} s={1.3} />
+      <Plant x={238} y={104} s={0.85} />
+    </div>
+  );
+}
+
+const RETAIL_W = 262;
+const RETAIL_D = 176;
+
+const GARMENTS = ['#d96a4c', '#f2ebd8', '#25513a', '#c9ab72', '#7d8f83'];
+
+function Retail() {
+  return (
+    <div className="lws-v" data-v="retail">
+      <Plinth w={RETAIL_W} d={RETAIL_D} />
+
+      <WallSlab
+        x={38}
+        yFront={46}
+        w={186}
+        h={136}
+        t={9}
+        m={M.ivory}
+        radius={8}
+        face="linear-gradient(176deg,#f4edd9 0%,#e2d6b8 64%,#cfc09c 100%)"
+      >
+        <div
+          style={{
+            position: 'absolute',
+            left: 16,
+            top: 14,
+            width: 74,
+            height: 122,
+            transform: 'translateZ(0.5px)',
+            borderRadius: '37px 37px 0 0',
+            background: 'linear-gradient(176deg,#e2d6b6 0%,#cfc09c 100%)',
+            boxShadow: 'inset 0 6px 13px rgba(38,34,24,.18)',
+          }}
+        />
+      </WallSlab>
+
+      {/* slim dark metal shopfront frame — posts land on the tier, top bar
+          meets the wall height so it reads as a frame, not scaffolding */}
+      <div style={{ ...wallY(36, 152, 3.5, 128), background: 'linear-gradient(176deg,#4d5146,#1e211a)', borderRadius: 1 }} />
+      <div style={{ ...wallY(138, 152, 3.5, 128), background: 'linear-gradient(176deg,#3e4239,#15170f)', borderRadius: 1 }} />
+      <div
+        style={{
+          ...wallY(36, 152, 105, 3.5, 124.5),
+          background: 'linear-gradient(176deg,#4d5146,#2c3028)',
+          borderRadius: 1,
+        }}
+      />
+      <div style={{ ...wallY(36, 152, 105, 2, 84), background: 'rgba(58,62,52,.7)' }} />
+      <div style={{ ...flat(34, 148, 110, 7, 0.7), background: 'rgba(38,34,24,.24)', borderRadius: 3 }} />
+
+      {/* clothes rail with six hanging garments */}
+      <Cast x={44} y={86} w={98} h={34} o={0.8} />
+      <div style={{ ...wallY(52, 96, 3, 78), background: 'linear-gradient(180deg,#746a5a,#413a2e)' }} />
+      <div style={{ ...wallY(124, 96, 3, 78), background: 'linear-gradient(180deg,#63594a,#383226)' }} />
+      <div
+        style={{
+          ...flat(50, 94, 78, 4, 78),
+          background: 'linear-gradient(90deg,#d2b67e,#8a6f40)',
+          borderRadius: 2,
+        }}
+      />
+      {GARMENTS.map((c, i) => (
+        <div
+          key={c}
+          style={{
+            ...wallY(54 + i * 15, 98, 20, 54, 22),
+            background: `linear-gradient(176deg, ${c} 0%, rgba(20,16,8,.42) 190%)`,
+            clipPath:
+              'polygon(50% 0, 74% 4%, 100% 18%, 86% 26%, 89% 100%, 11% 100%, 14% 26%, 0 18%, 26% 4%)',
+          }}
+        />
+      ))}
+
+      {/* display table with folded stacks */}
+      <Cast x={36} y={132} w={94} h={44} />
+      <Box x={46} y={120} w={76} d={30} h={24} radius={4} m={M.oak} />
+      <Box
+        x={54}
+        y={126}
+        w={24}
+        d={14}
+        h={13}
+        z0={24}
+        radius={1}
+        m={M.cream}
+        front="linear-gradient(180deg,#f2e9d4 0 46%,#df7050 46% 100%)"
+      />
+      <Box x={84} y={128} w={22} d={12} h={9} z0={24} radius={1} m={M.forest} />
+      <div
+        style={{
+          ...flat(94, 132, 14, 9, 25),
+          borderRadius: '50%',
+          background: 'radial-gradient(60% 58% at 38% 32%, #f2dca6, #a8801f)',
+          boxShadow: '0 1px 2px rgba(46,40,26,.35)',
+        }}
+      />
+
+      {/* freestanding portrait totem — the shop's window screen */}
+      <Cast x={146} y={126} w={78} h={40} />
+      <Box x={154} y={128} w={64} d={16} h={7} radius={3} m={M.charcoal} />
+      <div style={{ ...flat(156, 122, 60, 14, 7), background: '#2b2e26', borderRadius: 2 }} />
+      <div
+        className="lws-wallface"
+        style={{
+          ...wallY(154, 134, 64, 132, 7),
+          background: 'linear-gradient(176deg,#3a3e34,#1b1e17)',
+          borderRadius: '5px 5px 0 0',
+          transformStyle: 'preserve-3d',
+          boxShadow: '4px 5px 12px rgba(38,34,24,.4)',
+        }}
+      >
+        <Screen x={3} y={4} w={58} h={120}>
+          <span className="lws-scr-k lws-scr-sm">Noble &amp; Co.</span>
+          <span className="lws-scr-h lws-scr-h-s">
+            Style
+            <br />
+            Moves
+            <br />
+            People
+          </span>
+          <span className="lws-coat" />
+          <span className="lws-scr-band lws-scr-band-coral" />
+        </Screen>
+      </div>
+
+      <Plant x={216} y={96} s={1.05} />
     </div>
   );
 }
@@ -455,99 +1030,192 @@ function Retail() {
 /* ---------- scene ---------- */
 
 const SCENE_CSS = `
-.lws-fit{container-type:inline-size;width:100%;aspect-ratio:740/392;position:relative;overflow:hidden}
+.lws-fit{container-type:inline-size;width:100%;aspect-ratio:800/548;position:relative;overflow:hidden}
 /* Coarse viewport-stepped fallback for engines without CSS trig (pre-2023):
-   never lets the 740px canvas blow out the layout, merely crops less
+   never lets the logical canvas blow out the layout, merely crops less
    gracefully. Overridden below wherever tan/atan2 are supported. */
-.lws-scale{position:absolute;inset:0;width:740px;height:392px;transform-origin:top left;
-  transform:scale(.45)}
-@media (min-width:480px){.lws-scale{transform:scale(.62)}}
-@media (min-width:680px){.lws-scale{transform:scale(.84)}}
-@media (min-width:1200px){.lws-scale{transform:scale(.9)}}
+.lws-scale{position:absolute;inset:0;width:800px;height:548px;transform-origin:top left;
+  transform:scale(.42)}
+@media (min-width:480px){.lws-scale{transform:scale(.56)}}
+@media (min-width:680px){.lws-scale{transform:scale(.8)}}
+@media (min-width:1200px){.lws-scale{transform:scale(.92)}}
 @supports (transform:scale(tan(atan2(1px,1px)))){
   /* atan2(length,length) -> angle whose tan is their unitless ratio */
-  .lws-scale{transform:scale(tan(atan2(100cqw,740px)))}
+  .lws-scale{transform:scale(tan(atan2(100cqw,800px)))}
 }
-.lws-stage{position:absolute;inset:0;perspective:1750px;perspective-origin:50% 30%}
-.lws-world{position:absolute;left:10px;top:-20px;width:720px;height:430px;transform-style:preserve-3d;
-  transform:rotateX(55deg) rotateZ(-20deg)}
-.lws-v{transition:opacity .45s ease,transform .45s ease}
-.lws-world[data-active] .lws-v{opacity:.42}
-.lws-world[data-active="cafe"] .lws-v[data-v="cafe"],
-.lws-world[data-active="hotel"] .lws-v[data-v="hotel"],
-.lws-world[data-active="retail"] .lws-v[data-v="retail"]{opacity:1;transform:translateZ(14px)}
+.lws-stage{position:absolute;inset:0}
+/* Each vignette gets its OWN perspective layer with an IDENTICAL camera (same
+   box, same perspective + origin), so the projection matches exactly while the
+   three composite in plain DOM order. Without this they share one 3D context
+   and the browser sorts whole planes by a single depth each — which put the
+   hotel's ground shadow straight through the café's menu board. The plinths
+   never interpenetrate, so back-to-front paint order is the correct answer. */
+.lws-cell{position:absolute;inset:0;perspective:2100px;perspective-origin:50% 34%}
+.lws-world{position:absolute;left:70px;top:30px;width:660px;height:520px;transform-style:preserve-3d;
+  transform:rotateX(54deg) rotateZ(-20deg) scale3d(1.06,1.06,1.06);
+  --cafe-x:16px;--cafe-y:276px;--hotel-x:206px;--hotel-y:22px;--retail-x:366px;--retail-y:288px}
+.lws-v{position:absolute;transform-style:preserve-3d;transition:transform .5s cubic-bezier(.22,.7,.3,1)}
+.lws-v[data-v="cafe"]{left:var(--cafe-x);top:var(--cafe-y)}
+.lws-v[data-v="hotel"]{left:var(--hotel-x);top:var(--hotel-y)}
+.lws-v[data-v="retail"]{left:var(--retail-x);top:var(--retail-y)}
+
+/* Active place: lift + ring + brighter screens. NEVER opacity on these groups —
+   opacity<1 forces transform-style:flat and would collapse the whole vignette
+   onto the ground plane. The ring is a leaf, so its opacity is safe. */
+.lws-stage[data-active="cafe"] .lws-v[data-v="cafe"],
+.lws-stage[data-active="hotel"] .lws-v[data-v="hotel"],
+.lws-stage[data-active="retail"] .lws-v[data-v="retail"]{transform:translateZ(30px)}
+.lws-ring{opacity:0;transform-origin:50% 50%;transition:opacity .4s ease}
+.lws-stage[data-active="cafe"] .lws-v[data-v="cafe"] .lws-ring,
+.lws-stage[data-active="hotel"] .lws-v[data-v="hotel"] .lws-ring,
+.lws-stage[data-active="retail"] .lws-v[data-v="retail"] .lws-ring{opacity:1}
+.lws-stage[data-active="cafe"] .lws-v[data-v="cafe"] .lws-scr,
+.lws-stage[data-active="hotel"] .lws-v[data-v="hotel"] .lws-scr,
+.lws-stage[data-active="retail"] .lws-v[data-v="retail"] .lws-scr{
+  animation:none;box-shadow:0 0 0 1px rgba(255,255,255,.55),0 0 30px rgba(226,178,82,.75)}
+
+/* warm ground wash unifying the three plinths */
+.lws-wash{position:absolute;left:-60px;top:-60px;width:780px;height:640px;transform:translateZ(0.2px);
+  border-radius:50%;
+  background:radial-gradient(38% 30% at 26% 74%,rgba(176,138,62,.13) 0%,transparent 70%),
+    radial-gradient(34% 28% at 54% 26%,rgba(31,66,48,.09) 0%,transparent 70%),
+    radial-gradient(36% 30% at 82% 68%,rgba(217,106,76,.1) 0%,transparent 70%)}
 
 /* sync thread lying on the ground, joining the three plinths — the one
    element that says "one system, many places", so it must actually read */
-.lws-thread{position:absolute;left:0;top:0;width:720px;height:430px;transform:translateZ(1px);
-  filter:drop-shadow(0 1px 0 rgba(255,255,255,.85))}
-.lws-thread path{fill:none;stroke:#1f4230;stroke-width:2.5;stroke-dasharray:6 6;
-  stroke-linecap:round;opacity:.9;animation:lws-thread-flow 2.6s linear infinite}
-.lws-thread circle{fill:#d96a4c;stroke:#f5f1e8;stroke-width:2}
-@keyframes lws-thread-flow{to{stroke-dashoffset:-12}}
+.lws-thread{position:absolute;left:0;top:0;width:100%;height:100%;transform:translateZ(1px);
+  overflow:visible;filter:drop-shadow(0 1px 0 rgba(255,255,255,.85))}
+.lws-thread-m{display:none}
+.lws-thread path{fill:none;stroke:#1f4230;stroke-width:3.4;stroke-dasharray:8 8;
+  stroke-linecap:round;animation:lws-thread-flow 2.6s linear infinite}
+.lws-thread circle{fill:#d96a4c;stroke:#f7f3ea;stroke-width:2.6}
+
+/* awning scallop — semicircular teeth hanging off the front edge */
+.lws-scallop{position:absolute;left:0;bottom:-8px;width:100%;height:10px;
+  background:radial-gradient(circle at 9px 1px,#1f4230 8px,rgba(0,0,0,0) 8.5px) 0 0/18px 12px repeat-x}
 
 /* screen micro-typography (decorative; aria-hidden at the mount) */
-.lws-scr-k{font-family:var(--font-mono),monospace;font-size:4.4px;letter-spacing:.14em;
-  text-transform:uppercase;color:#77591f;margin-bottom:2px}
-.lws-scr-t{font-weight:700;font-size:7.2px;letter-spacing:-.02em;margin-bottom:3px}
-.lws-scr-serif{font-family:var(--lw-serif);font-weight:500;font-size:10px;line-height:1.05}
-.lws-scr-row{display:flex;justify-content:space-between;align-items:baseline;font-size:5px;
-  border-top:1px dotted rgba(31,66,48,.35);padding-top:2px;margin-top:2px}
-.lws-scr-row i{font-style:normal}
-.lws-scr-row b{font-family:var(--font-mono),monospace}
-.lws-scr-band{height:8px;border-radius:2px;margin-top:2px;
-  background:linear-gradient(90deg,#1f4230 0 35%,#b08a3e 35% 55%,#e4d9bd 55%)}
-.lws-scr-band-coral{background:linear-gradient(90deg,#d96a4c 0 45%,#e4d9bd 45%)}
+.lws-scr-k{font-family:var(--font-mono),monospace;font-size:5.2px;letter-spacing:.14em;
+  text-transform:uppercase;color:#8a6a25;margin-bottom:2px;white-space:nowrap;overflow:hidden}
+.lws-scr-h{font-family:var(--lw-serif);font-weight:600;line-height:1.02;letter-spacing:-.018em;
+  color:#1c3b28;margin-bottom:3px}
+.lws-scr-h-s{font-size:13px}
+.lws-scr-h-m{font-size:14px}
+.lws-scr-h-l{font-size:19px}
+.lws-scr-row{display:flex;justify-content:space-between;align-items:baseline;gap:3px;font-size:5.6px;
+  border-top:1px dotted rgba(31,66,48,.34);padding-top:2px;margin-top:2px;color:#2f4536}
+.lws-scr-row i{font-style:normal;white-space:nowrap;overflow:hidden}
+.lws-scr-row b{white-space:nowrap}
+.lws-scr-row b{font-family:var(--font-mono),monospace;color:#8a6a25}
+.lws-scr-band{height:7px;border-radius:2px;margin-top:auto;
+  background:linear-gradient(90deg,#1f4230 0 34%,#b08a3e 34% 56%,#e4d9bd 56%)}
+.lws-scr-band-coral{background:linear-gradient(90deg,#d96a4c 0 46%,#1f4230 46% 62%,#e4d9bd 62%)}
 
-/* gentle screen glow breathing — the only idle motion, and it stops on request */
-@keyframes lws-glow{0%,100%{box-shadow:0 0 0 1px rgba(255,255,255,.4),0 0 14px rgba(176,138,62,.28)}
-  50%{box-shadow:0 0 0 1px rgba(255,255,255,.4),0 0 26px rgba(176,138,62,.5)}}
-.lws-wallface>div{animation:lws-glow 5.5s ease-in-out infinite}
+/* CSS-drawn screen imagery */
+.lws-latte{flex:none;width:34px;height:34px;border-radius:50%;margin:1px auto 4px;
+  background:
+    radial-gradient(circle at 50% 46%,#f3e2c4 0 23%,rgba(0,0,0,0) 23.5%),
+    radial-gradient(circle at 39% 33%,rgba(255,255,255,.6) 0 14%,rgba(0,0,0,0) 34%),
+    radial-gradient(circle at 50% 50%,#b3834c 0 38%,rgba(0,0,0,0) 38.5%),
+    radial-gradient(circle at 50% 50%,#fffdf6 0 49%,rgba(0,0,0,0) 49.5%);
+  box-shadow:0 1px 3px rgba(38,34,24,.28)}
+.lws-land{flex:none;display:block;width:100%;height:30px;border-radius:2px;margin-bottom:3px;
+  background:
+    radial-gradient(circle at 76% 24%,#ffe9ae 0 8%,rgba(255,233,174,.4) 8% 15%,rgba(0,0,0,0) 16%),
+    radial-gradient(150% 108% at 16% 126%,#2c5540 0 42%,rgba(0,0,0,0) 43%),
+    radial-gradient(128% 96% at 74% 132%,#43765a 0 44%,rgba(0,0,0,0) 45%),
+    linear-gradient(180deg,#c3dbe3 0%,#e9ddc5 58%,#d6c5a1 100%)}
+.lws-coat{flex:none;display:block;width:28px;height:36px;margin:4px auto 3px;
+  background:linear-gradient(176deg,#33372e,#1c1f19);
+  clip-path:polygon(50% 0,72% 6%,100% 24%,88% 33%,90% 100%,10% 100%,12% 33%,0 24%,28% 6%)}
+.lws-scr-over{margin-top:-1px}
+.lws-scr-over2{margin-top:auto;margin-bottom:0}
+
+/* Idle motion — three animated properties total, all off on request. */
+@keyframes lws-thread-flow{to{stroke-dashoffset:-14}}
+@keyframes lws-glow{0%,100%{box-shadow:0 0 0 1px rgba(255,255,255,.45),0 0 12px rgba(214,168,76,.3)}
+  50%{box-shadow:0 0 0 1px rgba(255,255,255,.45),0 0 24px rgba(214,168,76,.55)}}
+@keyframes lws-lamp{0%,100%{opacity:.82}50%{opacity:1}}
+.lws-scr{animation:lws-glow 6s ease-in-out infinite}
+.lws-lamp{animation:lws-lamp 5.2s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){
-  .lws-wallface>div{animation:none}
-  .lws-thread path{animation:none}
-  .lws-v{transition:none}
+  .lws-scr,.lws-lamp,.lws-thread path{animation:none}
+  .lws-v,.lws-ring{transition:none}
 }
 
-/* Small screens: drop the micro-copy noise, enlarge the massing — the
-   three-place story survives, the 2px type does not. */
+/* ── Dedicated mobile arrangement ──────────────────────────────────────────
+   Not a shrunken desktop: its own logical canvas, its own tighter/taller
+   triangle (hotel top-centre, café lower-left, retail lower-right) and its
+   own thread path, so each plinth stays over half the viewport wide. */
 @media (max-width:640px){
-  .lws-scr-k,.lws-scr-row{display:none}
-  .lws-scr-t{font-size:8px}
-  .lws-world{transform:rotateX(52deg) rotateZ(-18deg) scale(1.12)}
+  .lws-fit{aspect-ratio:480/460}
+  .lws-scale{width:480px;height:460px;transform:scale(.58)}
+  .lws-world{left:40px;top:35px;width:400px;height:390px;
+    transform:rotateX(53deg) rotateZ(-20deg);
+    --cafe-x:-56px;--cafe-y:282px;--hotel-x:90px;--hotel-y:48px;--retail-x:92px;--retail-y:194px}
+  .lws-wash{left:-70px;top:-40px;width:540px;height:510px}
+  .lws-thread-d{display:none}
+  .lws-thread-m{display:block}
+  /* micro-copy is noise at this size — headline + imagery only */
+  .lws-scr-sm,.lws-scr-row,.lws-scr-band{display:none}
+  .lws-scr-h{margin-bottom:0}
+  .lws-scr-h-s{font-size:15px}
+  .lws-scr-h-m{font-size:16px}
+  .lws-scr-h-l{font-size:21px}
+  .lws-latte{width:40px;height:40px}
+  .lws-land{height:40px}
+  .lws-coat{width:36px;height:48px}
+}
+@media (max-width:640px) and (min-width:400px){.lws-scale{transform:scale(.75)}}
+@media (max-width:640px) and (min-width:520px){.lws-scale{transform:scale(.98)}}
+@media (max-width:640px){
+  @supports (transform:scale(tan(atan2(1px,1px)))){
+    .lws-scale{transform:scale(tan(atan2(100cqw,480px)))}
+  }
 }
 `;
+
+/** One perspective layer holding one vignette's ground plane. */
+function Layer({ children }: { children: ReactNode }) {
+  return (
+    <div className="lws-cell">
+      <div className="lws-world">{children}</div>
+    </div>
+  );
+}
 
 export default function WorldsScene({ active = null }: WorldsSceneProps) {
   return (
     <div className="lws-fit">
       <style dangerouslySetInnerHTML={{ __html: SCENE_CSS }} />
       <div className="lws-scale">
-        <div className="lws-stage">
-          <div className="lws-world" data-active={active ?? undefined}>
-            {/* warm ground wash unifying the three plinths */}
-            <div
-              style={{
-                position: 'absolute',
-                inset: -30,
-                borderRadius: '50%',
-                background:
-                  'radial-gradient(46% 40% at 24% 66%, rgba(176,138,62,.10) 0%, transparent 70%),' +
-                  'radial-gradient(42% 38% at 52% 34%, rgba(31,66,48,.07) 0%, transparent 70%),' +
-                  'radial-gradient(44% 40% at 80% 64%, rgba(217,106,76,.08) 0%, transparent 70%)',
-              }}
-            />
-            {/* thread first so it sits under the plinths' shadows */}
-            <svg className="lws-thread" viewBox="0 0 720 430" aria-hidden="true">
-              <path d="M134 288 C 240 262, 290 176, 372 138 C 460 176, 520 262, 594 296" />
-              <circle cx="134" cy="288" r="4" />
-              <circle cx="372" cy="138" r="4" />
-              <circle cx="594" cy="296" r="4" />
+        <div className="lws-stage" data-active={active ?? undefined}>
+          {/* ground layer: wash + sync thread, under every plinth shadow */}
+          <Layer>
+            <div className="lws-wash" />
+            <svg className="lws-thread lws-thread-d" viewBox="0 0 660 520" aria-hidden="true">
+              <path d="M152 458 C 232 428, 252 284, 346 222 C 424 276, 444 406, 498 464" />
+              <circle cx="152" cy="458" r="4.6" />
+              <circle cx="346" cy="222" r="4.6" />
+              <circle cx="498" cy="464" r="4.6" />
             </svg>
-            <Cafe />
+            <svg className="lws-thread lws-thread-m" viewBox="0 0 400 390" aria-hidden="true">
+              <path d="M80 464 C 168 476, 240 430, 268 380 C 296 330, 292 274, 262 240" />
+              <circle cx="80" cy="464" r="4.6" />
+              <circle cx="268" cy="380" r="4.6" />
+              <circle cx="262" cy="240" r="4.6" />
+            </svg>
+          </Layer>
+          {/* one perspective layer each, composited back to front */}
+          <Layer>
             <Hotel />
+          </Layer>
+          <Layer>
             <Retail />
-          </div>
+          </Layer>
+          <Layer>
+            <Cafe />
+          </Layer>
         </div>
       </div>
     </div>
