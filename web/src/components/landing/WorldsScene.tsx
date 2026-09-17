@@ -436,7 +436,10 @@ const screenShell: CSSProperties = {
   overflow: 'hidden',
   display: 'flex',
   flexDirection: 'column',
-  padding: '7% 6%',
+  /* Fixed, not a percentage: CSS resolves percentage padding against the
+     containing block's WIDTH on every side, so a landscape screen got ~17
+     units of vertical padding and squeezed its sub-line out of the box. */
+  padding: '4px',
   color: '#1f4230',
   lineHeight: 1.2,
 };
@@ -955,8 +958,8 @@ function Retail() {
       <div style={{ ...wallY(124, 96, 3, 78), background: 'linear-gradient(180deg,#63594a,#383226)' }} />
       <div
         style={{
-          ...flat(50, 94, 78, 4, 78),
-          background: 'linear-gradient(90deg,#d2b67e,#8a6f40)',
+          ...wallY(50, 97, 78, 3.5, 74.5),
+          background: 'linear-gradient(180deg,#e0c68f,#96793f)',
           borderRadius: 2,
         }}
       />
@@ -965,7 +968,10 @@ function Retail() {
           key={c}
           style={{
             ...wallY(54 + i * 15, 98, 20, 54, 22),
-            background: `linear-gradient(176deg, ${c} 0%, rgba(20,16,8,.42) 190%)`,
+            /* Shade as an OVERLAY over an opaque base. A gradient that ends in
+               an rgba() stop interpolates the ALPHA too, which made the lower
+               half of every garment see-through. */
+            background: `linear-gradient(176deg, rgba(255,255,255,.2) 0%, rgba(24,18,8,.44) 100%), ${c}`,
             clipPath:
               'polygon(50% 0, 74% 4%, 100% 18%, 86% 26%, 89% 100%, 11% 100%, 14% 26%, 0 18%, 26% 4%)',
           }}
@@ -1111,10 +1117,12 @@ const SCENE_CSS = `
   color:#1c3b28;margin-bottom:3px}
 .lws-scr-h-s{font-size:13px}
 .lws-scr-h-m{font-size:14px}
-.lws-scr-h-l{font-size:19px}
-.lws-scr-row{display:flex;justify-content:space-between;align-items:baseline;gap:3px;font-size:5.6px;
+.lws-scr-h-l{font-size:17px}
+/* align-items:center, NOT baseline: a flex item with overflow:hidden takes its
+   margin-box bottom as its baseline, which floated every price one row up. */
+.lws-scr-row{display:flex;justify-content:space-between;align-items:center;gap:3px;font-size:5.6px;
   border-top:1px dotted rgba(31,66,48,.34);padding-top:2px;margin-top:2px;color:#2f4536}
-.lws-scr-row i{font-style:normal;white-space:nowrap;overflow:hidden}
+.lws-scr-row i{font-style:normal;white-space:nowrap;overflow:hidden;min-width:0}
 .lws-scr-row b{white-space:nowrap}
 .lws-scr-row b{font-family:var(--font-mono),monospace;color:#8a6a25}
 .lws-scr-band{height:7px;border-radius:2px;margin-top:auto;
@@ -1129,7 +1137,7 @@ const SCENE_CSS = `
     radial-gradient(circle at 50% 50%,#b3834c 0 38%,rgba(0,0,0,0) 38.5%),
     radial-gradient(circle at 50% 50%,#fffdf6 0 49%,rgba(0,0,0,0) 49.5%);
   box-shadow:0 1px 3px rgba(38,34,24,.28)}
-.lws-land{flex:none;display:block;width:100%;height:30px;border-radius:2px;margin-bottom:3px;
+.lws-land{flex:none;display:block;width:100%;height:26px;border-radius:2px;margin-bottom:3px;
   background:
     radial-gradient(circle at 76% 24%,#ffe9ae 0 8%,rgba(255,233,174,.4) 8% 15%,rgba(0,0,0,0) 16%),
     radial-gradient(150% 108% at 16% 126%,#2c5540 0 42%,rgba(0,0,0,0) 43%),
@@ -1169,11 +1177,11 @@ const SCENE_CSS = `
   /* micro-copy is noise at this size — headline + imagery only */
   .lws-scr-sm,.lws-scr-row,.lws-scr-band{display:none}
   .lws-scr-h{margin-bottom:0}
-  .lws-scr-h-s{font-size:15px}
+  .lws-scr-h-s{font-size:14px}
   .lws-scr-h-m{font-size:16px}
-  .lws-scr-h-l{font-size:21px}
+  .lws-scr-h-l{font-size:19px}
   .lws-latte{width:40px;height:40px}
-  .lws-land{height:40px}
+  .lws-land{height:34px}
   .lws-coat{width:36px;height:48px}
 }
 @media (max-width:640px) and (min-width:400px){.lws-scale{transform:scale(.75)}}
