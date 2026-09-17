@@ -44,6 +44,12 @@ export type WorldPlace = 'cafe' | 'hotel' | 'retail';
 interface WorldsSceneProps {
   /** Highlighted vignette; the others keep their own light. `null` = all equal. */
   active?: WorldPlace | null;
+  /**
+   * Places rendered as a prerendered IMAGE by the caller instead of in CSS.
+   * Omitting them here is what makes mixed mode work: the image slot and the
+   * CSS vignette occupy the same slot, so exactly one of them must draw it.
+   */
+  hidden?: WorldPlace[];
 }
 
 /* ---------- geometry helpers ---------- */
@@ -1178,11 +1184,159 @@ function Retail() {
   );
 }
 
+/* ---------- thumbnail variant ---------- */
+
+/**
+ * A deliberately LIGHT vignette for the locations strip: same camera, same
+ * materials, ~18 nodes instead of ~105. Rendering three full vignettes would
+ * add ~950 elements for detail that is illegible at 96px, so this keeps only
+ * what reads at that size — the plinth, the wall and the screen on it.
+ *
+ * It occupies a fixed, aspect-reserved box, which is also the slot a
+ * prerendered image per place would drop into with no relayout.
+ */
+const MDECK = 14;
+
+function mFlat(x: number, y: number, w: number, h: number, z = 0): CSSProperties {
+  return { position: 'absolute', left: x, top: y, width: w, height: h, transform: `translateZ(${z + MDECK}px)` };
+}
+function mWallY(x: number, yBottom: number, w: number, h: number, z = 0): CSSProperties {
+  return {
+    position: 'absolute', left: x, top: yBottom - h, width: w, height: h,
+    transformOrigin: 'bottom', transform: `translateZ(${z + MDECK}px) rotateX(-90deg)`,
+  };
+}
+function mWallX(xLine: number, yTop: number, d: number, h: number, z = 0): CSSProperties {
+  return {
+    position: 'absolute', left: xLine, top: yTop - h, width: d, height: h,
+    transformOrigin: 'bottom left', transform: `translateZ(${z + MDECK}px) rotateX(-90deg) rotateY(-90deg)`,
+  };
+}
+
+const MINI: Record<WorldPlace, { wall: string; m: Mat; head: string; art: string; prop: Mat }> = {
+  cafe: {
+    wall:
+      'repeating-linear-gradient(90deg, rgba(0,0,0,.09) 0 1.2px, rgba(255,255,255,0) 1.2px 9px),' +
+      'linear-gradient(176deg,#e6d3ae 0%,#c8ae83 100%)',
+    m: M.oak,
+    head: 'Coffee',
+    art: 'radial-gradient(circle at 50% 50%,#b3834c 0 34%,rgba(0,0,0,0) 35%),radial-gradient(circle at 50% 50%,#fffdf6 0 46%,rgba(0,0,0,0) 47%)',
+    prop: M.walnut,
+  },
+  hotel: {
+    wall: 'linear-gradient(176deg,#f4edd9 0%,#ddd1b2 100%)',
+    m: M.ivory,
+    head: 'Welcome',
+    art: 'linear-gradient(180deg,#c3dbe3 0%,#e9ddc5 58%,#d6c5a1 100%)',
+    prop: M.brass,
+  },
+  retail: {
+    wall: 'linear-gradient(176deg,#f4edd9 0%,#cfc09c 100%)',
+    m: M.ivory,
+    head: 'Style',
+    art: 'linear-gradient(180deg,#df7050 0 52%,#25513a 52%)',
+    prop: M.oak,
+  },
+};
+
+const MINI_CSS = `
+.lwm-fit{container-type:inline-size;width:100%;aspect-ratio:4/3;position:relative;overflow:hidden}
+.lwm-scale{position:absolute;inset:0;width:160px;height:120px;transform-origin:top left;transform:scale(.6)}
+@supports (transform:scale(tan(atan2(1px,1px)))){
+  .lwm-scale{transform:scale(tan(atan2(100cqw,160px)))}
+}
+.lwm-cell{position:absolute;inset:0;perspective:520px;perspective-origin:50% 40%}
+.lwm-world{position:absolute;left:4px;top:14px;width:152px;height:100px;transform-style:preserve-3d;
+  transform:rotateX(54deg) rotateZ(-8deg)}
+.lwm-head{font-family:var(--lw-serif);font-weight:600;font-size:8px;line-height:1;color:#1c3b28;
+  letter-spacing:-.02em;display:block;margin-top:2px}
+`;
+
+export function MiniWorld({ place }: { place: WorldPlace }) {
+  const v = MINI[place];
+  const drum = [];
+  for (let i = 0; i < 5; i += 1) {
+    drum.push(
+      <div
+        key={`m${i}`}
+        style={{
+          position: 'absolute', left: 14, top: 26, width: 124, height: 66,
+          transform: `translateZ(${1 + i * 2.6}px)`, borderRadius: '50%',
+          background: shade(DRUM_LO, DRUM_HI, i / 4),
+        }}
+      />,
+    );
+  }
+  return (
+    <div className="lwm-fit">
+      <style dangerouslySetInnerHTML={{ __html: MINI_CSS }} />
+      <div className="lwm-scale">
+        <div className="lwm-cell">
+          <div className="lwm-world">
+            <div
+              style={{
+                position: 'absolute', left: 0, top: 20, width: 154, height: 82,
+                transform: 'translateZ(0.3px)', borderRadius: '50%',
+                background: 'radial-gradient(42% 44% at 44% 44%, rgba(44,38,24,.4) 0%, rgba(44,38,24,0) 78%)',
+              }}
+            />
+            {drum}
+            <div
+              style={{
+                position: 'absolute', left: 15, top: 27, width: 122, height: 64,
+                transform: `translateZ(${MDECK - 0.4}px)`, borderRadius: '50%',
+                background: LIMESTONE,
+                boxShadow: 'inset 1px 2px 0 rgba(255,255,255,.7)',
+              }}
+            />
+            <div style={{ ...mFlat(32, 41, 88, 5, 40), background: v.m.top, borderRadius: 3 }} />
+            <div style={{ ...mWallX(120, 41, 5, 40), background: v.m.side }} />
+            <div
+              className="lwm-wall"
+              style={{
+                ...mWallY(32, 46, 88, 40),
+                background: v.wall,
+                borderRadius: '4px 4px 0 0',
+                transformStyle: 'preserve-3d',
+                boxShadow: 'inset 0 -10px 14px rgba(44,38,24,.14)',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute', left: 11, top: 6, width: 66, height: 27,
+                  transform: 'translateZ(1.6px)',
+                  background: 'linear-gradient(168deg,#fff 0%,#fdf8ea 54%,#f2e8d2 100%)',
+                  border: '1.5px solid #24271f', borderRadius: 2,
+                  padding: '3px 4px', overflow: 'hidden',
+                }}
+              >
+                <span style={{ display: 'block', height: 10, borderRadius: 1, background: v.art }} />
+                <span className="lwm-head">{v.head}</span>
+              </div>
+            </div>
+            <div style={{ ...mFlat(44, 50, 62, 17, 11), background: v.prop.top, borderRadius: 2 }} />
+            <div style={{ ...mWallY(44, 67, 62, 11), background: v.prop.front, borderRadius: '0 0 2px 2px' }} />
+            <div style={{ ...mWallX(106, 50, 17, 11), background: v.prop.side }} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ---------- scene ---------- */
 
-/* Ground thread, in front of the plinths: cafe -> hotel -> retail. */
-const THREAD_D = 'M207 386 C 300 400, 380 360, 466 338 C 560 340, 620 440, 713 447';
-const THREAD_M = 'M30 513 C 140 548, 250 545, 350 505 C 445 462, 455 240, 432 88';
+/**
+ * Ground thread, cafe -> hotel -> retail, in STAGE coordinates (the 1000x450
+ * desktop canvas / the 540x560 mobile one) rather than world coordinates.
+ *
+ * It is drawn by the hero in page space, NOT inside the 3D world, so that it
+ * reads identically whether a place is rendering as a CSS vignette or as a
+ * prerendered image. At this camera the ground is nearly flat on screen, so a
+ * page-space curve through the same points is visually the same line.
+ */
+export const THREAD_DESKTOP = 'M282 404 C 368 416, 452 368, 532 355 C 624 358, 692 406, 792 400';
+export const THREAD_MOBILE = 'M150 486 C 250 516, 350 500, 430 448 C 500 400, 500 280, 468 214';
 
 const SCENE_CSS = `
 .lws-fit{container-type:inline-size;width:100%;aspect-ratio:1000/450;position:relative;overflow:hidden}
@@ -1347,40 +1501,32 @@ function Layer({ children }: { children: ReactNode }) {
   );
 }
 
-export default function WorldsScene({ active = null }: WorldsSceneProps) {
+export default function WorldsScene({ active = null, hidden }: WorldsSceneProps) {
+  const off = (p: WorldPlace) => hidden?.includes(p) ?? false;
   return (
     <div className="lws-fit">
       <style dangerouslySetInnerHTML={{ __html: SCENE_CSS }} />
       <div className="lws-scale">
         <div className="lws-stage" data-active={active ?? undefined}>
-          {/* ground layer: wash + sync thread, under every plinth shadow */}
           <Layer>
             <div className="lws-wash" />
-            <svg className="lws-thread lws-thread-d" viewBox="0 0 940 410" aria-hidden="true">
-              <path d={THREAD_D} />
-              <path className="lws-flow" d={THREAD_D} />
-              <circle cx="207" cy="386" r="3" />
-              <circle cx="466" cy="338" r="3" />
-              <circle cx="713" cy="447" r="3" />
-            </svg>
-            <svg className="lws-thread lws-thread-m" viewBox="0 0 400 450" aria-hidden="true">
-              <path d={THREAD_M} />
-              <path className="lws-flow" d={THREAD_M} />
-              <circle cx="30" cy="513" r="3" />
-              <circle cx="350" cy="505" r="3" />
-              <circle cx="432" cy="88" r="3" />
-            </svg>
           </Layer>
           {/* one perspective layer each, composited back to front */}
-          <Layer>
-            <Hotel />
-          </Layer>
-          <Layer>
-            <Retail />
-          </Layer>
-          <Layer>
-            <Cafe />
-          </Layer>
+          {off('hotel') ? null : (
+            <Layer>
+              <Hotel />
+            </Layer>
+          )}
+          {off('retail') ? null : (
+            <Layer>
+              <Retail />
+            </Layer>
+          )}
+          {off('cafe') ? null : (
+            <Layer>
+              <Cafe />
+            </Layer>
+          )}
         </div>
       </div>
     </div>

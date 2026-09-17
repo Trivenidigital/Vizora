@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import {
   NavigationSection,
   HeroSection,
+  LocationsSection,
   PlacesSection,
   PipelineSection,
   WorkspaceSection,
@@ -58,6 +59,7 @@ export default function Index() {
       <NavigationSection scrolled={scrolled} menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
       <main id="main-content">
         <HeroSection onExplore={explore} />
+        <LocationsSection onView={explore} />
         <PlacesSection place={place} onPlaceChange={setPlace} />
         <PipelineSection />
         <WorkspaceSection />

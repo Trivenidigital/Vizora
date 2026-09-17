@@ -1,0 +1,16 @@
+{
+  "topic": "world-assets",
+  "task_text": "world-assets: image-asset generation spec for the Vizora homepage hybrid hero — three prerendered café/hotel/retail scene images dropped into replaceable next/image slots in web/src/components/landing; no agent, cron, MCP or backend capability involved",
+  "completed_at": "2026-09-17T14:04:09Z",
+  "drift_check_tag": "extends-Hermes",
+  "net_new_step_count": 7,
+  "hermes_step_count": 0,
+  "files_to_read_first": [
+    "tasks/redesign-reference/brief.txt",
+    "web/src/components/landing/WorldsScene.tsx",
+    "web/src/components/landing/HeroSection.tsx",
+    "web/src/app/globals.css",
+    "web/public/product/README.md"
+  ],
+  "verdict": "Static marketing-frontend asset spec. 7/7 steps net-new because no step intersects the Hermes capability list (no agent, trigger, cron, MCP, extraction, routing, approval, audit or messaging). Red-flag re-check performed; tag is the closest permitted value for work that sits outside the substrate."
+}

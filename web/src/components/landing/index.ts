@@ -1,6 +1,7 @@
 export { default as NavigationSection } from './NavigationSection';
 export { default as HeroSection } from './HeroSection';
-export { default as WorldsScene } from './WorldsScene';
+export { default as WorldsScene, MiniWorld } from './WorldsScene';
+export { default as LocationsSection } from './LocationsSection';
 export { default as PlacesSection } from './PlacesSection';
 export { default as PipelineSection } from './PipelineSection';
 export { default as WorkspaceSection } from './WorkspaceSection';

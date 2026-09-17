@@ -2,8 +2,10 @@
 
 import { useState, type CSSProperties } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { anchorProps } from './shared';
-import WorldsScene, { type WorldPlace } from './WorldsScene';
+import WorldsScene, { THREAD_DESKTOP, THREAD_MOBILE, type WorldPlace } from './WorldsScene';
+import { WORLD_ASSETS } from './worldAssets';
 
 interface HeroSectionProps {
   /** Jump to the Places section with this place selected. */
@@ -11,15 +13,55 @@ interface HeroSectionProps {
 }
 
 /**
- * Dot hues match the Places section's location swatches. `px`/`py` are the
- * pin's position as a percentage of the SCENE BOX, sitting at the front rim of
- * that vignette's plinth — the same slots a prerendered image per vignette
- * would occupy, so swapping the CSS scene for artwork needs no relayout.
+ * Dot hues match the Places section's location swatches.
+ *
+ * `px`/`py` place the pin as a percentage of the SCENE BOX, at the front rim of
+ * that vignette's plinth. `slot` is the aspect-reserved 4:3 box a prerendered
+ * render drops into for the same place.
+ *
+ * The two are tied together by one convention, documented for the renders in
+ * `web/public/landing/worlds/README.md`: an asset frames its plinth's front rim
+ * at 75% of the image height. A 34%-wide slot is 42.5% of the stage tall to
+ * that line, so `slot.top = py - 42.5` puts an image's plinth exactly where the
+ * CSS vignette's is, and a mixed row stays on one ground line.
  */
-const PLACES: Array<{ id: WorldPlace; label: string; dot: string; px: number; py: number }> = [
-  { id: 'cafe', label: 'Café', dot: 'var(--lw-brass)', px: 28.2, py: 76.9 },
-  { id: 'hotel', label: 'Hotel', dot: 'var(--lw-forest)', px: 53.2, py: 65.8 },
-  { id: 'retail', label: 'Retail', dot: 'var(--lw-coral)', px: 79.2, py: 75.8 },
+const PLACES: Array<{
+  id: WorldPlace;
+  label: string;
+  dot: string;
+  px: number;
+  py: number;
+  slot: { left: number; top: number; width: number };
+  /** Same idea for the <=640px cluster, which is a different arrangement. */
+  mslot: { left: number; top: number; width: number };
+}> = [
+  {
+    id: 'cafe',
+    label: 'Café',
+    dot: 'var(--lw-brass)',
+    px: 28.2,
+    py: 76.9,
+    slot: { left: 11.2, top: 34.4, width: 34 },
+    mslot: { left: 12.3, top: 63.9, width: 40 },
+  },
+  {
+    id: 'hotel',
+    label: 'Hotel',
+    dot: 'var(--lw-forest)',
+    px: 53.2,
+    py: 65.8,
+    slot: { left: 36.2, top: 23.3, width: 34 },
+    mslot: { left: 35.6, top: 22.2, width: 40 },
+  },
+  {
+    id: 'retail',
+    label: 'Retail',
+    dot: 'var(--lw-coral)',
+    px: 79.2,
+    py: 75.8,
+    slot: { left: 62.2, top: 33.3, width: 34 },
+    mslot: { left: 53.8, top: 57.8, width: 40 },
+  },
 ];
 
 const HERO_CSS = `
@@ -61,6 +103,45 @@ const HERO_CSS = `
 
 .lw-hero-scene{position:relative}
 .lw-hero-stage{position:relative}
+
+/* Image slots. One per place, aspect-RESERVED at 4:3 so switching a place
+   between CSS and image causes no layout shift and a mixed row stays aligned.
+   object-fit:contain means an asset is letterboxed, never stretched or
+   cropped. A CSS filter here is safe — it lands on an img, not on a
+   preserve-3d group. */
+.lw-slot{position:absolute;left:var(--x);top:var(--y);width:var(--w);aspect-ratio:4/3;
+  pointer-events:none;transition:transform .5s cubic-bezier(.22,.7,.3,1),filter .4s ease}
+.lw-slot img{width:100%;height:100%;object-fit:contain;object-position:50% 50%}
+.lw-slot[data-matte="ivory"] img{
+  -webkit-mask-image:radial-gradient(62% 60% at 50% 52%,#000 62%,rgba(0,0,0,0) 100%);
+  mask-image:radial-gradient(62% 60% at 50% 52%,#000 62%,rgba(0,0,0,0) 100%)}
+.lw-hero-stage[data-active="cafe"] .lw-slot[data-place="cafe"],
+.lw-hero-stage[data-active="hotel"] .lw-slot[data-place="hotel"],
+.lw-hero-stage[data-active="retail"] .lw-slot[data-place="retail"]{
+  transform:translateY(-10px);filter:drop-shadow(0 18px 26px rgba(44,38,24,.22))}
+
+/* The sync thread lives in PAGE space over the stage, not inside the 3D world,
+   so it is identical whether a place is CSS or a prerendered image. */
+.lw-thread{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;
+  overflow:visible;filter:drop-shadow(0 1px 0 rgba(255,255,255,.8))}
+.lw-thread-m{display:none}
+.lw-thread path{fill:none;stroke:#274c37;stroke-width:1.6;stroke-linecap:round;opacity:.82}
+.lw-thread .lw-flow{stroke:#3d7a55;stroke-width:2.6;stroke-dasharray:30 620;opacity:.95;
+  animation:lw-thread-flow 6s linear infinite}
+.lw-thread circle{fill:#274c37;stroke:#f7f3ea;stroke-width:1.6}
+@keyframes lw-thread-flow{from{stroke-dashoffset:650}to{stroke-dashoffset:-30}}
+/* <=640px the CSS scene switches to its cluster arrangement, so the image
+   slots have to follow it or a mixed row would sit in the desktop positions
+   inside the taller mobile canvas. */
+@media (max-width:640px){
+  .lw-thread-d{display:none}
+  .lw-thread-m{display:block}
+  .lw-slot{left:var(--mx);top:var(--my);width:var(--mw)}
+}
+@media (prefers-reduced-motion:reduce){
+  .lw-thread .lw-flow{animation:none;display:none}
+  .lw-slot{transition:none}
+}
 .lw-hero-places{display:flex;justify-content:center;gap:clamp(10px,2vw,26px);margin-top:2px;flex-wrap:wrap}
 .lw-place-btn{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:8px 15px;
   font-size:.82rem;font-weight:600;color:var(--lw-ink-2);border:1px solid transparent;
@@ -129,6 +210,9 @@ const HERO_CSS = `
 }
 `;
 
+/** Places delivered as a prerendered image today; empty while all are null. */
+const imagePlaces = PLACES.filter((p) => WORLD_ASSETS[p.id]).map((p) => p.id);
+
 export default function HeroSection({ onExplore }: HeroSectionProps) {
   const [preview, setPreview] = useState<WorldPlace | null>(null);
 
@@ -180,10 +264,69 @@ export default function HeroSection({ onExplore }: HeroSectionProps) {
         </div>
 
         <div className="lw-hero-scene">
-          <div className="lw-hero-stage">
-            <div aria-hidden="true" onMouseLeave={() => setPreview(null)}>
-              <WorldsScene active={preview} />
+          <div
+            className="lw-hero-stage"
+            data-active={preview ?? undefined}
+            onMouseLeave={() => setPreview(null)}
+          >
+            <div aria-hidden="true">
+              <WorldsScene active={preview} hidden={imagePlaces} />
             </div>
+            {PLACES.filter((p) => WORLD_ASSETS[p.id]).map((p) => {
+              const a = WORLD_ASSETS[p.id]!;
+              return (
+                <div
+                  key={`slot-${p.id}`}
+                  className="lw-slot"
+                  data-place={p.id}
+                  data-matte={a.matte}
+                  aria-hidden="true"
+                  style={
+                    {
+                      '--x': `${p.slot.left}%`,
+                      '--y': `${p.slot.top}%`,
+                      '--w': `${p.slot.width}%`,
+                      '--mx': `${p.mslot.left}%`,
+                      '--my': `${p.mslot.top}%`,
+                      '--mw': `${p.mslot.width}%`,
+                    } as CSSProperties
+                  }
+                >
+                  <Image
+                    src={a.src}
+                    alt={a.alt ?? ''}
+                    width={a.width}
+                    height={a.height}
+                    priority
+                    sizes="(min-width:1200px) 22vw, (min-width:641px) 26vw, 44vw"
+                  />
+                </div>
+              );
+            })}
+            <svg
+              className="lw-thread lw-thread-d"
+              viewBox="0 0 1000 450"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              <path d={THREAD_DESKTOP} />
+              <path className="lw-flow" d={THREAD_DESKTOP} />
+              <circle cx="282" cy="404" r="3" />
+              <circle cx="532" cy="355" r="3" />
+              <circle cx="792" cy="400" r="3" />
+            </svg>
+            <svg
+              className="lw-thread lw-thread-m"
+              viewBox="0 0 540 560"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              <path d={THREAD_MOBILE} />
+              <path className="lw-flow" d={THREAD_MOBILE} />
+              <circle cx="150" cy="486" r="3" />
+              <circle cx="430" cy="448" r="3" />
+              <circle cx="468" cy="214" r="3" />
+            </svg>
             <div className="lw-hero-places" role="group" aria-label="Explore a place">
               {PLACES.map((p) => (
                 <button

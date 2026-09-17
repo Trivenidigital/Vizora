@@ -377,8 +377,8 @@ export default function PlacesSection({
             Pick a place. See what its screens are doing.
           </h2>
           <p>
-            Every location in your workspace lists its screens; every screen shows what it is
-            playing now and what is scheduled next. Three clicks, no guesswork.
+            Open a location and its screens are right there — what each one is playing now, and
+            what is scheduled next. No guesswork, no remote desktop.
           </p>
         </div>
 

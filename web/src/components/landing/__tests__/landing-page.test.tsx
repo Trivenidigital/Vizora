@@ -175,6 +175,65 @@ describe('hero place explorer', () => {
   });
 });
 
+describe('your locations strip', () => {
+  const loc = (container: HTMLElement) =>
+    within(container.querySelector('#locations') as HTMLElement);
+
+  it('lists the three locations the page narrates', async () => {
+    const { container } = await renderPage();
+
+    expect(loc(container).getAllByRole('heading', { level: 3 }).map((h) => h.textContent)).toEqual([
+      'Riverside Café',
+      'Horizon Hotel',
+      'Noble & Co.',
+    ]);
+  });
+
+  it('View screens selects that place and jumps to the Places section', async () => {
+    const user = userEvent.setup();
+    const { container } = await renderPage();
+
+    const cards = loc(container).getAllByRole('button', { name: /View screens/ });
+    expect(cards).toHaveLength(3);
+    await user.click(cards[2]);
+
+    expect(window.location.hash).toBe('#places');
+    const places = container.querySelector('#places')!;
+    expect(
+      within(places as HTMLElement).getByRole('button', { name: /Noble & Co\./ }),
+    ).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('says the screens and figures are example content, so it cannot read as live data', async () => {
+    const { container } = await renderPage();
+
+    expect(container.querySelector('#locations')!.textContent).toContain(
+      'Illustrative workspace — the screens and figures shown are example content.',
+    );
+  });
+
+  it('counts agree with the Places section rather than contradicting it', async () => {
+    // Places shows three screens per location and "Now playing" on every one of
+    // them. A card claiming an offline screen would contradict that.
+    const { container } = await renderPage();
+
+    const text = container.querySelector('#locations')!.textContent ?? '';
+    expect(text.match(/3 screens online/g)).toHaveLength(3);
+    expect(text.match(/0 offline/g)).toHaveLength(3);
+  });
+});
+
+describe('hero world slots', () => {
+  it('renders the CSS diorama, not an image, while no render has been delivered', async () => {
+    const { container } = await renderPage();
+
+    // WORLD_ASSETS is all-null today, so every place draws in CSS.
+    expect(container.querySelectorAll('.lw-hero-stage img')).toHaveLength(0);
+    expect(container.querySelectorAll('.lw-hero-stage .lws-v')).toHaveLength(3);
+    expect(container.querySelectorAll('.lw-slot')).toHaveLength(0);
+  });
+});
+
 describe('places explorer', () => {
   const placesSection = (container: HTMLElement) =>
     within(container.querySelector('#places') as HTMLElement);
