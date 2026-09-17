@@ -6,7 +6,8 @@ thumbnails currently render the CSS-3D vignettes in
 the mixed-mode partner for any place that has no image.
 
 This folder is the drop point for the three photoreal renders — café, hotel and
-retail — that the design director is producing. Nothing switches over
+retail — that the design director is producing to
+`tasks/redesign-reference/WORLD-ASSETS-SPEC.md`. Nothing switches over
 automatically: a file here does nothing until its entry is filled in
 `web/src/components/landing/worldAssets.ts`.
 
@@ -27,9 +28,8 @@ automatically: a file here does nothing until its entry is filled in
 | Long edge | ≥ 1600px (the hero slot renders up to ~350px CSS at 2x DPR) |
 | Background | **Transparent alpha.** The three slots overlap; an opaque rectangle will show against its neighbours |
 | Subject | One vignette on its limestone plinth, centred horizontally, with room around it |
-| **Framing** | **The plinth's front rim must sit at 75% of the image height.** The hero derives each slot's position from that line (`slot.top = pin - 42.5`), which is what keeps an image and a CSS vignette on the same ground line in a mixed row |
-| Camera | Looking down ~54°, yawed ~8° to the left, key light from the upper-left-front — the same camera the CSS scene uses |
-| Palette | Ivory / limestone / deep forest / brass / coral, per `.lw` in `web/src/app/globals.css` |
+| **Framing** | **The plinth's front rim must sit at 75% of the image height**, the plinth filling ~80% of the frame width. This is an INTEGRATION requirement on top of the spec: the hero derives each slot from that line (`slot.top = pin - 42.5`) so an image and a CSS vignette share one ground line in a mixed row. If a delivered set frames differently, `slot.top` in `HeroSection.tsx` is the single number to re-derive — measure the rim's fraction `f` of image height and use `pin - f * 56.7` |
+| Camera, lighting, materials, per-scene content | **`tasks/redesign-reference/WORLD-ASSETS-SPEC.md` is the authority** — it carries the verbatim shared prompt block, the three scene paragraphs and the acceptance checklist. Do not restate the camera here; one number drifting between two documents is how a set ends up mismatched |
 
 If a render can only be delivered on a flat `#f5f1e8` background rather than
 alpha, set `matte: 'ivory'` on that entry. It feathers the image with a soft
