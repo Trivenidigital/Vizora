@@ -787,8 +787,10 @@ function Hotel() {
             height: 134,
             transform: 'translateZ(0.5px)',
             borderRadius: '69px 69px 0 0',
-            background: 'linear-gradient(176deg,#e6dbbe 0%,#d6c9a5 100%)',
-            boxShadow: 'inset 0 7px 14px rgba(38,34,24,.2), inset 0 0 0 1px rgba(255,255,255,.4)',
+            background: 'linear-gradient(176deg,#ddd0ae 0%,#c8b990 100%)',
+            boxShadow:
+              'inset 0 10px 20px rgba(38,34,24,.34), inset 6px 0 14px rgba(38,34,24,.16),' +
+              'inset 0 0 0 1px rgba(255,255,255,.45)',
           }}
         />
         <Screen x={22} y={28} w={128} h={78}>
@@ -927,8 +929,8 @@ function Retail() {
             height: 122,
             transform: 'translateZ(0.5px)',
             borderRadius: '37px 37px 0 0',
-            background: 'linear-gradient(176deg,#e2d6b6 0%,#cfc09c 100%)',
-            boxShadow: 'inset 0 6px 13px rgba(38,34,24,.18)',
+            background: 'linear-gradient(176deg,#d8cba8 0%,#c2b28c 100%)',
+            boxShadow: 'inset 0 9px 18px rgba(38,34,24,.3), inset 5px 0 12px rgba(38,34,24,.14)',
           }}
         />
       </WallSlab>
@@ -995,6 +997,14 @@ function Retail() {
       />
 
       {/* freestanding portrait totem — the shop's window screen */}
+      <div
+        style={{
+          ...flat(140, 138, 94, 34, 0.8),
+          borderRadius: '50%',
+          background:
+            'radial-gradient(50% 50% at 50% 42%, rgba(255,232,178,.5) 0%, rgba(255,232,178,0) 72%)',
+        }}
+      />
       <Cast x={146} y={126} w={78} h={40} />
       <Box x={154} y={128} w={64} d={16} h={7} radius={3} m={M.charcoal} />
       <div style={{ ...flat(156, 122, 60, 14, 7), background: '#2b2e26', borderRadius: 2 }} />
