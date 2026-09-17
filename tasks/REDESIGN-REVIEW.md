@@ -175,6 +175,35 @@ dark-theme product capture was framed rather than re-captured (below).
   `filter: blur`, reserved aspect ratio (no layout shift); the 48 MB tour
   video mounts only while its dialog is open.
 
+## Owner feedback round (after first review of the local build)
+
+- **Spacing** (`ec5296a9`): one `--lw-sec-y` token; gap between sections at
+  1440 went 202px → 132px (1920: 208 → 136; 390: 112 → 80); page 6015 → 5583px.
+- **Board alignment** (`2cfea7e9`, `c88615a2`): hero is now the board's
+  left-to-right panorama (904×407 at 1440, ~70% of the hero); place buttons
+  became on-scene coral pin + leader + serif label at ≥1200px (pill row
+  below); thin solid thread with a travelling highlight; both headline lines
+  upright forest serif; two-line kicker; editorial margin note; warmer
+  palette. The board's Product/Solutions/Resources/About + search were NOT
+  copied — no real destinations exist for them.
+- **Your locations panel** (`ad975149`): three cards under the hero, real
+  "View screens" (selects the place, scrolls to `#places`), captioned as
+  example content. Counts read 3 online / 0 offline (not the board's 5/1) so
+  they cannot contradict the Places section beneath. "Add location" omitted.
+- **Hybrid decision (owner + Astra): the photoreal look depends on three
+  prerendered scene images that DO NOT EXIST YET.** Slots are built:
+  `worldAssets.ts` (all `null` today → CSS vignettes render), 4:3
+  aspect-reserved `next/image` slots, `object-fit: contain`, mixed mode,
+  optional ivory matte, thread/labels in page space so they overlay either
+  mode; pinned by jest and checked visually with a throwaway placeholder
+  (not committed). Generation spec + acceptance checklist:
+  `tasks/redesign-reference/WORLD-ASSETS-SPEC.md`; drop point + provenance
+  table: `web/public/landing/worlds/README.md`. **Until those assets are
+  delivered and integrated, the visual match to the board is incomplete.**
+- Re-verified after this round: full web jest **124 suites / 1333 tests,
+  exit 0**; prod build exit 0; overflow 0 at 1440/1280/768/390/320; scene
+  nodes 308 + 60 (minis); evidence re-shot (`9d6517ba`).
+
 ## Asset provenance
 
 No new binary asset was added. Reused, with existing provenance:
