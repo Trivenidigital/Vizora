@@ -98,7 +98,7 @@ export default function LocationsSection({ onView }: LocationsSectionProps) {
                          srcset candidate below (smallest vw% x 640), so an "88vw" here
                          forced a 118px thumbnail to download w=640+ — and Chrome then
                          reused that larger cached file for the hero as well. */
-                      sizes="(max-width:420px) 300px, 120px"
+                      sizes="(max-width:360px) 220px, (max-width:420px) 300px, 120px"
                     />
                   ) : (
                     <MiniWorld place={l.id} />

@@ -132,7 +132,7 @@ describe('hero world slots — image mode', () => {
     // Thumbnails: px only. Any vw clause makes next/image drop the small srcset
     // candidates, and a 118px thumbnail then downloads w=640+.
     for (const img of Array.from(container.querySelectorAll('#locations .lwl-thumb img'))) {
-      expect(img.getAttribute('data-sizes')).toBe('(max-width:420px) 300px, 120px');
+      expect(img.getAttribute('data-sizes')).toBe('(max-width:360px) 220px, (max-width:420px) 300px, 120px');
     }
   });
 
