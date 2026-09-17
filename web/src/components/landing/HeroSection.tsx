@@ -102,7 +102,13 @@ const HERO_CSS = `
 .lw-hero-trust b{color:var(--lw-brass-ink);font-weight:700}
 
 .lw-hero-scene{position:relative}
-.lw-hero-stage{position:relative}
+/* Soft warm glow behind the panorama, as on the board. Decorative and behind
+   everything; a plain div, so no 3D group is affected. */
+.lw-hero-scene::before{content:'';position:absolute;left:-6%;top:-12%;width:112%;height:124%;
+  border-radius:50%;pointer-events:none;z-index:0;
+  background:radial-gradient(48% 42% at 50% 46%,rgba(214,176,104,.14) 0%,rgba(214,176,104,.05) 46%,
+    rgba(214,176,104,0) 74%)}
+.lw-hero-stage{position:relative;z-index:1}
 
 /* Image slots. One per place, aspect-RESERVED at 4:3 so switching a place
    between CSS and image causes no layout shift and a mixed row stays aligned.

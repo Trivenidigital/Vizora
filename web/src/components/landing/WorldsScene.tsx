@@ -141,10 +141,10 @@ function mat(light: string, mid: string, dark: string, deep: string): Mat {
 const M = {
   stone: mat('#f8f3e6', '#e9e0c9', '#d2c5a4', '#bbac86'),
   ivory: mat('#f6efdd', '#ebe1c6', '#d6c9a8', '#c0b189'),
-  oak: mat('#e7d0a5', '#d2b381', '#b08f5e', '#937449'),
-  walnut: mat('#c49b64', '#a87f4c', '#8a6437', '#6d4d27'),
+  oak: mat('#ead2a2', '#d5b47c', '#b28e57', '#957342'),
+  walnut: mat('#c99c5e', '#ab7d45', '#8b6231', '#6d4a22'),
   brass: mat('#f2dca6', '#dcbb6c', '#b89241', '#8e6c26'),
-  forest: mat('#3d6e52', '#2b5339', '#1c3b28', '#12281b'),
+  forest: mat('#417457', '#2e5a3e', '#1e402c', '#13291c'),
   coral: mat('#f0947a', '#df7050', '#bc5334', '#973d23'),
   charcoal: mat('#4d5146', '#34382e', '#23261f', '#15170f'),
   slate: mat('#6a8494', '#4e6879', '#3a505e', '#2a3c47'),
@@ -343,8 +343,8 @@ function shade(a: [number, number, number], b: [number, number, number], t: numb
   return `rgb(${a.map((v, i) => Math.round(v + (b[i] - v) * t)).join(',')})`;
 }
 
-const DRUM_LO: [number, number, number] = [162, 146, 116];
-const DRUM_HI: [number, number, number] = [223, 213, 186];
+const DRUM_LO: [number, number, number] = [170, 152, 116];
+const DRUM_HI: [number, number, number] = [230, 218, 187];
 
 const LIMESTONE =
   'radial-gradient(118% 96% at 33% 24%, rgba(255,255,255,.78) 0%, rgba(255,255,255,0) 62%),' +
@@ -352,7 +352,7 @@ const LIMESTONE =
   'radial-gradient(24% 20% at 24% 72%, rgba(178,163,126,.2) 0%, rgba(178,163,126,0) 74%),' +
   'radial-gradient(18% 16% at 58% 30%, rgba(178,163,126,.16) 0%, rgba(178,163,126,0) 78%),' +
   'repeating-linear-gradient(48deg, rgba(186,172,138,.09) 0 2px, rgba(255,255,255,0) 2px 6px),' +
-  'linear-gradient(152deg, #f9f4e8 0%, #ece3cd 52%, #ddd2b5 100%)';
+  'linear-gradient(152deg, #fbf5e4 0%, #f0e5c9 52%, #e1d3ae 100%)';
 
 function disc(x: number, y: number, w: number, h: number, z: number): CSSProperties {
   return {
@@ -597,7 +597,7 @@ function Cafe() {
         ])}
         face={
           'repeating-linear-gradient(90deg, rgba(0,0,0,.09) 0 1.5px, rgba(255,255,255,0) 1.5px 13px),' +
-          'linear-gradient(176deg, #e6d3ae 0%, #cbb287 62%, #b2996e 100%)'
+          'linear-gradient(176deg, #e2c99c 0%, #c4a471 62%, #a98c60 100%)'
         }
       >
         {/* shadow band the awning drops across the wall beneath it */}
@@ -1387,7 +1387,9 @@ const SCENE_CSS = `
   animation:none;box-shadow:0 0 0 1px rgba(255,255,255,.55),0 0 30px rgba(226,178,82,.75)}
 
 /* warm ground wash unifying the three plinths */
-.lws-wash{position:absolute;left:-80px;top:-70px;width:1100px;height:560px;transform:translateZ(0.2px);
+/* Kept INSIDE the canvas: overhanging the box made .lws-fit's overflow clip
+   cut the wash mid-gradient, which showed as a hard vertical edge. */
+.lws-wash{position:absolute;left:0;top:-30px;width:940px;height:500px;transform:translateZ(0.2px);
   border-radius:50%;
   background:radial-gradient(38% 30% at 26% 74%,rgba(176,138,62,.13) 0%,transparent 70%),
     radial-gradient(34% 28% at 54% 26%,rgba(31,66,48,.09) 0%,transparent 70%),
