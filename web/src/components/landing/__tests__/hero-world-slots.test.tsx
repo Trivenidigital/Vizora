@@ -4,20 +4,12 @@ import userEvent from '@testing-library/user-event';
 import Index from '@/app/page';
 
 /**
- * The image path for the hero's world slots, proven WITHOUT committing an
- * asset.
+ * The image path for the hero's world slots with a controlled manifest.
  *
- * `WORLD_ASSETS` is all-null in the repo — the CSS-3D vignettes are the live
- * rendering — so the only way to know the swap works before a render is
- * delivered is to mock the table. This file mocks it with three fakes and
- * pins the two things that must hold when real artwork lands: the slot draws
+ * This file mocks the table with three predictable assets and pins the two
+ * things that must hold independently of the production artwork: the slot draws
  * an <img> with its intrinsic size reserved, and the place buttons keep
  * working, because they are live HTML sitting ON TOP of either mode.
- *
- * The all-null default is pinned in `landing-page.test.tsx` instead. It has to
- * live in a separate file: `HeroSection` reads the table at module scope to
- * decide which places the CSS scene must skip, so one module registry cannot
- * hold both states.
  */
 
 jest.mock('@/components/landing/worldAssets', () => ({

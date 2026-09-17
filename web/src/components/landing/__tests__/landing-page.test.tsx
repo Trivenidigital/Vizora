@@ -224,13 +224,12 @@ describe('your locations strip', () => {
 });
 
 describe('hero world slots', () => {
-  it('renders the CSS diorama, not an image, while no render has been delivered', async () => {
+  it('renders each delivered world image without duplicating its CSS fallback', async () => {
     const { container } = await renderPage();
 
-    // WORLD_ASSETS is all-null today, so every place draws in CSS.
-    expect(container.querySelectorAll('.lw-hero-stage img')).toHaveLength(0);
-    expect(container.querySelectorAll('.lw-hero-stage .lws-v')).toHaveLength(3);
-    expect(container.querySelectorAll('.lw-slot')).toHaveLength(0);
+    expect(container.querySelectorAll('.lw-hero-stage img')).toHaveLength(3);
+    expect(container.querySelectorAll('.lw-hero-stage .lws-v')).toHaveLength(0);
+    expect(container.querySelectorAll('.lw-slot')).toHaveLength(3);
   });
 });
 

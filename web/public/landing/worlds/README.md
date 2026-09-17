@@ -1,9 +1,9 @@
 # Hero world renders
 
-**No asset is committed here yet.** The homepage hero and the "Your locations"
-thumbnails currently render the CSS-3D vignettes in
-`web/src/components/landing/WorldsScene.tsx`, which remain the live fallback and
-the mixed-mode partner for any place that has no image.
+The homepage hero and the "Your locations" thumbnails use the three coordinated
+renders in this folder. The CSS-3D vignettes in
+`web/src/components/landing/WorldsScene.tsx` remain the live fallback and the
+mixed-mode partner for any place whose manifest entry is `null`.
 
 This folder is the drop point for the three photoreal renders — café, hotel and
 retail — that the design director is producing to
@@ -44,4 +44,10 @@ homepage is public.
 
 | File | Tool / model | Date | Prompt or source | Licence | Added by |
 |---|---|---|---|---|---|
-| _(none committed yet)_ | | | | | |
+| `cafe.png` | Codex built-in image generator | 2026-09-17 | Shared block and café scene prompt from `tasks/redesign-reference/WORLD-ASSETS-SPEC.md`; attached concept board used only as a style/composition reference | Generated for this project for public website use under the applicable OpenAI service terms | Codex |
+| `hotel.png` | Codex built-in image generator | 2026-09-17 | Shared block and hotel scene prompt from `tasks/redesign-reference/WORLD-ASSETS-SPEC.md`; approved café render used as the set anchor | Generated for this project for public website use under the applicable OpenAI service terms | Codex |
+| `retail.png` | Codex built-in image generator | 2026-09-17 | Shared block and retail scene prompt from `tasks/redesign-reference/WORLD-ASSETS-SPEC.md`; approved café and hotel renders used as set anchors | Generated for this project for public website use under the applicable OpenAI service terms | Codex |
+
+The generator returned matching 1448×1086 transparent PNGs. They were resized
+once to 1600×1200 with high-quality bicubic interpolation to meet the repository
+minimum while preserving alpha and the original 4:3 composition.

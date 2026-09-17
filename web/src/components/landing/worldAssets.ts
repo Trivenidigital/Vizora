@@ -3,8 +3,8 @@ import type { WorldPlace } from './WorldsScene';
 /**
  * Replaceable image slots for the three hero vignettes.
  *
- * Every entry is `null` today and the CSS-3D vignette is the live rendering.
- * When a photoreal render is delivered it drops in here — file under
+ * A `null` entry renders the CSS-3D vignette as a fallback. When a
+ * photoreal render is delivered it drops in here — file under
  * `web/public/landing/worlds/` (see that folder's README for the provenance
  * table) — and the hero and the locations thumbnails switch that ONE place to
  * `next/image` without any other change. Mixed mode is supported and expected
@@ -29,7 +29,19 @@ export interface WorldAsset {
 }
 
 export const WORLD_ASSETS: Record<WorldPlace, WorldAsset | null> = {
-  cafe: null,
-  hotel: null,
-  retail: null,
+  cafe: {
+    src: '/landing/worlds/cafe.png',
+    width: 1600,
+    height: 1200,
+  },
+  hotel: {
+    src: '/landing/worlds/hotel.png',
+    width: 1600,
+    height: 1200,
+  },
+  retail: {
+    src: '/landing/worlds/retail.png',
+    width: 1600,
+    height: 1200,
+  },
 };

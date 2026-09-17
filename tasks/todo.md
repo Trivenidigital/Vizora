@@ -31,6 +31,29 @@ geo API, restyled) · #faq (rewritten from verified behavior) · final CTA · fo
 Deleted as obsolete: Stats, AIFeatures, Solutions, Security, FeatureShowcases,
 HowItWorks(layer stack), DemoVideo, Testimonials, MidPageCTA, StickyBottomBar.
 
+### Photoreal world asset delivery (2026-09-17)
+
+- [x] Generate café, hotel, and retail as one coordinated set from
+      `tasks/redesign-reference/WORLD-ASSETS-SPEC.md`, using the concept board
+      only as a style/composition reference.
+- [x] Deliver matching 1600×1200 transparent PNGs to
+      `web/public/landing/worlds/` and record provenance.
+- [x] Populate `WORLD_ASSETS` so the hero and location cards use the renders;
+      preserve the CSS vignettes as the `null` fallback.
+- [x] Update the temporary all-null test expectation for delivered image mode.
+- [x] Verify transparent corners, exact signage text, framing, and consistent
+      camera/light/material treatment across the set.
+- [x] Focused Jest: 2 suites / 29 tests passed.
+- [x] Production `next build` passed with the documented public build origins.
+- [x] Browser QA on `localhost:3105`: desktop hero and location cards render;
+      390px viewport has no horizontal overflow (`scrollWidth 375`, viewport
+      390) and all three 134px slots remain inside the viewport.
+
+**Review:** The three photoreal assets close the largest remaining visual gap
+against the concept board while leaving labels, thread, buttons, counts, and
+interaction semantics as live HTML. The pre-existing mobile scene order remains
+hotel above café/retail; asset delivery did not introduce or change that layout.
+
 ## Closed Workstream (iteration 1): Homepage light redesign — residual gaps vs the approved brief (2026-09-15)
 
 **Branch:** `feat/homepage-light-redesign` (worktree `C:\projects\vizora-homepage-redesign-20260915`, from main `a8df6c16`)
