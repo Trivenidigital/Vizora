@@ -1180,19 +1180,23 @@ function Retail() {
 
 /* ---------- scene ---------- */
 
+/* Ground thread, in front of the plinths: cafe -> hotel -> retail. */
+const THREAD_D = 'M207 386 C 300 400, 380 360, 466 338 C 560 340, 620 440, 713 447';
+const THREAD_M = 'M30 513 C 140 548, 250 545, 350 505 C 445 462, 455 240, 432 88';
+
 const SCENE_CSS = `
-.lws-fit{container-type:inline-size;width:100%;aspect-ratio:800/548;position:relative;overflow:hidden}
+.lws-fit{container-type:inline-size;width:100%;aspect-ratio:1000/450;position:relative;overflow:hidden}
 /* Coarse viewport-stepped fallback for engines without CSS trig (pre-2023):
    never lets the logical canvas blow out the layout, merely crops less
    gracefully. Overridden below wherever tan/atan2 are supported. */
-.lws-scale{position:absolute;inset:0;width:800px;height:548px;transform-origin:top left;
-  transform:scale(.42)}
-@media (min-width:480px){.lws-scale{transform:scale(.56)}}
-@media (min-width:680px){.lws-scale{transform:scale(.8)}}
-@media (min-width:1200px){.lws-scale{transform:scale(.92)}}
+.lws-scale{position:absolute;inset:0;width:1000px;height:450px;transform-origin:top left;
+  transform:scale(.34)}
+@media (min-width:480px){.lws-scale{transform:scale(.45)}}
+@media (min-width:680px){.lws-scale{transform:scale(.64)}}
+@media (min-width:1200px){.lws-scale{transform:scale(.9)}}
 @supports (transform:scale(tan(atan2(1px,1px)))){
   /* atan2(length,length) -> angle whose tan is their unitless ratio */
-  .lws-scale{transform:scale(tan(atan2(100cqw,800px)))}
+  .lws-scale{transform:scale(tan(atan2(100cqw,1000px)))}
 }
 .lws-stage{position:absolute;inset:0}
 /* Each vignette gets its OWN perspective layer with an IDENTICAL camera (same
@@ -1201,10 +1205,13 @@ const SCENE_CSS = `
    and the browser sorts whole planes by a single depth each — which put the
    hotel's ground shadow straight through the café's menu board. The plinths
    never interpenetrate, so back-to-front paint order is the correct answer. */
-.lws-cell{position:absolute;inset:0;perspective:2100px;perspective-origin:50% 34%}
-.lws-world{position:absolute;left:70px;top:30px;width:660px;height:520px;transform-style:preserve-3d;
-  transform:rotateX(54deg) rotateZ(-20deg) scale3d(1.06,1.06,1.06);
-  --cafe-x:16px;--cafe-y:276px;--hotel-x:206px;--hotel-y:22px;--retail-x:366px;--retail-y:288px}
+.lws-cell{position:absolute;inset:0;perspective:2600px;perspective-origin:50% 40%}
+/* A shallow -8deg yaw (was -20) is what turns the diagonal triangle into the
+   board's left-to-right ROW: the three plinths sit on one gently rising line,
+   cafe front-left, hotel centre-back, retail front-right. */
+.lws-world{position:absolute;left:62px;top:24px;width:940px;height:410px;transform-style:preserve-3d;
+  transform:rotateX(54deg) rotateZ(-8deg);
+  --cafe-x:71px;--cafe-y:192px;--hotel-x:326px;--hotel-y:138px;--retail-x:582px;--retail-y:257px}
 .lws-v{position:absolute;transform-style:preserve-3d;transition:transform .5s cubic-bezier(.22,.7,.3,1)}
 .lws-v[data-v="cafe"]{left:var(--cafe-x);top:var(--cafe-y)}
 .lws-v[data-v="hotel"]{left:var(--hotel-x);top:var(--hotel-y)}
@@ -1226,7 +1233,7 @@ const SCENE_CSS = `
   animation:none;box-shadow:0 0 0 1px rgba(255,255,255,.55),0 0 30px rgba(226,178,82,.75)}
 
 /* warm ground wash unifying the three plinths */
-.lws-wash{position:absolute;left:-60px;top:-60px;width:780px;height:640px;transform:translateZ(0.2px);
+.lws-wash{position:absolute;left:-80px;top:-70px;width:1100px;height:560px;transform:translateZ(0.2px);
   border-radius:50%;
   background:radial-gradient(38% 30% at 26% 74%,rgba(176,138,62,.13) 0%,transparent 70%),
     radial-gradient(34% 28% at 54% 26%,rgba(31,66,48,.09) 0%,transparent 70%),
@@ -1237,9 +1244,11 @@ const SCENE_CSS = `
 .lws-thread{position:absolute;left:0;top:0;width:100%;height:100%;transform:translateZ(1px);
   overflow:visible;filter:drop-shadow(0 1px 0 rgba(255,255,255,.85))}
 .lws-thread-m{display:none}
-.lws-thread path{fill:none;stroke:#1f4230;stroke-width:3.8;stroke-dasharray:9 8;
-  stroke-linecap:round;animation:lws-thread-flow 2.6s linear infinite}
-.lws-thread circle{fill:#d96a4c;stroke:#f7f3ea;stroke-width:2.8}
+.lws-thread path{fill:none;stroke:#274c37;stroke-width:1.6;stroke-linecap:round;opacity:.82}
+/* the only motion on the thread: one short bright segment travelling along it */
+.lws-thread .lws-flow{stroke:#3d7a55;stroke-width:2.6;stroke-dasharray:30 620;opacity:.95;
+  animation:lws-thread-flow 6s linear infinite}
+.lws-thread circle{fill:#274c37;stroke:#f7f3ea;stroke-width:1.6;r:3}
 
 /* awning scallop — semicircular teeth hanging off the front edge */
 .lws-scallop{position:absolute;left:0;bottom:-8px;width:100%;height:10px;
@@ -1285,14 +1294,15 @@ const SCENE_CSS = `
 .lws-scr-over2{margin-top:auto;margin-bottom:0}
 
 /* Idle motion — three animated properties total, all off on request. */
-@keyframes lws-thread-flow{to{stroke-dashoffset:-14}}
+@keyframes lws-thread-flow{from{stroke-dashoffset:650}to{stroke-dashoffset:-30}}
 @keyframes lws-glow{0%,100%{box-shadow:0 0 0 1px rgba(255,255,255,.45),0 0 12px rgba(214,168,76,.3)}
   50%{box-shadow:0 0 0 1px rgba(255,255,255,.45),0 0 24px rgba(214,168,76,.55)}}
 @keyframes lws-lamp{0%,100%{opacity:.82}50%{opacity:1}}
 .lws-scr{animation:lws-glow 6s ease-in-out infinite}
 .lws-lamp{animation:lws-lamp 5.2s ease-in-out infinite}
 @media (prefers-reduced-motion:reduce){
-  .lws-scr,.lws-lamp,.lws-thread path{animation:none}
+  .lws-scr,.lws-lamp,.lws-thread path,.lws-thread .lws-flow{animation:none}
+  .lws-thread .lws-flow{display:none}
   .lws-v,.lws-ring{transition:none}
 }
 
@@ -1346,17 +1356,19 @@ export default function WorldsScene({ active = null }: WorldsSceneProps) {
           {/* ground layer: wash + sync thread, under every plinth shadow */}
           <Layer>
             <div className="lws-wash" />
-            <svg className="lws-thread lws-thread-d" viewBox="0 0 660 520" aria-hidden="true">
-              <path d="M152 486 C 268 508, 330 460, 346 232 C 366 296, 352 420, 410 470" />
-              <circle cx="152" cy="486" r="5" />
-              <circle cx="346" cy="232" r="5" />
-              <circle cx="410" cy="470" r="5" />
+            <svg className="lws-thread lws-thread-d" viewBox="0 0 940 410" aria-hidden="true">
+              <path d={THREAD_D} />
+              <path className="lws-flow" d={THREAD_D} />
+              <circle cx="207" cy="386" r="3" />
+              <circle cx="466" cy="338" r="3" />
+              <circle cx="713" cy="447" r="3" />
             </svg>
             <svg className="lws-thread lws-thread-m" viewBox="0 0 400 450" aria-hidden="true">
-              <path d="M30 513 C 140 548, 250 545, 350 505 C 445 462, 455 240, 432 88" />
-              <circle cx="30" cy="513" r="5" />
-              <circle cx="350" cy="505" r="5" />
-              <circle cx="432" cy="88" r="5" />
+              <path d={THREAD_M} />
+              <path className="lws-flow" d={THREAD_M} />
+              <circle cx="30" cy="513" r="3" />
+              <circle cx="350" cy="505" r="3" />
+              <circle cx="432" cy="88" r="3" />
             </svg>
           </Layer>
           {/* one perspective layer each, composited back to front */}
