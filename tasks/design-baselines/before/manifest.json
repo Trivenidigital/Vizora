@@ -2,23 +2,30 @@
   "label": "before",
   "base": "http://localhost:3001",
   "publicOnly": false,
-  "capturedAt": "2026-09-18T02:24:34.364Z",
+  "capturedAt": "2026-09-18T03:53:12.188Z",
+  "seedEpoch": "2026-01-15T12:00:00.000Z",
   "shots": [
     {
       "route": "/",
+      "session": "tenant",
       "landedOn": "/",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "root__1440.png",
-      "bytes": 1618845,
+      "bytes": 1633861,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va"
       ]
     },
     {
       "route": "/login",
+      "session": "tenant",
       "landedOn": "/login",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "login__1440.png",
       "bytes": 296817,
@@ -28,8 +35,11 @@
     },
     {
       "route": "/register",
+      "session": "tenant",
       "landedOn": "/register",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "register__1440.png",
       "bytes": 340019,
@@ -39,52 +49,67 @@
     },
     {
       "route": "/privacy",
+      "session": "tenant",
       "landedOn": "/privacy",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "privacy__1440.png",
-      "bytes": 277757,
+      "bytes": 277813,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va"
       ]
     },
     {
       "route": "/terms",
+      "session": "tenant",
       "landedOn": "/terms",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "terms__1440.png",
-      "bytes": 273950,
+      "bytes": 273923,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va"
       ]
     },
     {
       "route": "/sla",
+      "session": "tenant",
       "landedOn": "/sla",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "sla__1440.png",
-      "bytes": 317036,
+      "bytes": 317006,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va"
       ]
     },
     {
       "route": "/refund",
+      "session": "tenant",
       "landedOn": "/refund",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "refund__1440.png",
-      "bytes": 240832,
+      "bytes": 240979,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va"
       ]
     },
     {
       "route": "/__not-found__",
+      "session": "tenant",
       "landedOn": "/__not-found__",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "-not-found-__1440.png",
       "bytes": 31477,
@@ -95,235 +120,305 @@
     },
     {
       "route": "/dashboard",
+      "session": "tenant",
       "landedOn": "/dashboard",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "dashboard__1440.png",
-      "bytes": 182711,
+      "bytes": 180346,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/devices",
+      "session": "tenant",
       "landedOn": "/dashboard/devices",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "dashboard-devices__1440.png",
-      "bytes": 228550,
+      "bytes": 224471,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/content",
+      "session": "tenant",
       "landedOn": "/dashboard/content",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "dashboard-content__1440.png",
-      "bytes": 351675,
+      "bytes": 349606,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/playlists",
+      "session": "tenant",
       "landedOn": "/dashboard/playlists",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "dashboard-playlists__1440.png",
-      "bytes": 237421,
+      "bytes": 236257,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/schedules",
+      "session": "tenant",
       "landedOn": "/dashboard/schedules",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "dashboard-schedules__1440.png",
-      "bytes": 82013,
+      "bytes": 80949,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/analytics",
+      "session": "tenant",
       "landedOn": "/dashboard/analytics",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "dashboard-analytics__1440.png",
-      "bytes": 228906,
+      "bytes": 237805,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/layouts",
+      "session": "tenant",
       "landedOn": "/dashboard/layouts",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "dashboard-layouts__1440.png",
-      "bytes": 109487,
+      "bytes": 108396,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/widgets",
+      "session": "tenant",
       "landedOn": "/dashboard/widgets",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "dashboard-widgets__1440.png",
-      "bytes": 208479,
+      "bytes": 207312,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/health",
+      "session": "tenant",
       "landedOn": "/dashboard/health",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "dashboard-health__1440.png",
-      "bytes": 318522,
+      "bytes": 315700,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/settings",
+      "session": "tenant",
       "landedOn": "/dashboard/settings",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "dashboard-settings__1440.png",
-      "bytes": 279259,
+      "bytes": 277332,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/settings/team",
+      "session": "tenant",
       "landedOn": "/dashboard/settings/team",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "dashboard-settings-team__1440.png",
-      "bytes": 79100,
+      "bytes": 78033,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/settings/billing",
+      "session": "tenant",
       "landedOn": "/dashboard/settings/billing",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "dashboard-settings-billing__1440.png",
-      "bytes": 95070,
+      "bytes": 93989,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/settings/api-keys",
+      "session": "tenant",
       "landedOn": "/dashboard/settings/api-keys",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "dashboard-settings-api-keys__1440.png",
-      "bytes": 101139,
+      "bytes": 100059,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/settings/customization",
+      "session": "tenant",
       "landedOn": "/dashboard/settings/customization",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "dashboard-settings-customization__1440.png",
-      "bytes": 182716,
+      "bytes": 181597,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/admin",
-      "landedOn": "/dashboard",
-      "redirected": true,
+      "session": "platform",
+      "landedOn": "/admin",
+      "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "admin__1440.png",
-      "bytes": 182711,
+      "bytes": 115700,
       "consoleErrors": [
-        "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
-        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
+        "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va"
       ]
     },
     {
       "route": "/admin/organizations",
-      "landedOn": "/dashboard",
-      "redirected": true,
+      "session": "platform",
+      "landedOn": "/admin/organizations",
+      "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "admin-organizations__1440.png",
-      "bytes": 182711,
+      "bytes": 76404,
       "consoleErrors": [
-        "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
-        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
+        "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va"
       ]
     },
     {
       "route": "/admin/users",
-      "landedOn": "/dashboard",
-      "redirected": true,
+      "session": "platform",
+      "landedOn": "/admin/users",
+      "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "admin-users__1440.png",
-      "bytes": 182711,
+      "bytes": 68127,
       "consoleErrors": [
-        "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
-        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
+        "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va"
       ]
     },
     {
       "route": "/admin/health",
-      "landedOn": "/dashboard",
-      "redirected": true,
+      "session": "platform",
+      "landedOn": "/admin/health",
+      "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 1440,
       "viewport": 1440,
       "file": "admin-health__1440.png",
-      "bytes": 182711,
+      "bytes": 120284,
       "consoleErrors": [
-        "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
-        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
+        "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va"
       ]
     },
     {
       "route": "/",
+      "session": "tenant",
       "landedOn": "/",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "root__390.png",
-      "bytes": 1120124,
+      "bytes": 1177898,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va"
       ]
     },
     {
       "route": "/login",
+      "session": "tenant",
       "landedOn": "/login",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "login__390.png",
       "bytes": 47952,
@@ -333,63 +428,81 @@
     },
     {
       "route": "/register",
+      "session": "tenant",
       "landedOn": "/register",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "register__390.png",
-      "bytes": 67432,
+      "bytes": 65684,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va"
       ]
     },
     {
       "route": "/privacy",
+      "session": "tenant",
       "landedOn": "/privacy",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "privacy__390.png",
-      "bytes": 246010,
+      "bytes": 246269,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va"
       ]
     },
     {
       "route": "/terms",
+      "session": "tenant",
       "landedOn": "/terms",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "terms__390.png",
-      "bytes": 243963,
+      "bytes": 243743,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va"
       ]
     },
     {
       "route": "/sla",
+      "session": "tenant",
       "landedOn": "/sla",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "sla__390.png",
-      "bytes": 288955,
+      "bytes": 288844,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va"
       ]
     },
     {
       "route": "/refund",
+      "session": "tenant",
       "landedOn": "/refund",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "refund__390.png",
-      "bytes": 219268,
+      "bytes": 219204,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va"
       ]
     },
     {
       "route": "/__not-found__",
+      "session": "tenant",
       "landedOn": "/__not-found__",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "-not-found-__390.png",
       "bytes": 25327,
@@ -400,95 +513,126 @@
     },
     {
       "route": "/dashboard",
+      "session": "tenant",
       "landedOn": "/dashboard",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "dashboard__390.png",
-      "bytes": 148511,
+      "bytes": 147269,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/devices",
+      "session": "tenant",
       "landedOn": "/dashboard/devices",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "dashboard-devices__390.png",
-      "bytes": 257102,
+      "bytes": 254688,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/content",
+      "session": "tenant",
       "landedOn": "/dashboard/content",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "dashboard-content__390.png",
-      "bytes": 426975,
+      "bytes": 424547,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/playlists",
+      "session": "tenant",
       "landedOn": "/dashboard/playlists",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "dashboard-playlists__390.png",
-      "bytes": 249239,
+      "bytes": 248551,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/schedules",
+      "session": "tenant",
       "landedOn": "/dashboard/schedules",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "dashboard-schedules__390.png",
-      "bytes": 46688,
+      "bytes": 45932,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/analytics",
+      "session": "tenant",
       "landedOn": "/dashboard/analytics",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "dashboard-analytics__390.png",
-      "bytes": 185371,
+      "bytes": 193743,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/layouts",
+      "session": "tenant",
       "landedOn": "/dashboard/layouts",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "dashboard-layouts__390.png",
-      "bytes": 91191,
+      "bytes": 90042,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/widgets",
+      "session": "tenant",
       "landedOn": "/dashboard/widgets",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "dashboard-widgets__390.png",
-      "bytes": 205479,
+      "bytes": 204276,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
@@ -496,122 +640,154 @@
     },
     {
       "route": "/dashboard/health",
+      "session": "tenant",
       "landedOn": "/dashboard/health",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "dashboard-health__390.png",
-      "bytes": 361474,
+      "bytes": 357386,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/settings",
+      "session": "tenant",
       "landedOn": "/dashboard/settings",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "dashboard-settings__390.png",
-      "bytes": 223335,
+      "bytes": 221717,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/settings/team",
+      "session": "tenant",
       "landedOn": "/dashboard/settings/team",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "dashboard-settings-team__390.png",
-      "bytes": 37444,
+      "bytes": 36659,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/settings/billing",
+      "session": "tenant",
       "landedOn": "/dashboard/settings/billing",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "dashboard-settings-billing__390.png",
-      "bytes": 61400,
+      "bytes": 60623,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/settings/api-keys",
+      "session": "tenant",
       "landedOn": "/dashboard/settings/api-keys",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "dashboard-settings-api-keys__390.png",
-      "bytes": 62480,
+      "bytes": 61596,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/dashboard/settings/customization",
+      "session": "tenant",
       "landedOn": "/dashboard/settings/customization",
       "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "dashboard-settings-customization__390.png",
-      "bytes": 140637,
+      "bytes": 139812,
       "consoleErrors": [
         "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
+        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED",
         "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
       ]
     },
     {
       "route": "/admin",
-      "landedOn": "/dashboard",
-      "redirected": true,
+      "session": "platform",
+      "landedOn": "/admin",
+      "redirected": false,
+      "overflowsX": true,
+      "scrollWidth": 459,
       "viewport": 390,
       "file": "admin__390.png",
-      "bytes": 148511,
+      "bytes": 113544,
       "consoleErrors": [
-        "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
-        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
+        "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va"
       ]
     },
     {
       "route": "/admin/organizations",
-      "landedOn": "/dashboard",
-      "redirected": true,
+      "session": "platform",
+      "landedOn": "/admin/organizations",
+      "redirected": false,
+      "overflowsX": true,
+      "scrollWidth": 485,
       "viewport": 390,
       "file": "admin-organizations__390.png",
-      "bytes": 148511,
+      "bytes": 61090,
       "consoleErrors": [
-        "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
-        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
+        "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va"
       ]
     },
     {
       "route": "/admin/users",
-      "landedOn": "/dashboard",
-      "redirected": true,
+      "session": "platform",
+      "landedOn": "/admin/users",
+      "redirected": false,
+      "overflowsX": false,
+      "scrollWidth": 390,
       "viewport": 390,
       "file": "admin-users__390.png",
-      "bytes": 148511,
+      "bytes": 56138,
       "consoleErrors": [
-        "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
-        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
+        "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va"
       ]
     },
     {
       "route": "/admin/health",
-      "landedOn": "/dashboard",
-      "redirected": true,
+      "session": "platform",
+      "landedOn": "/admin/health",
+      "redirected": false,
+      "overflowsX": true,
+      "scrollWidth": 507,
       "viewport": 390,
       "file": "admin-health__390.png",
-      "bytes": 148511,
+      "bytes": 108465,
       "consoleErrors": [
-        "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va",
-        "WebSocket connection to 'ws://localhost:3002/socket.io/?EIO=4&transport=websocket' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED"
+        "eval() is not supported in this environment. If this page was served with a `Content-Security-Policy` header, make sure that `unsafe-eval` is included. React requires eval() in development mode for va"
       ]
     }
   ]
