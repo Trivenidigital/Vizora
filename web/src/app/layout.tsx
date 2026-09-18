@@ -1,5 +1,5 @@
 import './globals.css';
-import { Sora, DM_Sans, JetBrains_Mono } from 'next/font/google';
+import { Sora, DM_Sans, JetBrains_Mono, Fraunces } from 'next/font/google';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { CustomizationProvider } from '@/components/providers/CustomizationProvider';
 import CommandPaletteWrapper from '@/components/CommandPaletteWrapper';
@@ -11,6 +11,23 @@ import type { Viewport } from 'next';
 const sora = Sora({ subsets: ['latin'], variable: '--font-sora', display: 'swap' });
 const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-dm', display: 'swap' });
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono', display: 'swap' });
+/**
+ * Editorial display serif (Little Worlds). Loaded here rather than on the
+ * homepage wrapper so `--lw-serif` — which is just `var(--font-fraunces)` with
+ * a fallback stack — resolves anywhere in the app. Until now it resolved only
+ * inside `<div className="mkt lw …">`, so any surface outside the landing page
+ * that reached for the serif silently got Georgia.
+ *
+ * `axes` is not optional: without declaring them, next/font serves a wght-only
+ * instance and the `font-variation-settings: 'opsz' 60, 'SOFT' 40` in
+ * globals.css is inert.
+ */
+const fraunces = Fraunces({
+  subsets: ['latin'],
+  variable: '--font-fraunces',
+  display: 'swap',
+  axes: ['SOFT', 'opsz'],
+});
 
 export const metadata = {
   title: {
@@ -37,7 +54,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${sora.variable} ${dmSans.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`${sora.variable} ${dmSans.variable} ${jetbrainsMono.variable} ${fraunces.variable}`}>
       <body className={`${dmSans.className} min-h-screen bg-[var(--background)] text-[var(--foreground)]`}>
         {/* z-[60]: the marketing nav is `fixed z-50` and later in the DOM, so at
             equal z-index it painted over the focused skip link (measured with

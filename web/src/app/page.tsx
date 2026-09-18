@@ -15,7 +15,6 @@ import {
   scrollTo,
 } from '@/components/landing';
 import type { PricingData, WorldPlace } from '@/components/landing';
-import { fraunces } from '@/components/landing/fonts';
 
 export default function Index() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -54,8 +53,10 @@ export default function Index() {
     scrollTo('places');
   };
 
+  // Fraunces is loaded in the root layout, so `--font-fraunces` is already on
+  // <html> and this wrapper no longer carries its variable class.
   return (
-    <div className={`mkt lw ${fraunces.variable} relative min-h-screen overflow-x-hidden`}>
+    <div className="mkt lw relative min-h-screen overflow-x-hidden">
       <NavigationSection scrolled={scrolled} menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
       <main id="main-content">
         <HeroSection onExplore={explore} />
