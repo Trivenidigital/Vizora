@@ -1469,6 +1469,33 @@ body {
   transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/*
+ * ── Recharts legend labels are TEXT, and must be ink ──────────────────────
+ *
+ * Recharts paints each legend LABEL in that series' own colour, inline on the
+ * element. The series palette (theme/palette.js) is sized for graphical
+ * objects — SC 1.4.11's 3:1 — because that is what a line, an area and a
+ * swatch are. The label beside the swatch is not a graphical object; it is
+ * normal text and wants 4.5:1. Measured on the card, brass came to 3.10:1 and
+ * coral to 3.32:1, so two of eight legend labels failed AA the moment the
+ * palette landed. Darkening the whole palette to fix the labels would have cost
+ * the separability the series need from each other.
+ *
+ * So the SWATCH carries the hue and the LABEL carries ink — which is what a
+ * legend is for anyway. Ink on card is 14.83:1, for every series and any series
+ * added later. It also lifts the pie legends on /dashboard/analytics, whose
+ * status colours are Phase 3's to retire.
+ *
+ * `!important` because recharts writes `color` as an INLINE STYLE, which
+ * outranks any class (this file's trap list, item 2). It is the narrow,
+ * correct use of it: overriding a third-party inline style on a single element
+ * class. The five wrappers render a bare `<Legend />` and spread nothing, so
+ * there is no prop-level place to do this without editing all five.
+ */
+.recharts-legend-item-text {
+  color: var(--foreground) !important;
+}
+
 /* ══════════════════════════════════════════════════════════════════
    FLEET DATA TABLE
    ------------------------------------------------------------------
