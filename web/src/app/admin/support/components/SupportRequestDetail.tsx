@@ -123,7 +123,7 @@ export function SupportRequestDetail({
           <span className={`px-2.5 py-1 rounded text-xs font-medium ${statusColors[request.status]}`}>
             {statusLabels[request.status]}
           </span>
-          <span className="px-2.5 py-1 rounded text-xs font-medium bg-[#1F2937] text-[var(--foreground-secondary)]">
+          <span className="px-2.5 py-1 rounded text-xs font-medium bg-[var(--surface-secondary)] text-[var(--foreground-secondary)]">
             {categoryLabels[request.category] || request.category}
           </span>
           <span className="text-xs text-[var(--foreground-tertiary)] ml-auto">
@@ -160,7 +160,7 @@ export function SupportRequestDetail({
           <div className="border border-[var(--border)] rounded-lg overflow-hidden">
             <button
               onClick={() => setShowContext(!showContext)}
-              className="w-full flex items-center justify-between p-3 text-sm text-[var(--foreground-secondary)] hover:bg-[#1F2937] transition"
+              className="w-full flex items-center justify-between p-3 text-sm text-[var(--foreground-secondary)] hover:bg-[var(--surface-secondary)] transition"
             >
               <span className="font-medium">Context Details</span>
               {showContext ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -190,7 +190,7 @@ export function SupportRequestDetail({
                     <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <span className="text-[var(--foreground-tertiary)] text-xs">Console Errors</span>
-                      <pre className="mt-1 p-2 bg-[#0A0F1C] rounded text-xs text-red-300 overflow-x-auto whitespace-pre-wrap">
+                      <pre className="mt-1 p-2 bg-[var(--surface-secondary)] rounded text-xs text-[var(--error-ink)] overflow-x-auto whitespace-pre-wrap">
                         {request.consoleErrors}
                       </pre>
                     </div>
@@ -217,10 +217,10 @@ export function SupportRequestDetail({
                     <div
                       className={`max-w-[80%] rounded-lg p-3 text-sm ${
                         isUser
-                          ? 'bg-[#00E5A0]/20 text-[#00E5A0]'
+                          ? 'bg-[var(--primary-lightest)] text-[var(--primary-ink)]'
                           : isAdmin
-                          ? 'bg-[#1F2937] text-[var(--foreground-secondary)] border border-purple-500/30'
-                          : 'bg-[#1F2937] text-[var(--foreground-secondary)]'
+                          ? 'bg-[var(--surface-secondary)] text-[var(--foreground-secondary)] border border-purple-500/30'
+                          : 'bg-[var(--surface-secondary)] text-[var(--foreground-secondary)]'
                       }`}
                     >
                       <div className="flex items-center gap-2 mb-1">
@@ -252,14 +252,14 @@ export function SupportRequestDetail({
               onChange={(e) => setReplyContent(e.target.value)}
               placeholder="Type your reply..."
               rows={3}
-              className="flex-1 bg-[#1F2937] border border-[var(--border)] rounded-lg text-white text-sm p-3 focus:outline-none focus:ring-2 focus:ring-[#00E5A0]/50 placeholder-[var(--foreground-tertiary)] resize-none"
+              className="flex-1 bg-[var(--surface)] border border-[var(--border)] rounded-lg text-[var(--foreground)] text-sm p-3 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] placeholder-[var(--foreground-tertiary)] resize-none"
             />
           </div>
           <div className="flex justify-end">
             <button
               onClick={handleReply}
               disabled={!replyContent.trim() || replying}
-              className="flex items-center gap-2 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
             >
               <Send className="w-4 h-4" />
               {replying ? 'Sending...' : 'Send Reply'}
@@ -276,7 +276,7 @@ export function SupportRequestDetail({
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="bg-[#1F2937] border border-[var(--border)] rounded-lg text-white text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#00E5A0]/50"
+                className="bg-[var(--surface)] border border-[var(--border)] rounded-lg text-[var(--foreground)] text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
               >
                 <option value="open">Open</option>
                 <option value="in_progress">In Progress</option>
@@ -291,7 +291,7 @@ export function SupportRequestDetail({
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value)}
-                className="bg-[#1F2937] border border-[var(--border)] rounded-lg text-white text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#00E5A0]/50"
+                className="bg-[var(--surface)] border border-[var(--border)] rounded-lg text-[var(--foreground)] text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
               >
                 <option value="critical">Critical</option>
                 <option value="high">High</option>
@@ -309,7 +309,7 @@ export function SupportRequestDetail({
                 onChange={(e) => setResolutionNotes(e.target.value)}
                 placeholder="Describe the resolution..."
                 rows={2}
-                className="w-full bg-[#1F2937] border border-[var(--border)] rounded-lg text-white text-sm p-3 focus:outline-none focus:ring-2 focus:ring-[#00E5A0]/50 placeholder-[var(--foreground-tertiary)] resize-none"
+                className="w-full bg-[var(--surface)] border border-[var(--border)] rounded-lg text-[var(--foreground)] text-sm p-3 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] placeholder-[var(--foreground-tertiary)] resize-none"
               />
             </div>
           )}
@@ -319,7 +319,7 @@ export function SupportRequestDetail({
               <button
                 onClick={handleSaveChanges}
                 disabled={saving}
-                className="px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                className="px-4 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
               >
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
