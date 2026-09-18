@@ -587,8 +587,23 @@ body {
  *
  * The homepage renders IDENTICALLY through this collapse, and that is not a
  * hope — the Little Worlds values moved verbatim, and the landing components
- * name `--lw-*` / `--mkt-*` directly rather than going through `.eh-*` (checked:
- * zero `.eh-*` usages in components/landing). The baseline diff is the proof.
+ * name `--lw-*` / `--mkt-*` for COLOUR rather than going through `.eh-*`. The
+ * baseline diff is the proof.
+ *
+ * ── `components/landing` IS NOT `.eh-*`-FREE — corrected 2026-09-18 ───────
+ * This note and the one on `.eh-btn-neon` below both used to claim "zero
+ * `.eh-*` usages in components/landing". That is false, and it is the kind of
+ * claim someone acts on. Three are in use:
+ *     `.eh-heading`  ProductTourDialog.tsx:62
+ *     `.eh-reveal`   shared.tsx:43
+ *     `.eh-visible`  shared.tsx:17
+ * None of them carries colour, which is why the COLOUR conclusion still holds
+ * and the homepage stayed byte-identical through Phases 1 and 2. But
+ * `.eh-reveal` is the homepage's section-entrance animation and `.eh-heading`
+ * is its dialog type: changing either restyles a surface that is under design
+ * review. Re-check with
+ *     grep -ro 'eh-[a-z-]*' web/src/components/landing/
+ * before touching a shared `.eh-*` rule — do not trust this list to stay true.
  */
 .lw {
   background: var(--background);
@@ -814,11 +829,13 @@ body:has(.mkt) .consent-bar {
  *
  * The folded `.mkt` override paired this fill with #04241B, a near-black that
  * measures 1.42:1 on forest — an unreadable button label. It never showed,
- * because the LANDING COMPONENTS USE NO `.eh-*` UTILITIES AT ALL (checked: zero
- * matches across components/landing). Those overrides served the previous
- * marketing page and have been dead since the Little Worlds rebuild; the live
- * consumers are the six `.eh-btn-neon` call sites on the auth and legal pages,
- * which were rendering mint and now join the one palette.
+ * because NO LANDING COMPONENT USES `.eh-btn-neon`. (This used to say they use
+ * no `.eh-*` at all, which is wrong — see the corrected list at the `.lw`
+ * note above. Three are in use; none of them is this one, so the conclusion
+ * stands and only the reason needed narrowing.) Those overrides served the
+ * previous marketing page and have been dead since the Little Worlds rebuild;
+ * the live consumers are the six `.eh-btn-neon` call sites on the auth and
+ * legal pages, which were rendering mint and now join the one palette.
  *
  * `--primary` rather than a literal, so a white-label tenant's fill still flows
  * through exactly as it did.
@@ -1066,8 +1083,8 @@ body:has(.mkt) .consent-bar {
 }
 .eh-dash-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(0, 229, 160, 0.15);
-  box-shadow: 0 8px 24px rgba(0, 229, 160, 0.04);
+  border-color: var(--accent-edge);
+  box-shadow: 0 8px 24px rgba(35, 38, 31, 0.07);
 }
 
 /* Interactive card variant — for clickable cards (stat cards, quick actions) */
@@ -1076,28 +1093,53 @@ body:has(.mkt) .consent-bar {
 }
 .eh-dash-card-interactive:hover {
   transform: translateY(-2px);
-  border-color: rgba(0, 229, 160, 0.2);
-  box-shadow: 0 8px 32px rgba(0, 229, 160, 0.06);
+  border-color: var(--accent-edge);
+  box-shadow: 0 10px 30px rgba(35, 38, 31, 0.09);
 }
 .eh-dash-card-interactive:active {
   transform: translateY(0);
 }
 
-/* Dashboard section heading — Sora font, proper hierarchy */
+/*
+ * ══════════════════════════════════════════════════════════════════
+ * TYPE SCALE — Fraunces for titles and section heads, and NOWHERE else
+ * ------------------------------------------------------------------
+ * Plan §1 layer 2: "Fraunces for page titles/section heads only; DM Sans for
+ * all UI; JetBrains Mono for kickers, codes and tabular figures. (A serif on
+ * table cells and form labels would hurt a working tool.)"
+ *
+ * These two classes ARE that boundary — between them they carry every page
+ * title and section heading in the dashboard, and nothing else. `<body>` is
+ * already DM Sans (app/layout.tsx), so UI text needs no rule; the mono role is
+ * carried by `.eh-th`, `.eh-sort-btn`, the responsive cell labels and
+ * `.eh-fleet-chip-count` below.
+ *
+ * `--lw-serif` (not `font-[var(--lw-serif)]`, which Tailwind parses as
+ * font-WEIGHT and drops — trap 3). It resolves everywhere since Phase 0 moved
+ * Fraunces to the root layout; before that it fell back to Georgia outside the
+ * homepage wrapper.
+ * ══════════════════════════════════════════════════════════════════
+ */
+
+/* Dashboard page title */
 .eh-dash-title {
-  font-family: var(--font-sora), sans-serif;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.2;
+  font-family: var(--lw-serif);
+  /* 480/500, not 700. Fraunces at bold is a display face and shouts on a
+     working screen; the homepage settled on these two weights. */
+  font-weight: 500;
+  font-variation-settings: 'opsz' 40;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
   color: var(--foreground);
 }
 
-/* Section subheading — Sora but lighter weight */
+/* Section subheading — same face, lighter */
 .eh-dash-subtitle {
-  font-family: var(--font-sora), sans-serif;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.3;
+  font-family: var(--lw-serif);
+  font-weight: 480;
+  font-variation-settings: 'opsz' 24;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
   color: var(--foreground);
 }
 
@@ -1186,22 +1228,33 @@ body:has(.mkt) .consent-bar {
   transform: translateY(0);
 }
 
-/* Table header cell */
+/*
+ * Table header cell — MONO, the kicker role.
+ *
+ * An uppercase, letter-spaced 11px label is a kicker, and the type scale gives
+ * kickers JetBrains Mono (`.lw-mono` / `.mkt-mono` do the same on the public
+ * pages). The BODY cells stay DM Sans: a serif or a mono in a data table is the
+ * thing the plan calls out as hurting a working tool, and mono costs width on
+ * every row.
+ */
 .eh-th {
   padding: 12px 24px;
+  font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.1em;
   color: var(--foreground-tertiary);
   text-align: left;
 }
 
-/* Table body cell */
+/* Table body cell. DM Sans by inheritance; only the FIGURES are tabular, so
+   columns of numbers line up without forcing mono onto names and labels. */
 .eh-td {
   padding: 16px 24px;
   white-space: nowrap;
   font-size: 14px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Table row hover */
@@ -1223,35 +1276,74 @@ body:has(.mkt) .consent-bar {
   font-weight: 600;
   line-height: 1;
 }
+/*
+ * ── Badge tones ───────────────────────────────────────────────────────────
+ * Each semantic tone is its own INK on its own TINT, and every pairing below
+ * is the one recorded at the `--status-*-bg` declarations at the top of this
+ * file — i.e. the ink measured against the pill it actually renders on, not
+ * against the page behind it. The old fills were composited rgba() of the
+ * retired palette (a 10% neon / amber / red / cyan wash over whatever was
+ * behind), which is why three of them could not be measured at all.
+ *
+ * `success` no longer borrows the BRAND tokens. It used to paint
+ * `--badge-brand-bg` + `--primary-ink`, which conflated "this is fine" with
+ * "this is Vizora" and, worse, put a white-label-derived ink on a fixed tint:
+ * a tenant ink is guaranteed AA against `--surface` only, and measures ~13%
+ * lower on a tint (observed live at 3.83:1 on `.eh-fleet-chip`). The brand
+ * tone is now `.eh-badge-brand` and is OUTLINED for exactly that reason.
+ */
 .eh-badge-success {
-  /* rgba(0,229,160,.1) over white composites to #D2EDE7, on which
-     `--primary-ink` is 4.12:1. `--badge-brand-bg` is per-theme and gives
-     5.16:1 on light without changing the dark badge (7.6:1 already). */
-  background: var(--badge-brand-bg);
-  color: var(--primary-ink);
+  /* #166534 on #dfe3d6 = 5.47:1 */
+  background: var(--status-online-bg);
+  color: var(--success-ink);
 }
 .eh-badge-warning {
-  /* Same split as `.eh-badge-success` above, for the same reason. `--warning` is
-     a FILL for glyphs and hairlines; as badge TEXT on light it measured 3.02:1
-     over its own composited fill and 2.52:1 where the badge sits on
-     `--background-secondary`. `--warning-ink` is the text-safe pair and is
-     ALREADY `#fbbf24` under `.dark` — identical to `--warning` there — so the
-     dark badge is unchanged by construction and only the failing light case
-     moves. `.eh-partial-banner` already paints its text with this token. */
-  background: rgba(251, 191, 36, 0.1);
+  /* #92400e on #ebdfd2 = 5.41:1. `--warning` is a FILL for glyphs and
+     hairlines; as badge TEXT it measured 3.02:1 over its own composited fill.
+     `.eh-partial-banner` already paints its text with this token. */
+  background: var(--status-error-bg);
   color: var(--warning-ink);
 }
 .eh-badge-error {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--error);
+  /* #b91c1c on #efdcd4 = 4.89:1 */
+  background: var(--status-offline-bg);
+  color: var(--error-ink);
 }
 .eh-badge-info {
-  background: rgba(0, 180, 216, 0.1);
-  color: var(--info);
+  /* #0d6e89 on #dee4df = 4.51:1 */
+  background: var(--status-pairing-bg);
+  color: var(--info-ink);
 }
 .eh-badge-neutral {
-  background: var(--surface-hover);
-  color: var(--foreground-secondary);
+  /* #5f6456 on #e6e3d9 = 4.75:1 */
+  background: var(--status-neutral-bg);
+  color: var(--foreground-tertiary);
+}
+
+/*
+ * OUTLINE variants — the second axis of the badge vocabulary.
+ *
+ * The Little Worlds status tints are deliberately low chroma, so six of them
+ * live inside about eight points of each other and a seventh would not be
+ * separable by hue. Callers that need more distinctions than six get them from
+ * FORM instead: an outlined pill is unmistakably not a filled one at badge
+ * size, in greyscale, and at 390px. `admin/StatusBadge` uses this to keep
+ * `past_due` apart from `canceled` and `maintenance` apart from `info` without
+ * a new colour.
+ *
+ * It also solves the white-label problem for the brand tone. The ground is
+ * `--surface`, which is the substrate `applyCSSVariables` derives a tenant's
+ * `--brand-ink-light` against, so `.eh-badge-brand` clears AA for EVERY tenant
+ * by construction — 10.79:1 for Vizora's own forest.
+ */
+.eh-badge-outline {
+  background: var(--surface);
+  border: 1px solid currentColor;
+}
+.eh-badge-brand {
+  background: var(--surface);
+  border: 1px solid var(--primary-ink);
+  color: var(--primary-ink);
 }
 
 /* Dashboard page entrance — subtler than homepage reveal */
@@ -1301,12 +1393,12 @@ body:has(.mkt) .consent-bar {
 }
 .eh-filter-pill-active {
   background: var(--primary);
-  color: #061A21;
+  color: var(--lw-on-forest);
   font-weight: 600;
 }
 .eh-filter-pill-active:hover {
-  background: #00CC8E;
-  color: #061A21;
+  background: var(--primary-light);
+  color: var(--lw-on-forest);
 }
 
 /* Active filter chip — removable tag */
@@ -1315,7 +1407,11 @@ body:has(.mkt) .consent-bar {
   align-items: center;
   gap: 4px;
   padding: 3px 10px;
-  background: rgba(0, 229, 160, 0.1);
+  /* Outlined on `--surface`, not a brand tint: `--primary-ink` is white-label
+     derived and is only guaranteed AA against `--surface`. Same rule, and the
+     same reason, as `.eh-badge-brand`. */
+  background: var(--surface);
+  border: 1px solid var(--primary-ink);
   color: var(--primary-ink);
   border-radius: 6px;
   font-size: 12px;
@@ -1352,8 +1448,8 @@ body:has(.mkt) .consent-bar {
   color: var(--foreground);
 }
 .eh-icon-btn-danger:hover {
-  background: rgba(239, 68, 68, 0.1);
-  color: var(--error);
+  background: var(--status-offline-bg);
+  color: var(--error-ink);
 }
 
 /* Sticky bulk action bar */
@@ -1366,8 +1462,8 @@ body:has(.mkt) .consent-bar {
   justify-content: space-between;
   gap: 12px;
   padding: 10px 20px;
-  background: rgba(0, 229, 160, 0.06);
-  border: 1px solid rgba(0, 229, 160, 0.2);
+  background: var(--badge-brand-bg);
+  border: 1px solid var(--accent-edge);
   border-radius: 12px;
   backdrop-filter: blur(8px);
 }
@@ -1392,7 +1488,7 @@ body:has(.mkt) .consent-bar {
 .eh-progress-bar {
   height: 100%;
   border-radius: 9999px;
-  background: linear-gradient(90deg, var(--primary), var(--info));
+  background: var(--primary);
   transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -1459,10 +1555,11 @@ body:has(.mkt) .consent-bar {
   gap: 4px;
   width: 100%;
   min-height: 24px;
+  font-family: var(--font-mono), ui-monospace, monospace;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.1em;
   color: var(--foreground-tertiary);
   border-radius: 6px;
   transition: color 0.15s ease;
@@ -1638,17 +1735,25 @@ body:has(.mkt) .consent-bar {
   border-color: var(--border-dark);
   color: var(--foreground);
 }
+/* Pressed state is OUTLINED on `--surface`, not filled with `--badge-brand-bg`.
+   The filled form put a white-label-derived ink on a fixed tint and measured
+   3.83:1 live for the default brand — `applyCSSVariables` guarantees a tenant's
+   ink against `--surface` only. Two-pixel border so "pressed" still reads. */
 .eh-fleet-chip[aria-pressed='true'] {
   border-color: var(--primary-ink);
-  background: var(--badge-brand-bg);
+  border-width: 2px;
+  padding: 7px 13px;
+  background: var(--surface);
   color: var(--primary-ink);
 }
+/* Mono, per the type scale: this is a tabular figure, which is the mono role.
+   Sora at 700 also read as a heading in a control. */
 .eh-fleet-chip-count {
-  font-family: var(--font-sora), sans-serif;
-  font-size: 16px;
-  font-weight: 700;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 15px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   color: var(--foreground);
 }
 .eh-fleet-chip[aria-pressed='true'] .eh-fleet-chip-count {
@@ -1720,10 +1825,11 @@ body:has(.mkt) .consent-bar {
   .eh-datatable td[data-label]::before {
     content: attr(data-label);
     flex: none;
+    font-family: var(--font-mono), ui-monospace, monospace;
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.1em;
     color: var(--foreground-tertiary);
   }
   /* Where supported, mark the generated label as decorative so the real
