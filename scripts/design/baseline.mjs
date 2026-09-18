@@ -53,6 +53,19 @@ const PASSWORD = process.env.DEMO_TENANT_PASSWORD;
 /** The synthetic org seeded by scripts/marketing/seed-demo-tenant.mjs. Nothing else may be photographed. */
 const EXPECTED_TENANT = 'Northwind Coffee Roasters';
 
+/** The platform super-admin from the same seed, for the /admin/* surface. */
+const PLATFORM_EMAIL = process.env.DEMO_PLATFORM_EMAIL || 'platform@vizora.local';
+
+/**
+ * Proof that /admin actually RENDERED for the platform session.
+ *
+ * `admin/layout.tsx` redirects a non-super-admin to /dashboard, which produces
+ * a perfectly clean screenshot of the wrong page — exactly how four admin
+ * "baselines" were four copies of the dashboard. Asserting on admin's own
+ * heading is what makes the session prove its reach instead of assuming it.
+ */
+const EXPECTED_ADMIN_HEADING = 'Admin Dashboard';
+
 function arg(name, fallback) {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
   if (hit) return hit.slice(name.length + 3);
@@ -78,6 +91,16 @@ const PUBLIC_ROUTES = [
   '/__not-found__',
 ];
 
+/**
+ * The Vizora PLATFORM surface, captured as a super-admin.
+ *
+ * Separate from AUTHED_ROUTES because it needs a different session:
+ * `admin/layout.tsx` redirects anyone without `isSuperAdmin` to /dashboard, so
+ * captured as the tenant admin these four were simply four more copies of the
+ * dashboard. The seed provides `platform@vizora.local` for this.
+ */
+const ADMIN_ROUTES = ['/admin', '/admin/organizations', '/admin/users', '/admin/health'];
+
 /** Routes behind auth. Every one of these photographs the synthetic demo tenant. */
 const AUTHED_ROUTES = [
   '/dashboard',
@@ -94,10 +117,6 @@ const AUTHED_ROUTES = [
   '/dashboard/settings/billing',
   '/dashboard/settings/api-keys',
   '/dashboard/settings/customization',
-  '/admin',
-  '/admin/organizations',
-  '/admin/users',
-  '/admin/health',
 ];
 
 const VIEWPORT_HEIGHT = { 1920: 1080, 1440: 900, 1280: 800, 1024: 768, 768: 1024, 430: 932, 390: 844, 375: 812, 320: 640 };
@@ -129,6 +148,23 @@ const TEXT_SUBSTITUTIONS = {
     { selector: 'table tbody td:nth-child(5)', text: 'Jan 15, 2026, 12:00 PM' },
   ],
 };
+
+/**
+ * Painted over on EVERY route, because the instability follows the element.
+ *
+ * The 32x32 gradient brand swatch in both shells (`dashboard/layout.tsx:158`,
+ * `admin/components/AdminSidebar.tsx:70`) rasterises its antialiased corners
+ * differently between runs — 6 px at a max channel delta of 15, invisible to a
+ * human and fatal to an exact-equality comparison. It surfaced on a different
+ * route each run (billing, then api-keys), so masking per-route would just move
+ * the flake around.
+ *
+ * COST, stated plainly: the swatch's own fill and radius are no longer covered
+ * by the baseline. It is one small element and everything around it — the
+ * wordmark beside it, the whole shell — still is. Excluding the routes instead
+ * would have cost four entire screens.
+ */
+const GLOBAL_MASKS = ['a[href="/dashboard"] .bg-gradient-to-br', 'aside .bg-gradient-to-br:has(> span)'];
 
 /**
  * Pin the readiness verdict the dashboard's "System Status" card renders.
@@ -172,6 +208,37 @@ async function pinReadiness(ctx) {
    * regression looks. Zero is the state that renders no badge at all; the count
    * is not what a redesign is being reviewed for.
    */
+  /*
+   * Pin the live telemetry on /admin/health.
+   *
+   * That page renders real uptime, Redis memory and per-service latency and
+   * refreshes every 30s, so two captures of identical code disagreed by 707 px
+   * — and the numbers change width, which reflowed the layout and changed the
+   * full-page width from 517 to 512. Pinned rather than masked because these
+   * values are scattered across the page: masking each would blank most of it,
+   * while fixing the payload leaves every card, badge and label fully covered.
+   * Only the volatile numerics are touched; statuses are left alone.
+   */
+  const VOLATILE = new Set(['uptime', 'latency', 'memory', 'maxMemory', 'responseTime', 'timestamp']);
+  await ctx.route('**/api/v1/admin/health*', async (route) => {
+    try {
+      const res = await route.fetch();
+      const body = await res.json();
+      const pin = (node) => {
+        if (!node || typeof node !== 'object') return;
+        for (const [k, v] of Object.entries(node)) {
+          if (VOLATILE.has(k) && typeof v === 'number') node[k] = k === 'uptime' ? 86_400 : 1;
+          else if (VOLATILE.has(k) && typeof v === 'string') node[k] = '2026-01-15T12:00:00.000Z';
+          else pin(v);
+        }
+      };
+      pin(body);
+      await route.fulfill({ response: res, json: body });
+    } catch {
+      await route.fallback();
+    }
+  });
+
   await ctx.route('**/api/v1/notifications/unread-count*', async (route) => {
     try {
       const res = await route.fetch();
@@ -362,6 +429,31 @@ const FREEZE = () => {
  * `animations: 'disabled'` on the screenshot call finalises CSS animations, but
  * it does not stop a caret blinking or a `<video>` decoding a different frame.
  */
+/**
+ * Jump to the bottom and back. DELIBERATE — do not "fix" this to a stepped scroll.
+ *
+ * A single jump does not bring below-fold elements *through* the viewport, so on
+ * its own it would never trigger a `loading="lazy"` image. That hazard is real,
+ * and it is why a naive probe against these pages must scroll in steps or it
+ * will conclude an image never loads. It does NOT apply here, because the
+ * warm-up has already fetched every `/_next/image` variant to completion: the
+ * images are in cache and paint on capture regardless of how we scrolled. The
+ * warm-up substitutes for the scrolling.
+ *
+ * Stepped scrolling was tried and MEASURED WORSE: 47/52 determinism, and on the
+ * homepage specifically the scene tiles were missing from two of three
+ * consecutive captures — i.e. usually wrong, not merely unstable. The loss
+ * happens between the readiness check and the shot (all 7 images and all 3
+ * tiles reported loaded at check time), and neither `loading='eager'` nor
+ * `decode()` closed it. Jump-scroll plus warming reaches 52/52 with the tiles
+ * present, so that is the configuration that ships.
+ */
+async function sweepScroll(page) {
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await page.waitForTimeout(400);
+  await page.evaluate(() => window.scrollTo(0, 0));
+}
+
 const STABILISE_CSS = `
   *, *::before, *::after {
     animation-play-state: paused !important;
@@ -395,17 +487,17 @@ async function capture(label, routes, viewports, out, settleMs, publicOnly) {
       '--hide-scrollbars',
     ],
   });
-  let storageState;
-
-  if (publicOnly) {
-    console.log('public mode — no login, no tenant data reachable');
-  } else {
-    if (!PASSWORD) {
-      throw new Error(
-        'Set DEMO_TENANT_PASSWORD (same value used to seed the demo tenant), or pass --public.',
-      );
-    }
-    console.log('login…');
+  /**
+   * Sign in and return the resulting session.
+   *
+   * `assertText` is the identity guard, and it is not a formality: it is what
+   * stops this ever photographing something other than the synthetic fixture.
+   * For the tenant it asserts the org name; for the platform operator it asserts
+   * that /admin actually RENDERED rather than bouncing to /dashboard, which is
+   * the precise failure that made the previous admin baselines worthless.
+   */
+  async function signIn({ email, landing, assertText, label }) {
+    console.log(`login (${label})…`);
     const bootstrap = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const bp = await bootstrap.newPage();
     await bp.addInitScript(FREEZE);
@@ -417,28 +509,72 @@ async function capture(label, routes, viewports, out, settleMs, publicOnly) {
     // audit-surface.mjs — do not replace with a bare fill().
     await bp.waitForSelector('#email:not([disabled])', { timeout: 60_000 });
     await bp.waitForTimeout(1500);
-    await bp.locator('#email').pressSequentially(EMAIL, { delay: 15 });
+    await bp.locator('#email').pressSequentially(email, { delay: 15 });
     await bp.locator('#password').pressSequentially(PASSWORD, { delay: 15 });
     await bp.click('button[type="submit"]');
     await bp.waitForURL(/\/dashboard/, { timeout: 90_000 }).catch(() => {});
     if (!/\/dashboard/.test(bp.url())) {
       throw new Error(`Refusing to capture: login did not reach the dashboard (at ${bp.url()}).`);
     }
+    if (landing) await bp.goto(`${BASE}${landing}`, { waitUntil: 'domcontentloaded' });
     const found = await bp
-      .waitForFunction((name) => document.body.innerText.includes(name), EXPECTED_TENANT, {
-        timeout: 30_000,
-      })
+      .waitForFunction((t) => document.body.innerText.includes(t), assertText, { timeout: 30_000 })
       .then(() => true)
       .catch(() => false);
     if (!found) {
       throw new Error(
-        `Refusing to capture: logged-in workspace is not the synthetic demo tenant ` +
-          `("${EXPECTED_TENANT}" not found). Re-seed with scripts/marketing/seed-demo-tenant.mjs.`,
+        `Refusing to capture: the ${label} session did not show "${assertText}" ` +
+          `(at ${bp.url()}). Re-seed with scripts/marketing/seed-demo-tenant.mjs.`,
       );
     }
-    console.log(`  tenant verified: ${EXPECTED_TENANT}`);
-    storageState = await bootstrap.storageState();
+    console.log(`  ${label} verified: ${assertText}`);
+    const state = await bootstrap.storageState();
     await bootstrap.close();
+    return state;
+  }
+
+  /**
+   * Which session captures which routes. One entry when unauthenticated, two
+   * otherwise — the admin surface is unreachable from the tenant session.
+   */
+  let sessions;
+
+  if (publicOnly) {
+    console.log('public mode — no login, no tenant data reachable');
+    sessions = [{ label: 'public', storageState: undefined, routes }];
+  } else {
+    if (!PASSWORD) {
+      throw new Error(
+        'Set DEMO_TENANT_PASSWORD (same value used to seed the demo tenant), or pass --public.',
+      );
+    }
+    const tenantRoutes = routes.filter((r) => !ADMIN_ROUTES.includes(r));
+    const adminRoutes = routes.filter((r) => ADMIN_ROUTES.includes(r));
+
+    sessions = [];
+    if (tenantRoutes.length) {
+      sessions.push({
+        label: 'tenant',
+        storageState: await signIn({
+          email: EMAIL,
+          assertText: EXPECTED_TENANT,
+          label: 'tenant',
+        }),
+        routes: tenantRoutes,
+      });
+    }
+    if (adminRoutes.length) {
+      sessions.push({
+        label: 'platform',
+        storageState: await signIn({
+          email: PLATFORM_EMAIL,
+          landing: '/admin',
+          assertText: EXPECTED_ADMIN_HEADING,
+          label: 'platform',
+        }),
+        routes: adminRoutes,
+      });
+    }
   }
 
   /*
@@ -453,9 +589,9 @@ async function capture(label, routes, viewports, out, settleMs, publicOnly) {
    * the dev cache — so without this the before/after diff reports compile
    * artefacts as visual regressions.
    */
-  {
+  for (const session of sessions) {
     const warm = await browser.newContext({
-      ...(storageState ? { storageState } : {}),
+      ...(session.storageState ? { storageState: session.storageState } : {}),
       viewport: { width: viewports[0], height: VIEWPORT_HEIGHT[viewports[0]] || 900 },
       colorScheme: 'light',
     });
@@ -472,8 +608,8 @@ async function capture(label, routes, viewports, out, settleMs, publicOnly) {
     wp.on('request', (r) => {
       if (r.url().includes('/_next/image')) optimiserUrls.add(r.url());
     });
-    process.stdout.write(`warm-up (${routes.length} routes)…`);
-    for (const route of routes) {
+    process.stdout.write(`warm-up ${session.label} (${session.routes.length} routes)…`);
+    for (const route of session.routes) {
       await wp.goto(`${BASE}${route}`, { waitUntil: 'load', timeout: 90_000 }).catch(() => {});
       /*
        * Let the images actually FINISH here, not just start.
@@ -487,7 +623,10 @@ async function capture(label, routes, viewports, out, settleMs, publicOnly) {
        * (5877 px and 25825 px) that were nothing but a cold optimiser cache.
        * Scroll first so the lazy ones are requested at all.
        */
-      await wp.evaluate(() => window.scrollTo(0, document.body.scrollHeight)).catch(() => {});
+      // Jump-scroll is safe here BECAUSE of the optimiser warming below — see
+      // sweepScroll. This only needs to provoke the requests; the warming is
+      // what guarantees they finish and cache.
+      await sweepScroll(wp).catch(() => {});
       await wp
         .waitForFunction(
           () =>
@@ -507,6 +646,18 @@ async function capture(label, routes, viewports, out, settleMs, publicOnly) {
      * way turned a run that was losing scene tiles into one byte-identical to
      * the reference set, on the same code.
      */
+    /*
+     * NOT redundant with the stepped scroll above — tested, on purpose.
+     *
+     * Stepped scrolling fixes the "never requested" half of the problem: it
+     * brings lazy elements through the viewport so the request is issued at all.
+     * It does nothing about the "requested but slow" half — next/image still has
+     * to generate each variant, and an abandoned generation is never cached.
+     * With this block disabled and stepped scrolling in place, the homepage
+     * scene tiles were still MISSING from the capture while the reference set
+     * had them. Both mechanisms are load-bearing; do not delete this one on the
+     * assumption that the scroll covers it.
+     */
     if (optimiserUrls.size) {
       let warmed = 0;
       for (const u of optimiserUrls) {
@@ -525,8 +676,9 @@ async function capture(label, routes, viewports, out, settleMs, publicOnly) {
   for (const vw of viewports) {
     const height = VIEWPORT_HEIGHT[vw] || 900;
     const isMobile = vw <= 500;
+    for (const session of sessions) {
     const ctx = await browser.newContext({
-      ...(storageState ? { storageState } : {}),
+      ...(session.storageState ? { storageState: session.storageState } : {}),
       viewport: { width: vw, height },
       // Phase 0 predates the light-only decision (plan §3 D1) but the app still
       // ships a dark default, so pin the scheme rather than inheriting the host's.
@@ -539,7 +691,7 @@ async function capture(label, routes, viewports, out, settleMs, publicOnly) {
     await ctx.addInitScript(FREEZE);
     await pinReadiness(ctx);
 
-    for (const route of routes) {
+    for (const route of session.routes) {
       const page = await ctx.newPage();
       const consoleErrors = [];
       page.on('console', (m) => {
@@ -557,12 +709,10 @@ async function capture(label, routes, viewports, out, settleMs, publicOnly) {
         await page.addStyleTag({ content: STABILISE_CSS });
         await page.evaluate(() => {
           document.querySelectorAll('nextjs-portal').forEach((n) => n.remove());
-          // Scroll through the page once so anything gated on IntersectionObserver
-          // (`.eh-reveal`, lazy images) has fired before a full-page shot.
-          window.scrollTo(0, document.body.scrollHeight);
         });
-        await page.waitForTimeout(400);
-        await page.evaluate(() => window.scrollTo(0, 0));
+        // Sweep so anything gated on IntersectionObserver (`.eh-reveal`) fires,
+        // then return to the top. Jump, not stepped — see sweepScroll.
+        await sweepScroll(page);
         /*
          * Wait for every <img> to finish decoding.
          *
@@ -638,10 +788,47 @@ async function capture(label, routes, viewports, out, settleMs, publicOnly) {
             [sub.selector, sub.text],
           );
         }
+        /*
+         * Grow the viewport to the content and take a NORMAL shot, rather than
+         * asking for `fullPage`.
+         *
+         * `fullPage` uses Chromium's capture-beyond-viewport, which re-renders
+         * the document outside the visible box. That re-evaluates
+         * `loading="lazy"`, and a scene tile that was verifiably loaded moments
+         * earlier can come out blank — measured repeatedly on the homepage, in
+         * every scroll configuration, and unfixed by `loading='eager'` or
+         * `decode()`. Resizing means every pixel captured was genuinely inside
+         * the viewport and genuinely painted, so there is nothing left to
+         * re-evaluate. It is also why fidelity has to be eyeballed: two blank
+         * tiles diff to zero just as happily as two correct ones.
+         */
+        const contentHeight = await page.evaluate(() =>
+          Math.max(
+            document.body.scrollHeight,
+            document.documentElement.scrollHeight,
+            document.body.offsetHeight,
+            document.documentElement.offsetHeight,
+          ),
+        );
+        await page.setViewportSize({ width: vw, height: Math.min(contentHeight, 20000) });
+        // Let the enlarged viewport settle: the resize itself triggers the lazy
+        // loads for everything now on screen, and they must finish before the shot.
+        await page
+          .waitForFunction(
+            () =>
+              Array.from(document.images).every((i) =>
+                !i.getAttribute('src') && !i.currentSrc ? true : i.complete && i.naturalWidth > 0,
+              ),
+            null,
+            { timeout: 30_000 },
+          )
+          .catch(() => {});
+        await page.waitForTimeout(600);
         await page.screenshot({
           path: nodePath.join(dir, file),
-          fullPage: true,
           animations: 'disabled',
+          mask: GLOBAL_MASKS.map((sel) => page.locator(sel)),
+          maskColor: '#ff00ff',
         });
         const bytes = fs.statSync(nodePath.join(dir, file)).size;
         /*
@@ -655,27 +842,77 @@ async function capture(label, routes, viewports, out, settleMs, publicOnly) {
          * baselined. Unlabelled, that reads as "admin covered" on a review
          * checklist. Naming it is the difference between a gap and a lie.
          */
+        /*
+         * Record horizontal overflow explicitly.
+         *
+         * `fullPage` used to capture past the right edge, which is how the admin
+         * routes' mobile overflow was spotted (full-page widths of 512/485/459
+         * against a 390 viewport). A viewport-sized shot clips that instead, so
+         * the defect would become invisible in the image. Measuring scrollWidth
+         * keeps the signal — arguably better, since it names the number rather
+         * than leaving a reviewer to notice an unusually wide PNG.
+         */
+        const overflow = await page.evaluate(() => ({
+          scrollWidth: document.documentElement.scrollWidth,
+          clientWidth: document.documentElement.clientWidth,
+        }));
+        const overflowsX = overflow.scrollWidth > overflow.clientWidth + 1;
         const landed = new URL(page.url()).pathname;
         const redirected = landed !== route && !(route === '/__not-found__' && landed === route);
-        manifest.push({ route, landedOn: landed, redirected, viewport: vw, file, bytes, consoleErrors });
+        manifest.push({
+          route,
+          session: session.label,
+          landedOn: landed,
+          redirected,
+          overflowsX,
+          scrollWidth: overflow.scrollWidth,
+          viewport: vw,
+          file,
+          bytes,
+          consoleErrors,
+        });
         console.log(
           `  ${String(vw).padStart(4)}px ${route} -> ${file} (${(bytes / 1024).toFixed(0)} KB)` +
-            (redirected ? `  [REDIRECTED to ${landed} — this is not a baseline of ${route}]` : ''),
+            (redirected ? `  [REDIRECTED to ${landed} — this is not a baseline of ${route}]` : '') +
+            (overflowsX ? `  [OVERFLOWS-X ${overflow.scrollWidth}px in a ${vw}px viewport]` : ''),
         );
       } catch (err) {
-        manifest.push({ route, viewport: vw, file: null, error: String(err).slice(0, 300), consoleErrors });
+        manifest.push({
+          route,
+          session: session.label,
+          viewport: vw,
+          file: null,
+          error: String(err).slice(0, 300),
+          consoleErrors,
+        });
         console.log(`  ${String(vw).padStart(4)}px ${route} -> ERROR ${String(err).slice(0, 140)}`);
       }
       await page.close();
     }
     await ctx.close();
+    }
   }
 
   await browser.close();
 
   fs.writeFileSync(
     nodePath.join(dir, 'manifest.json'),
-    JSON.stringify({ label, base: BASE, publicOnly, capturedAt: new Date().toISOString(), shots: manifest }, null, 2),
+    JSON.stringify(
+      {
+        label,
+        base: BASE,
+        publicOnly,
+        capturedAt: new Date().toISOString(),
+        // The fixture's epoch. Time-bearing screens are only comparable between
+        // two sets seeded with the SAME value — see the SEED_EPOCH note in
+        // scripts/marketing/seed-demo-tenant.mjs. Check this first when a diff
+        // makes no sense.
+        seedEpoch: process.env.DEMO_SEED_EPOCH || null,
+        shots: manifest,
+      },
+      null,
+      2,
+    ),
   );
 
   const ok = manifest.filter((m) => m.file).length;
@@ -697,7 +934,13 @@ if (compareIdx !== -1) {
   const label = arg('label', null);
   if (!label) throw new Error('Usage: --label <name>   (or --compare <a> <b>)');
   const publicOnly = process.argv.includes('--public');
-  const defaultRoutes = publicOnly ? PUBLIC_ROUTES : [...PUBLIC_ROUTES, ...AUTHED_ROUTES];
+  // ADMIN_ROUTES is a separate list because it needs a separate session, but it
+  // is still part of the default set — leaving it out would silently shrink the
+  // baseline from 26 routes to 22 and drop the admin surface entirely, which is
+  // the opposite of why it was split out.
+  const defaultRoutes = publicOnly
+    ? PUBLIC_ROUTES
+    : [...PUBLIC_ROUTES, ...AUTHED_ROUTES, ...ADMIN_ROUTES];
   const routes = arg('routes', defaultRoutes.join(',')).split(',').map((s) => s.trim()).filter(Boolean);
   const viewports = arg('viewports', '1440,390').split(',').map((s) => parseInt(s.trim(), 10)).filter(Boolean);
   const settleMs = parseInt(arg('settle', '3500'), 10);
