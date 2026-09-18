@@ -465,7 +465,29 @@ async function capture(label, routes, viewports, out, settleMs, publicOnly) {
     process.stdout.write(`warm-up (${routes.length} routes)…`);
     for (const route of routes) {
       await wp.goto(`${BASE}${route}`, { waitUntil: 'load', timeout: 90_000 }).catch(() => {});
-      await wp.waitForTimeout(600);
+      /*
+       * Let the images actually FINISH here, not just start.
+       *
+       * `next/image` optimises on demand in dev and caches the result under
+       * .next/cache/images. A warm-up that closes the page while a variant is
+       * still being generated leaves it uncached, so the real capture pays the
+       * same cost and can miss it — and a run right after `rm -rf .next` then
+       * differs from one on a warm tree with no code change between them. That
+       * is exactly how a Phase 0 comparison produced two homepage "regressions"
+       * (5877 px and 25825 px) that were nothing but a cold optimiser cache.
+       * Scroll first so the lazy ones are requested at all.
+       */
+      await wp.evaluate(() => window.scrollTo(0, document.body.scrollHeight)).catch(() => {});
+      await wp
+        .waitForFunction(
+          () =>
+            Array.from(document.images).every((i) =>
+              !i.getAttribute('src') && !i.currentSrc ? true : i.complete && i.naturalWidth > 0,
+            ),
+          null,
+          { timeout: 20_000 },
+        )
+        .catch(() => {});
       process.stdout.write('.');
     }
     process.stdout.write('\n');
