@@ -129,7 +129,20 @@ export default function DashboardLayout({
     <SocketProvider user={user}>
     <div className="min-h-screen bg-[var(--background)]">
       {/* Header */}
-      <header className="bg-[var(--surface)]/80 backdrop-blur-xl border-b border-[var(--border)] fixed top-0 left-0 right-0 z-30 transition-colors duration-200">
+      {/*
+        SOLID surface, not `bg-[var(--surface)]/80 backdrop-blur-xl`.
+
+        Tailwind drops an opacity modifier applied to a `var()` colour: it can
+        only build `rgb(<channels> / .8)`, and `rgb(var(--surface) / .8)` is
+        invalid, so the whole declaration is discarded. Compiled and checked —
+        `.bg-\[var\(--surface\)\]\/80` is emitted NOWHERE. This header has
+        therefore had no background colour at all; content scrolled under it
+        behind nothing but a blur. 55 further sites across 19 files have the
+        same shape (see the Phase 2 report). Little Worlds wants an opaque,
+        quiet header anyway, so the blur goes with it rather than costing a
+        compositing layer for nothing.
+      */}
+      <header className="bg-[var(--surface)] border-b border-[var(--border)] fixed top-0 left-0 right-0 z-30 transition-colors duration-200">
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-4">
@@ -155,8 +168,13 @@ export default function DashboardLayout({
                 {brandLogo ? (
                   <img src={brandLogo} alt={brandName} className="w-8 h-8 rounded-lg object-contain" />
                 ) : (
-                  <div className="w-8 h-8 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] rounded-lg flex items-center justify-center">
-                    <span className="text-[#061A21] font-bold text-lg">{brandInitial}</span>
+                  /* Forest fill with the on-forest ink (#f2efe4 on #1f4230 =
+                     9.70:1), matching `.eh-btn-neon`. `--primary` rather than a
+                     literal so a white-label tenant's fill still flows through;
+                     the neon→cyan gradient it replaces was 1.65:1 substrate-side
+                     and read as a foreign object on ivory. */
+                  <div className="w-8 h-8 bg-[var(--primary)] rounded-lg flex items-center justify-center">
+                    <span className="text-[var(--lw-on-forest)] font-bold text-lg">{brandInitial}</span>
                   </div>
                 )}
                 <h1 className="text-2xl font-bold eh-gradient eh-heading">
@@ -180,10 +198,10 @@ export default function DashboardLayout({
                       />
                     ) : (
                       <div
-                        className="w-8 h-8 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] rounded-full flex items-center justify-center"
+                        className="w-8 h-8 bg-[var(--primary)] rounded-full flex items-center justify-center"
                         aria-label={`${user.email} avatar`}
                       >
-                        <span className="text-[#061A21] text-sm font-semibold">{getUserInitials()}</span>
+                        <span className="text-[var(--lw-on-forest)] text-sm font-semibold">{getUserInitials()}</span>
                       </div>
                     )}
                     <div className="hidden md:block text-left">
@@ -223,9 +241,9 @@ export default function DashboardLayout({
                               setUserMenuOpen(false);
                               handleLogout();
                             }}
-                            className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-500/10 transition flex items-center gap-2"
+                            className="w-full text-left px-4 py-2 text-sm text-[var(--error-ink)] hover:bg-[var(--status-offline-bg)] transition flex items-center gap-2"
                           >
-                            <Icon name="logout" size="md" className="text-red-500" />
+                            <Icon name="logout" size="md" className="text-[var(--error-ink)]" />
                             <span>Logout</span>
                           </button>
                         </div>
@@ -248,11 +266,28 @@ export default function DashboardLayout({
       </div>
 
       <div className="flex pt-16">
-        {/* Sidebar */}
+        {/*
+          Sidebar.
+
+          The rail sits on `--background-secondary` (limestone) and the ACTIVE
+          item on `--surface` (card ivory), so the current page reads as a raised
+          card on a recessed rail. That inversion is not decoration — it is what
+          makes the active label's contrast provable under white-label.
+          `applyCSSVariables` derives a tenant's `--brand-ink-light` against
+          `--surface` specifically, so an active label painted on `--surface` is
+          guaranteed AA for EVERY tenant. The obvious alternative, a brand tint
+          such as `--badge-brand-bg` (#e0e0d6), silently costs ~13% of that ratio
+          and drops a tenant sitting at the 4.5:1 floor to ~3.9:1.
+
+          The previous `bg-[var(--primary)]/10` wash never rendered at all:
+          Tailwind discards an opacity modifier on a `var()` colour (verified
+          against the compiled sheet — the rule is emitted nowhere), so the
+          active item had no ground, only a left rule.
+        */}
         <aside
           className={`${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-          } fixed lg:relative lg:translate-x-0 w-56 bg-[var(--surface)] min-h-[calc(100vh-4rem)] border-r border-[var(--border)] transition-transform duration-300 ease-in-out z-20`}
+          } fixed lg:relative lg:translate-x-0 w-56 bg-[var(--background-secondary)] min-h-[calc(100vh-4rem)] border-r border-[var(--border)] transition-transform duration-300 ease-in-out z-20`}
         >
           <nav className="p-3 space-y-1">
             {navigation.map((item) => {
@@ -265,7 +300,7 @@ export default function DashboardLayout({
                   aria-current={active ? 'page' : undefined}
                   className={`flex items-center gap-2.5 px-3 py-3 min-h-[44px] rounded-lg text-sm font-medium transition-all duration-150 ${
                     active
-                      ? 'bg-[var(--primary)]/10 text-[var(--primary-ink)] border-l-2 border-[var(--primary-ink)]'
+                      ? 'bg-[var(--surface)] text-[var(--primary-ink)] border-l-2 border-[var(--primary-ink)] shadow-[0_1px_2px_rgba(35,38,31,0.06)]'
                       : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]'
                   }`}
                 >
@@ -275,7 +310,7 @@ export default function DashboardLayout({
                   <Icon name={item.icon} size="md" className={active ? 'text-[var(--primary-ink)]' : 'text-[var(--foreground-tertiary)]'} />
                   <span className="flex-1">{item.name}</span>
                   {active && (
-                    <span className="w-2 h-2 bg-[var(--primary-ink)] rounded-full shadow-neon-sm"></span>
+                    <span className="w-2 h-2 bg-[var(--primary-ink)] rounded-full"></span>
                   )}
                 </Link>
               );
@@ -283,7 +318,7 @@ export default function DashboardLayout({
           </nav>
 
           {/* Sidebar Footer */}
-          <div className="absolute bottom-0 left-0 right-0 p-2 border-t border-[var(--border)] bg-[var(--surface-secondary)]">
+          <div className="absolute bottom-0 left-0 right-0 p-2 border-t border-[var(--border)] bg-[var(--background-tertiary)]">
             <div className="text-xs text-[var(--foreground-tertiary)] space-y-1">
               <div className="flex justify-between">
                 <span>Version</span>

@@ -15,6 +15,35 @@ export default function AdminLayout({
   const { user, loading: authLoading } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
+  /*
+   * Collapse the rail to its icon width below `lg`.
+   *
+   * The rail is `fixed` at 256px and `<main>` clears it with a matching
+   * margin, so at 390px the content box was 134px wide and every admin page
+   * overflowed the viewport horizontally (measured by the design harness:
+   * /admin 459px, /admin/organizations 485px, /admin/health 507px against a
+   * 390px viewport). Collapsing to the 64px rail returns 326px of content
+   * width — the same trade the dashboard shell already makes, and the chevron
+   * stays reachable inside the rail, so this is a default rather than a lock.
+   *
+   * Debounced and mirrored from the dashboard layout deliberately: two shells
+   * that disagree about where "small" starts is a worse bug than the copy.
+   */
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const apply = () => setSidebarCollapsed(window.innerWidth < 1024);
+    const handleResize = () => {
+      clearTimeout(timer);
+      timer = setTimeout(apply, 150);
+    };
+    apply();
+    window.addEventListener('resize', handleResize);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
   // Check if user is super admin
   useEffect(() => {
     if (!authLoading && user) {

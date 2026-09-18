@@ -1,7 +1,12 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { BrandConfig, loadBrandConfig, applyCSSVariables } from '@/lib/customization';
+import {
+  BrandConfig,
+  loadBrandConfig,
+  applyCSSVariables,
+  defaultBrandConfig,
+} from '@/lib/customization';
 import { apiClient } from '@/lib/api';
 
 interface CustomizationContextType {
@@ -12,15 +17,19 @@ interface CustomizationContextType {
 
 const CustomizationContext = createContext<CustomizationContextType | undefined>(undefined);
 
-const defaultBrandConfig: BrandConfig = {
-  id: 'default',
-  name: 'Vizora',
-  primaryColor: '#00E5A0',
-  secondaryColor: '#00B4D8',
-  accentColor: '#00CC8E',
-  fontFamily: 'sans',
-  showPoweredBy: true,
-};
+/*
+ * The default config is IMPORTED, not restated.
+ *
+ * It was declared twice — here and in lib/customization.ts — with identical
+ * values, which is the arrangement that drifts. It matters more than an
+ * ordinary duplicate because these colours are not a fallback nobody sees:
+ * they are the `||` operands below, and `applyCSSVariables` publishes the
+ * result as an inline `--primary` on <html>, which beats the `:root` palette
+ * for every signed-in tenant. A third copy lives server-side in
+ * `organizations.service.ts` `getBranding()` and is the one that actually
+ * decides; see the comment at the definition site for why none of them has
+ * been moved off the retired neon yet.
+ */
 
 export function CustomizationProvider({ children }: { children: React.ReactNode }) {
   const [brandConfig, setBrandConfig] = useState<BrandConfig | null>(null);
@@ -70,9 +79,9 @@ export function CustomizationProvider({ children }: { children: React.ReactNode 
           id: org.id,
           name: branding.name || org.name,
           logo: branding.logoUrl,
-          primaryColor: branding.primaryColor || '#00E5A0',
-          secondaryColor: branding.secondaryColor || '#00B4D8',
-          accentColor: branding.accentColor || '#00CC8E',
+          primaryColor: branding.primaryColor || defaultBrandConfig.primaryColor,
+          secondaryColor: branding.secondaryColor || defaultBrandConfig.secondaryColor,
+          accentColor: branding.accentColor || defaultBrandConfig.accentColor,
           fontFamily: branding.fontFamily || 'sans',
           showPoweredBy: branding.showPoweredBy ?? true,
           customDomain: branding.customDomain || '',

@@ -17,8 +17,31 @@ export interface BrandConfig {
   customCSS?: string;
 }
 
-// Default brand configuration (matches Vizora's brand colors)
-const defaultBrandConfig: BrandConfig = {
+/**
+ * Default brand configuration (matches Vizora's brand colors).
+ *
+ * ── STILL THE RETIRED NEON, DELIBERATELY, AND IT OUTRANKS `:root` ─────────
+ * These are not cosmetic defaults. `applyCSSVariables` below writes `--primary`
+ * as an INLINE STYLE on <html> for any config whose id is not `'default'`, and
+ * `CustomizationProvider` builds exactly such a config from the branding API —
+ * so this triple (or the server's copy of it) decides `--primary` for the whole
+ * authenticated app and beats the Little Worlds `:root` palette outright. No
+ * organisation row currently stores a brand colour, so every signed-in tenant
+ * takes the fallback. That is why the logged-in app is still neon after Phase 1
+ * promoted the one palette to `:root`: the root token is correct and simply
+ * never wins.
+ *
+ * They are NOT changed here because the authoritative copy is the server's —
+ * `middleware/.../organizations.service.ts` `getBranding()` returns the same
+ * triple and its comment requires the two to stay in sync. Moving the web side
+ * alone would break that invariant and change nothing a user sees, since the
+ * API response always wins for a signed-in session. Retiring the neon is a
+ * coordinated web + middleware change (middleware deploy), not a web restyle.
+ *
+ * Exported so `CustomizationProvider` reads them instead of restating them:
+ * this file is the one place the web side declares them.
+ */
+export const defaultBrandConfig: BrandConfig = {
   id: 'default',
   name: 'Vizora',
   primaryColor: '#00E5A0',
