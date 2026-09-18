@@ -462,6 +462,16 @@ async function capture(label, routes, viewports, out, settleMs, publicOnly) {
     await warm.addInitScript(FREEZE);
     await pinReadiness(warm);
     const wp = await warm.newPage();
+    /*
+     * Record every on-demand image-optimiser URL the pages ask for, so they can
+     * be fetched to completion below. Waiting for `complete` on the page is not
+     * enough on its own: a variant that is still being generated when the page
+     * closes is never cached, so the next visit pays the same cost again.
+     */
+    const optimiserUrls = new Set();
+    wp.on('request', (r) => {
+      if (r.url().includes('/_next/image')) optimiserUrls.add(r.url());
+    });
     process.stdout.write(`warm-up (${routes.length} routes)…`);
     for (const route of routes) {
       await wp.goto(`${BASE}${route}`, { waitUntil: 'load', timeout: 90_000 }).catch(() => {});
@@ -491,6 +501,23 @@ async function capture(label, routes, viewports, out, settleMs, publicOnly) {
       process.stdout.write('.');
     }
     process.stdout.write('\n');
+    /*
+     * Fetch each optimiser URL to completion, which is what actually populates
+     * .next/cache/images. Verified: warming the homepage's seven variants this
+     * way turned a run that was losing scene tiles into one byte-identical to
+     * the reference set, on the same code.
+     */
+    if (optimiserUrls.size) {
+      let warmed = 0;
+      for (const u of optimiserUrls) {
+        const res = await wp.request.get(u, { timeout: 120_000 }).catch(() => null);
+        if (res && res.ok()) {
+          await res.body().catch(() => {});
+          warmed++;
+        }
+      }
+      console.log(`  image optimiser: ${warmed}/${optimiserUrls.size} variants cached`);
+    }
     await warm.close();
   }
 
