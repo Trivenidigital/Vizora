@@ -183,6 +183,32 @@ export function readableInk(color: string, background: string, minRatio = 4.5): 
 }
 
 /**
+ * Does this branding carry Vizora's own default colours, i.e. did the tenant
+ * never choose one?
+ *
+ * BRIDGE. See the long note at the call site in `applyCSSVariables` for why the
+ * client has to recognise its own defaults at all, and what replaces this.
+ *
+ * Compares the triple only. `name`, `logoUrl` and the rest are real tenant
+ * choices that a tenant may well have made without touching the colours, and
+ * they do not feed `--primary`, so they must not affect this answer.
+ *
+ * Exported for tests: the whole point is that the predicate matches the values
+ * the server actually sends.
+ */
+export function isUnbrandedDefault(config: BrandConfig): boolean {
+  // Both sides optional: `accentColor` is optional on BrandConfig, so an absent
+  // value on either side normalises to '' and two absences compare equal —
+  // which is the right answer, not a coincidence worth tightening away.
+  const eq = (a?: string, b?: string) => (a ?? '').toLowerCase() === (b ?? '').toLowerCase();
+  return (
+    eq(config.primaryColor, defaultBrandConfig.primaryColor) &&
+    eq(config.secondaryColor, defaultBrandConfig.secondaryColor) &&
+    eq(config.accentColor, defaultBrandConfig.accentColor)
+  );
+}
+
+/**
  * Apply CSS variables for customization
  */
 export function applyCSSVariables(config: BrandConfig = currentBrandConfig): void {
@@ -193,9 +219,41 @@ export function applyCSSVariables(config: BrandConfig = currentBrandConfig): voi
   root.style.setProperty('--brand-secondary', config.secondaryColor);
   root.style.setProperty('--brand-accent', config.accentColor || config.primaryColor);
 
-  // Also override the theme's --primary so the entire UI adapts (sidebar, focus rings, buttons)
-  // Only override if not using the default Vizora color to avoid flash
-  if (config.id !== 'default') {
+  /*
+   * Override the theme's `--primary` so the whole UI adapts — but ONLY when a
+   * tenant actually chose a colour.
+   *
+   * ── The bug this guard was meant to prevent, and didn't ──────────────────
+   * The condition used to be `config.id !== 'default'` alone. The intent was
+   * right: don't override when the values are just Vizora's own defaults. The
+   * implementation never matched it, because `CustomizationProvider` builds its
+   * config from the branding API and stamps the real org id on it — so `id` is
+   * never `'default'` for a signed-in user, and the guard passed even when the
+   * triple was the untouched default.
+   *
+   * These writes are INLINE STYLES on <html>, which outrank every stylesheet
+   * rule, so the effect was that `:root`'s Little Worlds `--primary` could never
+   * win behind login. No organisation row stores a brand colour today, so every
+   * tenant took the retired Electric Horizon neon: measured live, `.eh-btn-neon`
+   * painted its `--lw-on-forest` label at 1.43:1 where the token pairing
+   * promises 9.70:1.
+   *
+   * ── This is a BRIDGE, not the end state ──────────────────────────────────
+   * Pattern-matching the default triple is the web-only half of the fix, and it
+   * is exact rather than fuzzy on purpose: a tenant who deliberately picks
+   * Vizora's own neon gets treated as unbranded, which is indistinguishable
+   * from the correct outcome, and any other colour still overrides unchanged.
+   *
+   * The durable fix is for the SERVER to say whether branding was ever chosen —
+   * a flag, or omitting the branding object entirely — instead of returning a
+   * triple the client has to recognise. `getBranding()` in
+   * middleware/src/modules/organizations/organizations.service.ts synthesises
+   * this default, and its comment requires it to stay in sync with
+   * `defaultBrandConfig` above. That change needs a middleware deploy and
+   * belongs in W6, which already plans one. When it lands, delete
+   * `isUnbrandedDefault` and guard on the server's answer.
+   */
+  if (config.id !== 'default' && !isUnbrandedDefault(config)) {
     root.style.setProperty('--primary', config.primaryColor);
     // `--primary` is a FILL colour and a tenant may legitimately pick one that
     // is unreadable as text (the Vizora neon itself is 1.65:1 on white). Derive
@@ -218,6 +276,23 @@ export function applyCSSVariables(config: BrandConfig = currentBrandConfig): voi
      * `readableInk` itself keeps working against any substrate and is still
      * covered for dark inputs by customization-ink.test.ts.
      */
+  } else {
+    /*
+     * REMOVE, don't merely skip.
+     *
+     * This function runs more than once per page: `CustomizationProvider`
+     * applies the localStorage-cached config first for a fast first paint, then
+     * the API's answer when it arrives. So "unbranded" has to actively undo a
+     * previous branded write — a tenant clearing their brand colour, or a cached
+     * config from a different org, would otherwise leave a stale inline
+     * `--primary` on <html> outranking `:root` forever. Skipping the write only
+     * works if nothing ever wrote it, which is not a property this call has.
+     *
+     * `removeProperty` on an unset property is a no-op, so the common path
+     * costs nothing.
+     */
+    root.style.removeProperty('--primary');
+    root.style.removeProperty('--brand-ink-light');
   }
 
   // Font family
