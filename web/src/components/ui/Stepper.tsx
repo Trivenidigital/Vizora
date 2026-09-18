@@ -25,8 +25,8 @@ const statusStyles: Record<StepStatus, { circle: string; label: string }> = {
     label: 'text-[var(--foreground-secondary)]',
   },
   active: {
-    circle: 'bg-primary-600 dark:bg-primary-400 text-white animate-pulse',
-    label: 'text-primary-600 dark:text-primary-400 font-semibold',
+    circle: 'bg-brand text-[var(--lw-on-forest)] animate-pulse',
+    label: 'text-[var(--primary-ink)] font-semibold',
   },
   complete: {
     circle: 'bg-success-600 dark:bg-success-500 text-white',

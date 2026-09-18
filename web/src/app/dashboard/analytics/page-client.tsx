@@ -301,7 +301,7 @@ export default function AnalyticsClient() {
  onClick={() => setDateRange(range)}
  className={`px-4 py-2 rounded-lg font-medium transition-colors capitalize ${
  dateRange === range
- ? 'bg-primary-600 dark:bg-primary-400 text-white'
+ ? 'bg-brand text-[var(--lw-on-forest)]'
  : 'bg-[var(--background-tertiary)] text-[var(--foreground)] hover:bg-[var(--surface-hover)]'
  }`}
  >

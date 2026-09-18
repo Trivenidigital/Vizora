@@ -17,7 +17,7 @@ interface ProgressProps {
 }
 
 const variantStyles: Record<ProgressVariant, string> = {
-  primary: 'bg-primary-600 dark:bg-primary-400',
+  primary: 'bg-brand',
   success: 'bg-success-600 dark:bg-success-500',
   warning: 'bg-warning-600 dark:bg-warning-400',
   error: 'bg-error-600 dark:bg-error-500',

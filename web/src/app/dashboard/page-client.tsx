@@ -102,9 +102,9 @@ const getHealthSummary = (health: DashboardSystemHealth | null) => {
  label: 'Healthy',
  detail: 'All systems operational',
  dotClassName: 'bg-success-300 animate-pulse',
- cardClassName: 'bg-gradient-to-br from-[#00E5A0] to-[#00B4D8]',
- textClassName: 'text-primary-100',
- iconClassName: 'text-primary-200',
+ cardClassName: 'bg-gradient-to-br from-[var(--primary)] to-[var(--primary-light)]',
+ textClassName: 'text-[var(--lw-on-forest)]',
+ iconClassName: 'text-[var(--lw-on-forest)]',
  };
  case 'degraded':
  return {
@@ -683,52 +683,52 @@ export default function DashboardClient({
 
  {/* Getting Started Guide */}
  {stats.devices.total === 0 && (
- <div className="bg-gradient-to-r from-[#00E5A0] to-[#00B4D8] rounded-lg shadow-lg p-8 text-white">
+ <div className="bg-gradient-to-r from-[var(--primary)] to-[var(--primary-light)] rounded-lg shadow-lg p-8 text-[var(--lw-on-forest)]">
  <h3 className="eh-dash-subtitle text-2xl font-bold mb-4 flex items-center gap-2"><Icon name="power" size="xl" className="text-white" /> Getting Started</h3>
- <p className="mb-6 text-primary-100">
+ <p className="mb-6 text-[var(--lw-on-forest)]">
  Welcome to Vizora! Follow these steps to get your digital signage system up and running:
  </p>
  <div className="space-y-4">
  <div className="flex items-start gap-4">
- <div className="w-8 h-8 bg-[var(--surface)] text-primary-600 rounded-full flex items-center justify-center font-bold flex-shrink-0">
+ <div className="w-8 h-8 bg-[var(--surface)] text-[var(--primary-ink)] rounded-full flex items-center justify-center font-bold flex-shrink-0">
  1
  </div>
  <div>
  <div className="font-semibold mb-1">Pair Your First Device</div>
- <div className="text-sm text-primary-100">
+ <div className="text-sm text-[var(--lw-on-forest)]">
  Connect a display device to start showing content
  </div>
  </div>
  </div>
  <div className="flex items-start gap-4">
- <div className="w-8 h-8 bg-[var(--surface)] text-primary-600 rounded-full flex items-center justify-center font-bold flex-shrink-0">
+ <div className="w-8 h-8 bg-[var(--surface)] text-[var(--primary-ink)] rounded-full flex items-center justify-center font-bold flex-shrink-0">
  2
  </div>
  <div>
  <div className="font-semibold mb-1">Upload Your Content</div>
- <div className="text-sm text-primary-100">
+ <div className="text-sm text-[var(--lw-on-forest)]">
  Add images, videos, or other media to your library
  </div>
  </div>
  </div>
  <div className="flex items-start gap-4">
- <div className="w-8 h-8 bg-[var(--surface)] text-primary-600 rounded-full flex items-center justify-center font-bold flex-shrink-0">
+ <div className="w-8 h-8 bg-[var(--surface)] text-[var(--primary-ink)] rounded-full flex items-center justify-center font-bold flex-shrink-0">
  3
  </div>
  <div>
  <div className="font-semibold mb-1">Create a Playlist</div>
- <div className="text-sm text-primary-100">
+ <div className="text-sm text-[var(--lw-on-forest)]">
  Organize your content into playlists
  </div>
  </div>
  </div>
  <div className="flex items-start gap-4">
- <div className="w-8 h-8 bg-[var(--surface)] text-primary-600 rounded-full flex items-center justify-center font-bold flex-shrink-0">
+ <div className="w-8 h-8 bg-[var(--surface)] text-[var(--primary-ink)] rounded-full flex items-center justify-center font-bold flex-shrink-0">
  4
  </div>
  <div>
  <div className="font-semibold mb-1">Assign & Schedule</div>
- <div className="text-sm text-primary-100">
+ <div className="text-sm text-[var(--lw-on-forest)]">
  Assign playlists to devices and set schedules
  </div>
  </div>

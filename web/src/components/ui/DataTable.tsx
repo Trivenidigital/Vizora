@@ -106,7 +106,7 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps<any>>(
                     {col.sortable ? (
                       <button
                         onClick={() => handleSort(col.key)}
-                        className="inline-flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                        className="inline-flex items-center gap-1 hover:text-[var(--primary-ink)] transition-colors"
                       >
                         {col.header}
                         {sortKey === col.key && (
