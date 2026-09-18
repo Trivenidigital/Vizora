@@ -136,9 +136,24 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
 
   return (
     <>
-      {/* Keyboard Shortcut Hint (optional, can be hidden) */}
+      {/*
+        Keyboard shortcut hint.
+
+        NOT restyled, deliberately. Phase 2c was asked to re-skin it, and it
+        turns out that cannot be done inside
+        Phase 2's constraints: the palette is mounted from the ROOT layout, so
+        this chip renders on the HOMEPAGE too, and the homepage has to stay
+        pixel-identical while it is under design review. Measured — giving it a
+        hairline and the mono face moved `root__1440` by 1482 px and
+        `root__390` by 1464 px.
+
+        Whoever picks this up: either restyle it together with the homepage
+        review, or scope it to the authenticated shell first (mount the hint
+        from the dashboard layout rather than the root one, which is arguably
+        where it belongs — there is nothing to command on a marketing page).
+      */}
       {!open && (
-        <div className="fixed bottom-4 right-4 px-3 py-2 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-[var(--foreground-secondary)] font-mono text-xs pointer-events-none z-40">
+        <div className="fixed bottom-4 right-4 px-3 py-2 rounded-lg bg-[var(--background-secondary)] text-[var(--foreground-secondary)] text-xs font-medium pointer-events-none z-40">
           ⌘K
         </div>
       )}
