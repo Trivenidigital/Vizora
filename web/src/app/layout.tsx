@@ -2,7 +2,6 @@ import './globals.css';
 import { Sora, DM_Sans, JetBrains_Mono, Fraunces } from 'next/font/google';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { CustomizationProvider } from '@/components/providers/CustomizationProvider';
-import CommandPaletteWrapper from '@/components/CommandPaletteWrapper';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { CookieConsent } from '@/components/CookieConsent';
 
@@ -64,10 +63,21 @@ export default function RootLayout({
         </a>
         <ErrorBoundary>
           <ThemeProvider>
-            <CustomizationProvider>
-              <CommandPaletteWrapper />
-              {children}
-            </CustomizationProvider>
+            {/*
+              The command palette is NOT mounted here.
+
+              It used to be, which put its ⌘K hint — `fixed bottom-4 right-4` —
+              on every public page including the homepage. That was app chrome
+              leaking onto a marketing surface: every command it offers is a
+              `/dashboard/*` navigation, so there has never been anything to
+              command on a public route. It now mounts in the two authenticated
+              shells (`dashboard/layout.tsx`, `admin/layout.tsx`) instead.
+
+              Mounting it here also made the hint unrestylable: the homepage is
+              under design review and must stay pixel-identical, so any change
+              to the chip moved a surface it had no business being on.
+            */}
+            <CustomizationProvider>{children}</CustomizationProvider>
           </ThemeProvider>
         </ErrorBoundary>
         <CookieConsent />

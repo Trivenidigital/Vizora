@@ -137,23 +137,32 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
   return (
     <>
       {/*
-        Keyboard shortcut hint.
+        Keyboard shortcut hint — a key cap, so it reads as a key.
 
-        NOT restyled, deliberately. Phase 2c was asked to re-skin it, and it
-        turns out that cannot be done inside
-        Phase 2's constraints: the palette is mounted from the ROOT layout, so
-        this chip renders on the HOMEPAGE too, and the homepage has to stay
-        pixel-identical while it is under design review. Measured — giving it a
-        hairline and the mono face moved `root__1440` by 1482 px and
-        `root__390` by 1464 px.
+        Mono on the card surface: `--foreground-secondary` on `--surface` is
+        8.01:1. It was a borderless chip on `--background-secondary`, which on
+        the ivory substrate is a barely visible smudge.
 
-        Whoever picks this up: either restyle it together with the homepage
-        review, or scope it to the authenticated shell first (mount the hint
-        from the dashboard layout rather than the root one, which is arguably
-        where it belongs — there is nothing to command on a marketing page).
+        The hairline and the soft shadow are what separate it from the page, and
+        the shadow is doing most of that work: `--border` measures 1.30:1 against
+        `--background` and `--border-dark` only 1.52:1, because the Little Worlds
+        hairlines are deliberately low contrast. That is NOT a SC 1.4.11
+        failure — the chip is `pointer-events-none`, so it is an informational
+        label rather than a user interface component, and the 3:1 rule is about
+        identifying components and their states. What has to be legible here is
+        the text, and that is the 8.01:1 above. Do not "fix" the border by
+        reaching for a darker token: none of them reaches 3:1 on this substrate,
+        and a chip that shouted would be worse than one that recedes.
+
+        Restyling this was blocked through Phase 2c and is only possible now
+        because the palette moved off the ROOT layout. While it was mounted
+        there, this chip rendered on the homepage — which is under design review
+        and must stay pixel-identical — and these two lines measurably moved it:
+        `root__1440` by 1482 px, `root__390` by 1464 px. Do not mount the
+        palette globally again; there is nothing to command on a public page.
       */}
       {!open && (
-        <div className="fixed bottom-4 right-4 px-3 py-2 rounded-lg bg-[var(--background-secondary)] text-[var(--foreground-secondary)] text-xs font-medium pointer-events-none z-40">
+        <div className="fixed bottom-4 right-4 px-3 py-2 rounded-lg bg-[var(--surface)] border border-[var(--border)] shadow-[0_2px_8px_rgba(35,38,31,0.10)] text-[var(--foreground-secondary)] font-mono text-xs pointer-events-none z-40">
           ⌘K
         </div>
       )}

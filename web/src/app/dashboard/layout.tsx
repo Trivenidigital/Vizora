@@ -18,6 +18,7 @@ import EntitlementBanner from '@/components/EntitlementBanner';
 import { SupportChatProvider } from '@/components/support/SupportChatProvider';
 import { SupportChat } from '@/components/support/SupportChat';
 import { useCustomization } from '@/components/providers/CustomizationProvider';
+import CommandPaletteWrapper from '@/components/CommandPaletteWrapper';
 import { SCHEDULES_ENABLED } from '@/lib/feature-flags';
 
 const allNavigation: Array<{ name: string; href: string; icon: IconName; exactMatch?: boolean }> = [
@@ -117,6 +118,11 @@ export default function DashboardLayout({
               ) : (
                 children
               )}
+              {/* Mounted in BOTH branches. The editor drops the header and
+                  sidebar, but it was reachable by ⌘K before this component
+                  moved off the root layout, and losing the shortcut there
+                  would be a behaviour change this move did not intend. */}
+              <CommandPaletteWrapper />
             </DeviceStatusProvider>
           </QueryProvider>
         </SocketProvider>
@@ -360,6 +366,12 @@ export default function DashboardLayout({
           </QueryProvider>
         )}
       </div>
+
+      {/* Command palette + its ⌘K hint. Mounted on the authenticated shell
+          rather than the root layout — every command it offers is a
+          `/dashboard/*` navigation, so it has nothing to do on a public page.
+          See the note in app/layout.tsx. */}
+      <CommandPaletteWrapper />
 
       {/* Support Chat Widget */}
       <SupportChat />

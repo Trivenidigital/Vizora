@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { AdminSidebar } from './components/AdminSidebar';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import CommandPaletteWrapper from '@/components/CommandPaletteWrapper';
 
 export default function AdminLayout({
   children,
@@ -91,6 +92,13 @@ export default function AdminLayout({
       >
         <div className="p-6 lg:p-8">{children}</div>
       </main>
+
+      {/* Command palette + its Cmd-K hint. Mounted on the authenticated shells
+          rather than the root layout; see the note in app/layout.tsx. It is
+          deliberately NOT on the loading or access-denied returns above — those
+          are transient states, and the denied one is a refusal, which is a poor
+          place to offer navigation shortcuts. */}
+      <CommandPaletteWrapper />
     </div>
   );
 }
