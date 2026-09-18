@@ -438,15 +438,28 @@ body {
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   MARKETING SCOPE (.mkt) — light Electric Horizon
+   MARKETING SCOPE (.mkt) — now an alias, kept only as a hook
    ------------------------------------------------------------------
-   Applied to the public marketing page wrapper ONLY. Every rule here
-   is scoped under `.mkt`, so the shared .eh-* utilities keep their
-   dark values everywhere else (dashboard, auth). Do NOT recolour the
-   unscoped .eh-* classes below — they are used by the logged-in app.
+   HISTORICAL NOTE. This header used to read "light Electric Horizon"
+   and instructed: "Do NOT recolour the unscoped .eh-* classes below
+   — they are used by the logged-in app." That was correct while the
+   app was dark and marketing was light; recolouring the shared rules
+   would have restyled the dashboard as a silent side effect.
+
+   Phase 1 INVERTS it deliberately: the app now shares the marketing
+   palette, so the unscoped .eh-* rules are *meant* to be the one
+   skin, and they were re-skinned on purpose. Rewritten rather than
+   deleted because the original was load-bearing guidance — a reader
+   who followed it today would refuse to make the change this phase
+   exists to make. The mechanic it protected still holds: those rules
+   are SHARED, so any change to them must be verified on BOTH the
+   public pages and the dashboard, deliberately. Silent breakage
+   still passes CI; the baselines in tasks/design-baselines/ are how
+   you check.
 
    Neon #00E5A0 is 1.8:1 on this substrate and must never be text.
-   Use --mkt-mint for fills/glows and --mkt-mint-ink for small text.
+   It survives only in .mkt-dark-panel (a deliberately dark panel,
+   restyled in W1) and in the consent bar's own token pair.
    ══════════════════════════════════════════════════════════════════ */
 
 /*
