@@ -54,7 +54,56 @@ const ORG_SLUG = 'northwind-demo';
 const ADMIN_EMAIL = 'demo@vizora.local';
 const ADMIN_PASSWORD = process.env.DEMO_TENANT_PASSWORD;
 
-const now = new Date();
+/**
+ * A Vizora PLATFORM operator, for capturing the /admin/* surface.
+ *
+ * `admin/layout.tsx` sends any user without `isSuperAdmin` to /dashboard, and
+ * the demo tenant's admin is deliberately not one — so the visual baselines for
+ * /admin, /admin/organizations, /admin/users and /admin/health were silently
+ * four copies of the dashboard. Phase 1 restyles admin whether or not it gets a
+ * polish wave (it consumes the same tokens), so "we cannot see it break" is not
+ * an acceptable state for the safety net.
+ *
+ * Deliberately a SEPARATE user in a SEPARATE org rather than flipping the flag
+ * on `demo@vizora.local`, for two reasons that are both about blast radius:
+ *   - `isSuperAdmin` rides in the JWT and changes tenant-facing UI
+ *     (/dashboard/templates, /dashboard/settings/security key off it), so
+ *     promoting the demo admin would move dashboard screenshots that have
+ *     nothing to do with admin.
+ *   - a second user inside Northwind would appear in its team list, putting a
+ *     Vizora employee on the customer's /dashboard/settings/team page — which is
+ *     both a changed baseline and a lie about what the fixture represents.
+ * Vizora staff are not members of a customer's organisation, and the fixture
+ * should not pretend otherwise.
+ */
+const PLATFORM_ORG_SLUG = 'vizora-platform-demo';
+const PLATFORM_EMAIL = 'platform@vizora.local';
+
+/**
+ * The instant every relative timestamp below is measured back from.
+ *
+ * Defaults to wall-clock, which is what a one-off demo seed wants. Set
+ * `DEMO_SEED_EPOCH` to an ISO instant to make the whole fixture REPRODUCIBLE.
+ *
+ * This exists because the visual baselines depend on it. The screenshot harness
+ * freezes the clock inside the browser, but it cannot freeze the database: with
+ * a wall-clock epoch, every "last seen 4 minutes ago", uptime series and
+ * activity feed shifts on each re-seed. Measured: re-seeding moved 10 of 52
+ * baseline shots — health by 4.7%, devices by 1.5% — with no code change
+ * whatsoever. A baseline that a re-seed invalidates is not a baseline.
+ *
+ * THE FOOTGUN, stated so nobody has to rediscover it: the pin is not recorded
+ * anywhere the harness can check. Re-seed without `DEMO_SEED_EPOCH`, or with a
+ * different value than the baselines were captured under, and every time-bearing
+ * screen will diff — silently, and looking exactly like a real regression.
+ * `tasks/design-baselines/before/manifest.json` records the epoch each set was
+ * captured with; when a diff is unexplained, compare that FIRST.
+ */
+const SEED_EPOCH = process.env.DEMO_SEED_EPOCH;
+if (SEED_EPOCH && Number.isNaN(Date.parse(SEED_EPOCH))) {
+  throw new Error(`DEMO_SEED_EPOCH is not a parseable instant: "${SEED_EPOCH}"`);
+}
+const now = SEED_EPOCH ? new Date(SEED_EPOCH) : new Date();
 const minsAgo = (m) => new Date(now.getTime() - m * 60_000);
 const daysAgo = (d) => new Date(now.getTime() - d * 86_400_000);
 
@@ -149,11 +198,16 @@ const PLAYLISTS = [
 async function main() {
   console.log('Seeding synthetic demo tenant (local only)…');
 
-  // Clean any prior run of THIS demo org only.
+  // Clean any prior run of THESE demo orgs only.
   const existing = await prisma.organization.findUnique({ where: { slug: ORG_SLUG } });
   if (existing) {
     await prisma.organization.delete({ where: { id: existing.id } });
     console.log('  removed previous demo org');
+  }
+  const existingPlatform = await prisma.organization.findUnique({ where: { slug: PLATFORM_ORG_SLUG } });
+  if (existingPlatform) {
+    await prisma.organization.delete({ where: { id: existingPlatform.id } });
+    console.log('  removed previous platform org');
   }
 
   const org = await prisma.organization.create({
@@ -245,6 +299,32 @@ async function main() {
     });
   }
 
+  // The platform operator. Its own org, so Northwind's team list is untouched.
+  const platformOrg = await prisma.organization.create({
+    data: {
+      name: 'Vizora Platform',
+      slug: PLATFORM_ORG_SLUG,
+      subscriptionTier: 'enterprise',
+      subscriptionStatus: 'active',
+      screenQuota: 0,
+      country: 'US',
+    },
+  });
+
+  await prisma.user.create({
+    data: {
+      email: PLATFORM_EMAIL,
+      passwordHash: await bcrypt.hash(ADMIN_PASSWORD, 10),
+      firstName: 'Rowan',
+      lastName: 'Ellis',
+      role: 'admin',
+      isActive: true,
+      isSuperAdmin: true,
+      organizationId: platformOrg.id,
+      lastLoginAt: minsAgo(11),
+    },
+  });
+
   const counts = {
     displays: await prisma.display.count({ where: { organizationId: org.id } }),
     online: await prisma.display.count({ where: { organizationId: org.id, status: 'online' } }),
@@ -253,6 +333,12 @@ async function main() {
   };
   console.log('  seeded:', counts);
   console.log('  login:', ADMIN_EMAIL);
+  console.log('  platform super-admin:', PLATFORM_EMAIL, '(same password)');
+  console.log(
+    '  epoch:',
+    now.toISOString(),
+    SEED_EPOCH ? '(pinned via DEMO_SEED_EPOCH — reproducible)' : '(wall-clock — visual baselines will drift; see SEED_EPOCH)',
+  );
 }
 
 main()
