@@ -73,7 +73,41 @@ One thing got *easier*. August's biggest cost was hand-classifying 728 neon usag
 
 **Reading:** roughly 60% of colour usage is already variable-driven, so Phase 1 alone moves most of the app. The remaining ~2.3k hard-coded sites are the long pole, and the lack of visual baselines is the biggest *risk*, not the biggest cost.
 
-## 3. Decisions needed before starting
+## 3. Decisions — TAKEN 2026-09-18
+
+| # | Decision | Answer |
+|---|---|---|
+| D1 | Dark mode | **DROPPED — light only.** Overrides the recommendation below. |
+| D2 | Existing users with no saved preference | **Light, with a one-time dismissible notice.** |
+| D3 | Admin area | **OUT of scope** — see the consequence note below; it is not "admin is unchanged". |
+| D3b | Emails + TV installer + display pairing screen | **IN**, final wave, separate PRs. |
+| D4 | Customer content surfaces | **OUT** — stays neutral. |
+| D5 | Sequencing | **Phase 0 starts now**, in parallel with Astra's homepage review. |
+
+### Consequences of D1 + D2 (recorded because they change the work)
+
+1. **The one-time notice cannot offer "switch to dark"** — there is no dark to
+   switch to. It becomes a plain "Vizora has a new look" dismissal. If users
+   later ask for dark back, that is a new project, not a toggle we left behind.
+2. **Dropping dark is not free.** Measured: `.dark` token block (14 rules),
+   `ThemeProvider` + `ThemeToggle` + the settings toggle, 53 `useTheme`/`isDark`
+   usages across 15 files, chart dark palettes, `readableInk`'s dark-ink
+   derivation, `darkMode: 'class'` in the Tailwind config, and **469 `dark:`
+   utility variants** in JSX. Plan: remove the *provider, toggle and token
+   block* in Phase 1 (so `.dark` is never applied), and let the 469 inert
+   `dark:` variants be deleted opportunistically per wave under the ratchet
+   test — they cost nothing at runtime once the class is never set, and a
+   big-bang deletion has no visual payoff and real regression risk.
+3. **`web/src/lib/hooks/useTheme.ts` is a SECOND, different hook** from the
+   provider's. The widget components (Clock/Weather/Rss/Sheets/SocialFeed) use
+   theme for *widget* rendering — that is customer content (D4, out of scope).
+   Do not delete widget theming while removing app theming.
+4. **Admin will change appearance regardless.** It consumes the same tokens and
+   `.eh-*` utilities, so Phase 1 restyles it whether or not it is "in scope".
+   D3 therefore means: *no dedicated polish wave for admin* — it inherits the
+   palette and may look rough in places. Accept that, or fold W5 back in.
+
+### Original recommendations (superseded where D1–D5 differ)
 
 | # | Decision | Recommendation | Why |
 |---|---|---|---|
