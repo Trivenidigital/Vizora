@@ -10,7 +10,14 @@ module.exports = {
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
-  darkMode: 'class',
+  /*
+   * `darkMode` is deliberately absent. Dark mode was removed (plan §3 D1): the
+   * `.dark` token block is gone and nothing applies the class, so leaving
+   * `darkMode: 'class'` configured would keep Tailwind emitting `dark:` variants
+   * that can never match — dead CSS in every bundle. The ~467 inert `dark:`
+   * utilities already in the JSX are left in place and retire under the ratchet
+   * per-wave; this line is what stops them costing anything at runtime.
+   */
   theme: {
     extend: {
       /**

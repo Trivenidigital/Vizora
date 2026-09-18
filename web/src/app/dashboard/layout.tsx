@@ -6,11 +6,11 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { SocketProvider } from '@/lib/hooks/useSocket';
 import Breadcrumbs from '@/components/Breadcrumbs';
-import ThemeToggle from '@/components/ThemeToggle';
 import NotificationBell from '@/components/NotificationBell';
 import { DeviceStatusProvider } from '@/lib/context/DeviceStatusContext';
 import QueryProvider from '@/lib/providers/QueryProvider';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import { NewLookNotice } from '@/components/NewLookNotice';
 import { Icon } from '@/theme/icons';
 import type { IconName } from '@/theme/icons';
 import TrialBanner from '@/components/TrialBanner';
@@ -166,7 +166,6 @@ export default function DashboardLayout({
             </div>
             <div className="flex items-center gap-4">
               <NotificationBell />
-              <ThemeToggle />
               {!authLoading && user && (
                 <div className="relative">
                   <button
@@ -329,6 +328,14 @@ export default function DashboardLayout({
 
       {/* Support Chat Widget */}
       <SupportChat />
+
+      {/*
+        One-time "new look" notice. Mounted on the AUTHENTICATED shell, not the
+        root layout: it exists for people who knew the old interface, and a
+        first-time visitor to a public page has nothing to be told. Keeping it
+        off the public routes also keeps those baselines pixel-identical.
+      */}
+      <NewLookNotice />
     </div>
     </SocketProvider>
     </SupportChatProvider>

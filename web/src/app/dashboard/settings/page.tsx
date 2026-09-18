@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { Icon } from '@/theme/icons';
-import { useTheme } from '@/components/providers/ThemeProvider';
 import { semanticColors } from '@/theme/colors';
 import Modal from '@/components/Modal';
 import { useToast } from '@/lib/hooks/useToast';
@@ -14,7 +13,6 @@ import { useCustomization } from '@/components/providers/CustomizationProvider';
 export const dynamic = 'force-dynamic';
 
 export default function SettingsPage() {
- const { mode, setMode } = useTheme();
  const toast = useToast();
  const [settings, setSettings] = useState({
  organizationName: 'My Organization',
@@ -472,35 +470,12 @@ export default function SettingsPage() {
  <div className="eh-dash-card bg-[var(--surface)] rounded-lg shadow-md p-6">
  <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)] mb-4">Appearance</h3>
  <div className="space-y-4">
- <div>
- <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-3">
- Theme Preference
- </label>
- <div className="space-y-2">
- {[
- { value: 'light', label: 'Light', icon: 'light_mode' },
- { value: 'dark', label: 'Dark', icon: 'dark_mode' },
- { value: 'system', label: 'System', icon: 'settings' },
- ].map(({ value, label, icon }) => (
- <label
- key={value}
- className="flex items-center p-2.5 border border-[var(--border)] rounded-lg cursor-pointer hover:bg-[var(--surface-hover)] transition"
- >
- <input
- type="radio"
- name="theme"
- value={value}
- checked={mode === value}
- onChange={(e) => setMode(e.target.value as 'light' | 'dark' | 'system')}
- className="w-4 h-4 accent-primary cursor-pointer"
- />
- <Icon name={icon as any} size="lg" className="ml-3 text-[var(--foreground-secondary)]" />
- <span className="ml-3 text-sm font-medium text-[var(--foreground)]">{label}</span>
- </label>
- ))}
- </div>
- </div>
-
+ {/*
+ Theme preference control REMOVED — dark mode was dropped (plan §3 D1), so a
+ three-way light/dark/system radio would offer two options that no longer
+ exist. The card keeps its "Appearance" heading and the colour preview below,
+ which still describe something real.
+ */}
  {/* Color Preview */}
  <div>
  <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-3">

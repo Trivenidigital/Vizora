@@ -417,6 +417,9 @@ const FREEZE = () => {
 
   try {
     localStorage.setItem('vizora_cookie_consent', 'all');
+    // Same reason as the consent bar: a one-time overlay would otherwise sit on
+    // top of all 26 authenticated routes and make every diff about the overlay.
+    localStorage.setItem('vizora_new_look_seen', '1');
   } catch {
     /* private mode */
   }
