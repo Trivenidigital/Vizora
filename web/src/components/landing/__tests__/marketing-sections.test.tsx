@@ -103,26 +103,48 @@ describe('the workspace section ships the real product shot', () => {
   });
 });
 
-describe('token scopes stay separated', () => {
+/**
+ * These three used to assert that `.mkt` and `.lw` were SEPARATE palettes, with
+ * the marketing scope pinned to its cool ink (`--mkt-ink: #0A222E`) and the warm
+ * set quarantined inside `.lw`. That invariant was correct for exactly as long
+ * as the homepage was the only warm surface.
+ *
+ * Phase 1 of `docs/plans/2026-09-17-full-web-little-worlds-redesign.md` retires
+ * it deliberately: one palette on `:root`, serving every surface, with `.mkt`
+ * and `.lw` reduced to aliases. So the assertions are re-pointed rather than
+ * deleted — the thing worth protecting was never "two scopes", it was "nobody
+ * quietly reintroduces a second competing palette", and that is what these now
+ * check.
+ */
+describe('one palette, no competing scopes', () => {
   it('keeps the reduced-motion reveal override scoped to .mkt', () => {
     const css = fs.readFileSync(GLOBALS_CSS, 'utf8');
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.mkt \.eh-reveal/);
     expect(css).toMatch(/\.mkt \.eh-reveal \{[^}]*transition: none !important/);
   });
 
-  it('leaves the shared .mkt palette on its original cool ink', () => {
+  it('defines the Little Worlds palette on :root, not in a scope', () => {
     const css = fs.readFileSync(GLOBALS_CSS, 'utf8');
-    // `.mkt` is still applied to the legal pages and the auth layout. The
-    // rebrand adds `.lw` alongside it rather than recolouring it, so this ink
-    // must survive verbatim inside the `.mkt` block itself.
-    expect(cssBlock(css, '.mkt')).toContain('--mkt-ink: #0A222E');
+    // Not via cssBlock: `:root` lives inside `@layer base`, so it is indented
+    // and the helper's line-anchored lookup does not reach it. Slice the layer's
+    // opening instead, which is enough to prove these are unscoped.
+    const rootStart = css.indexOf(':root {');
+    expect(rootStart).toBeGreaterThan(-1);
+    const root = css.slice(rootStart, css.indexOf('\n  }', rootStart));
+    expect(root).toContain('--lw-forest: #1f4230');
+    expect(root).toContain('--background: #f5f1e8');
+    expect(root).toContain('--foreground: #23261f');
   });
 
-  it('defines the Little Worlds palette in its own .lw block', () => {
+  it('leaves no palette behind in the .mkt or .lw aliases', () => {
     const css = fs.readFileSync(GLOBALS_CSS, 'utf8');
-    const lw = cssBlock(css, '.lw');
-    expect(lw).toContain('--lw-forest: #1f4230');
-    // and the warm palette is not smuggled into the shared scope
-    expect(cssBlock(css, '.mkt')).not.toContain('--lw-forest');
+    // The old cool ink is gone entirely — not merely overridden somewhere later,
+    // which is how two palettes coexisted the first time.
+    expect(css).not.toContain('--mkt-ink: #0A222E');
+    for (const alias of ['.mkt', '.lw']) {
+      const block = cssBlock(css, alias);
+      expect(block).not.toMatch(/--mkt-[a-z0-9-]+:/);
+      expect(block).not.toMatch(/--lw-[a-z0-9-]+:/);
+    }
   });
 });

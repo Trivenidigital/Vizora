@@ -5,53 +5,79 @@
 @layer base {
   :root {
     /*
-     * Light Mode — Electric Horizon (cool grey), the SAME substrate as the
-     * marketing site.
+     * LITTLE WORLDS — the one light palette, app-wide.
      *
-     * This block used to be a warm-cream palette (#F0ECE8 / taupe borders)
-     * while `.mkt` painted the public pages cool grey (#E9EEEF). Both were
-     * labelled "Electric Horizon"; they were different palettes, so logging in
-     * changed the product's colour temperature. These values are now identical
-     * to the `.mkt` base-token reset below — one light palette serves both
-     * surfaces, and `.mkt` keeps re-declaring them only so it can win over
-     * `.dark` on public routes while a dark-mode user is signed in.
+     * Promoted here from the `.lw` scope, which proved it on the homepage. It
+     * used to be Electric Horizon cool grey (#E9EEEF / #0A222E); before that a
+     * warm cream fought a cool grey across the login boundary. There is now one
+     * palette and no scope to escape it: `.mkt` and `.lw` are aliases kept only
+     * for the landing components that still name `--mkt-*` / `--lw-*`.
      *
-     * Contrast on this substrate, computed:
-     *   --foreground           #0A222E on #E9EEEF = 14.00:1
-     *   --foreground-secondary #3E5860 on #E9EEEF =  6.48:1
-     *   --foreground-tertiary  #4E656C on #E9EEEF =  5.02:1  (micro labels, .eh-th)
+     * Every ratio in this file is computed by `scripts/design/contrast.mjs`.
+     * `docs/plans/2026-08-03-full-app-rebrand.md` records that four of six
+     * hand-written ratios in an earlier pass were wrong, so none are asserted
+     * by eye. Measured on this substrate:
+     *   --foreground           #23261f on paper 13.61:1  on card 14.83:1
+     *   --foreground-secondary #4b5045 on paper  7.36:1  on card  8.01:1
+     *   --foreground-tertiary  #5f6456 on paper  5.41:1  on card  5.89:1 (.eh-th)
+     *   --primary-ink          #1f4230 on paper  9.91:1  on card 10.79:1
      */
-    --background: #E9EEEF;
-    --background-secondary: #E2EAEC;
-    --background-tertiary: #DCE5E7;
-    --foreground: #0A222E;
-    --foreground-secondary: #3E5860;
-    --foreground-tertiary: #4E656C;
+    --background: #f5f1e8;
+    --background-secondary: #efe9dc;
+    --background-tertiary: #e9e2d2;
+    --foreground: #23261f;
+    --foreground-secondary: #4b5045;
+    --foreground-tertiary: #5f6456;
 
     /* Surface and Cards */
-    --surface: #FFFFFF;
-    --surface-secondary: #F4F8F8;
-    --surface-hover: #E8EEEF;
+    --surface: #fdfbf5;
+    --surface-secondary: #f3eee1;
+    --surface-hover: #efe9dc;
 
-    /* Translucent panel fill for the glass cards. Per-theme because the
-       blur sits over a light substrate here and a dark one under .dark. */
+    /*
+     * Translucent panel fill. This is what `.eh-card` paints, and it is NOT
+     * interchangeable with `--surface`: over the ivory page it composites to
+     * #fcfaf7, two points off #fdfbf5 in blue. That difference is exactly what
+     * kept the homepage byte-identical through this promotion.
+     */
     --surface-glass: rgba(255, 255, 255, 0.66);
 
-    /* Stops for .eh-gradient, which paints TEXT. The neon pair is 1.65:1 and
-       2.46:1 on this substrate, so light needs its own darker stops. */
-    --gradient-from: #00A171;
-    --gradient-to: #0090B4;
+    /*
+     * Hairlines. The landing surface draws card edges with an ink alpha rather
+     * than a solid, so the warmth of whatever is behind shows through.
+     */
+    --hairline: rgba(35, 38, 31, 0.14);
+    --hairline-soft: rgba(35, 38, 31, 0.08);
+
+    /*
+     * `.eh-gradient` paints TEXT and is now SOLID forest, not a gradient — the
+     * neon-to-cyan wordmark reads alien on ivory. These two stops remain for
+     * any non-text gradient that still references them.
+     */
+    --gradient-from: #1f4230;
+    --gradient-to: #2b5942;
 
     /* Borders */
-    --border: #D3DBDD;
-    --border-light: #E2EAEC;
-    --border-dark: #B7C4C7;
+    --border: #ddd5c2;
+    --border-light: #e9e2d2;
+    --border-dark: #cfc5ae;
 
-    /* Semantic Colors - Light Mode — same fill ramp the marketing scope uses */
-    --primary: #00B27C;
-    --primary-light: #00CC8E;
-    --primary-lighter: #A7F3D0;
-    --primary-lightest: #ECFDF5;
+    /* Semantic Colors — forest, the Little Worlds brand */
+    --primary: #1f4230;
+    --primary-light: #2b5942;
+    --primary-lighter: #c9d6cd;
+    --primary-lightest: #e0e0d6;
+
+    /*
+     * Brass and coral. FILL colours only — white on brass is 3.21:1 and on
+     * coral 3.43:1, both short of AA for normal text, so they carry large text
+     * and icons at most. The `-ink` variants are the text-safe forms:
+     * brass-ink #77591f = 5.76:1 on paper, coral-ink #a63d20 = 5.63:1.
+     */
+    --accent-brass: #b08a3e;
+    --accent-brass-ink: #77591f;
+    --accent-coral: #d96a4c;
+    --accent-coral-ink: #a63d20;
 
     /*
      * Brand INK - the text/border-safe brand colour.
@@ -62,7 +88,7 @@
      * paints glyphs or 1px strokes must use `--primary-ink` instead; fills,
      * dots, glows and icon shapes keep `--primary`.
      *
-     * Light: #00745B on --surface (#FFFFFF) = 5.75:1  (AA for normal text)
+     * Light: #1f4230 on --surface (#fdfbf5) = 10.79:1 (forest is safe as text)
      * Dark:  #00E5A0 on --surface (#0C2229) = 11.6:1  (neon is already safe)
      *
      * When an organisation supplies its own brand colour, applyCSSVariables()
@@ -72,7 +98,7 @@
      * beat BOTH the light and dark class rules and leave one theme unreadable.
      * Feeding the theme-scoped rules instead keeps each theme in control.
      */
-    --primary-ink: var(--brand-ink-light, #00745B);
+    --primary-ink: var(--brand-ink-light, #1f4230);
 
     --success: #16a34a;
     --success-light: #22c55e;
@@ -98,21 +124,27 @@
      * Semantic INK — the text-safe variants, same rule as --primary-ink.
      *
      * The semantic families above are FILL colours; as small text they fail on
-     * a light substrate. Measured against --surface (#FFFFFF) and --background
-     * (#E9EEEF), the values they replace are:
+     * a light substrate. Re-measured on the ivory substrate against all THREE
+     * things they land on — paper (#f5f1e8), card (#fdfbf5) and the glass
+     * composite (#fcfaf7) — plus their own badge fill:
      *
-     *   success #16a34a  3.30 / 2.82   ->  #166534  7.13 / 6.09
-     *   warning #d97706  3.19 / 2.72   ->  #92400e  7.09 / 6.06
-     *   error   #dc2626  4.83 / 4.13   ->  #b91c1c  6.47 / 5.53
-     *   info    #0097B8  3.43 / 2.93   ->  #0E7490  5.36 / 4.58
+     *            paper  card  glass  on-fill
+     *   success  6.33   6.89  6.84   5.47
+     *   warning  6.29   6.85  6.81   5.41
+     *   error    5.74   6.25  6.21   4.89
+     *   info     5.16   5.62  5.59   4.51
      *
-     * Note error passed on white and still failed on the page substrate, which
-     * is why the threshold is checked against both and not just the card.
+     * Three of the four carried over from the cool-grey palette untouched —
+     * ivory and cool grey are close enough in luminance that the inks still
+     * clear AA. Only `info` moved, #0E7490 -> #0d6e89: it passed on every
+     * substrate but came to 4.28:1 on its own badge fill, which is the pairing
+     * of the two that a badge actually renders. Checking the ink against the
+     * page and forgetting the pill is how that kind of miss ships.
      */
     --success-ink: #166534;
     --warning-ink: #92400e;
     --error-ink: #b91c1c;
-    --info-ink: #0E7490;
+    --info-ink: #0d6e89;
 
     /*
      * Badge FILLS — the surface a semantic ink is painted on.
@@ -120,24 +152,31 @@
      * The `-lightest` ramp above cannot serve here: it is a light-substrate
      * ramp, so under `.dark` `--success-lightest` is #dcfce7 and a badge using
      * it would be a near-white pill carrying mid-green text. These are declared
-     * per theme instead, and every pair below is computed against its own ink:
+     * per theme instead.
      *
-     *   online   #166534 on #E6F6EC = 6.37:1
-     *   offline  #b91c1c on #FBE9E9 = 5.53:1
-     *   error    #92400e on #FDF0E1 = 6.32:1
-     *   pairing  #0E7490 on #EAF6F9 = 4.86:1
-     *   brand    #00745B on #E3F7EF = 5.16:1   (was 4.12:1 on rgba(0,229,160,.1))
+     * Each fill is its own ink mixed 10% into the ivory paper, so the pills are
+     * warm tints of the page rather than the cool pastels the old palette used.
+     * Computed, ink on its own fill:
+     *
+     *   online   #166534 on #dfe3d6 = 5.47:1
+     *   offline  #b91c1c on #efdcd4 = 4.89:1
+     *   error    #92400e on #ebdfd2 = 5.41:1
+     *   pairing  #0d6e89 on #dee4df = 4.51:1
+     *   neutral  #5f6456 on #e6e3d9 = 4.75:1
+     *   brand    #1f4230 on #e0e0d6 = 8.40:1
      *
      * `--status-neutral-bg` carries idle AND unknown; those two are told apart
      * by glyph and by the dashed ring on unknown, never by hue (see
-     * DeviceStatusIndicator) — status must survive a greyscale screenshot.
+     * DeviceStatusIndicator) — status must survive a greyscale screenshot. That
+     * matters more on this palette, not less: these tints are deliberately low
+     * chroma, so hue alone was never going to carry the distinction.
      */
-    --status-online-bg: #E6F6EC;
-    --status-offline-bg: #FBE9E9;
-    --status-error-bg: #FDF0E1;
-    --status-pairing-bg: #EAF6F9;
-    --status-neutral-bg: #E4EBED;
-    --badge-brand-bg: #E3F7EF;
+    --status-online-bg: #dfe3d6;
+    --status-offline-bg: #efdcd4;
+    --status-error-bg: #ebdfd2;
+    --status-pairing-bg: #dee4df;
+    --status-neutral-bg: #e6e3d9;
+    --badge-brand-bg: #e0e0d6;
 
     /*
      * Solid danger surface — white sits on THIS, not on `--error`.
@@ -152,21 +191,26 @@
     --danger-solid-hover: #b91c1c;
 
     /* Accent Colors */
-    --accent-warm: #F59E0B;
-    --accent-warm-light: #FBBF24;
+    --accent-warm: #b08a3e;
+    --accent-warm-light: #c9a765;
 
-    /* Utility Colors */
-    --gray-50: #F0ECE8;
-    --gray-100: #E8E3DD;
-    --gray-200: #D1CBC5;
-    --gray-300: #B5AEA6;
-    --gray-400: #9A958E;
-    --gray-500: #6B655D;
-    --gray-600: #3D3632;
-    --gray-700: #1B3D47;
-    --gray-800: #122D35;
-    --gray-900: #0A222E;
-    --gray-950: #061A21;
+    /*
+     * Neutral ramp, re-cut warm. The old one was two palettes spliced together
+     * — warm taupes at 50-600 and teal-blacks at 700-950 — which is why
+     * anything using the top of the ramp next to anything using the bottom
+     * looked subtly wrong. This one walks ivory to ink in a single hue family.
+     */
+    --gray-50: #faf7ef;
+    --gray-100: #f3eee1;
+    --gray-200: #e9e2d2;
+    --gray-300: #ddd5c2;
+    --gray-400: #b9b3a1;
+    --gray-500: #8a8a7a;
+    --gray-600: #5f6456;
+    --gray-700: #4b5045;
+    --gray-800: #373a30;
+    --gray-900: #23261f;
+    --gray-950: #171a14;
 
     /* Shadows */
     --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -296,6 +340,72 @@
     --focus-ring-width: 2px;
     --focus-ring-offset: 2px;
     --focus-ring-color: var(--primary-ink);
+
+    /*
+     * The soft forest wash used by focus rings and hover tints. Replaces the
+     * rgba(0, 229, 160, …) literals that were scattered through the `.eh-*`
+     * rules, so a future palette move is one line rather than a hunt.
+     */
+    --accent-ring: rgba(31, 66, 48, 0.15);
+    --accent-wash: rgba(31, 66, 48, 0.05);
+    --accent-edge: rgba(31, 66, 48, 0.28);
+
+    /*
+     * LITTLE WORLDS NAMED TOKENS — promoted verbatim from the `.lw` scope.
+     *
+     * The landing components name these directly, so they keep their names and
+     * values; what changed is that they now resolve everywhere instead of only
+     * inside the homepage wrapper. `--lw-serif` in particular resolved to the
+     * Georgia fallback anywhere outside `.lw` before this.
+     */
+    --lw-paper: #f5f1e8;
+    --lw-paper-2: #efe9dc;
+    --lw-stone: #e4dccb;
+    --lw-card: #fdfbf5;
+    --lw-screen: #fffdf4;
+    --lw-ink: #23261f;
+    --lw-ink-2: #4b5045;
+    --lw-muted: #5f6456;
+    --lw-hair: rgba(35, 38, 31, 0.14);
+    --lw-hair-2: rgba(35, 38, 31, 0.08);
+    --lw-forest: #1f4230;
+    --lw-forest-deep: #142c20;
+    --lw-on-forest: #f2efe4;
+    --lw-brass: #b08a3e;
+    --lw-brass-ink: #77591f;
+    --lw-coral: #d96a4c;
+    --lw-coral-ink: #a63d20;
+    --lw-serif: var(--font-fraunces), 'Iowan Old Style', Georgia, serif;
+    --lw-sec-y: clamp(40px, 4.6vw, 68px);
+
+    /*
+     * LEGACY `--mkt-*` ALIASES. Components that survived the homepage's first
+     * iteration (pricing internals, the FAQ disclosure, the tour dialog) still
+     * name these. They carry the warm values the `.lw` scope used to remap them
+     * to, so those components render exactly as they do today — and the legal
+     * and auth pages, which carried `.mkt` WITHOUT `.lw` and were therefore
+     * still cool grey, now join the one palette.
+     */
+    --mkt-page: #f5f1e8;
+    --mkt-page-2: #efe9dc;
+    --mkt-canvas-1: #efe9dc;
+    --mkt-canvas-2: #e4dccb;
+    --mkt-surface: #fdfbf5;
+    --mkt-surface-2: #f3eee1;
+    --mkt-ink: #23261f;
+    --mkt-ink-2: #4b5045;
+    --mkt-muted: #5f6456;
+    --mkt-hair: rgba(35, 38, 31, 0.14);
+    --mkt-hair-2: rgba(35, 38, 31, 0.08);
+    --mkt-mint: #1f4230;
+    --mkt-mint-hot: #2b5942;
+    --mkt-mint-ink: #1f4230;
+    --mkt-cyan: #1f4230;
+    --mkt-cyan-ink: #1f4230;
+    --mkt-violet: #77591f;
+    --mkt-violet-ink: #77591f;
+    --mkt-amber: #b08a3e;
+    --mkt-amber-ink: #77591f;
   }
 
   /* Dark Mode — Electric Horizon (deep teal) */
@@ -339,156 +449,39 @@ body {
    Use --mkt-mint for fills/glows and --mkt-mint-ink for small text.
    ══════════════════════════════════════════════════════════════════ */
 
+/*
+ * `.mkt` is now an ALIAS, not a scope.
+ *
+ * It used to re-declare a whole cool-grey palette so the public pages could
+ * win over `.dark` while a dark-mode user was signed in. Every one of those
+ * values now lives on `:root` in the Little Worlds palette, so there is
+ * nothing left to override — the legal and auth pages that carried `.mkt`
+ * WITHOUT `.lw` were the last surfaces still rendering cool grey, and they
+ * join the one palette by this deletion.
+ *
+ * The class is kept because `body:has(.mkt)` still selects on it for the
+ * consent bar, and because removing it from seven route wrappers is churn
+ * with no visual payoff. `color-scheme` stays: native controls, scrollbars
+ * and autofill follow it, and it is the one thing here that is not a token.
+ */
 .mkt {
-  --mkt-page: #E9EEEF;
-  --mkt-page-2: #E2EAEC;
-  --mkt-canvas-1: #DFE8EA;
-  --mkt-canvas-2: #CFDDE1;
-  --mkt-surface: #FFFFFF;
-  --mkt-surface-2: #F4F8F8;
-
-  --mkt-ink: #0A222E;
-  --mkt-ink-2: #3E5860;   /* body copy — 6.4:1 */
-  --mkt-muted: #4E656C;   /* micro labels — 5:1 */
-  --mkt-hair: rgba(10, 34, 46, 0.11);
-  --mkt-hair-2: rgba(10, 34, 46, 0.07);
-
-  --mkt-mint: #00B27C;      /* fills, buttons, dots */
-  --mkt-mint-hot: #00E5A0;  /* glows only — never text */
-  --mkt-mint-ink: #00745B;  /* mint as small text — 4.9:1 */
-  --mkt-cyan: #00B4D8;
-  --mkt-cyan-ink: #00697F;
-  --mkt-violet: #8B5CF6;
-  --mkt-violet-ink: #5B32C9;
-  --mkt-amber: #F59E0B;
-  --mkt-amber-ink: #8A5A00;
-  --mkt-rose: #E11D48;
-
-  background: var(--mkt-page);
-  color: var(--mkt-ink);
-
-  /* Base token reset — this is what makes `.mkt` usable on pages that were
-     never hardcoded dark. The legal and auth pages contain zero colour
-     literals; they read var(--background)/var(--surface)/etc. and are dark
-     only because ThemeProvider puts `.dark` on <html>. Re-declaring the
-     family here beats `.dark` for anything inside `.mkt`, without touching
-     ThemeProvider and without changing the dashboard.
-     Also why components shared with the dashboard (MfaEnrollFlow,
-     admin/backlog/page-client) need no edit: they read these tokens, so they
-     render light inside `.mkt` and stay dark everywhere else. */
-  --background: #E9EEEF;
-  --background-secondary: #E2EAEC;
-  --background-tertiary: #DCE5E7;
-  --foreground: #0A222E;
-  --foreground-secondary: #3E5860;
-  --foreground-tertiary: #4E656C;
-  --surface: #FFFFFF;
-  --surface-secondary: #F4F8F8;
-  --surface-hover: #E8EEEF;
-  --border: #D3DBDD;
-  --border-light: #E2EAEC;
-  --border-dark: #B7C4C7;
-  --primary: #00B27C;
-  --primary-light: #00CC8E;
-
-  /*
-   * The semantic families MUST be redeclared here.
-   *
-   * `.mkt` re-tunes the base tokens but previously left success/warning/error/
-   * info alone. Those are declared on `:root` and on `.dark` — and `.dark`
-   * lives on <html>, so for a signed-in dark-mode user visiting a light
-   * marketing or auth page the DARK values inherited straight through. Every
-   * validation message on the four auth screens rendered #ef4444 at 3.21:1 on
-   * this substrate, and success at 1.95:1.
-   *
-   * These are the light values, matching `:root`.
-   */
-  --success: #16a34a;
-  --success-light: #22c55e;
-  --success-lighter: #bbf7d0;
-  --success-lightest: #f0fdf4;
-  --warning: #d97706;
-  --warning-light: #fbbf24;
-  --warning-lighter: #fde68a;
-  --warning-lightest: #fffbeb;
-  --error: #dc2626;
-  --error-light: #ef4444;
-  --error-lighter: #fecaca;
-  --error-lightest: #fef2f2;
-  --info: #0097B8;
-  --info-light: #00B4D8;
-  --info-lighter: #A5F3FC;
-  --info-lightest: #ECFEFF;
-  --success-ink: #166534;
-  --warning-ink: #92400e;
-  --error-ink: #b91c1c;
-  --info-ink: #0E7490;
-
-  /* --primary-ink leaks the same way the semantic families did. `.mkt` sets
-     --primary but not its ink, so for a signed-in dark-mode user every brand
-     link on these light pages ("Sign up free", "Terms of Service") rendered the
-     dark neon at 1.41:1 on #E9EEEF. Measured, not assumed. */
-  --primary-ink: var(--brand-ink-light, #00745B);
-
-  /*
-   * Re-declared, not inherited — and this one is genuinely counter-intuitive.
-   *
-   * `--focus-ring-color: var(--primary-ink)` is declared on :root, and custom
-   * property substitution happens at COMPUTED-VALUE time on the element that
-   * declares it. So it resolves once on <html> — to the DARK ink for a
-   * dark-mode user — and inherits into `.mkt` ALREADY RESOLVED. Redefining
-   * --primary-ink here cannot retroactively change it; the indirection has to
-   * be restated inside this scope.
-   *
-   * Measured before this line: 1.41:1 focus ring on the light auth pages.
-   */
-  --focus-ring-color: var(--primary-ink);
-
-  /* Native controls, scrollbars and autofill follow this. `html.dark` sets it
-     to dark, which reached these light pages too. */
   color-scheme: light;
 }
 
-/* shared utilities, re-tuned for the light substrate — scoped, non-invasive */
-.mkt .eh-gradient {
-  background: linear-gradient(135deg, #00A171, #0090B4);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-.mkt .eh-btn-neon {
-  background: var(--mkt-mint);
-  color: #04241B;
-  box-shadow: 0 8px 24px rgba(0, 178, 124, 0.26);
-}
-.mkt .eh-btn-neon:hover {
-  background: #00A171;
-  box-shadow: 0 14px 34px rgba(0, 178, 124, 0.34);
-}
-.mkt .eh-btn-ghost {
-  border: 1px solid var(--mkt-hair);
-  color: var(--mkt-ink);
-  background: rgba(255, 255, 255, 0.55);
-}
-.mkt .eh-btn-ghost:hover {
-  color: var(--mkt-ink);
-  border-color: rgba(10, 34, 46, 0.2);
-  background: #FFFFFF;
-}
-.mkt .eh-card,
-.mkt .eh-ai-card {
-  background: rgba(255, 255, 255, 0.66);
-  border: 1px solid var(--mkt-hair-2);
-}
-.mkt .eh-card:hover,
-.mkt .eh-ai-card:hover {
-  border-color: rgba(0, 178, 124, 0.28);
-  box-shadow: 0 14px 38px rgba(10, 34, 46, 0.09);
-}
-.mkt .eh-nav-link::after { background: var(--mkt-mint); }
-.mkt .eh-neural-grid::before,
-.mkt .eh-neural-grid::after { opacity: 0.45; }
-.mkt .eh-grain::before { opacity: 0.26; mix-blend-mode: multiply; }
+/*
+ * The `.mkt`-scoped `.eh-*` overrides are GONE, folded into the unscoped rules
+ * further down this file.
+ *
+ * They existed because the shared utilities hardcoded the dark palette, so the
+ * light marketing pages had to restate every one of them. With one palette on
+ * `:root` the unscoped rules are already correct for every surface, and a
+ * second copy scoped to `.mkt` would be a place for the two to drift apart —
+ * which is the exact failure the August plan warned about.
+ *
+ * The values did not change; they moved. Each folded rule carries the homepage
+ * rendering it has to reproduce, because the homepage is under design review
+ * and any pixel move there is a defect, not a redesign.
+ */
 
 /* Escape hatch: a deliberately DARK panel nested inside the light `.mkt` scope
    (the auth ValuePanel). Without this, .mkt's light token values resolve on a
@@ -507,8 +500,14 @@ body {
   --primary: #00E5A0;
   color: #F0ECE8;
 }
+/* `.eh-gradient` is solid now, so a background-image override would paint
+   nothing (the unscoped rule sets -webkit-text-fill-color: currentColor and
+   would win on the fill). Give the dark panel its own solid ink instead. This
+   panel stays dark on purpose and is restyled in W1, not here. */
 .mkt .mkt-dark-panel .eh-gradient {
-  background-image: linear-gradient(135deg, #00E5A0, #00B4D8);
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: #00E5A0;
 }
 .mkt .mkt-dark-panel .eh-card {
   background: rgba(12, 34, 41, 0.6);
@@ -568,95 +567,27 @@ body {
    the ivory substrate uses the `-ink` variants only.
    ══════════════════════════════════════════════════════════════════ */
 
+/*
+ * `.lw` is now an ALIAS too. Its entire token set was promoted to `:root` and
+ * serves the whole app; what remains here is the page-level paint the wrapper
+ * still applies to itself, which is a property, not a token.
+ *
+ * The homepage renders IDENTICALLY through this collapse, and that is not a
+ * hope — the Little Worlds values moved verbatim, and the landing components
+ * name `--lw-*` / `--mkt-*` directly rather than going through `.eh-*` (checked:
+ * zero `.eh-*` usages in components/landing). The baseline diff is the proof.
+ */
 .lw {
-  --lw-paper: #f5f1e8; /* ivory page */
-  --lw-paper-2: #efe9dc; /* limestone tint */
-  --lw-stone: #e4dccb; /* deeper limestone (plinths, wells) */
-  --lw-card: #fdfbf5; /* raised card surface */
-  --lw-screen: #fffdf4; /* signage screen face */
-
-  --lw-ink: #23261f; /* warm ink — headings/body */
-  --lw-ink-2: #4b5045; /* secondary copy */
-  --lw-muted: #5f6456; /* micro labels */
-  --lw-hair: rgba(35, 38, 31, 0.14);
-  --lw-hair-2: rgba(35, 38, 31, 0.08);
-
-  --lw-forest: #1f4230; /* primary brand */
-  --lw-forest-deep: #142c20;
-  --lw-on-forest: #f2efe4; /* text on forest fills */
-  --lw-brass: #b08a3e; /* fills only */
-  --lw-brass-ink: #77591f; /* brass as small text */
-  --lw-coral: #d96a4c; /* fills only */
-  --lw-coral-ink: #a63d20; /* coral as small text */
-
-  --lw-serif: var(--font-fraunces), 'Iowan Old Style', Georgia, serif;
-
-  /* ONE vertical rhythm for every landing section's top AND bottom padding, so
-     the gap between two sections is exactly 2x this and changing the page's
-     breathing is a one-line edit. Each section used to carry its own
-     clamp(56px,7vw,104px), which put 202px between every pair at 1440.
-     Homepage-only: `.lw` is applied by the homepage wrapper alone, so the
-     legal/auth pages (plain `.mkt`) are untouched. */
-  --lw-sec-y: clamp(40px, 4.6vw, 68px);
-
-  background: var(--lw-paper);
-  color: var(--lw-ink);
-
-  /* Base-token re-point so any shared component rendered inside the
-     homepage (dialogs, consent-adjacent UI) sits on the warm palette. */
-  --background: #f5f1e8;
-  --background-secondary: #efe9dc;
-  --background-tertiary: #e9e2d2;
-  --foreground: #23261f;
-  --foreground-secondary: #4b5045;
-  --foreground-tertiary: #5f6456;
-  --surface: #fdfbf5;
-  --surface-secondary: #f3eee1;
-  --surface-hover: #efe9dc;
-  --border: #ddd5c2;
-  --border-light: #e9e2d2;
-  --primary: #1f4230;
-  --primary-light: #2b5942;
-  --primary-ink: #1f4230;
-  --focus-ring-color: var(--primary-ink);
+  background: var(--background);
+  color: var(--foreground);
   color-scheme: light;
-
-  /* Legacy `.mkt` token remap: components that survived iteration 1
-     (pricing internals, the FAQ disclosure, the tour dialog) read
-     `--mkt-*`. The wrapper carries BOTH classes and this block comes
-     later in the sheet, so these warm values win on the homepage while
-     the legal/auth pages (plain `.mkt`) keep the cool-grey originals. */
-  --mkt-page: #f5f1e8;
-  --mkt-page-2: #efe9dc;
-  --mkt-canvas-1: #efe9dc;
-  --mkt-canvas-2: #e4dccb;
-  --mkt-surface: #fdfbf5;
-  --mkt-surface-2: #f3eee1;
-  --mkt-ink: #23261f;
-  --mkt-ink-2: #4b5045;
-  --mkt-muted: #5f6456;
-  --mkt-hair: rgba(35, 38, 31, 0.14);
-  --mkt-hair-2: rgba(35, 38, 31, 0.08);
-  --mkt-mint: #1f4230;
-  --mkt-mint-hot: #2b5942;
-  --mkt-mint-ink: #1f4230;
-  --mkt-cyan: #1f4230;
-  --mkt-cyan-ink: #1f4230;
-  --mkt-violet: #77591f;
-  --mkt-violet-ink: #77591f;
-  --mkt-amber: #b08a3e;
-  --mkt-amber-ink: #77591f;
 }
 
-/* ---- shared primitives, re-tuned under .lw ---- */
-.lw ::selection {
+/* Unscoped now — one palette, so the selection wash and the solid wordmark
+   apply everywhere. `.eh-gradient` itself was rewritten to solid forest where
+   it is defined; this override had nothing left to say. */
+::selection {
   background: rgba(31, 66, 48, 0.18);
-}
-.lw .eh-gradient {
-  /* the old neon gradient wordmark reads alien on ivory; solid forest */
-  background: none;
-  -webkit-text-fill-color: currentColor;
-  color: var(--lw-forest);
 }
 
 /* ---- type ---- */
@@ -817,22 +748,6 @@ body {
 }
 
 body:has(.mkt) .consent-bar {
-  --consent-surface: #FFFFFF;
-  --consent-ink: #0A222E;
-  --consent-ink-2: #3E5860;
-  --consent-hair: rgba(10, 34, 46, 0.11);
-  --consent-hair-strong: rgba(10, 34, 46, 0.32);
-  --consent-accent: #00745B;      /* mint-ink — safe as text on light */
-  --consent-accent-hover: #005C48;
-  --consent-fill: #00B27C;
-  --consent-fill-hover: #00A171;
-  --consent-on-fill: #04241B;
-}
-
-/* On the Little Worlds homepage the same bar follows the warm palette —
-   otherwise the emerald pill is the most saturated object on first paint.
-   Same mechanism as above; `.lw` only ever appears alongside `.mkt`. */
-body:has(.lw) .consent-bar {
   --consent-surface: #fdfbf5;
   --consent-ink: #23261f;
   --consent-ink-2: #4b5045;
@@ -844,6 +759,10 @@ body:has(.lw) .consent-bar {
   --consent-fill-hover: #142c20;
   --consent-on-fill: #f2efe4;
 }
+
+/* The separate `body:has(.lw)` override is GONE: it carried exactly these
+   values, and with one palette there is nothing for it to differ from. The
+   homepage bar is unchanged — it was already reading the forest set. */
 
 /* ── Electric Horizon Global Utilities ── */
 
@@ -859,11 +778,16 @@ body:has(.lw) .consent-bar {
   transform: translateY(0);
 }
 
+/*
+ * SOLID forest, not a gradient. Reproduces `.lw .eh-gradient` exactly — the
+ * neon-to-cyan wordmark reads alien on ivory, which the homepage settled months
+ * ago. The name is now a misnomer and is kept only because 640 call sites use
+ * it; renaming is Phase 3's business, not a palette change's.
+ */
 .eh-gradient {
-  background: linear-gradient(135deg, var(--gradient-from), var(--gradient-to));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: var(--primary-ink);
 }
 
 .eh-heading {
@@ -872,15 +796,30 @@ body:has(.lw) .consent-bar {
   line-height: 1.05;
 }
 
+/*
+ * Forest fill with the on-forest ink: #f2efe4 on #1f4230 = 9.70:1, computed.
+ *
+ * The folded `.mkt` override paired this fill with #04241B, a near-black that
+ * measures 1.42:1 on forest — an unreadable button label. It never showed,
+ * because the LANDING COMPONENTS USE NO `.eh-*` UTILITIES AT ALL (checked: zero
+ * matches across components/landing). Those overrides served the previous
+ * marketing page and have been dead since the Little Worlds rebuild; the live
+ * consumers are the six `.eh-btn-neon` call sites on the auth and legal pages,
+ * which were rendering mint and now join the one palette.
+ *
+ * `--primary` rather than a literal, so a white-label tenant's fill still flows
+ * through exactly as it did.
+ */
 .eh-btn-neon {
-  background: #00E5A0;
-  color: #061A21;
+  background: var(--primary);
+  color: var(--lw-on-forest);
+  box-shadow: 0 8px 24px rgba(31, 66, 48, 0.26);
   font-weight: 600;
   transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 .eh-btn-neon:hover {
-  background: #00CC8E;
-  box-shadow: 0 0 28px rgba(0, 229, 160, 0.3);
+  background: var(--primary-light);
+  box-shadow: 0 14px 34px rgba(31, 66, 48, 0.34);
   transform: translateY(-1px);
 }
 .eh-btn-neon:active {
@@ -903,20 +842,20 @@ body:has(.lw) .consent-bar {
 .eh-btn-ghost:hover {
   /* Ink, not neon: this paints glyphs, and the neon is 1.65:1 on light. */
   color: var(--primary-ink);
-  border-color: rgba(0, 229, 160, 0.3);
-  background: rgba(0, 229, 160, 0.04);
+  border-color: var(--accent-edge);
+  background: var(--accent-wash);
 }
 
 .eh-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: var(--surface-glass);
+  border: 1px solid var(--hairline-soft);
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
     border-color 0.3s ease, box-shadow 0.3s ease !important;
 }
 .eh-card:hover {
   transform: translateY(-3px);
-  border-color: rgba(0, 229, 160, 0.2);
-  box-shadow: 0 12px 40px rgba(0, 229, 160, 0.06);
+  border-color: var(--accent-edge);
+  box-shadow: 0 14px 38px rgba(35, 38, 31, 0.09);
 }
 
 .eh-nav-link {
@@ -930,7 +869,7 @@ body:has(.lw) .consent-bar {
   left: 0;
   width: 0;
   height: 1.5px;
-  background: #00E5A0;
+  background: var(--primary-ink);
   transition: width 0.25s ease;
 }
 .eh-nav-link:hover::after {
@@ -1057,19 +996,19 @@ body:has(.lw) .consent-bar {
 }
 
 .eh-ai-card:hover {
-  border-color: rgba(0, 229, 160, 0.3);
-  box-shadow: 0 0 20px rgba(0, 229, 160, 0.08), 0 8px 32px rgba(0, 0, 0, 0.2);
+  border-color: var(--accent-edge);
+  box-shadow: 0 0 20px rgba(31, 66, 48, 0.08), 0 8px 32px rgba(35, 38, 31, 0.12);
   transform: translateY(-3px);
 }
 
 .eh-ai-card:hover .eh-ai-icon {
-  box-shadow: 0 0 12px rgba(0, 229, 160, 0.2);
+  box-shadow: 0 0 12px rgba(31, 66, 48, 0.2);
 }
 
 /* Powered by AI badge pulse */
 @keyframes eh-ai-badge-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(0, 229, 160, 0.15); }
-  50% { box-shadow: 0 0 0 6px rgba(0, 229, 160, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(31, 66, 48, 0.15); }
+  50% { box-shadow: 0 0 0 6px rgba(31, 66, 48, 0); }
 }
 
 .eh-ai-badge {
@@ -1170,7 +1109,7 @@ body:has(.lw) .consent-bar {
 .eh-input:focus {
   outline: none;
   border-color: var(--primary-ink);
-  box-shadow: 0 0 0 3px rgba(0, 229, 160, 0.15);
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
 /* Standardized select styling */
@@ -1184,7 +1123,7 @@ body:has(.lw) .consent-bar {
   font-size: 14px;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%239A958E' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%235f6456' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 12px center;
   padding-right: 36px;
@@ -1192,7 +1131,7 @@ body:has(.lw) .consent-bar {
 .eh-select:focus {
   outline: none;
   border-color: var(--primary-ink);
-  box-shadow: 0 0 0 3px rgba(0, 229, 160, 0.15);
+  box-shadow: 0 0 0 3px var(--accent-ring);
 }
 
 /* Neon button size variants */
@@ -1227,7 +1166,7 @@ body:has(.lw) .consent-bar {
 }
 .eh-btn-danger:hover {
   background: var(--danger-solid-hover);
-  box-shadow: 0 0 16px rgba(239, 68, 68, 0.25);
+  box-shadow: 0 0 16px rgba(185, 28, 28, 0.22);
   transform: translateY(-1px);
 }
 .eh-btn-danger:active {

@@ -179,8 +179,22 @@ export function applyCSSVariables(config: BrandConfig = currentBrandConfig): voi
     // a text-safe ink per theme so brand-coloured labels stay legible.
     // These feed the theme-scoped `--primary-ink` rules rather than setting it
     // directly - an inline value would override both themes at once.
-    root.style.setProperty('--brand-ink-light', readableInk(config.primaryColor, '#FFFFFF'));
-    root.style.setProperty('--brand-ink-dark', readableInk(config.primaryColor, '#0C2229'));
+    // Derived against the REAL card surface each theme paints, not a notional
+    // white. The light argument used to be plain white, which was right only by
+    // coincidence — `--surface` happened to be white too. The Little Worlds
+    // card is ivory, so deriving against white returns an ink a shade short of
+    // AA on the surface it actually lands on. Keep these two arguments equal to
+    // `--surface` in each theme.
+    root.style.setProperty('--brand-ink-light', readableInk(config.primaryColor, '#fdfbf5'));
+    /*
+     * `--brand-ink-dark` is NOT set any more. Dark mode was removed (D1), which
+     * took the `.dark` block — the only thing that ever read it — with it.
+     * Writing it would leave a live-looking custom property on <html> that
+     * nothing consumes, which is the shape of bug that gets "fixed" later by
+     * someone wiring a new reader to it on the assumption it means something.
+     * `readableInk` itself keeps working against any substrate and is still
+     * covered for dark inputs by customization-ink.test.ts.
+     */
   }
 
   // Font family
