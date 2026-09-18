@@ -491,15 +491,17 @@ export default function SettingsPage() {
  ].map(({ name, color }) => (
  <div key={name} className="space-y-2">
  <div className="flex items-center gap-2">
+ {/*
+   One swatch, not two. This pair used to render color.light beside
+   color.dark as a theme pair. Dark mode was removed (plan D1), so the
+   second swatch showed a colour that can never appear anywhere in the
+   product -- a live-looking artefact of a theme that no longer exists,
+   the same shape as the --brand-ink-dark variable deleted in Phase 1.
+ */}
  <div
  className="w-8 h-8 rounded-md border border-[var(--border)]"
  style={{ backgroundColor: color.light }}
- title={`${name} light`}
- />
- <div
- className="w-8 h-8 rounded-md border border-[var(--border)]"
- style={{ backgroundColor: color.dark }}
- title={`${name} dark`}
+ title={name}
  />
  </div>
  <p className="text-xs font-medium text-[var(--foreground-secondary)] capitalize">{name}</p>

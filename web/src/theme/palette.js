@@ -30,18 +30,30 @@
 const semanticColors = {
   // Primary action color — EH neon green
   primary: {
-    light: '#00CC8E',
-    dark: '#00E5A0',
-    50: '#ECFDF5',
-    100: '#D1FAE5',
-    200: '#A7F3D0',
-    300: '#6EE7B7',
-    400: '#34D399',
-    500: '#00E5A0',
-    600: '#00CC8E',
-    700: '#00A876',
-    800: '#007A56',
-    900: '#064E3B',
+    /*
+     * Little Worlds forest. 500 is the brand anchor, keeping the convention
+     * the retired Electric Horizon ramp used (its 500 was the neon #00E5A0),
+     * so `primary-500` still means "the brand colour" and nothing that reads
+     * this shape has to learn a new rule.
+     *
+     * `light`/`dark` are NOT a theme pair any more -- dark mode was removed
+     * (plan D1). They are kept because `theme/colors.ts` maps status names
+     * onto these objects and the settings swatch grid reads them; `dark` is
+     * simply the deeper forest, which is what a "dark" variant of this brand
+     * now means.
+     */
+    light: '#2b5942',
+    dark: '#142c20',
+    50: '#eef3f0',
+    100: '#d6e2db',
+    200: '#b0c7bb',
+    300: '#84a897',
+    400: '#5a8672',
+    500: '#1f4230',
+    600: '#1a3728',
+    700: '#142c20',
+    800: '#0f2118',
+    900: '#0a170f',
   },
 
   // Success state — keep distinct from primary (slightly warmer green)

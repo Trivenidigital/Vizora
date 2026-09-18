@@ -249,18 +249,18 @@
      * and pinned by src/theme/__tests__/css-token-sync.test.ts.
      */
     /* >>> generated: palette scale, see tailwind.theme.cjs <<< */
-    --c-primary-50: 236 253 245;
-    --c-primary-100: 209 250 229;
-    --c-primary-200: 167 243 208;
-    --c-primary-300: 110 231 183;
-    --c-primary-400: 52 211 153;
-    --c-primary-500: 0 229 160;
-    --c-primary-600: 0 204 142;
-    --c-primary-700: 0 168 118;
-    --c-primary-800: 0 122 86;
-    --c-primary-900: 6 78 59;
-    --c-primary-light: 0 204 142;
-    --c-primary-dark: 0 229 160;
+    --c-primary-50: 238 243 240;
+    --c-primary-100: 214 226 219;
+    --c-primary-200: 176 199 187;
+    --c-primary-300: 132 168 151;
+    --c-primary-400: 90 134 114;
+    --c-primary-500: 31 66 48;
+    --c-primary-600: 26 55 40;
+    --c-primary-700: 20 44 32;
+    --c-primary-800: 15 33 24;
+    --c-primary-900: 10 23 15;
+    --c-primary-light: 43 89 66;
+    --c-primary-dark: 20 44 32;
     --c-success-50: 240 253 244;
     --c-success-100: 220 252 231;
     --c-success-200: 187 247 208;
