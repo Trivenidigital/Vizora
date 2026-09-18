@@ -20,19 +20,19 @@ export function hasConsentFor(category: 'essential' | 'all'): boolean {
 /**
  * Cookie consent bar.
  *
- * Rendered from the ROOT layout, so it appears over BOTH the light public
- * marketing pages and the dark authenticated app. It is a sibling of the page
- * content rather than a descendant of `.mkt`, so it cannot inherit the
- * marketing tokens — it carries its own `.consent-bar` token pair instead
- * (dark by default; `body:has(.mkt) .consent-bar` swaps in the light values).
+ * Rendered from the ROOT layout, so it appears over both the public marketing
+ * pages and the authenticated app. It is a sibling of the page content rather
+ * than a descendant of `.mkt`, so it cannot inherit tokens by descent — it
+ * carries its own `.consent-bar` set instead.
  *
- * Theme selection lives entirely in CSS, in globals.css. The JS alternative
- * (`document.querySelector('.mkt')` in an effect keyed on `usePathname()`) was
- * tried first and was never shown to misbehave — see the longer note in
- * globals.css before assuming there was a bug here. CSS is preferred because
- * it removes the failure mode by construction rather than depending on commit
- * ordering: `:has()` holds no state, so it cannot latch a stale answer in a
- * component that stays mounted across every route change.
+ * There is now ONE set. The app used to be dark and the marketing pages light,
+ * so `.consent-bar` held dark values and `body:has(.mkt) .consent-bar` swapped
+ * in light ones; with one palette app-wide (plan §3 D1) there is no second
+ * substrate and the override is gone. The `:has()` reasoning is kept in the
+ * globals.css note because it is the right answer if a substrate switch is ever
+ * needed here again — in short, the JS alternative latches a point-in-time DOM
+ * answer into state in a component that never unmounts, and `:has()` cannot go
+ * stale. It was never shown to misbehave; do not go looking for that bug.
  *
  * Colours come from CSS custom properties applied via Tailwind arbitrary
  * values. Two deliberate choices:

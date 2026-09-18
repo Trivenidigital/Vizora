@@ -266,4 +266,52 @@ const tokens = {
   },
 };
 
-module.exports = { semanticColors, ehColors, ehCard, tokens };
+/**
+ * CHART SERIES — the categorical palette, and the one part of this file that
+ * is already Little Worlds.
+ *
+ * It lives here rather than in `chartConfig.ts` for two reasons. This file is
+ * the sanctioned home for colour VALUES (it is the ratchet's single named
+ * exemption), and recharts writes these into SVG `fill`/`stroke` PRESENTATION
+ * ATTRIBUTES, where a `var(--token)` is not resolved — so the chart palette
+ * cannot be token references the way the rest of the redesign is. Concrete
+ * values in the one sanctioned place is the honest form of that constraint.
+ *
+ * Series 1-3 are the brand triad (forest, brass, coral); 4-8 extend it with
+ * muted hues in the same tonal register, because a categorical palette needs
+ * separable HUES and the brand has only three. Every entry is checked on the
+ * card substrate it renders on:
+ *
+ *   forest  #1f4230 10.79:1   teal   #2f6d6a 5.77:1
+ *   brass   #b08a3e  3.10:1   plum   #7a4a63 6.79:1
+ *   coral   #d96a4c  3.32:1   olive  #6b7a3e 4.53:1
+ *                             blue   #46618c 6.06:1
+ *                             clay   #8c5a3c 5.57:1
+ *
+ * All clear the 3:1 that WCAG SC 1.4.11 asks of a graphical object, and the
+ * CLOSEST pair in sRGB is teal/blue at a distance of 42.8, comfortably past
+ * the ~40 usually taken as the floor for categorical separability. Both
+ * numbers matter: a palette can be readable and still be unusable because two
+ * series cannot be told apart.
+ *
+ * Adding a ninth means re-running both checks, not eyeballing a gap.
+ */
+const chartSeries = [
+  '#1f4230',
+  '#b08a3e',
+  '#d96a4c',
+  '#2f6d6a',
+  '#7a4a63',
+  '#6b7a3e',
+  '#46618c',
+  '#8c5a3c',
+];
+
+/** Chart chrome — grid, axes, tooltip. Mirrors the `:root` tokens by value. */
+const chartChrome = {
+  surface: '#fdfbf5',
+  ink: '#23261f',
+  hairline: '#ddd5c2',
+};
+
+module.exports = { semanticColors, ehColors, ehCard, tokens, chartSeries, chartChrome };

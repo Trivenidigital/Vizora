@@ -138,7 +138,7 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
     <>
       {/* Keyboard Shortcut Hint (optional, can be hidden) */}
       {!open && (
-        <div className="fixed bottom-4 right-4 px-3 py-2 rounded-lg bg-[var(--background-secondary)] text-[var(--foreground-secondary)] text-xs font-medium pointer-events-none z-40">
+        <div className="fixed bottom-4 right-4 px-3 py-2 rounded-lg bg-[var(--surface)] border border-[var(--border)] text-[var(--foreground-secondary)] font-mono text-xs pointer-events-none z-40">
           ⌘K
         </div>
       )}
@@ -206,7 +206,7 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
                           }}
                           className={`w-full px-4 py-3 text-left flex items-center gap-3 transition-colors ${
                             isSelected
-                              ? 'bg-[#00E5A0] text-[#061A21]'
+                              ? 'bg-[var(--lw-forest)] text-[var(--lw-on-forest)]'
                               : 'text-[var(--foreground)] hover:bg-[var(--surface-hover)]'
                           }`}
                         >
