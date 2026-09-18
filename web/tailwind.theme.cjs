@@ -1,179 +1,103 @@
-const semanticColors = {
-  primary: {
-    light: '#00CC8E',
-    dark: '#00E5A0',
-    50: '#ECFDF5',
-    100: '#D1FAE5',
-    200: '#A7F3D0',
-    300: '#6EE7B7',
-    400: '#34D399',
-    500: '#00E5A0',
-    600: '#00CC8E',
-    700: '#00A876',
-    800: '#007A56',
-    900: '#064E3B',
-  },
-  success: {
-    light: '#16a34a',
-    dark: '#22c55e',
-    50: '#f0fdf4',
-    100: '#dcfce7',
-    200: '#bbf7d0',
-    300: '#86efac',
-    400: '#4ade80',
-    500: '#22c55e',
-    600: '#16a34a',
-    700: '#15803d',
-    800: '#166534',
-    900: '#145231',
-  },
-  warning: {
-    light: '#d97706',
-    dark: '#fbbf24',
-    50: '#fffbeb',
-    100: '#fef3c7',
-    200: '#fde68a',
-    300: '#fcd34d',
-    400: '#fbbf24',
-    500: '#f59e0b',
-    600: '#d97706',
-    700: '#b45309',
-    800: '#92400e',
-    900: '#78350f',
-  },
-  error: {
-    light: '#dc2626',
-    dark: '#ef4444',
-    50: '#fef2f2',
-    100: '#fee2e2',
-    200: '#fecaca',
-    300: '#fca5a5',
-    400: '#f87171',
-    500: '#ef4444',
-    600: '#dc2626',
-    700: '#b91c1c',
-    800: '#991b1b',
-    900: '#7f1d1d',
-  },
-  info: {
-    light: '#0097B8',
-    dark: '#00B4D8',
-    50: '#ECFEFF',
-    100: '#CFFAFE',
-    200: '#A5F3FC',
-    300: '#67E8F9',
-    400: '#22D3EE',
-    500: '#00B4D8',
-    600: '#0097B8',
-    700: '#0E7490',
-    800: '#155E75',
-    900: '#164E63',
-  },
-  neutral: {
-    50: '#F0ECE8',
-    100: '#E8E3DD',
-    200: '#D1CBC5',
-    300: '#B5AEA6',
-    400: '#8A8278',
-    500: '#5A5248',
-    600: '#3D3632',
-    700: '#1B3D47',
-    800: '#122D35',
-    900: '#0A222E',
-    950: '#061A21',
-  },
+/**
+ * Tailwind's view of the design tokens.
+ *
+ * This file no longer holds any values. `src/theme/palette.js` does — see its
+ * header for why four copies of the same numbers existed and what now reads
+ * from where. What lives here is the DERIVATION Tailwind needs:
+ *
+ *   cssVarColors / cssVarEhColors   the colour map the config consumes, where
+ *                                   every entry is `rgb(var(--c-…) / <alpha-value>)`
+ *                                   instead of a literal hex
+ *   colorVariableDeclarations()     the exact `--c-*` text globals.css declares
+ *
+ * ── Why CSS variables, and why CHANNELS rather than hex ───────────────────
+ * Pointing the Tailwind colour map at CSS variables is what lets Phase 1
+ * re-theme `bg-primary-500` from `:root` instead of from a rebuild. But a
+ * variable holding `#00E5A0` cannot carry an opacity modifier: Tailwind expands
+ * `bg-error-500/10` to `rgb(<value> / 0.1)`, and `rgb(#ef4444 / 0.1)` is not
+ * valid CSS, so the declaration is dropped and the tint silently disappears.
+ * There are 27 such usages in `web/src` today (`bg-error-500/10`,
+ * `bg-success-500/10`, `border-error-500/20`, …) — every one of them a visible
+ * status tint. So the variables hold bare channels (`239 68 68`) and the map
+ * wraps them, which keeps all 27 working. This is the documented Tailwind v3
+ * contract for themable colours, not a trick.
+ *
+ * The one exception is `eh.card`, which is an rgba with its own alpha and
+ * therefore cannot be a channel triple. It stays a whole-colour variable, which
+ * means `bg-eh-card/<n>` would not compose — checked, and there are zero such
+ * usages.
+ */
+const { semanticColors, ehColors, ehCard, tokens } = require('./src/theme/palette.js');
+
+const VAR_PREFIX = '--c-';
+
+/** `--c-primary-500`, `--c-eh-bg`, … */
+const varName = (family, key) => `${VAR_PREFIX}${family}-${key}`;
+
+/** `'#00E5A0'` -> `'0 229 160'`. Throws rather than emitting a broken variable. */
+function hexToChannels(hex) {
+  const body = String(hex).trim().replace(/^#/, '');
+  const full =
+    body.length === 3
+      ? body
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : body;
+  if (!/^[0-9a-fA-F]{6}$/.test(full)) {
+    throw new Error(`palette: expected a 3- or 6-digit hex colour, got "${hex}"`);
+  }
+  const n = parseInt(full, 16);
+  return `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`;
+}
+
+const alphaAware = (family, key) => `rgb(var(${varName(family, key)}) / <alpha-value>)`;
+
+/** The 50–900 ramps, as variable references. */
+const cssVarColors = Object.fromEntries(
+  Object.entries(semanticColors).map(([family, ramp]) => [
+    family,
+    Object.fromEntries(Object.keys(ramp).map((key) => [key, alphaAware(family, key)])),
+  ]),
+);
+
+/** The `eh-*` namespace, as variable references. See the `card` note above. */
+const cssVarEhColors = {
+  ...Object.fromEntries(Object.keys(ehColors).map((key) => [key, alphaAware('eh', key)])),
+  card: `var(${varName('eh', 'card')})`,
 };
 
-const tokens = {
-  spacing: {
-    xs: '4px',
-    sm: '8px',
-    md: '12px',
-    lg: '16px',
-    xl: '24px',
-    '2xl': '32px',
-    '3xl': '48px',
-    '4xl': '64px',
-    '5xl': '80px',
-  },
-  radius: {
-    xs: '2px',
-    sm: '4px',
-    md: '8px',
-    lg: '12px',
-    xl: '16px',
-    '2xl': '24px',
-    full: '9999px',
-  },
-  shadow: {
-    none: 'none',
-    xs: '0 1px 2px rgba(0, 0, 0, 0.05)',
-    sm: '0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06)',
-    md: '0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06)',
-    lg: '0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05)',
-    xl: '0 20px 25px rgba(0, 0, 0, 0.1), 0 10px 10px rgba(0, 0, 0, 0.04)',
-    '2xl': '0 25px 50px rgba(0, 0, 0, 0.1)',
-    inner: 'inset 0 2px 4px rgba(0, 0, 0, 0.06)',
-  },
-  transition: {
-    fast: '150ms ease-in-out',
-    normal: '300ms ease-in-out',
-    slow: '500ms ease-in-out',
-  },
-  zIndex: {
-    hide: '-1',
-    auto: 'auto',
-    base: '0',
-    docked: '10',
-    dropdown: '1000',
-    sticky: '1020',
-    fixed: '1030',
-    backdrop: '1040',
-    offcanvas: '1050',
-    modal: '1060',
-    popover: '1070',
-    tooltip: '1080',
-  },
-  breakpoints: {
-    xs: '0px',
-    sm: '640px',
-    md: '768px',
-    lg: '1024px',
-    xl: '1280px',
-    '2xl': '1536px',
-  },
-  animation: {
-    spin: 'spin 1s linear infinite',
-    pulse: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-    bounce: 'bounce 1s infinite',
-    fadeIn: 'fadeIn 300ms ease-in-out',
-    slideIn: 'slideIn 300ms ease-in-out',
-    slideOut: 'slideOut 300ms ease-in-out',
-  },
-  border: {
-    none: '0px',
-    xs: '0.5px',
-    sm: '1px',
-    md: '2px',
-    lg: '4px',
-  },
-  opacity: {
-    0: '0',
-    5: '0.05',
-    10: '0.1',
-    20: '0.2',
-    25: '0.25',
-    30: '0.3',
-    40: '0.4',
-    50: '0.5',
-    60: '0.6',
-    70: '0.7',
-    75: '0.75',
-    80: '0.8',
-    90: '0.9',
-    95: '0.95',
-    100: '1',
-  },
-};
+/**
+ * The exact block `globals.css` must declare, generated from the palette.
+ *
+ * globals.css is hand-authored CSS with no build step, so the declarations
+ * cannot literally be generated into it at compile time — which would leave the
+ * hexes written out in two places with nothing holding them together. So they
+ * ARE written in two places, and `src/theme/__tests__/css-token-sync.test.ts`
+ * fails the build if the two ever disagree. Drift is caught, not hoped against.
+ */
+function colorVariableDeclarations(indent = '    ') {
+  const lines = [];
+  for (const [family, ramp] of Object.entries(semanticColors)) {
+    for (const [key, hex] of Object.entries(ramp)) {
+      lines.push(`${indent}${varName(family, key)}: ${hexToChannels(hex)};`);
+    }
+  }
+  for (const [key, hex] of Object.entries(ehColors)) {
+    lines.push(`${indent}${varName('eh', key)}: ${hexToChannels(hex)};`);
+  }
+  lines.push(`${indent}${varName('eh', 'card')}: ${ehCard};`);
+  return lines.join('\n');
+}
 
-module.exports = { semanticColors, tokens };
+module.exports = {
+  semanticColors,
+  tokens,
+  ehColors,
+  ehCard,
+  cssVarColors,
+  cssVarEhColors,
+  colorVariableDeclarations,
+  hexToChannels,
+  varName,
+};

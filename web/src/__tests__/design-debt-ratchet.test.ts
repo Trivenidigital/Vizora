@@ -46,15 +46,34 @@ const BASELINE_FILE = path.join(__dirname, 'design-debt-ratchet.baseline.json');
 
 const EXCLUDED_DIRS = new Set(['node_modules', '.next', '__tests__', 'generated']);
 
-/** Art-directed marketing surface — see the note above. Path fragments, POSIX-style. */
-const EXCLUDED_PATHS = ['components/landing/'];
+/**
+ * Excluded paths, POSIX-style, relative to `web/src`.
+ *
+ * `components/landing/` — art-directed marketing surface, see the note above.
+ *
+ * `theme/palette.js` — the SANCTIONED home for colour values. Counting it would
+ * make the ratchet punish the one file the migration is moving colours INTO,
+ * and it is a single named exception rather than a glob so a second "palette"
+ * file cannot quietly inherit the exemption.
+ */
+const EXCLUDED_PATHS = ['components/landing/', 'theme/palette.js'];
 
 const PATTERNS = {
   hexLiterals: /#[0-9a-fA-F]{3,8}\b/g,
   tailwindArbitraryColors: /\[#[0-9a-fA-F]{3,8}\]/g,
   rawPaletteClasses:
     /\b(?:bg|text|border|ring|from|to|via)-(?:gray|slate|zinc|neutral|blue|indigo|purple|green|emerald|teal|cyan|red|rose|yellow|amber|orange)-\d+\b/g,
-  darkVariants: /\bdark:/g,
+  /*
+   * `dark:` immediately followed by non-whitespace, i.e. an actual Tailwind
+   * variant. A bare /\bdark:/ also matched OBJECT KEYS — `dark: '#00E5A0'` in
+   * the semantic ramps, `dark: { … }` in chartConfig — so 7 of the original
+   * 474 were not variants at all. That was caught the useful way: moving the
+   * ramps out of colors.ts made the number "improve" by 5 while not one class
+   * list changed, which is precisely the kind of meaningless movement a
+   * ratchet must not reward. The honest count of `dark:` variants is 467.
+   * (The plan's §3 states 469 from a plain grep; the difference is these keys.)
+   */
+  darkVariants: /\bdark:(?=\S)/g,
 } as const;
 
 type Metric = keyof typeof PATTERNS;
@@ -65,7 +84,14 @@ function walk(dir: string, out: string[] = []): string[] {
     const full = path.join(dir, entry);
     if (statSync(full).isDirectory()) {
       walk(full, out);
-    } else if (/\.tsx?$/.test(entry) && !/\.d\.ts$/.test(entry) && !/\.(test|spec)\.tsx?$/.test(entry)) {
+    } else if (
+      // .js/.cjs/.mjs as well as .ts/.tsx: otherwise moving a palette into a
+      // plain .js file takes it off the books without removing any debt, and
+      // the counter can be dodged by choosing an extension.
+      /\.(tsx?|jsx?|cjs|mjs)$/.test(entry) &&
+      !/\.d\.ts$/.test(entry) &&
+      !/\.(test|spec)\.(tsx?|jsx?)$/.test(entry)
+    ) {
       out.push(full);
     }
   }

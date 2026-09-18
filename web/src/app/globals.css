@@ -181,6 +181,117 @@
     --transition-normal: 300ms ease-in-out;
     --transition-slow: 500ms ease-in-out;
 
+    /*
+     * The Tailwind colour scale, as CSS variables.
+     *
+     * These back the `primary-*`, `success-*`, `warning-*`, `error-*`,
+     * `info-*`, `neutral-*` and `eh-*` Tailwind utilities, which used to
+     * compile hex literals straight out of the config. Declaring them here
+     * means Phase 1 can re-point the whole scale from `:root` rather than
+     * from a rebuild.
+     *
+     * BARE CHANNELS, not hex, and that is load-bearing: Tailwind expands an
+     * opacity modifier to `rgb(<value> / .1)`, and `rgb(#ef4444 / .1)` is
+     * invalid CSS, so the declaration would be dropped and 27 status tints in
+     * web/src would silently vanish. `--c-eh-card` is the one exception: it
+     * carries its own alpha and so cannot be a triple.
+     *
+     * THEME-INVARIANT ON PURPOSE. The scale is a fixed ramp; the tokens that
+     * change per theme are the semantic ones above (--primary, --surface, …).
+     * Do not add a .dark copy of this block without deciding that deliberately.
+     *
+     * Generated from src/theme/palette.js — regenerate with:
+     *   node -e "console.log(require('./web/tailwind.theme.cjs').colorVariableDeclarations())"
+     * and pinned by src/theme/__tests__/css-token-sync.test.ts.
+     */
+    /* >>> generated: palette scale, see tailwind.theme.cjs <<< */
+    --c-primary-50: 236 253 245;
+    --c-primary-100: 209 250 229;
+    --c-primary-200: 167 243 208;
+    --c-primary-300: 110 231 183;
+    --c-primary-400: 52 211 153;
+    --c-primary-500: 0 229 160;
+    --c-primary-600: 0 204 142;
+    --c-primary-700: 0 168 118;
+    --c-primary-800: 0 122 86;
+    --c-primary-900: 6 78 59;
+    --c-primary-light: 0 204 142;
+    --c-primary-dark: 0 229 160;
+    --c-success-50: 240 253 244;
+    --c-success-100: 220 252 231;
+    --c-success-200: 187 247 208;
+    --c-success-300: 134 239 172;
+    --c-success-400: 74 222 128;
+    --c-success-500: 34 197 94;
+    --c-success-600: 22 163 74;
+    --c-success-700: 21 128 61;
+    --c-success-800: 22 101 52;
+    --c-success-900: 20 82 49;
+    --c-success-light: 22 163 74;
+    --c-success-dark: 34 197 94;
+    --c-warning-50: 255 251 235;
+    --c-warning-100: 254 243 199;
+    --c-warning-200: 253 230 138;
+    --c-warning-300: 252 211 77;
+    --c-warning-400: 251 191 36;
+    --c-warning-500: 245 158 11;
+    --c-warning-600: 217 119 6;
+    --c-warning-700: 180 83 9;
+    --c-warning-800: 146 64 14;
+    --c-warning-900: 120 53 15;
+    --c-warning-light: 217 119 6;
+    --c-warning-dark: 251 191 36;
+    --c-error-50: 254 242 242;
+    --c-error-100: 254 226 226;
+    --c-error-200: 254 202 202;
+    --c-error-300: 252 165 165;
+    --c-error-400: 248 113 113;
+    --c-error-500: 239 68 68;
+    --c-error-600: 220 38 38;
+    --c-error-700: 185 28 28;
+    --c-error-800: 153 27 27;
+    --c-error-900: 127 29 29;
+    --c-error-light: 220 38 38;
+    --c-error-dark: 239 68 68;
+    --c-info-50: 236 254 255;
+    --c-info-100: 207 250 254;
+    --c-info-200: 165 243 252;
+    --c-info-300: 103 232 249;
+    --c-info-400: 34 211 238;
+    --c-info-500: 0 180 216;
+    --c-info-600: 0 151 184;
+    --c-info-700: 14 116 144;
+    --c-info-800: 21 94 117;
+    --c-info-900: 22 78 99;
+    --c-info-light: 0 151 184;
+    --c-info-dark: 0 180 216;
+    --c-neutral-50: 240 236 232;
+    --c-neutral-100: 232 227 221;
+    --c-neutral-200: 209 203 197;
+    --c-neutral-300: 181 174 166;
+    --c-neutral-400: 138 130 120;
+    --c-neutral-500: 90 82 72;
+    --c-neutral-600: 61 54 50;
+    --c-neutral-700: 27 61 71;
+    --c-neutral-800: 18 45 53;
+    --c-neutral-900: 10 34 46;
+    --c-neutral-950: 6 26 33;
+    --c-eh-bg: 6 26 33;
+    --c-eh-bg-secondary: 8 30 40;
+    --c-eh-bg-tertiary: 10 34 46;
+    --c-eh-surface: 12 34 41;
+    --c-eh-surface-secondary: 18 45 53;
+    --c-eh-accent: 0 229 160;
+    --c-eh-accent-hover: 0 204 142;
+    --c-eh-cyan: 0 180 216;
+    --c-eh-violet: 139 92 246;
+    --c-eh-text: 240 236 232;
+    --c-eh-text-secondary: 138 130 120;
+    --c-eh-text-muted: 90 82 72;
+    --c-eh-border: 27 61 71;
+    --c-eh-border-light: 38 74 85;
+    --c-eh-card: rgba(12, 34, 41, 0.6);
+    /* <<< end generated palette scale >>> */
     /* Focus state */
     --focus-ring-width: 2px;
     --focus-ring-offset: 2px;
