@@ -354,7 +354,7 @@ export default function AnalyticsClient() {
  <div
  role="alert"
  aria-label="Analytics data unavailable"
- className="bg-[var(--error)]/10 border border-[var(--error)]/30 rounded-lg px-4 py-3 flex flex-col gap-2"
+ className="bg-error/10 border border-error/30 rounded-lg px-4 py-3 flex flex-col gap-2"
  >
  <div className="flex items-center gap-2">
  <Icon name="error" size="sm" className="text-[var(--error-ink)]" />

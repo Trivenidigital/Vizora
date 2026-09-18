@@ -335,19 +335,19 @@ export default function HealthMonitoringClient() {
 
  {/* Additional Info */}
  <div className="grid grid-cols-2 gap-3 text-sm">
- <div className="bg-[var(--surface)]/50/50 p-2 rounded">
+ <div className="bg-surface/50 p-2 rounded">
  <p className="text-[var(--foreground-secondary)] text-xs">Uptime</p>
  <p className="font-medium text-[var(--foreground)]">
  {typeof health.uptime === 'number' ? `${Math.floor(health.uptime / 24)}d ${health.uptime % 24}h` : 'Not reported'}
  </p>
  </div>
- <div className="bg-[var(--surface)]/50/50 p-2 rounded">
+ <div className="bg-surface/50 p-2 rounded">
  <p className="text-[var(--foreground-secondary)] text-xs">Temp</p>
  <p className="font-medium text-[var(--foreground)]">
  {typeof health.temperature === 'number' ? `${health.temperature}°C` : 'Not reported'}
  </p>
  </div>
- <div className="bg-[var(--surface)]/50/50 p-2 rounded col-span-2">
+ <div className="bg-surface/50 p-2 rounded col-span-2">
  <p className="text-[var(--foreground-secondary)] text-xs mb-1">Last Heartbeat</p>
  <p className="font-medium text-[var(--foreground)] text-xs">
  {health.lastHeartbeat ? `${Math.round((Date.now() - health.lastHeartbeat.getTime()) / 1000)}s ago` : 'Never'}

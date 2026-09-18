@@ -27,7 +27,7 @@
  * means `bg-eh-card/<n>` would not compose — checked, and there are zero such
  * usages.
  */
-const { semanticColors, ehColors, ehCard, tokens } = require('./src/theme/palette.js');
+const { semanticColors, ehColors, ehCard, tokens, lwSemantic } = require('./src/theme/palette.js');
 
 const VAR_PREFIX = '--c-';
 
@@ -68,6 +68,24 @@ const cssVarEhColors = {
 };
 
 /**
+ * The SEMANTIC tokens as named, channel-backed Tailwind colours.
+ *
+ * This is the half the original mechanism never covered, and the reason 55
+ * `bg-[var(--surface)]/80`-shaped declarations emit nothing today. Every entry
+ * is named after the `:root` token it mirrors, so the mapping is mechanical and
+ * a codemod can derive it rather than consulting a table — with two deliberate
+ * exceptions, `brand` and `brand-ink`, which are NOT channel forms of the
+ * tenant-overridable `--primary`. See the note in palette.js.
+ *
+ * Authors write `bg-surface/80`, `border-error/30`, `bg-brand/10`. NEVER
+ * `bg-[var(--surface)]/80` — that is the form that silently emits nothing, and
+ * `src/__tests__/no-var-opacity.test.ts` fails the build if it reappears.
+ */
+const cssVarSemanticColors = Object.fromEntries(
+  Object.keys(lwSemantic).map((key) => [key, alphaAware('lw', key)]),
+);
+
+/**
  * The exact block `globals.css` must declare, generated from the palette.
  *
  * globals.css is hand-authored CSS with no build step, so the declarations
@@ -87,6 +105,9 @@ function colorVariableDeclarations(indent = '    ') {
     lines.push(`${indent}${varName('eh', key)}: ${hexToChannels(hex)};`);
   }
   lines.push(`${indent}${varName('eh', 'card')}: ${ehCard};`);
+  for (const [key, hex] of Object.entries(lwSemantic)) {
+    lines.push(`${indent}${varName('lw', key)}: ${hexToChannels(hex)};`);
+  }
   return lines.join('\n');
 }
 
@@ -97,6 +118,8 @@ module.exports = {
   ehCard,
   cssVarColors,
   cssVarEhColors,
+  cssVarSemanticColors,
+  lwSemantic,
   colorVariableDeclarations,
   hexToChannels,
   varName,

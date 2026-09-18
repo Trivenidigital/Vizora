@@ -312,7 +312,7 @@ export default function HelpPage() {
                   className="w-full flex items-center justify-between p-4 hover:bg-[var(--surface-hover)] transition-colors duration-150"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-lg bg-brand/10 flex items-center justify-center">
                       <Icon
                         name={category.icon}
                         size="md"

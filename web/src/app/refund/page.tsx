@@ -10,7 +10,7 @@ export default function RefundPolicyPage() {
   return (
     <div className="mkt min-h-screen bg-[var(--background)]">
       {/* Header */}
-      <header className="border-b border-[var(--border)]/30 bg-[var(--surface)]/80 backdrop-blur-sm">
+      <header className="border-b border-border/30 bg-surface/80 backdrop-blur-sm">
         <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="text-lg font-semibold text-[var(--foreground)] hover:text-[var(--primary-ink)] transition-colors">
             Vizora
@@ -122,7 +122,7 @@ export default function RefundPolicyPage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-[var(--border)]/30 py-6 text-center text-xs text-[var(--foreground-tertiary)]">
+      <footer className="border-t border-border/30 py-6 text-center text-xs text-[var(--foreground-tertiary)]">
         <div className="flex items-center justify-center gap-3">
           <Link href="/terms" className="hover:text-[var(--foreground-secondary)] transition-colors">Terms of Service</Link>
           <span className="text-[var(--border)]">|</span>

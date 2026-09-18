@@ -136,7 +136,12 @@ export default function DashboardLayout({
     <div className="min-h-screen bg-[var(--background)]">
       {/* Header */}
       {/*
-        SOLID surface, not `bg-[var(--surface)]/80 backdrop-blur-xl`.
+        SOLID surface, not a translucent one with a backdrop blur.
+
+        (The offending class is deliberately not spelled out here. Tailwind
+        scans comments, and `src/__tests__/no-var-opacity.test.ts` scans them
+        too — quoting the broken form would make this comment fail the gate
+        that exists to keep the form out. Same convention as CookieConsent.tsx.)
 
         Tailwind drops an opacity modifier applied to a `var()` colour: it can
         only build `rgb(<channels> / .8)`, and `rgb(var(--surface) / .8)` is
@@ -295,7 +300,8 @@ export default function DashboardLayout({
           such as `--badge-brand-bg` (#e0e0d6), silently costs ~13% of that ratio
           and drops a tenant sitting at the 4.5:1 floor to ~3.9:1.
 
-          The previous `bg-[var(--primary)]/10` wash never rendered at all:
+          The previous brand wash — an opacity modifier on an arbitrary
+          `var()` colour — never rendered at all:
           Tailwind discards an opacity modifier on a `var()` colour (verified
           against the compiled sheet — the rule is emitted nowhere), so the
           active item had no ground, only a left rule.

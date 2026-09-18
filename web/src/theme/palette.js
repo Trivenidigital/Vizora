@@ -267,6 +267,73 @@ const tokens = {
 };
 
 /**
+ * SEMANTIC TOKENS, as values — so they can also exist as Tailwind colours.
+ *
+ * These are the same values `globals.css` declares on `:root` as `--surface`,
+ * `--foreground`, `--border` and friends. They are restated here for one
+ * reason: Tailwind can only carry an OPACITY MODIFIER on a colour it can build
+ * as `rgb(<channels> / <alpha>)`. A variable holding `#fdfbf5` cannot, so
+ * an opacity modifier on an ARBITRARY `var()` colour is discarded outright —
+ * the broken form is deliberately not spelled out here, because
+ * `src/__tests__/no-var-opacity.test.ts` scans comments too and quoting it
+ * would make this note fail the gate it is describing. 55 such declarations in
+ * `web/src` have never rendered a background or a border in their lives.
+ *
+ * Worse than the existing bug: 390 opacity modifiers that WORK today (177 on
+ * `[#hex]`, 213 on palette classes) would be destroyed the moment a codemod
+ * rewrote them to `-[var(--token)]/NN`. That is why these get channel forms
+ * BEFORE any batch runs, and why the config exposes NAMED colours — an
+ * arbitrary `var()` can be mis-typed again, a named colour cannot.
+ *
+ * The mechanism is not new: `--c-primary-500` and the `eh-*` namespace have
+ * worked this way since Phase 0. It simply never covered the semantic tokens.
+ *
+ * `css-token-sync.test.ts` fails if these and `globals.css` disagree.
+ *
+ * ── `brand` / `brand-ink` are NAMED DIFFERENTLY ON PURPOSE ────────────────
+ * Every other entry here is theme-fixed, so its channel form is always correct
+ * and takes the token's own name. `--primary` and `--primary-ink` are NOT:
+ * `applyCSSVariables` overrides them at runtime with a white-label tenant's
+ * hex, as an inline style on <html>. A channel triple cannot follow a hex
+ * override, so `bg-brand/10` is Vizora's forest for EVERY tenant, branded or
+ * not — it is not a channel form of `--primary` and must not be read as one.
+ * They are called `brand` rather than `primary` so that the difference is
+ * visible at the call site instead of being a footnote someone misses.
+ *
+ * Converting today's hardcoded `bg-[#00E5A0]/10` sites to `bg-brand/10` is
+ * therefore not a white-label regression: those sites never followed the
+ * tenant either. But do NOT convert a site that currently reads
+ * `var(--primary)` WITHOUT an opacity modifier — that one does follow the
+ * tenant, and a channel token would take that away.
+ */
+const lwSemantic = {
+  background: '#f5f1e8',
+  'background-secondary': '#efe9dc',
+  'background-tertiary': '#e9e2d2',
+  foreground: '#23261f',
+  'foreground-secondary': '#4b5045',
+  'foreground-tertiary': '#5f6456',
+  surface: '#fdfbf5',
+  'surface-secondary': '#f3eee1',
+  'surface-hover': '#efe9dc',
+  border: '#ddd5c2',
+  'border-light': '#e9e2d2',
+  'border-dark': '#cfc5ae',
+  // See the note above: fixed Vizora forest, NOT a channel form of --primary.
+  brand: '#1f4230',
+  'brand-ink': '#1f4230',
+  success: '#16a34a',
+  'success-ink': '#166534',
+  warning: '#d97706',
+  'warning-ink': '#92400e',
+  error: '#dc2626',
+  'error-ink': '#b91c1c',
+  info: '#0097B8',
+  'info-ink': '#0d6e89',
+  danger: '#dc2626',
+};
+
+/**
  * CHART SERIES — the categorical palette, and the one part of this file that
  * is already Little Worlds.
  *
@@ -314,4 +381,4 @@ const chartChrome = {
   hairline: '#ddd5c2',
 };
 
-module.exports = { semanticColors, ehColors, ehCard, tokens, chartSeries, chartChrome };
+module.exports = { semanticColors, ehColors, ehCard, tokens, chartSeries, chartChrome, lwSemantic };

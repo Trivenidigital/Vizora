@@ -335,6 +335,29 @@
     --c-eh-border: 27 61 71;
     --c-eh-border-light: 38 74 85;
     --c-eh-card: rgba(12, 34, 41, 0.6);
+    --c-lw-background: 245 241 232;
+    --c-lw-background-secondary: 239 233 220;
+    --c-lw-background-tertiary: 233 226 210;
+    --c-lw-foreground: 35 38 31;
+    --c-lw-foreground-secondary: 75 80 69;
+    --c-lw-foreground-tertiary: 95 100 86;
+    --c-lw-surface: 253 251 245;
+    --c-lw-surface-secondary: 243 238 225;
+    --c-lw-surface-hover: 239 233 220;
+    --c-lw-border: 221 213 194;
+    --c-lw-border-light: 233 226 210;
+    --c-lw-border-dark: 207 197 174;
+    --c-lw-brand: 31 66 48;
+    --c-lw-brand-ink: 31 66 48;
+    --c-lw-success: 22 163 74;
+    --c-lw-success-ink: 22 101 52;
+    --c-lw-warning: 217 119 6;
+    --c-lw-warning-ink: 146 64 14;
+    --c-lw-error: 220 38 38;
+    --c-lw-error-ink: 185 28 28;
+    --c-lw-info: 0 151 184;
+    --c-lw-info-ink: 13 110 137;
+    --c-lw-danger: 220 38 38;
     /* <<< end generated palette scale >>> */
     /* Focus state */
     --focus-ring-width: 2px;

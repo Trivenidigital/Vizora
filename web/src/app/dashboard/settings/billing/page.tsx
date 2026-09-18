@@ -236,7 +236,7 @@ export default function BillingPage() {
 
  {/* Actions Footer */}
  {isPaidPlan && (
- <div className="px-6 py-4 bg-[var(--background)]/50 border-t border-[var(--border)]">
+ <div className="px-6 py-4 bg-background/50 border-t border-[var(--border)]">
  <div className="flex flex-wrap gap-4">
  {subscription?.paymentProvider && (
  <button

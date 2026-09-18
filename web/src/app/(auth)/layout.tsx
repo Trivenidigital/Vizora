@@ -6,7 +6,43 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     <div className="mkt min-h-screen bg-[var(--background)]">
       {children}
       {/* Shared footer for all auth pages */}
-      <footer className="fixed bottom-0 left-0 right-0 py-3 text-center text-[10px] text-[var(--foreground-tertiary)] bg-[var(--background)]/80 backdrop-blur-sm border-t border-[var(--border)]/30">
+      {/*
+       * Deliberately has NO background, and that is not an oversight.
+       *
+       * This bar used to carry an arbitrary-var background at 80% opacity
+       * (the `bg-[var(...)]` form with an opacity suffix — deliberately not
+       * written out here, see the last paragraph), plus `backdrop-blur-sm`.
+       * Tailwind silently discarded it: a var holding a whole colour cannot go
+       * in `rgb(<channels> / <alpha>)`. So the bar has always been
+       * transparent, and the two-column auth layout came to depend on that:
+       * the dark value panel shows through on the left, the ivory form on the
+       * right, with no seam.
+       *
+       * Converting it to the working `bg-background/80` during B0 restored the
+       * author's original intent and introduced a visible regression — an
+       * ivory band painted straight across the dark panel, 57,489 px at a
+       * channel delta of 516. The screenshot caught it; the no-var-opacity
+       * gate could not, because a dead declaration and a correctly-working one
+       * are indistinguishable to a lint rule. Only a render knows which of the
+       * two the design is relying on.
+       *
+       * `backdrop-blur-sm` STAYS. Only the background was dead — a backdrop
+       * filter needs no background to work, and this one has been blurring
+       * what sits behind the bar all along. Dropping it as "decorative along
+       * with the translucency" cost 18,853 px at a channel delta of 158 on
+       * the register page, which is how I learned the two were independent.
+       *
+       * The BORDER was dead for the same reason and is deliberately restored:
+       * `border-border/30` now paints the 1px hairline the author wrote, which
+       * is the one part of this bar that was doing real work and never got to.
+       * It is the only remaining pixel difference against the Phase 2 baseline.
+       *
+       * Finally: the dead form is described above rather than quoted, because
+       * the gate test scans raw file text and correctly flagged my first draft
+       * of this comment as an offence. Tailwind scans comments the same way —
+       * a class literal written in prose is still a class literal to both.
+       */}
+      <footer className="fixed bottom-0 left-0 right-0 py-3 text-center text-[10px] text-[var(--foreground-tertiary)] backdrop-blur-sm border-t border-border/30">
         <div className="flex items-center justify-center gap-3">
           <a href="/terms" className="hover:text-[var(--foreground-secondary)] transition-colors">Terms of Service</a>
           <span className="text-[var(--border)]">|</span>

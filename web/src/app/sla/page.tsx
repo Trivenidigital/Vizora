@@ -10,7 +10,7 @@ export default function SLAPage() {
   return (
     <div className="mkt min-h-screen bg-[var(--background)]">
       {/* Header */}
-      <header className="border-b border-[var(--border)]/30 bg-[var(--surface)]/80 backdrop-blur-sm">
+      <header className="border-b border-border/30 bg-surface/80 backdrop-blur-sm">
         <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="text-lg font-semibold text-[var(--foreground)] hover:text-[var(--primary-ink)] transition-colors">
             Vizora
@@ -59,7 +59,7 @@ export default function SLAPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm border-collapse">
                 <thead>
-                  <tr className="border-b border-[var(--border)]/30">
+                  <tr className="border-b border-border/30">
                     <th className="text-left py-2 pr-4 text-[var(--foreground)] font-semibold">Severity</th>
                     <th className="text-left py-2 pr-4 text-[var(--foreground)] font-semibold">Description</th>
                     <th className="text-left py-2 pr-4 text-[var(--foreground)] font-semibold">Response Time</th>
@@ -67,19 +67,19 @@ export default function SLAPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="border-b border-[var(--border)]/20">
+                  <tr className="border-b border-border/20">
                     <td className="py-2 pr-4 font-medium text-[var(--foreground)]">Critical</td>
                     <td className="py-2 pr-4">Service completely down</td>
                     <td className="py-2 pr-4">1 hour</td>
                     <td className="py-2">4 hours</td>
                   </tr>
-                  <tr className="border-b border-[var(--border)]/20">
+                  <tr className="border-b border-border/20">
                     <td className="py-2 pr-4 font-medium text-[var(--foreground)]">High</td>
                     <td className="py-2 pr-4">Service significantly degraded</td>
                     <td className="py-2 pr-4">4 hours</td>
                     <td className="py-2">24 hours</td>
                   </tr>
-                  <tr className="border-b border-[var(--border)]/20">
+                  <tr className="border-b border-border/20">
                     <td className="py-2 pr-4 font-medium text-[var(--foreground)]">Medium</td>
                     <td className="py-2 pr-4">Minor feature impacted</td>
                     <td className="py-2 pr-4">Next business day</td>
@@ -106,17 +106,17 @@ export default function SLAPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm border-collapse">
                 <thead>
-                  <tr className="border-b border-[var(--border)]/30">
+                  <tr className="border-b border-border/30">
                     <th className="text-left py-2 pr-4 text-[var(--foreground)] font-semibold">Monthly Uptime</th>
                     <th className="text-left py-2 text-[var(--foreground)] font-semibold">Service Credit</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="border-b border-[var(--border)]/20">
+                  <tr className="border-b border-border/20">
                     <td className="py-2 pr-4">&lt; 99.9% but &ge; 99.5%</td>
                     <td className="py-2">10% of monthly fee</td>
                   </tr>
-                  <tr className="border-b border-[var(--border)]/20">
+                  <tr className="border-b border-border/20">
                     <td className="py-2 pr-4">&lt; 99.5% but &ge; 99.0%</td>
                     <td className="py-2">25% of monthly fee</td>
                   </tr>
@@ -200,7 +200,7 @@ export default function SLAPage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-[var(--border)]/30 py-6 text-center text-xs text-[var(--foreground-tertiary)]">
+      <footer className="border-t border-border/30 py-6 text-center text-xs text-[var(--foreground-tertiary)]">
         <div className="flex items-center justify-center gap-3">
           <Link href="/terms" className="hover:text-[var(--foreground-secondary)] transition-colors">Terms of Service</Link>
           <span className="text-[var(--border)]">|</span>

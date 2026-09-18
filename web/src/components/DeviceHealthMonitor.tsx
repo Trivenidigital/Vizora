@@ -44,7 +44,7 @@ const MetricBar = ({ label, value, unit, thresholds }: any) => (
     </div>
     <div className="w-full h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
       <div
-        className={`h-full ${typeof value === 'number' ? getMetricStatus(value, thresholds) : 'bg-[var(--foreground-tertiary)]/30'} transition-all`}
+        className={`h-full ${typeof value === 'number' ? getMetricStatus(value, thresholds) : 'bg-foreground-tertiary/30'} transition-all`}
         style={{ width: `${typeof value === 'number' ? Math.min(value, 100) : 0}%` }}
       />
     </div>

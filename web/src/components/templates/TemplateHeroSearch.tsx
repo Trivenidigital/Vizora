@@ -100,7 +100,7 @@ export default function TemplateHeroSearch({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search templates... e.g. restaurant menu, sale banner, welcome screen"
-              className="w-full pl-12 pr-32 py-4 rounded-xl bg-[var(--surface)]/80 backdrop-blur-sm border border-[var(--border)] text-[var(--foreground)] placeholder-[var(--foreground-tertiary)] focus:outline-none focus:ring-2 focus:ring-[#00E5A0]/40 focus:border-[#00E5A0]/40 text-base transition-all"
+              className="w-full pl-12 pr-32 py-4 rounded-xl bg-surface/80 backdrop-blur-sm border border-[var(--border)] text-[var(--foreground)] placeholder-[var(--foreground-tertiary)] focus:outline-none focus:ring-2 focus:ring-[#00E5A0]/40 focus:border-[#00E5A0]/40 text-base transition-all"
               autoComplete="off"
             />
             <button
@@ -126,7 +126,7 @@ export default function TemplateHeroSearch({
                 setQuery(tag);
                 onTagClick(tag);
               }}
-              className="px-3 py-1.5 rounded-full text-xs font-medium bg-[var(--surface-hover)]/60 text-[var(--foreground-secondary)] border border-[var(--border)]/50 hover:border-[#00E5A0]/30 hover:text-[#00E5A0] hover:bg-[#00E5A0]/5 transition-all"
+              className="px-3 py-1.5 rounded-full text-xs font-medium bg-surface-hover/60 text-[var(--foreground-secondary)] border border-border/50 hover:border-[#00E5A0]/30 hover:text-[#00E5A0] hover:bg-[#00E5A0]/5 transition-all"
             >
               {tag}
             </button>

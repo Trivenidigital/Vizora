@@ -1,5 +1,11 @@
 /** @type {import('tailwindcss').Config} */
-const { cssVarColors, cssVarEhColors, tokens, varName } = require('./tailwind.theme.cjs');
+const {
+  cssVarColors,
+  cssVarEhColors,
+  cssVarSemanticColors,
+  tokens,
+  varName,
+} = require('./tailwind.theme.cjs');
 
 /** The neon accent, for the glow shadows and keyframes below. */
 const NEON = varName('primary', 500);
@@ -57,6 +63,22 @@ module.exports = {
         neutral: cssVarColors.neutral,
         // Electric Horizon namespace
         eh: cssVarEhColors,
+        /*
+         * The SEMANTIC tokens, as named channel-backed colours.
+         *
+         * Spread at the top level so they read as `bg-surface`,
+         * `border-error/30`, `text-foreground-secondary` — the same names the
+         * `:root` tokens carry, so the mapping needs no table. This is what
+         * makes an opacity modifier possible on a themable colour at all:
+         * `bg-[var(--surface)]/80` compiles to NOTHING, because Tailwind can
+         * only build `rgb(<channels> / <alpha>)`.
+         *
+         * Spread LAST so a name collision is loud rather than silent — the
+         * ramps above are `primary`/`success`/`warning`/`error`/`info` objects
+         * and these are flat strings, so any overlap would change the shape of
+         * the entry and break the build rather than quietly winning.
+         */
+        ...cssVarSemanticColors,
       },
       spacing: {
         xs: tokens.spacing.xs,

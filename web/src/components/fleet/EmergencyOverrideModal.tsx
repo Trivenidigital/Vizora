@@ -150,7 +150,7 @@ export default function EmergencyOverrideModal({ isOpen, onClose, organizationId
                 key={option.value}
                 className={`flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer transition ${
                   targetType === option.value
-                    ? 'border-[var(--primary-ink)] bg-[var(--primary)]/10 text-[var(--primary-ink)]'
+                    ? 'border-[var(--primary-ink)] bg-brand/10 text-[var(--primary-ink)]'
                     : 'border-[var(--border)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
                 }`}
               >
