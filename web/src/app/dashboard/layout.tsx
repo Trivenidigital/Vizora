@@ -179,7 +179,17 @@ export default function DashboardLayout({
                      literal so a white-label tenant's fill still flows through;
                      the neon→cyan gradient it replaces was 1.65:1 substrate-side
                      and read as a foreign object on ivory. */
-                  <div className="w-8 h-8 bg-[var(--primary)] rounded-lg flex items-center justify-center">
+                  /* `data-brand-mark` is the visual-baseline harness's mask
+                     hook (scripts/design/baseline.mjs GLOBAL_MASKS). This
+                     swatch rasterises its antialiased corners differently
+                     between runs, so it is masked rather than compared. The
+                     hook is an attribute, not a class, because the mask used to
+                     select on `.bg-gradient-to-br` and silently stopped
+                     matching the moment this tile stopped being a gradient. */
+                  <div
+                    data-brand-mark
+                    className="w-8 h-8 bg-[var(--primary)] rounded-lg flex items-center justify-center"
+                  >
                     <span className="text-[var(--lw-on-forest)] font-bold text-lg">{brandInitial}</span>
                   </div>
                 )}

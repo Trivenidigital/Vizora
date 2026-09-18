@@ -533,7 +533,16 @@ export default function DashboardClient({
  </p>
  </Link>
 
- <div className={`${healthSummary.cardClassName} p-6 rounded-lg border border-[var(--border)] hover:-translate-y-[2px] hover:shadow-md transition-all duration-300 text-white animate-[fadeIn_0.6s_ease-out]`}>
+ {/* `data-live-telemetry`: visual-baseline mask hook. This tile renders the
+     LIVE readiness of the stack, which genuinely flaps between ok and
+     degraded and repaints the whole gradient — it is not comparable between
+     two runs, so it is masked rather than compared. An attribute, not a
+     class, so a restyle cannot silently detach it. See GLOBAL_MASKS in
+     scripts/design/baseline.mjs. */}
+ <div
+ data-live-telemetry
+ className={`${healthSummary.cardClassName} p-6 rounded-lg border border-[var(--border)] hover:-translate-y-[2px] hover:shadow-md transition-all duration-300 text-white animate-[fadeIn_0.6s_ease-out]`}
+ >
  <div className="flex items-center justify-between mb-4">
  <p className={`text-sm font-medium ${healthSummary.textClassName}`}>System Status</p>
  <Icon name="power" size="2xl" className={healthSummary.iconClassName} />

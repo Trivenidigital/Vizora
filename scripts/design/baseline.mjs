@@ -147,24 +147,90 @@ const TEXT_SUBSTITUTIONS = {
   '/dashboard/settings/team': [
     { selector: 'table tbody td:nth-child(5)', text: 'Jan 15, 2026, 12:00 PM' },
   ],
+  /*
+   * /admin/health renders LIVE telemetry that no request interception can
+   * reach.
+   *
+   * `pinReadiness` routes `**\/api/v1/admin/health*` and pins `latency`,
+   * `responseTime`, `memory` and friends — and it is DEAD for this page.
+   * `app/admin/health/page.tsx` fetches the payload with `serverFetch`, i.e.
+   * from the Next server, which Playwright's `ctx.route` cannot intercept
+   * because the browser never makes the request; and the client deliberately
+   * does not re-fetch when an SSR payload exists (`if (!initialHealth)
+   * loadHealth()`), so the pinned browser-side call never fires either. The
+   * page therefore always renders unpinned live numbers.
+   *
+   * Measured across two runs of identical code: 2ms->7ms, 10ms->15ms,
+   * 50ms->106ms, 3ms->6ms. The three-digit case also changes the text WIDTH,
+   * which reflows and is what made this page's full-page height move.
+   *
+   * Substituting on the rendered text works wherever the data came from, which
+   * is the property the route interception lacks. Patterns rather than
+   * selectors because the values are scattered across cards, rows and
+   * subtitles; pinning each selector would be a list that rots the first time
+   * the page is laid out differently.
+   */
+  '/admin/health': [
+    { pattern: '\\d+(?:\\.\\d+)?\\s*ms', text: '1ms' },
+    { pattern: '\\d+(?:\\.\\d+)?\\s*(?:B|KB|MB|GB|TB)\\b', text: '1 MB' },
+  ],
+  /*
+   * /admin/users renders "Last Login", which THIS SCRIPT changes every time it
+   * runs.
+   *
+   * The capture signs in as the demo tenant and the platform operator, the
+   * backend stamps `lastLoginAt`, and the very next run photographs it. So the
+   * harness was generating its own diff: two runs of identical code disagreed
+   * by 36,980 and then 71,780 pixels, and 15,579 of those differed by more than
+   * 96 per channel — far too loud for antialiasing. It was literally
+   * "03:13 PM" against "03:20 PM" on the two seeded accounts.
+   *
+   * Worth being precise about why the frozen clock does not cover this: FREEZE
+   * pins `Date` INSIDE THE PAGE, and this timestamp is server state that was
+   * already written before the page rendered. Anything the capture itself
+   * mutates has to be pinned here, not there.
+   *
+   * This is the SAME cause the `/dashboard/settings/team` entry above was
+   * written for — `users.lastLoginAt`, written by this script's own login. That
+   * entry fixed the one route it was found on rather than the class, so
+   * `/admin/users` kept flapping. When a new route renders a login timestamp,
+   * it needs an entry here too.
+   */
+  '/admin/users': [
+    {
+      pattern: '\\b[A-Z][a-z]{2} \\d{1,2}, \\d{4}, \\d{1,2}:\\d{2} (?:AM|PM)\\b',
+      text: 'Jan 15, 2026, 12:00 PM',
+    },
+  ],
 };
 
 /**
  * Painted over on EVERY route, because the instability follows the element.
  *
- * The 32x32 gradient brand swatch in both shells (`dashboard/layout.tsx:158`,
- * `admin/components/AdminSidebar.tsx:70`) rasterises its antialiased corners
+ * The 32x32 brand swatch in both shells rasterises its antialiased corners
  * differently between runs — 6 px at a max channel delta of 15, invisible to a
  * human and fatal to an exact-equality comparison. It surfaced on a different
  * route each run (billing, then api-keys), so masking per-route would just move
  * the flake around.
+ *
+ * ── SELECT ON A DEDICATED ATTRIBUTE, NEVER ON STYLING ────────────────────
+ * These were `a[href="/dashboard"] .bg-gradient-to-br` and
+ * `aside .bg-gradient-to-br:has(> span)`. Phase 2a repainted both swatches from
+ * a neon->cyan gradient to a flat `--primary` fill, which removed
+ * `bg-gradient-to-br` from the markup — so both selectors matched NOTHING and
+ * the mask silently stopped existing. A mask that quietly stops masking is
+ * worse than no mask: the flake comes back and reads as a real regression.
+ *
+ * `data-brand-mark` exists only for this, so a restyle cannot detach it. If it
+ * ever matches nothing again that is a bug, and `assertMasksMatch` below fails
+ * the run rather than letting it pass quietly.
  *
  * COST, stated plainly: the swatch's own fill and radius are no longer covered
  * by the baseline. It is one small element and everything around it — the
  * wordmark beside it, the whole shell — still is. Excluding the routes instead
  * would have cost four entire screens.
  */
-const GLOBAL_MASKS = ['a[href="/dashboard"] .bg-gradient-to-br', 'aside .bg-gradient-to-br:has(> span)'];
+const GLOBAL_MASKS = ['[data-brand-mark]', '[data-live-telemetry]'];
 
 /**
  * Pin the readiness verdict the dashboard's "System Status" card renders.
@@ -467,10 +533,13 @@ const STABILISE_CSS = `
   nextjs-portal { display: none !important; }
 `;
 
-async function capture(label, routes, viewports, out, settleMs, publicOnly) {
+async function capture(label, routes, viewports, out, settleMs, publicOnly, isSubset = false) {
   if (!/^https?:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(BASE)) {
     throw new Error(`Refusing to capture against non-local target: ${BASE}`);
   }
+
+  /** selector -> total elements matched across the whole run. See GLOBAL_MASKS. */
+  const maskHits = new Map(GLOBAL_MASKS.map((sel) => [sel, 0]));
 
   const dir = setDir(label, out);
   fs.mkdirSync(dir, { recursive: true });
@@ -488,6 +557,29 @@ async function capture(label, routes, viewports, out, settleMs, publicOnly) {
       '--disable-font-subpixel-positioning',
       '--font-render-hinting=none',
       '--hide-scrollbars',
+      /*
+       * Pin COMPOSITING, which the five flags above do not touch.
+       *
+       * They pin how a glyph is rasterised; these pin whether it is rasterised
+       * at all. Chromium rasterises in tiles and reuses the ones it thinks are
+       * clean (partial raster), decodes images progressively (checker imaging)
+       * and scrolls on a separate thread — so a page that has been SCROLLED,
+       * which every page here has by `sweepScroll`, can end up with a different
+       * mix of freshly-rastered and reused tiles between two runs.
+       *
+       * That is the signature we measured on `/admin/users`, the tallest
+       * authenticated page and therefore the one with the most tiles: 36,980
+       * pixels differing with the content in exactly the same place — an offset
+       * sweep over dx,dy in [-2,2] put the minimum at (0,0) by a factor of
+       * four, so nothing had moved and nothing had reflowed — and the differing
+       * pixels were glyph edges and pill borders shading between background and
+       * ink. Fonts, colour profile and hinting were already pinned, so the
+       * remaining variable was the tile, not the type.
+       */
+      '--disable-partial-raster',
+      '--disable-checker-imaging',
+      '--disable-threaded-scrolling',
+      '--run-all-compositor-stages-before-draw',
     ],
   });
   /**
@@ -768,6 +860,49 @@ async function capture(label, routes, viewports, out, settleMs, publicOnly) {
         // the first place to look if its shot ever starts flapping.
         if (!imagesSettled) console.log(`      (image set never went quiet on ${route}; fell back to the 30s cap)`);
         /*
+         * Wait for the DOM to stop CHANGING, not just for the page to load.
+         *
+         * Every wait above answers "has the document and its assets arrived?".
+         * None of them answers "has the page finished rendering its DATA?" — a
+         * table that fetches rows is `load`-complete, font-complete and
+         * image-complete while still showing its zero state. Measured: two
+         * captures of identical code disagreed on `/admin/organizations` and
+         * `/admin/users` by the entire page (900px tall vs 1874-2775px), one
+         * run photographing "Total Users 0" against a database holding 3246.
+         * A baseline of a page's loading state is not a baseline of the page.
+         *
+         * This is a CONDITION, not a longer timeout, which matters: a bigger
+         * fixed settle is simultaneously too slow everywhere and still too
+         * short on the one slow run. The signature is text length plus node
+         * count — enough to catch rows appearing, cheap enough to poll — and it
+         * has to hold for four consecutive polls (~1s of quiet) for the same
+         * reason the image check does: a single sample cannot tell "finished"
+         * from "between two renders".
+         *
+         * Runs AFTER the scroll sweep so content revealed on scroll is already
+         * mounting, and it is bounded — a genuinely live page (one that never
+         * stops repainting) must not hang the capture, it must be reported.
+         */
+        const domSettled = await page
+          .waitForFunction(
+            () => {
+              const w = window;
+              const sig = `${document.body.innerText.length}:${document.getElementsByTagName('*').length}`;
+              if (w.__baselineDomSig !== sig) {
+                w.__baselineDomSig = sig;
+                w.__baselineDomStable = 0;
+                return false;
+              }
+              w.__baselineDomStable = (w.__baselineDomStable || 0) + 1;
+              return w.__baselineDomStable >= 4;
+            },
+            null,
+            { timeout: 20_000, polling: 250 },
+          )
+          .then(() => true)
+          .catch(() => false);
+        if (!domSettled) console.log(`      (DOM never went quiet on ${route}; captured mid-render — treat this shot as unreliable)`);
+        /*
          * Re-await fonts AFTER the scroll and the image wait.
          *
          * `document.fonts.ready` resolves once the fonts pending *at that
@@ -782,14 +917,53 @@ async function capture(label, routes, viewports, out, settleMs, publicOnly) {
           .catch(() => console.log(`      (fonts still loading after 20s on ${route})`));
         await page.waitForTimeout(300);
         for (const sub of TEXT_SUBSTITUTIONS[route] || []) {
-          await page.evaluate(
-            ([sel, text]) => {
-              document.querySelectorAll(sel).forEach((n) => {
-                n.textContent = text;
-              });
-            },
-            [sub.selector, sub.text],
-          );
+          if (sub.pattern) {
+            /*
+             * TWO passes, because one is provably not enough.
+             *
+             * Pass 1 — LEAF ELEMENTS. `{service.latency}ms` in JSX is two React
+             * children, so it renders as two adjacent text nodes, "10" and
+             * "ms". A per-text-node regex sees neither "10ms" nor anything
+             * matching and silently does nothing: measured, this left the
+             * service latencies on /admin/health flapping (10ms/74ms/2ms) after
+             * the substitution had already fixed every single-node value on the
+             * same page. Collapsing a leaf's `textContent` is safe precisely
+             * because it is a leaf — there is no nested markup to destroy.
+             *
+             * Pass 2 — TEXT NODES under elements that DO have element children,
+             * i.e. mixed content, where replacing `textContent` would delete the
+             * sibling markup. There the volatile number is one fragment of a
+             * longer string ("2ms latency") and only the fragment may move.
+             */
+            await page.evaluate(
+              ([source, text]) => {
+                const fresh = () => new RegExp(source, 'g');
+                for (const el of Array.from(document.body.querySelectorAll('*'))) {
+                  if (el.children.length === 0 && el.textContent && fresh().test(el.textContent)) {
+                    el.textContent = el.textContent.replace(fresh(), text);
+                  }
+                }
+                const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+                const nodes = [];
+                for (let n = walker.nextNode(); n; n = walker.nextNode()) nodes.push(n);
+                for (const n of nodes) {
+                  if (n.nodeValue && fresh().test(n.nodeValue)) {
+                    n.nodeValue = n.nodeValue.replace(fresh(), text);
+                  }
+                }
+              },
+              [sub.pattern, sub.text],
+            );
+          } else {
+            await page.evaluate(
+              ([sel, text]) => {
+                document.querySelectorAll(sel).forEach((n) => {
+                  n.textContent = text;
+                });
+              },
+              [sub.selector, sub.text],
+            );
+          }
         }
         /*
          * Grow the viewport to the content and take a NORMAL shot, rather than
@@ -827,6 +1001,16 @@ async function capture(label, routes, viewports, out, settleMs, publicOnly) {
           )
           .catch(() => {});
         await page.waitForTimeout(600);
+        /*
+         * Count what each mask actually matched, so a mask that has stopped
+         * matching cannot pass quietly. See GLOBAL_MASKS: the previous
+         * selectors were styling-based and silently died when the element was
+         * restyled, which took the mask with them and let the flake back in
+         * looking like a regression.
+         */
+        for (const sel of GLOBAL_MASKS) {
+          maskHits.set(sel, (maskHits.get(sel) || 0) + (await page.locator(sel).count()));
+        }
         await page.screenshot({
           path: nodePath.join(dir, file),
           animations: 'disabled',
@@ -922,6 +1106,24 @@ async function capture(label, routes, viewports, out, settleMs, publicOnly) {
   const totalKb = manifest.reduce((s, m) => s + (m.bytes || 0), 0) / 1024;
   console.log(`\n  ${ok}/${manifest.length} captured · ${(totalKb / 1024).toFixed(1)} MB · ${dir}`);
   if (ok !== manifest.length) process.exitCode = 1;
+
+  /*
+   * A mask that matched nothing ANYWHERE is a dead selector, not a clean run.
+   * Public-only runs render no shell, so there is legitimately nothing to mask
+   * and the check is skipped there.
+   */
+  if (!publicOnly && !isSubset) {
+    const dead = [...maskHits.entries()].filter(([, n]) => n === 0).map(([sel]) => sel);
+    if (dead.length) {
+      console.log(
+        `\n  MASK SELECTOR MATCHED NOTHING: ${dead.join(', ')}\n` +
+          `  The element it protects was probably renamed or restyled. Until it is fixed this\n` +
+          `  set is NOT comparable — whatever that mask covered is now free to flap and will\n` +
+          `  read as a regression. See GLOBAL_MASKS in this file.`,
+      );
+      process.exitCode = 1;
+    }
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════════════ */
@@ -947,5 +1149,8 @@ if (compareIdx !== -1) {
   const routes = arg('routes', defaultRoutes.join(',')).split(',').map((s) => s.trim()).filter(Boolean);
   const viewports = arg('viewports', '1440,390').split(',').map((s) => parseInt(s.trim(), 10)).filter(Boolean);
   const settleMs = parseInt(arg('settle', '3500'), 10);
-  await capture(label, routes, viewports, OUT, settleMs, publicOnly);
+  // A `--routes` subset legitimately may not include the route a mask lives on,
+  // so the dead-selector check below only fires on a full run.
+  const isSubset = routes.length !== defaultRoutes.length;
+  await capture(label, routes, viewports, OUT, settleMs, publicOnly, isSubset);
 }

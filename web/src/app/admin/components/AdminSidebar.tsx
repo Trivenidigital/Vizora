@@ -67,7 +67,12 @@ export function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
       <div className="h-16 flex items-center justify-between px-4 border-b border-[var(--border)]">
         {!collapsed && (
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-[var(--primary)] rounded-lg flex items-center justify-center">
+            {/* `data-brand-mark`: visual-baseline mask hook, see the matching
+                note in dashboard/layout.tsx. */}
+            <div
+              data-brand-mark
+              className="w-8 h-8 bg-[var(--primary)] rounded-lg flex items-center justify-center"
+            >
               <span className="text-[var(--lw-on-forest)] font-bold text-lg">V</span>
             </div>
             <span className="text-[var(--foreground)] font-semibold">Admin</span>
