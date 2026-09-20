@@ -9,9 +9,15 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       {/*
        * Deliberately has NO background, and that is not an oversight.
        *
-       * This bar used to carry an arbitrary-var background at 80% opacity
-       * (the `bg-[var(...)]` form with an opacity suffix — deliberately not
-       * written out here, see the last paragraph), plus `backdrop-blur-sm`.
+       * This bar used to carry an arbitrary-var background at 80% opacity —
+       * a background utility whose value was a bare CSS variable, with an
+       * opacity suffix after it — plus `backdrop-blur-sm`. The class is NOT
+       * written out anywhere in this file, in any form, for the reason in the
+       * last paragraph: an earlier draft of this very comment spelled it out
+       * with an ellipsis inside the brackets, Tailwind scanned the comment,
+       * generated `background-color: var(...)`, and that invalid declaration
+       * failed the whole stylesheet to parse — a 500 on every route in the
+       * app, from a comment explaining how not to break things.
        * Tailwind silently discarded it: a var holding a whole colour cannot go
        * in `rgb(<channels> / <alpha>)`. So the bar has always been
        * transparent, and the two-column auth layout came to depend on that:

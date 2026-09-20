@@ -54,31 +54,43 @@ module.exports = {
        * the variables hold bare CHANNELS (so `bg-error-500/10` keeps working).
        */
       colors: {
-        // Semantic colors
-        primary: cssVarColors.primary,
-        success: cssVarColors.success,
-        warning: cssVarColors.warning,
-        error: cssVarColors.error,
-        info: cssVarColors.info,
-        neutral: cssVarColors.neutral,
-        // Electric Horizon namespace
-        eh: cssVarEhColors,
         /*
          * The SEMANTIC tokens, as named channel-backed colours.
          *
-         * Spread at the top level so they read as `bg-surface`,
-         * `border-error/30`, `text-foreground-secondary` — the same names the
-         * `:root` tokens carry, so the mapping needs no table. This is what
-         * makes an opacity modifier possible on a themable colour at all:
-         * `bg-[var(--surface)]/80` compiles to NOTHING, because Tailwind can
-         * only build `rgb(<channels> / <alpha>)`.
+         * Spread FIRST, and the four that share a name with a ramp are merged
+         * into it below as a `DEFAULT` rather than sitting beside it.
          *
-         * Spread LAST so a name collision is loud rather than silent — the
-         * ramps above are `primary`/`success`/`warning`/`error`/`info` objects
-         * and these are flat strings, so any overlap would change the shape of
-         * the entry and break the build rather than quietly winning.
+         * ── Why the order and the merge both matter ──────────────────────
+         * These were originally spread LAST, with a comment claiming a name
+         * collision would "break the build rather than quietly winning". That
+         * was wrong, and wrong in the worst direction. `success`, `warning`,
+         * `error` and `info` exist in BOTH sets: ramp objects here, flat
+         * strings there. Spreading the strings last replaced each ramp object
+         * outright, so every `bg-error-500`, `text-success-700`,
+         * `bg-warning-500/10` — 141 classes across the app — silently stopped
+         * emitting. Tailwind does not error on that; it just drops the scale.
+         * It took a screenshot diff to find: "5 online" on the dashboard went
+         * from green to grey, 391 px, and `Toast`'s four AA-computed fills
+         * (`bg-success-700` and friends) left white text on no background at
+         * all.
+         *
+         * `DEFAULT` is Tailwind's own idiom for "this name is both a scale and
+         * a single colour": `bg-error` resolves to the flat token, and
+         * `bg-error-500` still resolves to the ramp. Nothing has to choose.
          */
         ...cssVarSemanticColors,
+
+        // Ramps. Merged with the flat token of the same name where one exists,
+        // so `bg-error` and `bg-error-500` both work.
+        primary: cssVarColors.primary,
+        neutral: cssVarColors.neutral,
+        success: { ...cssVarColors.success, DEFAULT: cssVarSemanticColors.success },
+        warning: { ...cssVarColors.warning, DEFAULT: cssVarSemanticColors.warning },
+        error: { ...cssVarColors.error, DEFAULT: cssVarSemanticColors.error },
+        info: { ...cssVarColors.info, DEFAULT: cssVarSemanticColors.info },
+
+        // Electric Horizon namespace
+        eh: cssVarEhColors,
       },
       spacing: {
         xs: tokens.spacing.xs,

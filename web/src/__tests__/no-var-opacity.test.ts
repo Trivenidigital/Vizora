@@ -92,6 +92,50 @@ describe('no opacity modifier on an arbitrary var() colour', () => {
   });
 
   /**
+   * A class-shaped literal in a SCANNED file must be a real class.
+   *
+   * Tailwind scans raw text, comments included. A comment in
+   * `app/(auth)/layout.tsx` quoted the broken form with an ellipsis inside the
+   * brackets to illustrate it — and Tailwind duly generated
+   * `background-color: var(...)`. That is invalid CSS, so the whole stylesheet
+   * failed to parse and every route in the app returned 500. From a comment
+   * whose subject was how not to break things.
+   *
+   * So the rule is not "don't write the broken class", it is "don't write
+   * anything class-SHAPED that cannot compile" — placeholders, ellipses and
+   * `<token>`-style stand-ins included. Describe it in prose instead; the
+   * convention is already established in `CookieConsent.tsx`.
+   *
+   * Only the Tailwind content glob is scanned, which is why this checks
+   * `app/` and `components/` and not `__tests__` — this file can therefore
+   * safely contain the examples above.
+   */
+  it('no scanned file contains a placeholder-shaped arbitrary value', () => {
+    const SCANNED = [path.join(SRC, 'app'), path.join(SRC, 'components')];
+    // An arbitrary value containing `...` or `<…>` — a stand-in, never a colour.
+    const PLACEHOLDER = /\b[a-z-]+-\[[^\]]*(?:\.\.\.|<[a-z])[^\]]*\]/g;
+    const offences: string[] = [];
+    for (const dir of SCANNED) {
+      for (const file of walk(dir)) {
+        const body = readFileSync(file, 'utf8');
+        const rel = path.relative(SRC, file).split(path.sep).join('/');
+        body.split('\n').forEach((line, i) => {
+          const hits = line.match(new RegExp(PLACEHOLDER.source, 'g'));
+          if (hits) offences.push(`  ${rel}:${i + 1}  ${hits.join(', ')}`);
+        });
+      }
+    }
+    if (offences.length) {
+      throw new Error(
+        `Placeholder-shaped arbitrary value(s) in Tailwind-scanned files. Tailwind will ` +
+          `generate a rule from these and invalid CSS fails the ENTIRE stylesheet:\n` +
+          `${offences.join('\n')}\n\nDescribe the class in prose instead.`,
+      );
+    }
+    expect(offences).toEqual([]);
+  });
+
+  /**
    * A SECOND dead form, found while fixing the first.
    *
    * `bg-[var(--surface)]/50/50` — a double opacity modifier — was sitting in
