@@ -90,7 +90,10 @@ describe('RegisterPage', () => {
 
   it('shows trust signals', () => {
     render(<RegisterContent />);
-    expect(screen.getByText('256-bit encrypted')).toBeInTheDocument();
+    // Was '256-bit encrypted' — a specific cipher-strength claim the product
+    // does not substantiate. B2 replaced it with what is actually true of the
+    // connection. See the claims test below.
+    expect(screen.getByText('Encrypted connection')).toBeInTheDocument();
     expect(screen.getByText('Free 30-day trial')).toBeInTheDocument();
     expect(screen.getByText('5 screens included')).toBeInTheDocument();
   });

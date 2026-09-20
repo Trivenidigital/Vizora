@@ -1,59 +1,53 @@
-// `mkt` puts the whole auth surface on the light public palette. The ValuePanel
-// keeps its own hardcoded dark brand panel deliberately — a dark brand panel
-// beside a light form is the intended split.
+// `mkt` puts the whole auth surface on the light public palette. As of B2 the
+// ValuePanel is light too: it is Vizora's own chrome, not a viewport onto
+// customer media, so it follows the settled chrome-goes-light rule. The
+// "dark brand panel beside a light form is the intended split" note that used
+// to sit here described the Electric Horizon layout and no longer holds.
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="mkt min-h-screen bg-[var(--background)]">
       {children}
       {/* Shared footer for all auth pages */}
       {/*
-       * Deliberately has NO background, and that is not an oversight.
+       * The background is BACK, and that is only correct because the panel
+       * beside it is now light.
        *
-       * This bar used to carry an arbitrary-var background at 80% opacity —
-       * a background utility whose value was a bare CSS variable, with an
-       * opacity suffix after it — plus `backdrop-blur-sm`. The class is NOT
-       * written out anywhere in this file, in any form, for the reason in the
-       * last paragraph: an earlier draft of this very comment spelled it out
-       * with an ellipsis inside the brackets, Tailwind scanned the comment,
-       * generated `background-color: var(...)`, and that invalid declaration
-       * failed the whole stylesheet to parse — a 500 on every route in the
-       * app, from a comment explaining how not to break things.
-       * Tailwind silently discarded it: a var holding a whole colour cannot go
-       * in `rgb(<channels> / <alpha>)`. So the bar has always been
-       * transparent, and the two-column auth layout came to depend on that:
-       * the dark value panel shows through on the left, the ivory form on the
-       * right, with no seam.
+       * History, because all three lessons in it are still live:
        *
-       * Converting it to the working `bg-background/80` during B0 restored the
-       * author's original intent and introduced a visible regression — an
-       * ivory band painted straight across the dark panel, 57,489 px at a
-       * channel delta of 516. The screenshot caught it; the no-var-opacity
-       * gate could not, because a dead declaration and a correctly-working one
-       * are indistinguishable to a lint rule. Only a render knows which of the
-       * two the design is relying on.
+       * 1. This bar carried a background utility whose value was a bare CSS
+       *    variable with an opacity suffix. Tailwind discards that form
+       *    outright — a var holding a whole colour cannot go inside
+       *    `rgb(<channels> / <alpha>)` — so the bar was transparent for its
+       *    whole life, and the two-column layout came to depend on it: the
+       *    dark value panel showed through on the left with no seam.
+       *    Restoring it in B0 therefore looked like a fix and rendered as a
+       *    regression: an ivory band straight across the dark panel, 57,489 px
+       *    at a channel delta of 516. It was reverted.
+       *    B2 removes the cause rather than the symptom. With the panel on
+       *    `--background-secondary`, an 80% `--background` bar composites to
+       *    #f3efe6 over the panel and #f5f1e8 over the form — a difference of
+       *    two points, so there is no seam left to avoid.
        *
-       * `backdrop-blur-sm` STAYS. Only the background was dead — a backdrop
-       * filter needs no background to work, and this one has been blurring
-       * what sits behind the bar all along. Dropping it as "decorative along
-       * with the translucency" cost 18,853 px at a channel delta of 158 on
-       * the register page, which is how I learned the two were independent.
+       * 2. `backdrop-blur-sm` is INDEPENDENT of the background and was never
+       *    dead. Dropping it as "decorative along with the translucency" cost
+       *    18,853 px at a channel delta of 158 on the register page.
        *
-       * The BORDER was dead for the same reason, but it was not INVISIBLE, and
-       * I described it wrongly at first. A dead `border-*` colour does not
-       * remove the border — the bare `border-t` utility still applies and
-       * Tailwind's default border colour takes over: `gray.200`, #e5e7eb, a
-       * COOL grey. So this bar has been drawing a cool-grey rule across a warm
-       * ivory page all along, which looked deliberate and therefore went
-       * untraced. `border-border/30` now paints it warm. That is the only
-       * remaining pixel difference against the Phase 2 baseline, and it is a
-       * correction, not merely a restoration.
+       * 3. A dead `border-*` COLOUR does not remove the border. The bare
+       *    `border-t` still applies and Tailwind's default takes over:
+       *    `gray.200`, #e5e7eb, a cool grey. This bar drew a cool-grey rule
+       *    across a warm ivory page for as long as the bug existed, and it
+       *    looked deliberate, so nobody traced it.
        *
-       * Finally: the dead form is described above rather than quoted, because
-       * the gate test scans raw file text and correctly flagged my first draft
-       * of this comment as an offence. Tailwind scans comments the same way —
-       * a class literal written in prose is still a class literal to both.
+       * Footer ink is `--foreground-tertiary`: 5.31:1 on the composite over
+       * the panel, 5.41:1 over the form. Both computed.
+       *
+       * The dead class form is described here, never quoted. Tailwind scans
+       * comments as raw text, and an earlier draft of this very comment
+       * spelled it out with an ellipsis inside the brackets — Tailwind
+       * generated `background-color: var(...)`, one invalid declaration failed
+       * the entire stylesheet, and every route in the app returned 500.
        */}
-      <footer className="fixed bottom-0 left-0 right-0 py-3 text-center text-[10px] text-[var(--foreground-tertiary)] backdrop-blur-sm border-t border-border/30">
+      <footer className="fixed bottom-0 left-0 right-0 py-3 text-center text-[10px] text-[var(--foreground-tertiary)] bg-background/80 backdrop-blur-sm border-t border-border/30">
         <div className="flex items-center justify-center gap-3">
           <a href="/terms" className="hover:text-[var(--foreground-secondary)] transition-colors">Terms of Service</a>
           <span className="text-[var(--border)]">|</span>

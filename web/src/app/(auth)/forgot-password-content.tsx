@@ -94,8 +94,8 @@ export default function ForgotPasswordContent() {
         {/* Mobile-only compact trust banner */}
         <div className="md:hidden mb-8">
           <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-7 h-7 rounded-lg bg-[#00E5A0]/10 border border-[#00E5A0]/20 flex items-center justify-center">
-              <span className="text-[#00E5A0] font-bold text-xs font-mono">V</span>
+            <div className="w-7 h-7 rounded-lg bg-[var(--primary)] flex items-center justify-center">
+              <span className="text-[var(--lw-on-forest)] font-bold text-xs font-mono">V</span>
             </div>
             <span className="text-[var(--foreground)] font-semibold text-sm">Vizora</span>
           </div>
@@ -174,7 +174,7 @@ export default function ForgotPasswordContent() {
                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                     <path d="M7 11V7a5 5 0 0110 0v4" />
                   </svg>
-                  256-bit encrypted
+                  Encrypted connection
                 </span>
                 <span className="text-[var(--border)]">|</span>
                 <span>Free 30-day trial</span>
