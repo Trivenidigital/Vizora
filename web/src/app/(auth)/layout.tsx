@@ -38,10 +38,15 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
        * with the translucency" cost 18,853 px at a channel delta of 158 on
        * the register page, which is how I learned the two were independent.
        *
-       * The BORDER was dead for the same reason and is deliberately restored:
-       * `border-border/30` now paints the 1px hairline the author wrote, which
-       * is the one part of this bar that was doing real work and never got to.
-       * It is the only remaining pixel difference against the Phase 2 baseline.
+       * The BORDER was dead for the same reason, but it was not INVISIBLE, and
+       * I described it wrongly at first. A dead `border-*` colour does not
+       * remove the border — the bare `border-t` utility still applies and
+       * Tailwind's default border colour takes over: `gray.200`, #e5e7eb, a
+       * COOL grey. So this bar has been drawing a cool-grey rule across a warm
+       * ivory page all along, which looked deliberate and therefore went
+       * untraced. `border-border/30` now paints it warm. That is the only
+       * remaining pixel difference against the Phase 2 baseline, and it is a
+       * correction, not merely a restoration.
        *
        * Finally: the dead form is described above rather than quoted, because
        * the gate test scans raw file text and correctly flagged my first draft

@@ -7,9 +7,24 @@ import path from 'node:path';
  * Tailwind builds an opacity modifier as `rgb(<channels> / <alpha>)`. A CSS
  * variable holding a whole colour (`#fdfbf5`) cannot go in that slot —
  * `rgb(#fdfbf5 / .8)` is invalid — so Tailwind DISCARDS the entire declaration.
- * No warning, no fallback, no colour. The element simply has no background,
- * border or ring, and it looks exactly like an element someone meant to leave
- * transparent.
+ * No warning, no fallback, no colour.
+ *
+ * What the element then looks like depends on the property, and the border case
+ * is the one that hides:
+ *   - `bg-*` / `ring-*`  -> genuinely nothing. Transparent, indistinguishable
+ *     from an element someone meant to leave bare.
+ *   - `border-*`         -> NOT nothing. The bare `border`/`border-t` utility
+ *     still applies, and Tailwind's default border colour takes over:
+ *     `gray.200`, #e5e7eb, a COOL grey. So a dead border declaration does not
+ *     vanish — it silently repaints itself in a palette this product does not
+ *     use. The legal pages drew cool-grey rules on a warm ivory ground for as
+ *     long as this bug existed, and nobody traced it, because a neutral grey
+ *     rule looks deliberate.
+ *
+ * That is why "the fix is invisible, it only restores intent" is wrong in both
+ * directions: it can reveal a background the design was relying on being
+ * absent (see the auth footer in `app/(auth)/layout.tsx`), and it can remove a
+ * wrong colour nobody knew was there.
  *
  * This shipped: 55 such declarations across 19 files, including the dashboard
  * header, which had no background at all and let content scroll underneath it
