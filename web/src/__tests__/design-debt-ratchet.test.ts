@@ -107,6 +107,35 @@ const PATTERNS = {
    */
   darkThemeForegroundShades:
     /(?<!dark:)\b(?:text|border|divide|placeholder)-(?:gray|slate|zinc|neutral|blue|indigo|purple|violet|green|emerald|teal|cyan|sky|red|rose|pink|yellow|amber|orange)-(?:200|300|400)\b/g,
+  /*
+   * MID-SHADE TEXT — a separate metric on purpose, and NOT part of the one
+   * above.
+   *
+   * `-500` is not a dark-theme shade. It is the middle of the ramp, perfectly
+   * correct in a light theme as a FILL, and wrong only when it carries small
+   * text. Folding it into `darkThemeForegroundShades` would make that metric's
+   * own name assert something false about half its contents — and a metric is
+   * read far more often than it is written.
+   *
+   * `text-` only, deliberately. There are roughly twice as many
+   * `bg-`/`border-`*-500 sites, and those are legitimate fills; sweeping them
+   * in would bury the real candidates under valid code.
+   *
+   * ── THE RATIO ALONE DOES NOT DECIDE THIS ─────────────────────────────────
+   * Measured on `--surface`: #ef4444 3.64:1, #3b82f6 3.55:1, #22c55e 2.20:1,
+   * #eab308 1.85:1. The first two FAIL AA for normal text (4.5:1) but PASS the
+   * 3:1 threshold that applies to large text and to non-text UI components. So
+   * a `text-red-500` on a 24px heading, or on an icon, is compliant and must be
+   * left alone.
+   *
+   * The obligation is therefore the computed ratio against the site's real
+   * ground AND its role — not the number on its own. Converting all of these
+   * mechanically would be false progress: it would churn compliant code, and
+   * the count going down would say nothing about whether anything was fixed.
+   * Resolving a site as "large text, 3.64:1, compliant" is a resolution.
+   */
+  midShadeText:
+    /(?<!dark:)\btext-(?:gray|slate|zinc|neutral|blue|indigo|purple|violet|green|emerald|teal|cyan|sky|red|rose|pink|yellow|amber|orange|lime|fuchsia)-500\b/g,
 } as const;
 
 type Metric = keyof typeof PATTERNS;
