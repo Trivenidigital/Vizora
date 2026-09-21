@@ -117,7 +117,7 @@ export default function AdminAnnouncementsClient({ initialAnnouncements }: Admin
       case 'critical':
         return 'bg-red-100 text-red-700 dark:bg-red-900/30 border-error-ink/30';
       case 'maintenance':
-        return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 border-purple-200';
+        return 'bg-[var(--cat-purple-bg)] text-[var(--cat-purple)] border-[var(--cat-purple-edge)]';
       default:
         return 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] border-[var(--border)]';
     }

@@ -38,12 +38,12 @@ interface ContentTaggerProps {
  * exists to surface. They stay until the categorical decision lands.
  */
 const TAG_COLORS = [
-  { name: 'blue', bg: 'bg-info/10', text: 'text-[var(--info-ink)]', border: 'border-[#00B4D8]/30' },
-  { name: 'red', bg: 'bg-red-100 dark:bg-red-900', text: 'text-[var(--error-ink)]', border: 'border-red-300 dark:border-red-700' },
-  { name: 'green', bg: 'bg-green-100 dark:bg-green-900', text: 'text-[var(--success-ink)]', border: 'border-green-300 dark:border-green-700' },
-  { name: 'purple', bg: 'bg-purple-100 dark:bg-purple-900', text: 'text-[var(--accent-brass-ink)]', border: 'border-purple-300 dark:border-purple-700' },
-  { name: 'yellow', bg: 'bg-yellow-100 dark:bg-yellow-900', text: 'text-[var(--warning-ink)]', border: 'border-yellow-300 dark:border-yellow-700' },
-  { name: 'pink', bg: 'bg-pink-100 dark:bg-pink-900', text: 'text-[var(--accent-coral-ink)]', border: 'border-pink-300 dark:border-pink-700' },
+  { name: 'blue', bg: 'bg-[var(--cat-blue-bg)]', text: 'text-[var(--cat-blue)]', border: 'border-[var(--cat-blue-edge)]' },
+  { name: 'red', bg: 'bg-[var(--cat-red-bg)]', text: 'text-[var(--cat-red)]', border: 'border-[var(--cat-red-edge)]' },
+  { name: 'green', bg: 'bg-[var(--cat-green-bg)]', text: 'text-[var(--cat-green)]', border: 'border-[var(--cat-green-edge)]' },
+  { name: 'purple', bg: 'bg-[var(--cat-purple-bg)]', text: 'text-[var(--cat-purple)]', border: 'border-[var(--cat-purple-edge)]' },
+  { name: 'yellow', bg: 'bg-[var(--cat-yellow-bg)]', text: 'text-[var(--cat-yellow)]', border: 'border-[var(--cat-yellow-edge)]' },
+  { name: 'pink', bg: 'bg-[var(--cat-pink-bg)]', text: 'text-[var(--cat-pink)]', border: 'border-[var(--cat-pink-edge)]' },
 ];
 
 export default function ContentTagger({

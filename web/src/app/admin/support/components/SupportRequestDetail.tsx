@@ -138,17 +138,17 @@ export function SupportRequestDetail({
 
         {/* AI Summary */}
         {(request.aiSummary || request.aiSuggestedAction) && (
-          <div className="bg-[#1a1a2e] border border-purple-500/30 rounded-lg p-4">
+          <div className="bg-[var(--cat-purple-bg)] border border-[var(--cat-purple-edge)] rounded-lg p-4">
             <div className="flex items-center gap-2 mb-2">
-              <Sparkles className="w-4 h-4 text-purple-400" />
-              <span className="text-sm font-medium text-purple-400">AI Analysis</span>
+              <Sparkles className="w-4 h-4 text-[var(--cat-purple)]" />
+              <span className="text-sm font-medium text-[var(--cat-purple)]">AI Analysis</span>
             </div>
             {request.aiSummary && (
               <p className="text-sm text-[var(--foreground-secondary)] mb-2">{request.aiSummary}</p>
             )}
             {request.aiSuggestedAction && (
-              <div className="mt-2 pt-2 border-t border-purple-500/20">
-                <span className="text-xs text-purple-300 font-medium">Suggested Action: </span>
+              <div className="mt-2 pt-2 border-t border-[var(--cat-purple-edge)]">
+                <span className="text-xs text-[var(--cat-purple)] font-medium">Suggested Action: </span>
                 <span className="text-sm text-[var(--foreground-secondary)]">{request.aiSuggestedAction}</span>
               </div>
             )}
@@ -228,7 +228,7 @@ export function SupportRequestDetail({
                           {isUser ? 'User' : isAdmin ? 'Admin' : 'Assistant'}
                         </span>
                         {isAdmin && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-500/20 text-purple-400">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--cat-purple-bg)] text-[var(--cat-purple)]">
                             ADMIN
                           </span>
                         )}

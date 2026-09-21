@@ -36,9 +36,9 @@ const colorStyles = {
     border: 'border-error-ink/30',
   },
   purple: {
-    bg: 'bg-purple-50 dark:bg-purple-900/20',
-    icon: 'bg-purple-100 dark:bg-purple-900 text-purple-600',
-    border: 'border-purple-200',
+    bg: 'bg-[var(--cat-purple-bg)]',
+    icon: 'bg-[var(--cat-purple-edge)] text-[var(--cat-purple)]',
+    border: 'border-[var(--cat-purple-edge)]',
   },
   orange: {
     bg: 'bg-orange-50 dark:bg-orange-900/20',

@@ -25,19 +25,22 @@ interface TemplateCardProps {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  retail: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
-  restaurant: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
-  corporate: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-  education: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-  healthcare: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
-  events: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  retail: 'bg-[var(--cat-purple-bg)] text-[var(--cat-purple)] border-[var(--cat-purple-edge)]',
+  restaurant: 'bg-[var(--cat-orange-bg)] text-[var(--cat-orange)] border-[var(--cat-orange-edge)]',
+  corporate: 'bg-[var(--cat-blue-bg)] text-[var(--cat-blue)] border-[var(--cat-blue-edge)]',
+  education: 'bg-[var(--cat-indigo-bg)] text-[var(--cat-indigo)] border-[var(--cat-indigo-edge)]',
+  healthcare: 'bg-[var(--cat-rose-bg)] text-[var(--cat-rose)] border-[var(--cat-rose-edge)]',
+  events: 'bg-[var(--cat-amber-bg)] text-[var(--cat-amber)] border-[var(--cat-amber-edge)]',
   general: 'bg-[var(--surface-hover)] text-[var(--foreground-secondary)] border-[var(--border)]',
 };
 
 const DIFFICULTY_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
-  beginner: { label: 'Beginner', color: 'text-green-400', dot: 'bg-green-400' },
-  intermediate: { label: 'Intermediate', color: 'text-yellow-400', dot: 'bg-yellow-400' },
-  advanced: { label: 'Advanced', color: 'text-red-400', dot: 'bg-red-400' },
+  // Difficulty is an ORDERED scale, not an identity set, so it takes the
+  // semantic inks rather than --cat-*: the green-amber-red progression is
+  // carrying "easy -> hard", which is exactly what those tokens encode.
+  beginner: { label: 'Beginner', color: 'text-[var(--success-ink)]', dot: 'bg-[var(--success-ink)]' },
+  intermediate: { label: 'Intermediate', color: 'text-[var(--warning-ink)]', dot: 'bg-[var(--warning-ink)]' },
+  advanced: { label: 'Advanced', color: 'text-[var(--error-ink)]', dot: 'bg-[var(--error-ink)]' },
 };
 
 export default function TemplateCard({

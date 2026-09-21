@@ -101,6 +101,92 @@
     --primary-ink: var(--brand-ink-light, #1f4230);
 
     /*
+     * CATEGORICAL — identity hues, not status.
+     *
+     * Several surfaces need N colours where the hue is an IDENTITY LABEL and
+     * asserts nothing: content tags, template categories, widget types, layout
+     * zones. The status tokens are the wrong tool — painting a tag
+     * `--success` claims a state it does not have — and flattening them to
+     * forest destroys the distinction the UI is carrying.
+     *
+     * ── THE NAMES ARE A CONTRACT ──────────────────────────────────────────
+     * `ContentTagger` persists the NAME: `onCreateTag(name, color)` stores
+     * 'blue', 'purple' and so on. So a tag saved as blue must still render as
+     * recognisably blue. What moves is the rendered VALUE, not the identity —
+     * these are "the ivory-safe blue", never "blue becomes brass". Do not add
+     * or remove a name without a migration: an absent name changes what an
+     * existing tag means.
+     *
+     * (This is also why the dark-theme-shade sweep stopped on these rather
+     * than mapping them. An earlier pass did map `text-purple-400` onto the
+     * brass ink, which made the tag named purple render gold — correct by
+     * contrast and wrong by meaning.)
+     *
+     * ── HOW THE VALUES WERE PICKED ────────────────────────────────────────
+     * Each hue kept, moved to a value that works on the warm substrate, then
+     * checked on BOTH axes the chart-series work established:
+     *
+     * 1. Contrast — every ink on its own tint (each is the ink at 12% over
+     *    `--background`, so a chip is a wash of itself):
+     *   red    #b3231f  4.83:1      rose   #a83a55  4.61:1
+     *   pink   #a33d6a  4.56:1      purple #7d4577  5.23:1
+     *   indigo #473a9c  6.53:1      blue   #1d5490  5.69:1
+     *   teal   #1f6b68  4.70:1      green  #2f6b3f  4.79:1
+     *   yellow #7a5c15  4.70:1      amber  #75600f  4.63:1
+     *   orange #9e4416  4.76:1
+     *   All clear AA on their tint AND on `--surface` (5.19-8.62:1).
+     *
+     * 2. Separability — only has to hold WITHIN a consuming map, since two
+     *    hues never compete unless they appear in the same list. Closest pair
+     *    per map, sRGB distance, against the ~40 floor:
+     *      tags (6)          41.0  purple/pink
+     *      categories (6)    50.1  orange/amber
+     *      widget types (6)  40.1  orange/red
+     *      layout zones (4)  44.0  green/teal
+     *    Both numbers matter: a set can be readable and still unusable
+     *    because two members cannot be told apart. Getting orange, amber and
+     *    red to coexist took three iterations — pushing amber yellower to
+     *    clear orange dropped it to 4.11:1, and pushing orange redder
+     *    collided with red in the widget map.
+     *
+     * Adding a twelfth hue means re-running both checks, not eyeballing a gap.
+     * `-edge` is the ink at 35% for chip borders.
+     */
+    --cat-red: #b3231f;
+    --cat-red-bg: #edd8d0;
+    --cat-red-edge: #dea9a2;
+    --cat-rose: #a83a55;
+    --cat-rose-bg: #ecdbd6;
+    --cat-rose-edge: #dab1b5;
+    --cat-pink: #a33d6a;
+    --cat-pink-bg: #ebdbd9;
+    --cat-pink-edge: #d8b2bc;
+    --cat-purple: #7d4577;
+    --cat-purple-bg: #e7dcda;
+    --cat-purple-edge: #cbb5c0;
+    --cat-indigo: #473a9c;
+    --cat-indigo-bg: #e0dbdf;
+    --cat-indigo-edge: #b8b1cd;
+    --cat-blue: #1d5490;
+    --cat-blue-bg: #dbdedd;
+    --cat-blue-edge: #a9bac9;
+    --cat-teal: #1f6b68;
+    --cat-teal-bg: #dbe1d9;
+    --cat-teal-edge: #aac2bb;
+    --cat-green: #2f6b3f;
+    --cat-green-bg: #dde1d4;
+    --cat-green-edge: #b0c2ad;
+    --cat-yellow: #7a5c15;
+    --cat-yellow-bg: #e6dfcf;
+    --cat-yellow-edge: #cabd9e;
+    --cat-amber: #75600f;
+    --cat-amber-bg: #e6e0ce;
+    --cat-amber-edge: #c8be9c;
+    --cat-orange: #9e4416;
+    --cat-orange-bg: #ebdccf;
+    --cat-orange-edge: #d7b49f;
+
+    /*
      * VIEWPORT — deliberately dark, on a light product.
      *
      * These are not leftover Electric Horizon substrate and must not be

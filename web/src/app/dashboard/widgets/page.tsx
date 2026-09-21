@@ -279,16 +279,22 @@ export default function WidgetsPage() {
   };
 
   const getColorForType = (type: string) => {
+    /*
+     * Widget TYPE identity, not status. Each gradient runs from the hue's tint
+     * to its ink so the tile reads as one colour with depth rather than as two
+     * unrelated stops — the old `-400 -> -600` pairs were dark-theme values and
+     * the light halves measured under 2.5:1 against anything.
+     */
     const mapping: Record<string, string> = {
-      weather: 'from-blue-400 to-blue-600',
-      rss: 'from-orange-400 to-orange-600',
-      'social-media': 'from-pink-400 to-pink-600',
-      'social-feed': 'from-pink-500 via-purple-500 to-orange-400',
-      clock: 'from-purple-400 to-purple-600',
-      countdown: 'from-red-400 to-red-600',
-      sheets: 'from-green-400 to-emerald-600',
+      weather: 'from-[var(--cat-blue-bg)] to-[var(--cat-blue)]',
+      rss: 'from-[var(--cat-orange-bg)] to-[var(--cat-orange)]',
+      'social-media': 'from-[var(--cat-pink-bg)] to-[var(--cat-pink)]',
+      'social-feed': 'from-[var(--cat-pink-bg)] via-[var(--cat-purple)] to-[var(--cat-orange)]',
+      clock: 'from-[var(--cat-purple-bg)] to-[var(--cat-purple)]',
+      countdown: 'from-[var(--cat-red-bg)] to-[var(--cat-red)]',
+      sheets: 'from-[var(--cat-green-bg)] to-[var(--cat-green)]',
     };
-    return mapping[type] || 'from-[#00E5A0] to-[#00B4D8]';
+    return mapping[type] || 'from-[var(--primary-light)] to-[var(--primary)]';
   };
 
   const openWizard = (type: WidgetType) => {

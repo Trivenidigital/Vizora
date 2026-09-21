@@ -971,9 +971,9 @@ export default function SchedulesClient() {
 
  {/* Next Occurrences Preview */}
  {formData.days.length > 0 && (
- <div className="bg-purple-50 dark:bg-purple-900 border border-purple-200 rounded-lg p-3">
- <p className="text-sm font-medium text-purple-900 mb-2">Next 10 Occurrences:</p>
- <div className="text-xs text-purple-800">
+ <div className="bg-[var(--cat-purple-bg)] border border-[var(--cat-purple-edge)] rounded-lg p-3">
+ <p className="text-sm font-medium text-[var(--cat-purple)] mb-2">Next 10 Occurrences:</p>
+ <div className="text-xs text-[var(--cat-purple)]">
  {getNextOccurrences().join(' • ')}
  </div>
  </div>

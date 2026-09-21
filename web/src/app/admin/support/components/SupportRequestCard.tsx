@@ -33,7 +33,7 @@ const priorityDotColors: Record<SupportPriority, string> = {
 const categoryBadgeColors: Record<SupportCategory, { bg: string; text: string }> = {
   bug_report: { bg: 'bg-red-500/20', text: 'text-[var(--error-ink)]' },
   feature_request: { bg: 'bg-blue-500/20', text: 'text-[var(--info-ink)]' },
-  help_question: { bg: 'bg-purple-500/20', text: 'text-purple-400' },
+  help_question: { bg: 'bg-[var(--cat-purple-bg)]', text: 'text-[var(--cat-purple)]' },
   template_request: { bg: 'bg-cyan-500/20', text: 'text-[var(--info-ink)]' },
   feedback: { bg: 'bg-green-500/20', text: 'text-[var(--success-ink)]' },
   urgent_issue: { bg: 'bg-red-500/20', text: 'text-[var(--error-ink)]' },

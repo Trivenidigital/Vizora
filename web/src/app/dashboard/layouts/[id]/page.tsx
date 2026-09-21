@@ -118,18 +118,23 @@ function getGridStyle(layoutType: string): React.CSSProperties {
   }
 }
 
+/*
+ * Zone identity, not status — a zone is 1/2/3/4, it is not healthy or failing.
+ * Four hues from the categorical set, which is checked for separability as a
+ * group (green/teal are the closest pair here at 44.0 sRGB).
+ */
 const zoneColors = [
-  'border-[#00E5A0] bg-[#00E5A0]/5',
-  'border-[#00B4D8] bg-[#00B4D8]/5',
-  'border-purple-400 bg-purple-400/5',
-  'border-orange-400 bg-orange-400/5',
+  'border-[var(--cat-green-edge)] bg-[var(--cat-green-bg)]',
+  'border-[var(--cat-teal-edge)] bg-[var(--cat-teal-bg)]',
+  'border-[var(--cat-purple-edge)] bg-[var(--cat-purple-bg)]',
+  'border-[var(--cat-orange-edge)] bg-[var(--cat-orange-bg)]',
 ];
 
 const zoneHeaderColors = [
-  'bg-[#00E5A0]/20 text-[#00E5A0]',
-  'bg-[#00B4D8]/20 text-[#00B4D8]',
-  'bg-purple-400/20 text-purple-400',
-  'bg-orange-400/20 text-orange-400',
+  'bg-[var(--cat-green-bg)] text-[var(--cat-green)]',
+  'bg-[var(--cat-teal-bg)] text-[var(--cat-teal)]',
+  'bg-[var(--cat-purple-bg)] text-[var(--cat-purple)]',
+  'bg-[var(--cat-orange-bg)] text-[var(--cat-orange)]',
 ];
 
 export default function LayoutEditorPage({ params }: { params: Promise<{ id: string }> }) {
