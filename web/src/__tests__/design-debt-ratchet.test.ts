@@ -74,6 +74,39 @@ const PATTERNS = {
    * (The plan's §3 states 469 from a plain grep; the difference is these keys.)
    */
   darkVariants: /\bdark:(?=\S)/g,
+  /*
+   * DARK-THEME FOREGROUND SHADES — a POOL to resolve, not a count of failures.
+   *
+   * The `-200/-300/-400` steps of a Tailwind ramp are light colours. They were
+   * chosen when this app had a dark theme, where a light foreground is exactly
+   * right. Phase 1 flipped the substrate to ivory and left them behind, so each
+   * one is now a candidate for invisibility: `#fbbf24` on `#f5f1e8` is 1.48:1,
+   * `#4ade80` is 1.68:1, `#f87171` is 2.67:1.
+   *
+   * Three of these have already shipped as live accessibility failures and all
+   * three were found by accident — a 1.77:1 admin panel (b7f4b768), a 1.48:1
+   * locked-account warning on the auth pages (349a1384), and a 1.02:1 chat
+   * header (f289a129). This metric exists so the remainder surface as a counted
+   * obligation instead of as luck.
+   *
+   * ── READ THIS BEFORE ACTING ON THE NUMBER ────────────────────────────────
+   * It counts the POOL, not the broken ones. Brokenness is a function of the
+   * GROUND, not of the class: a `-300` shade on a surface that is still dark is
+   * perfectly correct, and several are — the playlist letterbox and the display
+   * client are deliberately dark and stay that way. So a blanket codemod would
+   * be wrong in BOTH directions, and no static rule can decide it.
+   *
+   * The obligation per batch is therefore: resolve every site in that directory
+   * with a COMPUTED ratio against its real ground, and record the ground. A
+   * site left alone because its ground is genuinely dark is RESOLVED, not
+   * skipped — but it still counts here, because the pattern is all a scanner
+   * can see. Reaching zero is not the goal; reaching zero UNEXAMINED is.
+   *
+   * `bg-` is deliberately absent: a light FILL on a light page is a design
+   * choice, not a contrast failure. Only foreground roles are counted.
+   */
+  darkThemeForegroundShades:
+    /(?<!dark:)\b(?:text|border|divide|placeholder)-(?:gray|slate|zinc|neutral|blue|indigo|purple|violet|green|emerald|teal|cyan|sky|red|rose|pink|yellow|amber|orange)-(?:200|300|400)\b/g,
 } as const;
 
 type Metric = keyof typeof PATTERNS;
@@ -104,13 +137,19 @@ function countAll() {
     return !EXCLUDED_PATHS.some((p) => rel.startsWith(p));
   });
 
-  const counts = { hexLiterals: 0, tailwindArbitraryColors: 0, rawPaletteClasses: 0, darkVariants: 0 };
-  const worst: Record<Metric, Array<{ file: string; n: number }>> = {
-    hexLiterals: [],
-    tailwindArbitraryColors: [],
-    rawPaletteClasses: [],
-    darkVariants: [],
-  };
+  /*
+   * Derived from PATTERNS, not restated. These two were hardcoded lists of the
+   * four metric names, so adding a fifth threw `Cannot read properties of
+   * undefined (reading 'push')` from inside the counting loop — a crash rather
+   * than a miscount, which was the lucky outcome. Deriving them means a new
+   * metric needs one edit, in PATTERNS, and cannot half-land.
+   */
+  const keys = Object.keys(PATTERNS) as Metric[];
+  const counts = Object.fromEntries(keys.map((k) => [k, 0])) as Record<Metric, number>;
+  const worst = Object.fromEntries(keys.map((k) => [k, []])) as Record<
+    Metric,
+    Array<{ file: string; n: number }>
+  >;
 
   for (const file of files) {
     const body = readFileSync(file, 'utf8');

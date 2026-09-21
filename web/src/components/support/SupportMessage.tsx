@@ -153,7 +153,7 @@ export default function SupportMessage({
                 type="button"
                 onClick={onRetry}
                 aria-label="Retry message"
-                className="inline-flex items-center gap-1 rounded-md border border-red-400/30 px-2 py-1 text-red-100 hover:bg-red-500/10 transition"
+                className="inline-flex items-center gap-1 rounded-md border border-error-ink/30 px-2 py-1 text-[var(--error-ink)] hover:bg-error/10 transition"
               >
                 <RefreshCw className="h-3 w-3" />
                 <span>Retry</span>

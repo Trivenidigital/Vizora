@@ -141,7 +141,7 @@ export default function DaySelector({
         )}
 
         {selected.length === 0 && (
-          <div className="bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-800 rounded-lg p-3">
+          <div className="bg-[var(--status-offline-bg)] border border-[var(--error-ink)] rounded-lg p-3">
             <p className="text-sm text-[var(--error-ink)]">
               Please select at least one day
             </p>

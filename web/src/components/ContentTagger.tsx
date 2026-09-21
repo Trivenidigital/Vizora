@@ -17,6 +17,26 @@ interface ContentTaggerProps {
   className?: string;
 }
 
+/*
+ * NOT CONVERTED, and this is a resolution rather than a skip.
+ *
+ * These are CATEGORICAL identity colours: the user picks one and the `name`
+ * ('blue', 'red', …) is PERSISTED via `onCreateTag(name, color)`. Changing what
+ * 'blue' renders as therefore changes stored semantics, not just pixels — a
+ * tag someone named blue would stop being blue.
+ *
+ * They also cannot map onto the status tokens: `--success`/`--error` assert a
+ * STATE that a tag does not have. What they need is the `--cat-*` categorical
+ * set proposed in `tasks/redesign-colour-map.json` (proposedTokens), mirroring
+ * the chart series, which are already contrast- and separability-checked. That
+ * is a product decision about existing customer data, so it is deliberately
+ * left open rather than decided by a batch.
+ *
+ * The `-300` borders here are counted by the `darkThemeForegroundShades`
+ * ratchet metric and are EXAMINED: they sit on their own `-100` fills, not on
+ * the ivory page, so they are not the invisible-on-light failure that metric
+ * exists to surface. They stay until the categorical decision lands.
+ */
 const TAG_COLORS = [
   { name: 'blue', bg: 'bg-info/10', text: 'text-[var(--info-ink)]', border: 'border-[#00B4D8]/30' },
   { name: 'red', bg: 'bg-red-100 dark:bg-red-900', text: 'text-[var(--error-ink)]', border: 'border-red-300 dark:border-red-700' },
