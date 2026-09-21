@@ -8164,6 +8164,32 @@
   ]
  },
  "notes": {
+  "widgetGalleryFallsThroughItsOwnTypeMap": {
+   "_": "CORRECTED 2026-09-21. An earlier draft of this entry was going to RETRACT the finding as not reproducing. The retraction was wrong, and the reason it was wrong is the more useful half of this note. Re-measured at the source; both the source and the rendered evidence are below.",
+   "status": "REPRODUCES. Measured on feat/app-redesign-phase0, commit cc827d96.",
+   "finding": "app/dashboard/widgets/page.tsx getColorForType (and getIconForType beside it, identically) keys on widget type. Of the six types the Widget Gallery actually renders, TWO are in the map and FOUR fall through to the default. The four then share one gradient and one icon, so the tiles are indistinguishable from each other.",
+   "theSixTypesTheGalleryActuallyRenders": [
+    "weather        -> MAPPED   (--cat-blue)",
+    "rss            -> MAPPED   (--cat-orange)",
+    "social_instagram -> falls through",
+    "social_twitter   -> falls through",
+    "social_facebook  -> falls through",
+    "generic-api      -> falls through"
+   ],
+   "sourceOfThatList": "middleware ContentService.getWidgetTypes() (content.service.ts:1813) iterates dataSourceRegistry.getAll() and returns each source's `type`. The registry's members are the six providers registered in content.module.ts: WeatherDataSource, RssDataSource, InstagramDataSource, TwitterDataSource, FacebookDataSource, GenericApiDataSource. Their `readonly type` values are the six above. Served at GET /content/widgets/types, fetched by apiClient.getWidgetTypes() (lib/api/widgets.ts:72), consumed at page.tsx:234 and painted at page.tsx:689 via getColorForType(wType.type).",
+   "renderedEvidence": "tasks/design-baselines/after-cat/dashboard-widgets__1440.png. Six cards: Weather (blue), News & RSS Feed (copper), then Social Instagram, Social Twitter, Social Facebook and Generic-Api ALL four in the same flat forest fallback with the same generic placeholder icon. The failure is visible without measuring anything.",
+   "whyTheRetractionLookedRight": "There are TWO type lists in this one file and they disagree. DEFAULT_WIDGET_TYPES (page.tsx:17) holds weather, rss, social-feed, clock, sheets — and all five of those ARE in the map, so measuring against it returns a clean bill of health. But that constant is only reached through unavailableFallbackWidgetTypes() at page.tsx:255, i.e. ONLY when the types request throws, and it marks every entry available:false. On the normal path it contributes nothing but a name/description fallback. So the list that renders is the registry's, not this one. Anyone auditing this file top-down meets the wrong list first.",
+   "theSpellingTrap": "The live social types are spelled with UNDERSCORES (social_instagram). A grep for the hyphenated `social-instagram` returns zero hits across the whole repo and reads as proof the types do not exist. They do: a DTO enum member (dto/create-widget.dto.ts:15-17) and a real data source each (social.data-source.ts:12,137,247). The rendered card titles are what misleads — page.tsx:236 derives a display name with `type.replace(/_/g,' ')`, which eats underscores but leaves hyphens, which is why the same row of cards shows `Social Instagram` (was social_instagram) next to `Generic-Api` (was generic-api). The visible name is not the key.",
+   "whichMapKeysAreActuallyDead": {
+    "'social-media'": "DEAD. Zero occurrences anywhere outside this map — not in the registry, not in the DTO enum, not in DEFAULT_WIDGET_TYPES.",
+    "'social-feed' / 'clock' / 'sheets'": "NOT dead. Reachable through the API-unavailable fallback list, which still renders tiles.",
+    "'clock' / 'countdown'": "NOT dead for saved widgets either. Both are DTO enum members, so stored widgets can carry them and the My Widgets list (page.tsx:623,627) keys on widget.widgetType.",
+    "note": "So the honest count is ONE dead key, not two, and 'countdown' is not one of them. Do not repeat the earlier 'two dead keys, one of which is only a mode of clock' framing — it was derived from the fallback list too."
+   },
+   "whatThisIsNot": "Not a colour bug and not fixable in a colour batch. The --cat-* values it reaches for are correct; the gap is that four product types have no assigned identity at all, and assigning them is a design decision about which hue means which platform. Logged here, deliberately not fixed.",
+   "ifSomeoneFixesIt": "Key on the registry's spellings, not the gallery's labels, and fix getIconForType in the same change — it falls through for exactly the same four types, so a colour-only fix leaves four tiles still wearing one icon. The fallback itself is also worth a look: 'unknown type' currently renders as the brand gradient, which reads as a first-class category rather than an absence.",
+   "howThisGotMismeasuredTwice": "Both readings were honest measurements of the wrong list. The durable rule: when a component has a constant that LOOKS like the domain enum, confirm which list actually reaches the render before treating either as ground truth — and prefer the rendered artefact, which cannot be fooled by picking the wrong constant."
+  },
   "_": "Narrative findings that did not fit the machine-readable sections. Written for a reader who will act on them, not for a codemod. Everything here was measured on branch feat/app-redesign-phase0 on 2026-09-18 by a read-only scan; no source file was modified.",
   "paletteRepointFeasibility": {
    "question": "Can theme/palette.js be re-pointed to the forest scale as its own small PR, ahead of the batches?",
