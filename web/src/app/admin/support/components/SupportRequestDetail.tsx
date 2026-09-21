@@ -219,7 +219,7 @@ export function SupportRequestDetail({
                         isUser
                           ? 'bg-[var(--primary-lightest)] text-[var(--primary-ink)]'
                           : isAdmin
-                          ? 'bg-[var(--surface-secondary)] text-[var(--foreground-secondary)] border border-purple-500/30'
+                          ? 'bg-[var(--surface-secondary)] text-[var(--foreground-secondary)] border border-[var(--cat-purple-edge)]'
                           : 'bg-[var(--surface-secondary)] text-[var(--foreground-secondary)]'
                       }`}
                     >

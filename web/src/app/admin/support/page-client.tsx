@@ -101,7 +101,7 @@ export function SupportDashboardClient() {
       {/* Header */}
       <div>
         <div className="flex items-center gap-3 mb-1">
-          <MessageSquare className="w-8 h-8 text-[#00E5A0]" />
+          <MessageSquare className="w-8 h-8 text-[var(--primary-ink)]" />
           <h1 className="text-3xl font-bold text-[var(--foreground)]">Support Dashboard</h1>
         </div>
         <p className="mt-1 text-[var(--foreground-secondary)]">
@@ -130,7 +130,7 @@ export function SupportDashboardClient() {
               <button
                 onClick={() => setFilters((prev) => ({ ...prev, page: currentPage - 1 }))}
                 disabled={currentPage <= 1}
-                className="flex items-center gap-1 px-3 py-2 text-sm text-[var(--foreground-secondary)] bg-[#1F2937] border border-[var(--border)] rounded-lg hover:bg-[#374151] transition disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex items-center gap-1 px-3 py-2 text-sm text-[var(--foreground-secondary)] bg-[var(--background-secondary)] border border-[var(--border)] rounded-lg hover:bg-[var(--background-tertiary)] transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <ChevronLeft className="w-4 h-4" />
                 Previous
@@ -141,7 +141,7 @@ export function SupportDashboardClient() {
               <button
                 onClick={() => setFilters((prev) => ({ ...prev, page: currentPage + 1 }))}
                 disabled={currentPage >= totalPages}
-                className="flex items-center gap-1 px-3 py-2 text-sm text-[var(--foreground-secondary)] bg-[#1F2937] border border-[var(--border)] rounded-lg hover:bg-[#374151] transition disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex items-center gap-1 px-3 py-2 text-sm text-[var(--foreground-secondary)] bg-[var(--background-secondary)] border border-[var(--border)] rounded-lg hover:bg-[var(--background-tertiary)] transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Next
                 <ChevronRight className="w-4 h-4" />

@@ -207,41 +207,41 @@ const metrics: Array<{ label: string; start: string; current: string; target: st
 
 const colorMap: Record<string, { bg: string; border: string; text: string; badge: string }> = {
   red: {
-    bg: 'bg-red-50 dark:bg-red-900/10',
+    bg: 'bg-[var(--status-offline-bg)]',
     border: 'border-error-ink/40',
-    text: 'text-red-700',
-    badge: 'bg-red-100 dark:bg-red-900/30 text-red-700',
+    text: 'text-[var(--error-ink)]',
+    badge: 'bg-[var(--status-offline-bg)] text-[var(--error-ink)]',
   },
   orange: {
-    bg: 'bg-orange-50 dark:bg-orange-900/10',
+    bg: 'bg-[var(--status-error-bg)]',
     border: 'border-warning-ink/40',
-    text: 'text-orange-700',
-    badge: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700',
+    text: 'text-[var(--warning-ink)]',
+    badge: 'bg-[var(--status-error-bg)] text-[var(--warning-ink)]',
   },
   yellow: {
-    bg: 'bg-yellow-50 dark:bg-yellow-900/10',
+    bg: 'bg-[var(--status-error-bg)]',
     border: 'border-warning-ink/40',
-    text: 'text-yellow-700',
-    badge: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700',
+    text: 'text-[var(--warning-ink)]',
+    badge: 'bg-[var(--status-error-bg)] text-[var(--warning-ink)]',
   },
   blue: {
-    bg: 'bg-blue-50 dark:bg-blue-900/10',
+    bg: 'bg-[var(--status-pairing-bg)]',
     border: 'border-info-ink/40',
-    text: 'text-blue-700',
-    badge: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700',
+    text: 'text-[var(--info-ink)]',
+    badge: 'bg-[var(--status-pairing-bg)] text-[var(--info-ink)]',
   },
   gray: {
-    bg: 'bg-gray-50 dark:bg-gray-900/10',
+    bg: 'bg-[var(--background-secondary)]',
     border: 'border-border/40',
-    text: 'text-gray-600',
-    badge: 'bg-gray-100 dark:bg-gray-900/30 text-gray-600',
+    text: 'text-[var(--foreground-secondary)]',
+    badge: 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)]',
   },
 };
 
 function StatusIcon({ status }: { status: string }) {
-  if (status === 'FIXED') return <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />;
-  if (status === 'IN_PROGRESS') return <Clock className="w-4 h-4 text-blue-500 flex-shrink-0 animate-pulse" />;
-  if (status === 'BLOCKED') return <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />;
+  if (status === 'FIXED') return <CheckCircle className="w-4 h-4 text-[var(--success-ink)] flex-shrink-0" />;
+  if (status === 'IN_PROGRESS') return <Clock className="w-4 h-4 text-[var(--info-ink)] flex-shrink-0 animate-pulse" />;
+  if (status === 'BLOCKED') return <AlertTriangle className="w-4 h-4 text-[var(--error-ink)] flex-shrink-0" />;
   if (status === 'DEFERRED') return <Clock className="w-4 h-4 text-[var(--foreground-tertiary)] flex-shrink-0" />;
   return <Circle className="w-4 h-4 text-[var(--foreground-tertiary)] flex-shrink-0" />;
 }
@@ -277,7 +277,7 @@ function CollapsibleSection({ section }: { section: Section }) {
             {todoCount} open
           </span>
           {doneCount > 0 && (
-            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700">
+            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--status-online-bg)] text-[var(--success-ink)]">
               {doneCount} done
             </span>
           )}
@@ -306,7 +306,7 @@ function CollapsibleSection({ section }: { section: Section }) {
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 {item.owner && (
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${item.owner === 'YOU' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700' : 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700'}`}>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${item.owner === 'YOU' ? 'bg-[var(--cat-purple-bg)] text-[var(--cat-purple)]' : 'bg-[var(--status-pairing-bg)] text-[var(--info-ink)]'}`}>
                     {item.owner}
                   </span>
                 )}
@@ -354,7 +354,7 @@ export default function BacklogClient() {
               <div className="text-xs text-[var(--foreground-tertiary)]">{m.label}</div>
               <div className="text-lg font-bold text-[var(--foreground)] mt-0.5">{m.current}</div>
               <div className="text-xs text-[var(--foreground-tertiary)] mt-0.5">
-                {m.start} &rarr; <span className="text-[#00E5A0]">{m.target}</span>
+                {m.start} &rarr; <span className="text-[var(--primary-ink)]">{m.target}</span>
               </div>
             </div>
           ))}
@@ -368,7 +368,7 @@ export default function BacklogClient() {
       <div className="flex items-center gap-4 text-sm">
         <span className="text-[var(--foreground-secondary)]">{totalTodo} items remaining</span>
         <span className="text-[var(--foreground-tertiary)]">&middot;</span>
-        <span className="text-green-600">{completed.length} historical completed items</span>
+        <span className="text-[var(--success-ink)]">{completed.length} historical completed items</span>
       </div>
 
       {/* Priority sections */}
@@ -401,14 +401,14 @@ export default function BacklogClient() {
       <div className="rounded-xl border border-success-ink/40 overflow-hidden">
         <button
           onClick={() => setShowCompleted(!showCompleted)}
-          className="w-full flex items-center justify-between p-4 bg-green-50 dark:bg-green-900/10 hover:opacity-90 transition"
+          className="w-full flex items-center justify-between p-4 bg-[var(--status-online-bg)] hover:opacity-90 transition"
         >
           <div className="flex items-center gap-3">
             {showCompleted ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-            <CheckCircle className="w-5 h-5 text-green-500" />
+            <CheckCircle className="w-5 h-5 text-[var(--success-ink)]" />
             <h3 className="text-base font-semibold text-[var(--foreground)]">Completed Historical Items</h3>
           </div>
-          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700">
+          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--status-online-bg)] text-[var(--success-ink)]">
             {completed.length} items
           </span>
         </button>
@@ -416,7 +416,7 @@ export default function BacklogClient() {
           <div className="divide-y divide-[var(--border)]">
             {completed.map((item) => (
               <div key={item.id} className="flex items-center gap-3 px-4 py-2.5">
-                <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                <CheckCircle className="w-4 h-4 text-[var(--success-ink)] flex-shrink-0" />
                 <span className="text-sm text-[var(--foreground)] flex-1">{item.title}</span>
                 {item.notes && <span className="text-xs text-[var(--foreground-tertiary)]">{item.notes}</span>}
               </div>

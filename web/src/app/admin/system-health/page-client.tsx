@@ -79,7 +79,15 @@ interface SparklinePoint {
 // Sparkline component (pure CSS, no chart library needed)
 // ---------------------------------------------------------------------------
 
-function Sparkline({ data, color = '#00E5A0', height = 32 }: {
+/*
+ * Sparkline colours are LITERALS, not tokens, and that is forced: the value is
+ * handed to an SVG `stroke`/`fill` presentation attribute, where `var(--x)`
+ * does not resolve. Same constraint as the recharts series palette, which is
+ * why those live in theme/palette.js. The values here are the semantic inks by
+ * value — forest #1f4230, warning #92400e, error #b91c1c — so they track the
+ * palette even though they cannot reference it.
+ */
+function Sparkline({ data, color = '#1f4230', height = 32 }: {
   data: number[];
   color?: string;
   height?: number;
@@ -116,14 +124,14 @@ function Sparkline({ data, color = '#00E5A0', height = 32 }: {
 
 function StatusBadge({ status }: { status: string }) {
   const config: Record<string, { bg: string; text: string; icon: typeof CheckCircle }> = {
-    healthy: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700', icon: CheckCircle },
-    passed: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700', icon: CheckCircle },
-    warning: { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700', icon: AlertTriangle },
-    degraded: { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700', icon: AlertTriangle },
-    critical: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700', icon: XCircle },
-    failed: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700', icon: XCircle },
-    pending: { bg: 'bg-gray-100 dark:bg-gray-900/30', text: 'text-gray-700', icon: Clock },
-    running: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700', icon: RefreshCw },
+    healthy: { bg: 'bg-[var(--status-online-bg)]', text: 'text-[var(--success-ink)]', icon: CheckCircle },
+    passed: { bg: 'bg-[var(--status-online-bg)]', text: 'text-[var(--success-ink)]', icon: CheckCircle },
+    warning: { bg: 'bg-[var(--status-error-bg)]', text: 'text-[var(--warning-ink)]', icon: AlertTriangle },
+    degraded: { bg: 'bg-[var(--status-error-bg)]', text: 'text-[var(--warning-ink)]', icon: AlertTriangle },
+    critical: { bg: 'bg-[var(--status-offline-bg)]', text: 'text-[var(--error-ink)]', icon: XCircle },
+    failed: { bg: 'bg-[var(--status-offline-bg)]', text: 'text-[var(--error-ink)]', icon: XCircle },
+    pending: { bg: 'bg-[var(--background-secondary)]', text: 'text-[var(--foreground-secondary)]', icon: Clock },
+    running: { bg: 'bg-[var(--status-pairing-bg)]', text: 'text-[var(--info-ink)]', icon: RefreshCw },
   };
   const c = config[status] || config.pending;
   const Icon = c.icon;
@@ -241,10 +249,10 @@ export default function SystemHealthClient() {
       <div
         className={`p-6 rounded-xl border-2 ${
           monitorOverall === 'healthy'
-            ? 'bg-green-50 dark:bg-green-900/20 border-success-ink/30'
+            ? 'bg-[var(--status-online-bg)] border-success-ink/30'
             : monitorOverall === 'warning'
-            ? 'bg-yellow-50 dark:bg-yellow-900/20 border-warning-ink/30'
-            : 'bg-red-50 dark:bg-red-900/20 border-error-ink/30'
+            ? 'bg-[var(--status-error-bg)] border-warning-ink/30'
+            : 'bg-[var(--status-offline-bg)] border-error-ink/30'
         }`}
       >
         <div className="flex items-center justify-between">
@@ -276,20 +284,20 @@ export default function SystemHealthClient() {
             value={`${metrics.avg_latency_ms}ms`}
             icon={<Zap className="w-5 h-5" />}
             sparkData={history.map((h) => h.l)}
-            color={metrics.avg_latency_ms < 200 ? '#00E5A0' : metrics.avg_latency_ms < 500 ? '#EAB308' : '#EF4444'}
+            color={metrics.avg_latency_ms < 200 ? '#1f4230' : metrics.avg_latency_ms < 500 ? '#92400e' : '#b91c1c'}
           />
           <MetricCard
             title="5xx Errors"
             value={String(metrics.error_rate_5xx)}
             icon={<AlertTriangle className="w-5 h-5" />}
             sparkData={history.map((h) => h.e)}
-            color={metrics.error_rate_5xx === 0 ? '#00E5A0' : '#EF4444'}
+            color={metrics.error_rate_5xx === 0 ? '#1f4230' : '#b91c1c'}
           />
           <MetricCard
             title="Uptime"
             value={`${metrics.uptime_pct}%`}
             icon={<Activity className="w-5 h-5" />}
-            color="#00E5A0"
+            color="#1f4230"
           />
           <MetricCard
             title="DB Latency"
@@ -358,13 +366,13 @@ export default function SystemHealthClient() {
                   key={name}
                   className={`p-3 rounded-lg border ${
                     check.passed
-                      ? 'border-success-ink/50 bg-green-50/50 dark:bg-green-900/10'
-                      : 'border-error-ink/50 bg-red-50/50 dark:bg-red-900/10'
+                      ? 'border-success-ink/50 bg-[var(--status-online-bg)]'
+                      : 'border-error-ink/50 bg-[var(--status-offline-bg)]'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
-                      <Icon className={`w-4 h-4 ${check.passed ? 'text-green-500' : 'text-red-500'}`} />
+                      <Icon className={`w-4 h-4 ${check.passed ? 'text-[var(--success-ink)]' : 'text-[var(--error-ink)]'}`} />
                       <span className="font-medium text-sm text-[var(--foreground)]">
                         {name.replace(/_/g, ' ')}
                       </span>
@@ -375,7 +383,7 @@ export default function SystemHealthClient() {
                   {check.failures && check.failures.length > 0 && (
                     <ul className="mt-2 space-y-1">
                       {check.failures.map((f, i) => (
-                        <li key={i} className="text-xs text-red-600">
+                        <li key={i} className="text-xs text-[var(--error-ink)]">
                           {f}
                         </li>
                       ))}
@@ -384,7 +392,7 @@ export default function SystemHealthClient() {
                   {check.mismatches && check.mismatches.length > 0 && (
                     <ul className="mt-2 space-y-1">
                       {check.mismatches.map((m, i) => (
-                        <li key={i} className="text-xs text-red-600">
+                        <li key={i} className="text-xs text-[var(--error-ink)]">
                           {m}
                         </li>
                       ))}
@@ -411,7 +419,7 @@ function MetricCard({
   value,
   icon,
   sparkData,
-  color = '#00E5A0',
+  color = '#1f4230',
 }: {
   title: string;
   value: string;

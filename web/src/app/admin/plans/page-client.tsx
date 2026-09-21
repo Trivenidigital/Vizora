@@ -120,7 +120,7 @@ export default function AdminPlansClient({ initialPlans }: AdminPlansClientProps
         </div>
         <button
           onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition"
+          className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition"
         >
           <Plus className="w-5 h-5" />
           Create Plan
@@ -134,12 +134,12 @@ export default function AdminPlansClient({ initialPlans }: AdminPlansClientProps
             key={plan.id}
             className={`bg-[var(--surface)] rounded-xl border-2 ${
               plan.highlightText
-                ? 'border-[#00E5A0]'
+                ? 'border-[var(--primary-ink)]'
                 : 'border-[var(--border)]'
             } overflow-hidden relative`}
           >
             {plan.highlightText && (
-              <div className="absolute top-0 left-0 right-0 bg-[#00E5A0] text-[#061A21] text-center text-sm font-medium py-1">
+              <div className="absolute top-0 left-0 right-0 bg-[var(--primary)] text-[var(--lw-on-forest)] text-center text-sm font-medium py-1">
                 {plan.highlightText}
               </div>
             )}
@@ -207,7 +207,7 @@ export default function AdminPlansClient({ initialPlans }: AdminPlansClientProps
                 <div className="space-y-2 mb-4">
                   {plan.features.slice(0, 4).map((feature, index) => (
                     <div key={index} className="flex items-center gap-2 text-sm">
-                      <Check className="w-4 h-4 text-green-500 flex-shrink-0" />
+                      <Check className="w-4 h-4 text-[var(--success-ink)] flex-shrink-0" />
                       <span className="text-[var(--foreground-secondary)]">{feature}</span>
                     </div>
                   ))}
@@ -230,7 +230,7 @@ export default function AdminPlansClient({ initialPlans }: AdminPlansClientProps
                 </button>
                 <button
                   onClick={() => setDeletingPlan(plan)}
-                  className="flex items-center justify-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
+                  className="flex items-center justify-center gap-2 px-3 py-2 text-sm text-[var(--error-ink)] hover:bg-[var(--status-offline-bg)] dark:hover:bg-red-900/20 rounded-lg transition"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -249,7 +249,7 @@ export default function AdminPlansClient({ initialPlans }: AdminPlansClientProps
           </p>
           <button
             onClick={handleCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition"
           >
             <Plus className="w-5 h-5" />
             Create Plan

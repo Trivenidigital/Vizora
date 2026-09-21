@@ -97,10 +97,10 @@ export default function AdminDashboardClient({ initialStats }: AdminDashboardCli
             <Link
               key={action.name}
               href={action.href}
-              className="group bg-[var(--surface)] rounded-xl border border-[var(--border)] p-4 hover:shadow-md hover:border-[#00E5A0] transition-all"
+              className="group bg-[var(--surface)] rounded-xl border border-[var(--border)] p-4 hover:shadow-md hover:border-[var(--primary-ink)] transition-all"
             >
               <action.icon className={`w-8 h-8 text-${action.color}-500 mb-3`} />
-              <p className="font-medium text-[var(--foreground)] group-hover:text-[#00E5A0] transition">
+              <p className="font-medium text-[var(--foreground)] group-hover:text-[var(--primary-ink)] transition">
                 {action.name}
               </p>
             </Link>
@@ -116,7 +116,7 @@ export default function AdminDashboardClient({ initialStats }: AdminDashboardCli
             <h3 className="font-semibold text-[var(--foreground)]">Screen Status</h3>
             <Link
               href="/admin/health"
-              className="text-sm text-[#00E5A0] hover:underline flex items-center gap-1"
+              className="text-sm text-[var(--primary-ink)] hover:underline flex items-center gap-1"
             >
               View Details
               <ArrowRight className="w-4 h-4" />
@@ -144,7 +144,7 @@ export default function AdminDashboardClient({ initialStats }: AdminDashboardCli
             <div className="pt-3 border-t border-[var(--border)]">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-[var(--foreground-tertiary)]">Uptime Rate</span>
-                <span className="font-medium text-green-600">
+                <span className="font-medium text-[var(--success-ink)]">
                   {stats?.totalScreens
                     ? Math.round(((stats.onlineScreens ?? 0) / stats.totalScreens) * 100)
                     : 0}
@@ -161,7 +161,7 @@ export default function AdminDashboardClient({ initialStats }: AdminDashboardCli
             <h3 className="font-semibold text-[var(--foreground)]">Revenue Summary</h3>
             <Link
               href="/admin/analytics"
-              className="text-sm text-[#00E5A0] hover:underline flex items-center gap-1"
+              className="text-sm text-[var(--primary-ink)] hover:underline flex items-center gap-1"
             >
               View Analytics
               <ArrowRight className="w-4 h-4" />
@@ -190,7 +190,7 @@ export default function AdminDashboardClient({ initialStats }: AdminDashboardCli
             </div>
             <div className="pt-3 border-t border-[var(--border)]">
               <div className="flex items-center gap-2 text-sm">
-                <TrendingUp className="w-4 h-4 text-green-500" />
+                <TrendingUp className="w-4 h-4 text-[var(--success-ink)]" />
                 <span className="text-[var(--foreground-secondary)]">
                   Average Revenue Per Organization
                 </span>

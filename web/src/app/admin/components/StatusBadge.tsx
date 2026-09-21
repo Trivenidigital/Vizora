@@ -25,7 +25,7 @@ interface StatusBadgeProps {
 
 /**
  * Admin status pill. Renders through the shared `ui/Badge` — the colour table
- * this file used to carry (13 entries of `bg-green-100 dark:bg-green-900/30`
+ * this file used to carry (13 entries of `bg-[var(--status-online-bg)]`
  * and friends) is gone; what remains is the part that is genuinely admin's:
  * which tone each status means, and how the label is worded.
  *

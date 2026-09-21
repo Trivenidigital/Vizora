@@ -35,7 +35,7 @@ export function SupportStatsCards({ stats }: SupportStatsCardsProps) {
       {cards.map((card) => (
         <div
           key={card.label}
-          className="bg-[#111827] rounded-xl p-6 border border-[var(--border)]"
+          className="bg-[var(--surface)] rounded-xl p-6 border border-[var(--border)]"
         >
           <div className="flex items-center gap-2 mb-2">
             <span className={`w-2.5 h-2.5 rounded-full ${card.dotColor}`} />

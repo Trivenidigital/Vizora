@@ -78,7 +78,7 @@ export default function AdminAnalyticsClient({ initialStats }: AdminAnalyticsCli
           <select
             value={timeRange}
             onChange={(e) => setTimeRange(e.target.value)}
-            className="px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] text-sm focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+            className="px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] text-sm focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
           >
             <option value="7d">Last 7 days</option>
             <option value="30d">Last 30 days</option>
@@ -121,7 +121,7 @@ export default function AdminAnalyticsClient({ initialStats }: AdminAnalyticsCli
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-6">
           <h3 className="text-lg font-semibold text-[var(--foreground)] mb-6 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-green-500" />
+            <TrendingUp className="w-5 h-5 text-[var(--success-ink)]" />
             Revenue Metrics
           </h3>
           <div className="space-y-6">
@@ -150,7 +150,7 @@ export default function AdminAnalyticsClient({ initialStats }: AdminAnalyticsCli
 
         <div className="bg-[var(--surface)] rounded-xl border border-[var(--border)] p-6">
           <h3 className="text-lg font-semibold text-[var(--foreground)] mb-6 flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-[#00E5A0]" />
+            <BarChart3 className="w-5 h-5 text-[var(--primary-ink)]" />
             Platform Usage
           </h3>
           <div className="space-y-6">

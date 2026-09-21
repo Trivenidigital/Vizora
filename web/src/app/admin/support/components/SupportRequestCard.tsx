@@ -76,7 +76,7 @@ export function SupportRequestCard({ request, onSelect }: SupportRequestCardProp
   return (
     <div
       onClick={() => onSelect(request)}
-      className="bg-[#111827] rounded-lg p-4 border border-[var(--border)] hover:border-[#00E5A0]/30 cursor-pointer transition-colors"
+      className="bg-[var(--surface)] rounded-lg p-4 border border-[var(--border)] hover:border-brand/30 cursor-pointer transition-colors"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
@@ -106,7 +106,7 @@ export function SupportRequestCard({ request, onSelect }: SupportRequestCardProp
             e.stopPropagation();
             onSelect(request);
           }}
-          className="flex items-center gap-1 px-3 py-1.5 text-xs text-[var(--foreground-secondary)] hover:text-white bg-[#1F2937] rounded-lg hover:bg-[#374151] transition flex-shrink-0"
+          className="flex items-center gap-1 px-3 py-1.5 text-xs text-[var(--foreground-secondary)] hover:text-white bg-[var(--background-secondary)] rounded-lg hover:bg-[var(--background-tertiary)] transition flex-shrink-0"
         >
           <Eye className="w-3.5 h-3.5" />
           View

@@ -44,7 +44,7 @@ export function SupportFilters({ filters, onFiltersChange }: SupportFiltersProps
   };
 
   const selectClasses =
-    'bg-[#1F2937] border border-[var(--border)] rounded-lg text-white text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#00E5A0]/50 appearance-none cursor-pointer';
+    'bg-[var(--background-secondary)] border border-[var(--border)] rounded-lg text-white text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand/50 appearance-none cursor-pointer';
 
   return (
     <div className="flex flex-wrap items-center gap-3">
@@ -111,14 +111,14 @@ export function SupportFilters({ filters, onFiltersChange }: SupportFiltersProps
           onChange={(e) =>
             onFiltersChange({ ...filters, search: e.target.value || undefined, page: 1 })
           }
-          className="w-full bg-[#1F2937] border border-[var(--border)] rounded-lg text-white text-sm pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#00E5A0]/50 placeholder-[var(--foreground-tertiary)]"
+          className="w-full bg-[var(--background-secondary)] border border-[var(--border)] rounded-lg text-white text-sm pl-9 pr-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand/50 placeholder-[var(--foreground-tertiary)]"
         />
       </div>
 
       {hasActiveFilters && (
         <button
           onClick={handleClear}
-          className="flex items-center gap-1 px-3 py-2 text-sm text-[var(--foreground-secondary)] hover:text-white bg-[#1F2937] border border-[var(--border)] rounded-lg hover:bg-[#374151] transition"
+          className="flex items-center gap-1 px-3 py-2 text-sm text-[var(--foreground-secondary)] hover:text-white bg-[var(--background-secondary)] border border-[var(--border)] rounded-lg hover:bg-[var(--background-tertiary)] transition"
         >
           <X className="w-4 h-4" />
           Clear
