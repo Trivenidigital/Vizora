@@ -20,15 +20,15 @@ function formatDate(dateString: string): string {
 function statusColor(status: string): string {
   switch (status) {
     case 'open':
-      return 'bg-yellow-500/20 text-yellow-400';
+      return 'bg-yellow-500/20 text-[var(--warning-ink)]';
     case 'in_progress':
-      return 'bg-blue-500/20 text-blue-400';
+      return 'bg-blue-500/20 text-[var(--info-ink)]';
     case 'resolved':
-      return 'bg-green-500/20 text-green-400';
+      return 'bg-green-500/20 text-[var(--success-ink)]';
     case 'closed':
-      return 'bg-gray-500/20 text-gray-400';
+      return 'bg-gray-500/20 text-[var(--foreground-secondary)]';
     default:
-      return 'bg-gray-500/20 text-gray-400';
+      return 'bg-gray-500/20 text-[var(--foreground-secondary)]';
   }
 }
 
@@ -105,33 +105,33 @@ export default function SupportChatPanel() {
 
   return (
     <div
-      className={`fixed bottom-24 right-6 z-40 w-[380px] max-sm:w-[calc(100vw-48px)] max-h-[520px] max-sm:max-h-[70vh] bg-[#111827] border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-200 ${
+      className={`fixed bottom-24 right-6 z-40 w-[380px] max-sm:w-[calc(100vw-48px)] max-h-[520px] max-sm:max-h-[70vh] bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-200 ${
         isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
       }`}
     >
       {/* Green accent bar */}
-      <div className="h-0.5 bg-gradient-to-r from-[#00E5A0] to-[#00B4D8] flex-shrink-0" />
+      <div className="h-0.5 bg-gradient-to-r from-[var(--primary)] to-[var(--accent-brass)] flex-shrink-0" />
 
       {/* Header */}
-      <div className="flex items-center justify-between px-4 h-12 border-b border-white/10 flex-shrink-0">
+      <div className="flex items-center justify-between px-4 h-12 border-b border-[var(--border)] flex-shrink-0">
         <div className="flex items-center gap-2">
           {!showConversationList && (
             <button
               onClick={startNewConversation}
-              className="p-1 text-gray-400 hover:text-white transition-colors rounded"
+              className="p-1 text-[var(--foreground-secondary)] hover:text-[var(--foreground)] transition-colors rounded"
               aria-label="Back to conversations"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
           )}
-          <h3 className="text-sm font-semibold text-white">Vizora Assistant</h3>
+          <h3 className="text-sm font-semibold text-[var(--foreground)]">Vizora Assistant</h3>
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={() => {
               startComposing();
             }}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"
+            className="p-1.5 text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--surface-hover)] rounded transition-colors"
             aria-label="New conversation"
             title="New Chat"
           >
@@ -139,7 +139,7 @@ export default function SupportChatPanel() {
           </button>
           <button
             onClick={toggleChat}
-            className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded transition-colors"
+            className="p-1.5 text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--surface-hover)] rounded transition-colors"
             aria-label="Close chat"
           >
             <X className="w-4 h-4" />
@@ -152,13 +152,13 @@ export default function SupportChatPanel() {
         <div className="flex-1 overflow-y-auto">
           {conversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-              <div className="w-12 h-12 rounded-full bg-[#00E5A0]/10 flex items-center justify-center mb-3">
-                <svg className="w-6 h-6 text-[#00E5A0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 rounded-full bg-brand/10 flex items-center justify-center mb-3">
+                <svg className="w-6 h-6 text-[var(--primary-ink)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                 </svg>
               </div>
-              <p className="text-sm text-gray-400 mb-1">No conversations yet</p>
-              <p className="text-xs text-gray-500">Start a new chat to get help or report an issue.</p>
+              <p className="text-sm text-[var(--foreground-secondary)] mb-1">No conversations yet</p>
+              <p className="text-xs text-[var(--foreground-tertiary)]">Start a new chat to get help or report an issue.</p>
             </div>
           ) : (
             <div className="py-1">
@@ -166,17 +166,17 @@ export default function SupportChatPanel() {
                 <button
                   key={conv.id}
                   onClick={() => selectConversation(conv.id)}
-                  className="w-full text-left px-4 py-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-b-0"
+                  className="w-full text-left px-4 py-3 hover:bg-[var(--surface-hover)] transition-colors border-b border-[var(--border)] last:border-b-0"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm text-gray-200 truncate flex-1">
+                    <p className="text-sm text-[var(--foreground)] truncate flex-1">
                       {conv.title || 'Untitled conversation'}
                     </p>
                     <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded flex-shrink-0 ${statusColor(conv.status)}`}>
                       {conv.status.replace('_', ' ')}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">{formatDate(conv.createdAt)}</p>
+                  <p className="text-xs text-[var(--foreground-tertiary)] mt-1">{formatDate(conv.createdAt)}</p>
                 </button>
               ))}
             </div>
@@ -192,8 +192,8 @@ export default function SupportChatPanel() {
           <div className="flex-1 overflow-y-auto px-4 py-3 min-h-0">
             {messages.length === 0 && !isLoading && (
               <div className="flex flex-col items-center justify-center py-8 text-center">
-                <p className="text-sm text-gray-400 mb-1">How can we help?</p>
-                <p className="text-xs text-gray-500">Type a message or pick a quick action below.</p>
+                <p className="text-sm text-[var(--foreground-secondary)] mb-1">How can we help?</p>
+                <p className="text-xs text-[var(--foreground-tertiary)]">Type a message or pick a quick action below.</p>
               </div>
             )}
             {messages.map((msg) => (
@@ -209,8 +209,8 @@ export default function SupportChatPanel() {
             ))}
             {isLoading && (
               <div className="flex justify-start mb-3">
-                <div className="bg-[#1F2937] rounded-2xl rounded-bl-md px-4 py-3">
-                  <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
+                <div className="bg-[var(--background-secondary)] rounded-2xl rounded-bl-md px-4 py-3">
+                  <Loader2 className="w-4 h-4 text-[var(--foreground-secondary)] animate-spin" />
                 </div>
               </div>
             )}
@@ -221,7 +221,7 @@ export default function SupportChatPanel() {
           {messages.length === 0 && !activeRequestId && <SupportQuickActions />}
 
           {/* Input area */}
-          <div className="flex items-end gap-2 px-4 py-3 border-t border-white/10 flex-shrink-0">
+          <div className="flex items-end gap-2 px-4 py-3 border-t border-[var(--border)] flex-shrink-0">
             <textarea
               ref={textareaRef}
               value={inputText}
@@ -229,13 +229,13 @@ export default function SupportChatPanel() {
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
               rows={1}
-              className="flex-1 bg-[#1F2937] text-sm text-gray-200 placeholder-gray-500 px-3 py-2 rounded-xl resize-none outline-none focus:ring-1 focus:ring-[#00E5A0]/50 transition-all max-sm:py-3"
+              className="flex-1 bg-[var(--background-secondary)] text-sm text-[var(--foreground)] placeholder-[var(--foreground-tertiary)] px-3 py-2 rounded-xl resize-none outline-none focus:ring-1 focus:ring-brand/50 transition-all max-sm:py-3"
               style={{ maxHeight: '72px' }}
             />
             <button
               onClick={handleSend}
               disabled={!inputText.trim() || isLoading}
-              className="flex-shrink-0 w-9 h-9 max-sm:w-10 max-sm:h-10 flex items-center justify-center rounded-xl bg-[#00E5A0] text-[#0A0F1C] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
+              className="flex-shrink-0 w-9 h-9 max-sm:w-10 max-sm:h-10 flex items-center justify-center rounded-xl bg-[var(--primary)] text-[var(--lw-on-forest)] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
               aria-label="Send message"
             >
               <Send className="w-4 h-4" />

@@ -18,12 +18,12 @@ interface ContentTaggerProps {
 }
 
 const TAG_COLORS = [
-  { name: 'blue', bg: 'bg-[#00B4D8]/10', text: 'text-[#00B4D8]', border: 'border-[#00B4D8]/30' },
-  { name: 'red', bg: 'bg-red-100 dark:bg-red-900', text: 'text-red-800 dark:text-red-200', border: 'border-red-300 dark:border-red-700' },
-  { name: 'green', bg: 'bg-green-100 dark:bg-green-900', text: 'text-green-800 dark:text-green-200', border: 'border-green-300 dark:border-green-700' },
-  { name: 'purple', bg: 'bg-purple-100 dark:bg-purple-900', text: 'text-purple-800 dark:text-purple-200', border: 'border-purple-300 dark:border-purple-700' },
-  { name: 'yellow', bg: 'bg-yellow-100 dark:bg-yellow-900', text: 'text-yellow-800 dark:text-yellow-200', border: 'border-yellow-300 dark:border-yellow-700' },
-  { name: 'pink', bg: 'bg-pink-100 dark:bg-pink-900', text: 'text-pink-800 dark:text-pink-200', border: 'border-pink-300 dark:border-pink-700' },
+  { name: 'blue', bg: 'bg-info/10', text: 'text-[var(--info-ink)]', border: 'border-[#00B4D8]/30' },
+  { name: 'red', bg: 'bg-red-100 dark:bg-red-900', text: 'text-[var(--error-ink)]', border: 'border-red-300 dark:border-red-700' },
+  { name: 'green', bg: 'bg-green-100 dark:bg-green-900', text: 'text-[var(--success-ink)]', border: 'border-green-300 dark:border-green-700' },
+  { name: 'purple', bg: 'bg-purple-100 dark:bg-purple-900', text: 'text-[var(--accent-brass-ink)]', border: 'border-purple-300 dark:border-purple-700' },
+  { name: 'yellow', bg: 'bg-yellow-100 dark:bg-yellow-900', text: 'text-[var(--warning-ink)]', border: 'border-yellow-300 dark:border-yellow-700' },
+  { name: 'pink', bg: 'bg-pink-100 dark:bg-pink-900', text: 'text-[var(--accent-coral-ink)]', border: 'border-pink-300 dark:border-pink-700' },
 ];
 
 export default function ContentTagger({
@@ -90,7 +90,7 @@ export default function ContentTagger({
           {!isCreating ? (
             <button
               onClick={() => setIsCreating(true)}
-              className="px-3 py-1.5 rounded-full text-xs font-medium border-2 border-dashed border-[var(--border)] text-[var(--foreground-secondary)] hover:border-[#00E5A0] hover:text-[#00E5A0] transition"
+              className="px-3 py-1.5 rounded-full text-xs font-medium border-2 border-dashed border-[var(--border)] text-[var(--foreground-secondary)] hover:border-[var(--primary-ink)] hover:text-[var(--primary-ink)] transition"
             >
               + Add Tag
             </button>
@@ -101,7 +101,7 @@ export default function ContentTagger({
                 value={newTagName}
                 onChange={e => setNewTagName(e.target.value)}
                 placeholder="Tag name (e.g., Holiday, Promotion, Q4)"
-                className="w-full px-3 py-1.5 text-sm border border-[var(--border)] rounded bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0]"
+                className="w-full px-3 py-1.5 text-sm border border-[var(--border)] rounded bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[var(--primary-ink)]"
                 autoFocus
               />
 
@@ -126,7 +126,7 @@ export default function ContentTagger({
                 <button
                   onClick={handleCreateTag}
                   disabled={!newTagName.trim()}
-                  className="flex-1 px-3 py-1.5 text-sm bg-[#00E5A0] text-[#061A21] rounded hover:bg-[#00CC8E] disabled:opacity-50 transition"
+                  className="flex-1 px-3 py-1.5 text-sm bg-[var(--primary)] text-[var(--lw-on-forest)] rounded hover:bg-[var(--primary-light)] disabled:opacity-50 transition"
                 >
                   Create
                 </button>

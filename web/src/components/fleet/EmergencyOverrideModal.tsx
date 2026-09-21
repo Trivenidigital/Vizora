@@ -209,7 +209,7 @@ export default function EmergencyOverrideModal({ isOpen, onClose, organizationId
                     // Dark ink on the neon fill, matching ViewToggle and
                     // .eh-filter-pill-active. White on #00E5A0 is 1.65:1 — it
                     // failed in BOTH themes, not just light.
-                    ? 'bg-[var(--primary)] text-[#061A21]'
+                    ? 'bg-[var(--primary)] text-[var(--lw-on-forest)]'
                     : 'bg-[var(--background)] text-[var(--foreground-secondary)] border border-[var(--border)] hover:bg-[var(--surface-hover)]'
                 }`}
               >

@@ -95,7 +95,7 @@ export default function PlaylistPreviewPanel({ items }: PlaylistPreviewPanelProp
       <div className="flex-1 flex flex-col p-4">
         <div className="relative bg-black rounded-lg overflow-hidden aspect-video mb-4">
           {/* Content Display */}
-          <div className="absolute inset-0 flex items-center justify-center bg-[#061A21]">
+          <div className="absolute inset-0 flex items-center justify-center bg-[var(--viewport-bg)]">
             {currentItem?.content?.thumbnailUrl ? (
               <img
                 src={currentItem.content.thumbnailUrl}
@@ -103,20 +103,20 @@ export default function PlaylistPreviewPanel({ items }: PlaylistPreviewPanelProp
                 className="max-w-full max-h-full object-contain"
               />
             ) : (
-              <div className="text-center text-white">
+              <div className="text-center text-[var(--viewport-ink)]">
                 <div className="text-5xl mb-3">
                   {currentItem?.content?.type === 'video' ? (
-                    <Icon name="video" size="6xl" className="text-white" />
+                    <Icon name="video" size="6xl" className="text-[var(--viewport-ink)]" />
                   ) : currentItem?.content?.type === 'image' ? (
-                    <Icon name="image" size="6xl" className="text-white" />
+                    <Icon name="image" size="6xl" className="text-[var(--viewport-ink)]" />
                   ) : (
-                    <Icon name="document" size="6xl" className="text-white" />
+                    <Icon name="document" size="6xl" className="text-[var(--viewport-ink)]" />
                   )}
                 </div>
                 <p className="text-base font-medium">
                   {currentItem?.content?.title || `Item ${currentIndex + 1}`}
                 </p>
-                <p className="text-xs text-[#8A8278] mt-1 capitalize">
+                <p className="text-xs text-[var(--viewport-ink-muted)] mt-1 capitalize">
                   {currentItem?.content?.type || 'content'}
                 </p>
               </div>
@@ -124,9 +124,9 @@ export default function PlaylistPreviewPanel({ items }: PlaylistPreviewPanelProp
           </div>
 
           {/* Current Item Progress */}
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-[#1B3D47]">
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-[var(--viewport-border)]">
             <div
-              className="h-full bg-[#00E5A0] transition-all duration-1000 ease-linear"
+              className="h-full bg-[var(--viewport-ink)] transition-all duration-1000 ease-linear"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
@@ -154,7 +154,7 @@ export default function PlaylistPreviewPanel({ items }: PlaylistPreviewPanelProp
             </div>
             <div className="h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
               <div
-                className="h-full bg-[#00E5A0] transition-all duration-300"
+                className="h-full bg-[var(--primary)] transition-all duration-300"
                 style={{ width: `${totalProgressPercent}%` }}
               />
             </div>
@@ -173,13 +173,13 @@ export default function PlaylistPreviewPanel({ items }: PlaylistPreviewPanelProp
 
             <button
               onClick={togglePlayPause}
-              className="p-3 bg-[#00E5A0] hover:bg-[#00CC8E] text-[#061A21] rounded-lg transition"
+              className="p-3 bg-[var(--primary)] hover:bg-[var(--primary-light)] text-[var(--lw-on-forest)] rounded-lg transition"
               title={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
-                <Icon name="clock" size="md" className="text-[#061A21]" />
+                <Icon name="clock" size="md" className="text-[var(--lw-on-forest)]" />
               ) : (
-                <Icon name="power" size="md" className="text-[#061A21]" />
+                <Icon name="power" size="md" className="text-[var(--lw-on-forest)]" />
               )}
             </button>
 

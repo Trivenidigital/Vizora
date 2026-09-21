@@ -65,7 +65,7 @@ export default function DeviceGroupSelector({
             type="checkbox"
             checked={selectedGroupIds.includes(group.id)}
             onChange={() => handleToggleGroup(group.id)}
-            className="rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]"
+            className="rounded border-[var(--border)] text-[var(--primary-ink)] focus:ring-[var(--primary-ink)]"
           />
           <div className="flex-1">
             <div className="text-sm font-medium text-[var(--foreground)]">{group.name}</div>
@@ -102,31 +102,31 @@ export default function DeviceGroupSelector({
           {!isCreating ? (
             <button
               onClick={() => setIsCreating(true)}
-              className="w-full px-3 py-2 text-sm border border-dashed border-[#00E5A0]/30 rounded-lg text-[#00E5A0] hover:bg-[#00E5A0]/5 transition"
+              className="w-full px-3 py-2 text-sm border border-dashed border-brand/30 rounded-lg text-[var(--primary-ink)] hover:bg-brand/5 transition"
             >
               + Create New Group
             </button>
           ) : (
-            <div className="border border-[#00E5A0]/30 rounded-lg p-3 space-y-2">
+            <div className="border border-brand/30 rounded-lg p-3 space-y-2">
               <input
                 type="text"
                 value={newGroupName}
                 onChange={e => setNewGroupName(e.target.value)}
                 placeholder="Group name (e.g., Store 1, NYC Region)"
-                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0]"
+                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[var(--primary-ink)]"
               />
               <textarea
                 value={newGroupDesc}
                 onChange={e => setNewGroupDesc(e.target.value)}
                 placeholder="Description (optional)"
                 rows={2}
-                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0]"
+                className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[var(--primary-ink)]"
               />
               <div className="flex gap-2">
                 <button
                   onClick={handleCreateGroup}
                   disabled={!newGroupName.trim()}
-                  className="flex-1 px-3 py-2 text-sm bg-[#00E5A0] text-[#061A21] rounded hover:bg-[#00CC8E] disabled:opacity-50 transition"
+                  className="flex-1 px-3 py-2 text-sm bg-[var(--primary)] text-[var(--lw-on-forest)] rounded hover:bg-[var(--primary-light)] disabled:opacity-50 transition"
                 >
                   Create
                 </button>

@@ -209,7 +209,7 @@ export default function ContentLifecyclePanel({
               min={nowLocal}
               disabled={busy}
               onChange={(e) => setExpiresAt(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent disabled:opacity-50"
+              className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent disabled:opacity-50"
             />
           </div>
           <div>
@@ -224,7 +224,7 @@ export default function ContentLifecyclePanel({
               value={replacementId}
               disabled={busy}
               onChange={(e) => setReplacementId(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent disabled:opacity-50"
+              className="w-full px-3 py-2 text-sm border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent disabled:opacity-50"
             >
               <option value="">Remove from playlists on expiry</option>
               {candidates.map((c) => (
@@ -241,7 +241,7 @@ export default function ContentLifecyclePanel({
             type="button"
             onClick={handleSetExpiration}
             disabled={busy || !expiresAt}
-            className="bg-[#00E5A0] text-[#061A21] hover:bg-[#00CC8E] transition rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+            className="bg-[var(--primary)] text-[var(--lw-on-forest)] hover:bg-[var(--primary-light)] transition rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-50 flex items-center gap-2"
           >
             {savingExpiration && <LoadingSpinner size="sm" />}
             Schedule expiration
@@ -282,7 +282,7 @@ export default function ContentLifecyclePanel({
               checked={keepBackup}
               disabled={busy}
               onChange={(e) => setKeepBackup(e.target.checked)}
-              className="h-4 w-4 rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]"
+              className="h-4 w-4 rounded border-[var(--border)] text-[var(--primary-ink)] focus:ring-[var(--primary-ink)]"
             />
             Keep previous version (saved to version history)
           </label>
@@ -290,7 +290,7 @@ export default function ContentLifecyclePanel({
             type="button"
             onClick={handleReplaceFile}
             disabled={busy || !replaceFile}
-            className="bg-[#00E5A0] text-[#061A21] hover:bg-[#00CC8E] transition rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+            className="bg-[var(--primary)] text-[var(--lw-on-forest)] hover:bg-[var(--primary-light)] transition rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-50 flex items-center gap-2"
           >
             {replacing && <LoadingSpinner size="sm" />}
             Replace file
@@ -319,7 +319,7 @@ export default function ContentLifecyclePanel({
             <LoadingSpinner size="sm" />
           </div>
         ) : versionsError ? (
-          <div className="text-xs text-red-500 dark:text-red-400">
+          <div className="text-xs text-[var(--error-ink)]">
             {versionsError}{' '}
             <button
               type="button"

@@ -100,6 +100,46 @@
      */
     --primary-ink: var(--brand-ink-light, #1f4230);
 
+    /*
+     * VIEWPORT — deliberately dark, on a light product.
+     *
+     * These are not leftover Electric Horizon substrate and must not be
+     * "fixed" to ivory by a later pass. They paint the surfaces that FRAME
+     * CUSTOMER MEDIA: the letterbox around a playlist preview, and the player
+     * chrome attached to it. A light surround tints how a customer judges
+     * their own artwork, which is why video players and image lightboxes are
+     * dark everywhere — going light here would be a functional regression
+     * dressed as consistency. The rule is recorded in
+     * `tasks/redesign-colour-map.json` notes.darkPanelDecision.
+     *
+     * They exist as TOKENS rather than as the hex literals they replace so
+     * that the darkness reads as a recorded decision. Previously the same
+     * values were scattered EH colours (#061A21, #081E28, #1B3D47, #122D35,
+     * #8A8278), indistinguishable from debt.
+     *
+     * Warm, not teal: the old values were Electric Horizon's blue-blacks, which
+     * now clash with everything around them. These sit in the Little Worlds ink
+     * family — `--viewport-surface` IS `--lw-ink`.
+     *
+     * Computed on their own grounds:
+     *   ink #f2efe4 on bg #15170f = 15.71:1, on surface #23261f = 13.33:1
+     *   ink-muted #a9ab9e on bg = 7.75:1, on surface = 6.58:1
+     * `--viewport-border` is 1.73:1 on the letterbox and that is correct — it
+     * is a progress TRACK and a hairline, not a control boundary; the filled
+     * portion is `--viewport-ink` at 15.71:1, which is what has to be legible.
+     *
+     * The accent is ivory rather than a brand colour on purpose. Forest is a
+     * light-substrate ink — #1f4230 on #15170f is under 2:1 — so the brand
+     * simply does not work inside a letterbox, and inventing a second brand
+     * green for dark surfaces is how a palette grows a shadow copy of itself.
+     */
+    --viewport-bg: #15170f;
+    --viewport-surface: #23261f;
+    --viewport-hover: #333729;
+    --viewport-border: #3d4134;
+    --viewport-ink: #f2efe4;
+    --viewport-ink-muted: #a9ab9e;
+
     --success: #16a34a;
     --success-light: #22c55e;
     --success-lighter: #bbf7d0;

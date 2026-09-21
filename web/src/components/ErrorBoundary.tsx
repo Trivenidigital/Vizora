@@ -56,7 +56,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 </p>
                 {process.env.NODE_ENV === 'development' && (
                   <details className="mt-4 text-left">
-                    <summary className="text-sm font-mono text-red-600 cursor-pointer">
+                    <summary className="text-sm font-mono text-[var(--error-ink)] cursor-pointer">
                       Error details (dev only)
                     </summary>
                     <pre className="mt-2 text-xs bg-[var(--background-secondary)] p-2 rounded overflow-auto">
@@ -68,7 +68,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 )}
                 <button
                   onClick={this.handleReset}
-                  className="mt-6 w-full bg-[#00E5A0] hover:bg-[#00CC8E] text-[#061A21] font-semibold py-2 px-4 rounded transition"
+                  className="mt-6 w-full bg-[var(--primary)] hover:bg-[var(--primary-light)] text-[var(--lw-on-forest)] font-semibold py-2 px-4 rounded transition"
                 >
                   Try Again
                 </button>
