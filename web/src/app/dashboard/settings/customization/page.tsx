@@ -107,8 +107,8 @@ export default function CustomizationPage() {
  )}
 
  {saveError && (
- <div className="bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700 rounded-lg p-4">
- <p className="text-red-800 dark:text-red-100 font-medium">
+ <div className="bg-red-100 dark:bg-red-900 border border-error-ink/30 rounded-lg p-4">
+ <p className="text-red-800 font-medium">
  {saveError}
  </p>
  </div>

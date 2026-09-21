@@ -30,7 +30,7 @@ export default function ContainerProperties({
   const bgColorHex = rgbToHex(styles.backgroundColor || '#000000');
   const borderRadius = parseInt(styles.borderRadius || '0', 10);
 
-  const labelClass = 'block text-xs font-medium text-gray-400 mb-1';
+  const labelClass = 'block text-xs font-medium text-[var(--foreground-tertiary)] mb-1';
   const inputClass =
     'w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500';
 
@@ -53,7 +53,7 @@ export default function ContainerProperties({
               )
             }
           />
-          <span className="text-sm text-gray-300">{bgColorHex}</span>
+          <span className="text-sm text-[var(--foreground-tertiary)]">{bgColorHex}</span>
         </div>
       </div>
 

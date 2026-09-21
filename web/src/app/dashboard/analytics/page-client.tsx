@@ -279,7 +279,7 @@ export default function AnalyticsClient() {
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Current device status and proof-of-play reporting
  {realtimeStatus === 'connected' && (
- <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+ <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-600">
  <span className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full animate-pulse"></span>
  Realtime connection active
  </span>
@@ -374,7 +374,7 @@ export default function AnalyticsClient() {
  {/* Empty data notice */}
  {allMockData && (
    <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg px-4 py-3 flex items-center gap-3">
-     <span className="text-blue-400 text-sm font-medium">No Data Yet</span>
+     <span className="text-[var(--info-ink)] text-sm font-medium">No Data Yet</span>
      <span className="text-sm text-[var(--foreground-secondary)]">
        Analytics will appear as devices report content playback. Connect devices and upload content to get started.
      </span>

@@ -532,7 +532,7 @@ export default function TemplateLibraryPage() {
               <TemplateGridSkeleton count={8} />
             ) : error ? (
               <div className="eh-dash-card p-12 text-center">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-3 text-red-400">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="mx-auto mb-3 text-[var(--error-ink)]">
                   <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
                 </svg>
                 <p className="text-sm text-[var(--foreground-secondary)] mb-4">{error}</p>

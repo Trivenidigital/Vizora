@@ -131,7 +131,7 @@ const getHealthSummary = (health: DashboardSystemHealth | null) => {
  dotClassName: 'bg-slate-300',
  cardClassName: 'bg-gradient-to-br from-slate-600 to-slate-500',
  textClassName: 'text-slate-100',
- iconClassName: 'text-slate-200',
+ iconClassName: 'text-[var(--foreground-tertiary)]',
  };
  }
 };
@@ -467,16 +467,16 @@ export default function DashboardClient({
 
  {/* Error Banner */}
  {error && (
- <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
- <Icon name="error" size="lg" className="text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+ <div className="bg-red-50 dark:bg-red-900/20 border border-error-ink/30 rounded-lg p-4 flex items-start gap-3">
+ <Icon name="error" size="lg" className="text-red-600 flex-shrink-0 mt-0.5" />
  <div className="flex-1">
- <h3 className="text-sm font-semibold text-red-900 dark:text-red-100">
+ <h3 className="text-sm font-semibold text-red-900">
  Error loading dashboard data
  </h3>
- <p className="text-sm text-red-700 dark:text-red-300 mt-1">{error}</p>
+ <p className="text-sm text-red-700 mt-1">{error}</p>
  <button
  onClick={() => loadStats()}
- className="mt-3 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 underline"
+ className="mt-3 text-sm font-medium text-red-600 hover:text-red-700 dark:hover:text-[var(--error-ink)] underline"
  >
  Try again
  </button>

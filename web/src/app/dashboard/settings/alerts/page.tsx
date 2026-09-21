@@ -389,8 +389,8 @@ export default function AlertsPage() {
       </div>
 
       {!isAdmin && (
-        <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-          <p className="text-sm text-yellow-700 dark:text-yellow-300">
+        <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-warning-ink/30 rounded-lg">
+          <p className="text-sm text-yellow-700">
             Only administrators can create or modify alert rules. Contact your admin to change these settings.
           </p>
         </div>
@@ -478,7 +478,7 @@ export default function AlertsPage() {
                       </button>
                       <button
                         onClick={() => setRuleToDelete(rule)}
-                        className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-500/10 px-3 py-1 rounded transition"
+                        className="text-red-600 hover:text-red-800 dark:hover:text-[var(--error-ink)] hover:bg-red-500/10 px-3 py-1 rounded transition"
                       >
                         Delete
                       </button>

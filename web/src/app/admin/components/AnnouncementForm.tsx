@@ -46,9 +46,9 @@ export function AnnouncementForm({ announcement, onSubmit, onCancel, isLoading =
 
   const typeColors = {
     info: 'bg-[#00E5A0]/10 text-[#00E5A0]',
-    warning: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-    critical: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-    maintenance: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+    warning: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30',
+    critical: 'bg-red-100 text-red-700 dark:bg-red-900/30',
+    maintenance: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30',
   };
 
   return (

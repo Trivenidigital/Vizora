@@ -90,8 +90,8 @@ export default function FeatureFlagsPage() {
       </div>
 
       {!isAdmin && (
-        <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-          <p className="text-sm text-yellow-700 dark:text-yellow-300">
+        <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-warning-ink/30 rounded-lg">
+          <p className="text-sm text-yellow-700">
             Only administrators can modify feature flags. Contact your admin to change these settings.
           </p>
         </div>

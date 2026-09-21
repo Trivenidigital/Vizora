@@ -730,13 +730,13 @@ export default function SchedulesClient() {
  </div>
 
  {loadError && (
- <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
- <Icon name="error" size="lg" className="text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+ <div className="bg-red-50 dark:bg-red-900/20 border border-error-ink/30 rounded-lg p-4 flex items-start gap-3">
+ <Icon name="error" size="lg" className="text-red-600 flex-shrink-0 mt-0.5" />
  <div>
- <h3 className="text-sm font-semibold text-red-900 dark:text-red-100">
+ <h3 className="text-sm font-semibold text-red-900">
  Some schedule data could not load
  </h3>
- <p className="text-sm text-red-700 dark:text-red-300 mt-1">{loadError}</p>
+ <p className="text-sm text-red-700 mt-1">{loadError}</p>
  </div>
  </div>
  )}
@@ -797,7 +797,7 @@ export default function SchedulesClient() {
  </h3>
  <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
  scheduleActive
- ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
+ ? 'bg-green-100 dark:bg-green-900 text-green-800'
  : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)]'
  }`}>
  {scheduleActive ? 'Active' : 'Inactive'}
@@ -844,7 +844,7 @@ export default function SchedulesClient() {
  {permissions.canDeleteSchedules && (
  <button
  onClick={() => openDeleteModal(schedule)}
- className="px-4 py-2 text-sm bg-red-50 dark:bg-red-900 text-red-600 dark:text-red-200 rounded-lg hover:bg-red-100 dark:hover:bg-red-800 transition font-medium active:scale-95"
+ className="px-4 py-2 text-sm bg-red-50 dark:bg-red-900 text-red-600 rounded-lg hover:bg-red-100 dark:hover:bg-red-800 transition font-medium active:scale-95"
  >
  Delete
  </button>
@@ -903,7 +903,7 @@ export default function SchedulesClient() {
  formErrors.name ? 'border-red-500' : 'border-[var(--border)]'
  }`}
  />
- {formErrors.name && <p className="text-red-600 dark:text-red-400 text-sm mt-1">{formErrors.name}</p>}
+ {formErrors.name && <p className="text-red-600 text-sm mt-1">{formErrors.name}</p>}
  </div>
 
  {/* Time & Duration */}
@@ -937,7 +937,7 @@ export default function SchedulesClient() {
  formErrors.duration ? 'border-red-500' : 'border-[var(--border)]'
  }`}
  />
- {formErrors.duration && <p className="text-red-600 dark:text-red-400 text-sm mt-1">{formErrors.duration}</p>}
+ {formErrors.duration && <p className="text-red-600 text-sm mt-1">{formErrors.duration}</p>}
  </div>
  </div>
 
@@ -966,14 +966,14 @@ export default function SchedulesClient() {
  if (formErrors.days) setFormErrors({ ...formErrors, days: '' });
  }}
  />
- {formErrors.days && <p className="text-red-600 dark:text-red-400 text-sm mt-2">{formErrors.days}</p>}
+ {formErrors.days && <p className="text-red-600 text-sm mt-2">{formErrors.days}</p>}
  </div>
 
  {/* Next Occurrences Preview */}
  {formData.days.length > 0 && (
- <div className="bg-purple-50 dark:bg-purple-900 border border-purple-200 dark:border-purple-800 rounded-lg p-3">
- <p className="text-sm font-medium text-purple-900 dark:text-purple-200 mb-2">Next 10 Occurrences:</p>
- <div className="text-xs text-purple-800 dark:text-purple-300">
+ <div className="bg-purple-50 dark:bg-purple-900 border border-purple-200 rounded-lg p-3">
+ <p className="text-sm font-medium text-purple-900 mb-2">Next 10 Occurrences:</p>
+ <div className="text-xs text-purple-800">
  {getNextOccurrences().join(' • ')}
  </div>
  </div>
@@ -1001,7 +1001,7 @@ export default function SchedulesClient() {
  </option>
  ))}
  </select>
- {formErrors.playlistId && <p className="text-red-600 dark:text-red-400 text-sm mt-1">{formErrors.playlistId}</p>}
+ {formErrors.playlistId && <p className="text-red-600 text-sm mt-1">{formErrors.playlistId}</p>}
  </div>
 
  {/* Target Type Toggle */}
@@ -1056,7 +1056,7 @@ export default function SchedulesClient() {
  </option>
  ))}
  </select>
- {formErrors.deviceIds && <p className="text-red-600 dark:text-red-400 text-sm mt-1">{formErrors.deviceIds}</p>}
+ {formErrors.deviceIds && <p className="text-red-600 text-sm mt-1">{formErrors.deviceIds}</p>}
  </div>
  ) : (
  <div>
@@ -1088,7 +1088,7 @@ export default function SchedulesClient() {
  ))
  )}
  </div>
- {formErrors.deviceIds && <p className="text-red-600 dark:text-red-400 text-sm mt-1">{formErrors.deviceIds}</p>}
+ {formErrors.deviceIds && <p className="text-red-600 text-sm mt-1">{formErrors.deviceIds}</p>}
  {formData.deviceIds.length > 0 && (
  <p className="text-sm text-[var(--foreground-secondary)] mt-2">
  {formData.deviceIds.length} device{formData.deviceIds.length !== 1 ? 's' : ''} selected
@@ -1099,23 +1099,23 @@ export default function SchedulesClient() {
 
  {/* Conflict Warnings */}
  {conflictCheckFailed && (
- <div role="alert" className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
- <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-1 flex items-center gap-2">
- <Icon name="error" size="sm" className="text-red-600 dark:text-red-400" />
+ <div role="alert" className="bg-red-50 dark:bg-red-900/20 border border-error-ink/30 rounded-lg p-3">
+ <p className="text-sm font-semibold text-red-800 mb-1 flex items-center gap-2">
+ <Icon name="error" size="sm" className="text-red-600" />
  Unable to verify schedule conflicts
  </p>
- <p className="text-xs text-red-700 dark:text-red-300">
+ <p className="text-xs text-red-700">
  Check the schedule after saving or retry when the network is available.
  </p>
  </div>
  )}
  {conflictWarnings.length > 0 && (
- <div role="status" aria-live="polite" className="bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-lg p-3">
- <p className="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-1 flex items-center gap-2">
+ <div role="status" aria-live="polite" className="bg-amber-50 dark:bg-amber-900/30 border border-warning-ink/30 rounded-lg p-3">
+ <p className="text-sm font-semibold text-amber-800 mb-1 flex items-center gap-2">
  <span className="text-amber-500">&#9888;</span> Schedule Conflicts Detected
  </p>
  {conflictWarnings.map((c: any, i: number) => (
- <p key={i} className="text-xs text-amber-700 dark:text-amber-300">
+ <p key={i} className="text-xs text-amber-700">
  Overlaps with &quot;{c.name}&quot; ({formatConflictTimeRange(c)})
  </p>
  ))}

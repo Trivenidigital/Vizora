@@ -113,11 +113,11 @@ export default function AdminAnnouncementsClient({ initialAnnouncements }: Admin
       case 'info':
         return 'bg-[#00E5A0]/10 text-[#00E5A0] border-[#00E5A0]/20';
       case 'warning':
-        return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800';
+        return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 border-warning-ink/30';
       case 'critical':
-        return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800';
+        return 'bg-red-100 text-red-700 dark:bg-red-900/30 border-error-ink/30';
       case 'maintenance':
-        return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800';
+        return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 border-purple-200';
       default:
         return 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] border-[var(--border)]';
     }
@@ -246,7 +246,7 @@ export default function AdminAnnouncementsClient({ initialAnnouncements }: Admin
                   </button>
                   <button
                     onClick={() => setDeletingAnnouncement(announcement)}
-                    className="p-2 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-[var(--surface-hover)] rounded-lg transition"
+                    className="p-2 text-red-500 hover:text-red-700 dark:hover:text-[var(--error-ink)] hover:bg-[var(--surface-hover)] rounded-lg transition"
                     title="Delete"
                   >
                     <Trash2 className="w-5 h-5" />

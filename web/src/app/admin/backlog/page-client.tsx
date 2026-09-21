@@ -208,33 +208,33 @@ const metrics: Array<{ label: string; start: string; current: string; target: st
 const colorMap: Record<string, { bg: string; border: string; text: string; badge: string }> = {
   red: {
     bg: 'bg-red-50 dark:bg-red-900/10',
-    border: 'border-red-200 dark:border-red-800/40',
-    text: 'text-red-700 dark:text-red-400',
-    badge: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
+    border: 'border-error-ink/40',
+    text: 'text-red-700',
+    badge: 'bg-red-100 dark:bg-red-900/30 text-red-700',
   },
   orange: {
     bg: 'bg-orange-50 dark:bg-orange-900/10',
-    border: 'border-orange-200 dark:border-orange-800/40',
-    text: 'text-orange-700 dark:text-orange-400',
-    badge: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400',
+    border: 'border-warning-ink/40',
+    text: 'text-orange-700',
+    badge: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700',
   },
   yellow: {
     bg: 'bg-yellow-50 dark:bg-yellow-900/10',
-    border: 'border-yellow-200 dark:border-yellow-800/40',
-    text: 'text-yellow-700 dark:text-yellow-400',
-    badge: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400',
+    border: 'border-warning-ink/40',
+    text: 'text-yellow-700',
+    badge: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700',
   },
   blue: {
     bg: 'bg-blue-50 dark:bg-blue-900/10',
-    border: 'border-blue-200 dark:border-blue-800/40',
-    text: 'text-blue-700 dark:text-blue-400',
-    badge: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
+    border: 'border-info-ink/40',
+    text: 'text-blue-700',
+    badge: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700',
   },
   gray: {
     bg: 'bg-gray-50 dark:bg-gray-900/10',
-    border: 'border-gray-200 dark:border-gray-800/40',
-    text: 'text-gray-600 dark:text-gray-400',
-    badge: 'bg-gray-100 dark:bg-gray-900/30 text-gray-600 dark:text-gray-400',
+    border: 'border-border/40',
+    text: 'text-gray-600',
+    badge: 'bg-gray-100 dark:bg-gray-900/30 text-gray-600',
   },
 };
 
@@ -277,7 +277,7 @@ function CollapsibleSection({ section }: { section: Section }) {
             {todoCount} open
           </span>
           {doneCount > 0 && (
-            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700">
               {doneCount} done
             </span>
           )}
@@ -306,7 +306,7 @@ function CollapsibleSection({ section }: { section: Section }) {
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 {item.owner && (
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${item.owner === 'YOU' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' : 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400'}`}>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${item.owner === 'YOU' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700' : 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700'}`}>
                     {item.owner}
                   </span>
                 )}
@@ -368,7 +368,7 @@ export default function BacklogClient() {
       <div className="flex items-center gap-4 text-sm">
         <span className="text-[var(--foreground-secondary)]">{totalTodo} items remaining</span>
         <span className="text-[var(--foreground-tertiary)]">&middot;</span>
-        <span className="text-green-600 dark:text-green-400">{completed.length} historical completed items</span>
+        <span className="text-green-600">{completed.length} historical completed items</span>
       </div>
 
       {/* Priority sections */}
@@ -398,7 +398,7 @@ export default function BacklogClient() {
       </div>
 
       {/* Completed (collapsible) */}
-      <div className="rounded-xl border border-green-200 dark:border-green-800/40 overflow-hidden">
+      <div className="rounded-xl border border-success-ink/40 overflow-hidden">
         <button
           onClick={() => setShowCompleted(!showCompleted)}
           className="w-full flex items-center justify-between p-4 bg-green-50 dark:bg-green-900/10 hover:opacity-90 transition"
@@ -408,7 +408,7 @@ export default function BacklogClient() {
             <CheckCircle className="w-5 h-5 text-green-500" />
             <h3 className="text-base font-semibold text-[var(--foreground)]">Completed Historical Items</h3>
           </div>
-          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700">
             {completed.length} items
           </span>
         </button>

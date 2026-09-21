@@ -78,10 +78,10 @@ export default function TemplateDetailModal({
   };
 
   const getDifficultyConfig = (d: string) => {
-    if (d === 'beginner') return { label: 'Beginner', dot: 'bg-green-400', bg: 'bg-green-400/10 text-green-400' };
-    if (d === 'intermediate') return { label: 'Intermediate', dot: 'bg-yellow-400', bg: 'bg-yellow-400/10 text-yellow-400' };
-    if (d === 'advanced') return { label: 'Advanced', dot: 'bg-red-400', bg: 'bg-red-400/10 text-red-400' };
-    return { label: d, dot: 'bg-gray-400', bg: 'bg-gray-400/10 text-gray-400' };
+    if (d === 'beginner') return { label: 'Beginner', dot: 'bg-green-400', bg: 'bg-green-400/10 text-[var(--success-ink)]' };
+    if (d === 'intermediate') return { label: 'Intermediate', dot: 'bg-yellow-400', bg: 'bg-yellow-400/10 text-[var(--warning-ink)]' };
+    if (d === 'advanced') return { label: 'Advanced', dot: 'bg-red-400', bg: 'bg-red-400/10 text-[var(--error-ink)]' };
+    return { label: d, dot: 'bg-gray-400', bg: 'bg-gray-400/10 text-[var(--foreground-tertiary)]' };
   };
 
   return (

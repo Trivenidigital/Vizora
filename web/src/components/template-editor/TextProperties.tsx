@@ -86,7 +86,7 @@ export default function TextProperties({
   const colorHex = rgbToHex(styles.color || '#ffffff');
   const currentAlign = styles.textAlign || 'left';
 
-  const labelClass = 'block text-xs font-medium text-gray-400 mb-1';
+  const labelClass = 'block text-xs font-medium text-[var(--foreground-tertiary)] mb-1';
   const inputClass =
     'w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500';
 
@@ -184,7 +184,7 @@ export default function TextProperties({
               onPropertyChange(elementId, 'color', styles.color || '', e.target.value)
             }
           />
-          <span className="text-sm text-gray-300">{colorHex}</span>
+          <span className="text-sm text-[var(--foreground-tertiary)]">{colorHex}</span>
         </div>
       </div>
 
@@ -198,7 +198,7 @@ export default function TextProperties({
               className={`flex-1 rounded px-2 py-1.5 text-sm font-medium transition-colors ${
                 currentAlign === a.value
                   ? 'bg-emerald-600 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  : 'bg-gray-700 text-[var(--foreground-tertiary)] hover:bg-gray-600'
               }`}
               onClick={() =>
                 onPropertyChange(elementId, 'textAlign', styles.textAlign || 'left', a.value)

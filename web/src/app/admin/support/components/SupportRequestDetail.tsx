@@ -29,18 +29,18 @@ function timeAgo(dateStr: string): string {
 }
 
 const priorityColors: Record<SupportPriority, string> = {
-  critical: 'bg-red-500/20 text-red-400',
-  high: 'bg-orange-500/20 text-orange-400',
-  medium: 'bg-yellow-500/20 text-yellow-400',
-  low: 'bg-green-500/20 text-green-400',
+  critical: 'bg-red-500/20 text-[var(--error-ink)]',
+  high: 'bg-orange-500/20 text-[var(--warning-ink)]',
+  medium: 'bg-yellow-500/20 text-[var(--warning-ink)]',
+  low: 'bg-green-500/20 text-[var(--success-ink)]',
 };
 
 const statusColors: Record<SupportStatus, string> = {
-  open: 'bg-blue-500/20 text-blue-400',
-  in_progress: 'bg-yellow-500/20 text-yellow-400',
-  resolved: 'bg-green-500/20 text-green-400',
-  closed: 'bg-gray-500/20 text-gray-400',
-  wont_fix: 'bg-red-500/20 text-red-400',
+  open: 'bg-blue-500/20 text-[var(--info-ink)]',
+  in_progress: 'bg-yellow-500/20 text-[var(--warning-ink)]',
+  resolved: 'bg-green-500/20 text-[var(--success-ink)]',
+  closed: 'bg-gray-500/20 text-[var(--foreground-tertiary)]',
+  wont_fix: 'bg-red-500/20 text-[var(--error-ink)]',
 };
 
 const statusLabels: Record<SupportStatus, string> = {
@@ -187,7 +187,7 @@ export function SupportRequestDetail({
                 )}
                 {request.consoleErrors && (
                   <div className="flex items-start gap-2">
-                    <AlertTriangle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                    <AlertTriangle className="w-4 h-4 text-[var(--error-ink)] mt-0.5 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                       <span className="text-[var(--foreground-tertiary)] text-xs">Console Errors</span>
                       <pre className="mt-1 p-2 bg-[var(--surface-secondary)] rounded text-xs text-[var(--error-ink)] overflow-x-auto whitespace-pre-wrap">

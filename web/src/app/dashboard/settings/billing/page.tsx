@@ -170,7 +170,7 @@ export default function BillingPage() {
      read. A missing subscription used to render as "Free" plus a live
      "Cancel Subscription" button, which really cancels on the provider. */}
  {loadError ? (
- <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
+ <div className="rounded-lg border border-error-ink/30 bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/20">
  <p>Unable to load your billing information. Your plan is unchanged — please try again.</p>
  <p className="mt-1 text-xs opacity-80">{loadError}</p>
  <button
@@ -208,7 +208,7 @@ export default function BillingPage() {
  </p>
  )}
  {isCanceled && subscription?.currentPeriodEnd && (
- <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-1">
+ <p className="text-sm text-yellow-600 mt-1">
  Access until {formatDate(subscription.currentPeriodEnd)}
  </p>
  )}
@@ -257,7 +257,7 @@ export default function BillingPage() {
  <button
  onClick={handleReactivateSubscription}
  disabled={actionLoading}
- className="px-4 py-2 text-sm font-medium text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/50 border border-green-300 dark:border-green-700 rounded-lg hover:bg-green-100 dark:hover:bg-green-900 transition flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium text-green-700 bg-green-50 dark:bg-green-900/50 border border-success-ink/30 rounded-lg hover:bg-green-100 dark:hover:bg-green-900 transition flex items-center gap-2"
  >
  {actionLoading ? <LoadingSpinner size="sm" /> : <Icon name="refresh" size="sm" />}
  Reactivate Subscription
@@ -266,7 +266,7 @@ export default function BillingPage() {
  <button
  onClick={() => setIsCancelDialogOpen(true)}
  disabled={actionLoading}
- className="px-4 py-2 text-sm font-medium text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/50 border border-red-300 dark:border-red-700 rounded-lg hover:bg-red-100 dark:hover:bg-red-900 transition"
+ className="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 dark:bg-red-900/50 border border-error-ink/30 rounded-lg hover:bg-red-100 dark:hover:bg-red-900 transition"
  >
  Cancel Subscription
  </button>

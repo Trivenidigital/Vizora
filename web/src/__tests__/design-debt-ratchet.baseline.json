@@ -5,8 +5,8 @@
   "counts": {
     "hexLiterals": 864,
     "tailwindArbitraryColors": 660,
-    "rawPaletteClasses": 1131,
-    "darkVariants": 425,
-    "darkThemeForegroundShades": 151
+    "rawPaletteClasses": 807,
+    "darkVariants": 224,
+    "darkThemeForegroundShades": 26
   }
 }

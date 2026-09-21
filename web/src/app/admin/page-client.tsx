@@ -144,7 +144,7 @@ export default function AdminDashboardClient({ initialStats }: AdminDashboardCli
             <div className="pt-3 border-t border-[var(--border)]">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-[var(--foreground-tertiary)]">Uptime Rate</span>
-                <span className="font-medium text-green-600 dark:text-green-400">
+                <span className="font-medium text-green-600">
                   {stats?.totalScreens
                     ? Math.round(((stats.onlineScreens ?? 0) / stats.totalScreens) * 100)
                     : 0}

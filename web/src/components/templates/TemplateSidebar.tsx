@@ -48,9 +48,9 @@ const ORIENTATIONS: { value: Orientation; label: string; icon: ReactNode }[] = [
 
 const DIFFICULTIES: { value: Difficulty; label: string; color: string }[] = [
   { value: '', label: 'All', color: '' },
-  { value: 'beginner', label: 'Beginner', color: 'text-green-400' },
-  { value: 'intermediate', label: 'Intermediate', color: 'text-yellow-400' },
-  { value: 'advanced', label: 'Advanced', color: 'text-red-400' },
+  { value: 'beginner', label: 'Beginner', color: 'text-[var(--success-ink)]' },
+  { value: 'intermediate', label: 'Intermediate', color: 'text-[var(--warning-ink)]' },
+  { value: 'advanced', label: 'Advanced', color: 'text-[var(--error-ink)]' },
 ];
 
 export default function TemplateSidebar({

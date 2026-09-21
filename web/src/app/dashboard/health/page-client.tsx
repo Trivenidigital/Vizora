@@ -113,17 +113,17 @@ export default function HealthMonitoringClient() {
  };
 
  const getHealthStatusColor = (score: number) => {
- if (score >= 90) return 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-700';
+ if (score >= 90) return 'bg-green-50 dark:bg-green-900 border-success-ink/30';
  if (score >= 70) return 'bg-[#00E5A0]/5 dark:bg-[#00E5A0]/10 border-[#00E5A0]/30 dark:border-[#00E5A0]/30';
- if (score >= 50) return 'bg-yellow-50 dark:bg-yellow-900 border-yellow-200 dark:border-yellow-700';
- return 'bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-700';
+ if (score >= 50) return 'bg-yellow-50 dark:bg-yellow-900 border-warning-ink/30';
+ return 'bg-red-50 dark:bg-red-900 border-error-ink/30';
  };
 
  const getHealthStatusLabel = (score: number) => {
- if (score >= 90) return { label: 'Excellent', color: 'text-green-700 dark:text-green-300' };
+ if (score >= 90) return { label: 'Excellent', color: 'text-green-700' };
  if (score >= 70) return { label: 'Good', color: 'text-[#00E5A0] dark:text-[#00E5A0]' };
- if (score >= 50) return { label: 'Fair', color: 'text-yellow-700 dark:text-yellow-300' };
- return { label: 'Poor', color: 'text-red-700 dark:text-red-300' };
+ if (score >= 50) return { label: 'Fair', color: 'text-yellow-700' };
+ return { label: 'Poor', color: 'text-red-700' };
  };
 
  // Filter devices
@@ -177,13 +177,13 @@ export default function HealthMonitoringClient() {
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Monitor device performance and system health
  {realtimeStatus === 'connected' && (
- <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+ <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-600">
  <span className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full animate-pulse"></span>
  Real-time monitoring active
  </span>
  )}
  {realtimeStatus === 'offline' && (
- <span className="ml-2 inline-flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-400">
+ <span className="ml-2 inline-flex items-center gap-1 text-xs text-yellow-600">
  <span className="w-2 h-2 bg-yellow-600 dark:bg-yellow-400 rounded-full"></span>
  Polling mode
  </span>
@@ -217,7 +217,7 @@ export default function HealthMonitoringClient() {
  <div className="flex items-center justify-between">
  <div>
  <p className="text-sm font-medium text-[var(--foreground-secondary)]">Healthy</p>
- <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-2">
+ <p className="text-2xl font-bold text-green-600 mt-2">
  {stats.healthy}
  </p>
  </div>
@@ -229,7 +229,7 @@ export default function HealthMonitoringClient() {
  <div className="flex items-center justify-between">
  <div>
  <p className="text-sm font-medium text-[var(--foreground-secondary)]">Warnings</p>
- <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mt-2">
+ <p className="text-2xl font-bold text-yellow-600 mt-2">
  {stats.warning}
  </p>
  </div>
@@ -241,7 +241,7 @@ export default function HealthMonitoringClient() {
  <div className="flex items-center justify-between">
  <div>
  <p className="text-sm font-medium text-[var(--foreground-secondary)]">Critical</p>
- <p className="text-2xl font-bold text-red-600 dark:text-red-400 mt-2">
+ <p className="text-2xl font-bold text-red-600 mt-2">
  {stats.critical}
  </p>
  </div>
@@ -360,18 +360,18 @@ export default function HealthMonitoringClient() {
  <div
  className={`mt-4 border rounded p-3 animate-pulse ${
  activeAlerts[device.id].severity === 'critical'
- ? 'bg-red-100 dark:bg-red-900 border-red-300 dark:border-red-700'
+ ? 'bg-red-100 dark:bg-red-900 border-error-ink/30'
  : activeAlerts[device.id].severity === 'warning'
- ? 'bg-yellow-100 dark:bg-yellow-900 border-yellow-300 dark:border-yellow-700'
+ ? 'bg-yellow-100 dark:bg-yellow-900 border-warning-ink/30'
  : 'bg-[#00E5A0]/10 dark:bg-[#00E5A0]/10 border-[#00E5A0]/30'
  }`}
  >
  <p
  className={`text-sm font-semibold ${
  activeAlerts[device.id].severity === 'critical'
- ? 'text-red-800 dark:text-red-200'
+ ? 'text-red-800'
  : activeAlerts[device.id].severity === 'warning'
- ? 'text-yellow-800 dark:text-yellow-200'
+ ? 'text-yellow-800'
  : 'text-[#00E5A0] dark:text-[#00E5A0]'
  }`}
  >
@@ -382,15 +382,15 @@ export default function HealthMonitoringClient() {
 
  {/* Static Alert Banners */}
  {!activeAlerts[device.id] && health.score < 50 && (
- <div className="mt-4 bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700 rounded p-3">
- <p className="text-sm font-semibold text-red-800 dark:text-red-200">
+ <div className="mt-4 bg-red-100 dark:bg-red-900 border border-error-ink/30 rounded p-3">
+ <p className="text-sm font-semibold text-red-800">
  ⚠️ Critical: Device performance degraded. Consider maintenance.
  </p>
  </div>
  )}
  {!activeAlerts[device.id] && health.score < 70 && health.score >= 50 && (
- <div className="mt-4 bg-yellow-100 dark:bg-yellow-900 border border-yellow-300 dark:border-yellow-700 rounded p-3">
- <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-200">
+ <div className="mt-4 bg-yellow-100 dark:bg-yellow-900 border border-warning-ink/30 rounded p-3">
+ <p className="text-sm font-semibold text-yellow-800">
  ⚡ Warning: Some metrics need attention.
  </p>
  </div>

@@ -31,7 +31,7 @@ export default function ImageProperties({
 
   const borderRadius = parseInt(styles.borderRadius || '0', 10);
 
-  const labelClass = 'block text-xs font-medium text-gray-400 mb-1';
+  const labelClass = 'block text-xs font-medium text-[var(--foreground-tertiary)] mb-1';
   const inputClass =
     'w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500';
 
@@ -81,7 +81,7 @@ export default function ImageProperties({
           onChange={handleFileChange}
         />
         <button
-          className="w-full rounded bg-gray-700 px-3 py-2 text-sm text-gray-300 transition-colors hover:bg-gray-600 disabled:opacity-50"
+          className="w-full rounded bg-gray-700 px-3 py-2 text-sm text-[var(--foreground-tertiary)] transition-colors hover:bg-gray-600 disabled:opacity-50"
           disabled={uploading}
           onClick={() => fileInputRef.current?.click()}
         >

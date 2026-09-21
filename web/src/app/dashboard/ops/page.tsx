@@ -107,19 +107,19 @@ function StatusBadge({ status }: { status: SystemStatus }) {
   const config: Record<SystemStatus, { bg: string; text: string; ring: string; dot: string }> = {
     HEALTHY: {
       bg: 'bg-green-100 dark:bg-green-900/30',
-      text: 'text-green-800 dark:text-green-300',
+      text: 'text-green-800',
       ring: 'ring-green-500/30',
       dot: 'bg-green-500',
     },
     DEGRADED: {
       bg: 'bg-amber-100 dark:bg-amber-900/30',
-      text: 'text-amber-800 dark:text-amber-300',
+      text: 'text-amber-800',
       ring: 'ring-amber-500/30',
       dot: 'bg-amber-500',
     },
     CRITICAL: {
       bg: 'bg-red-100 dark:bg-red-900/30',
-      text: 'text-red-800 dark:text-red-300',
+      text: 'text-red-800',
       ring: 'ring-red-500/30',
       dot: 'bg-red-500 animate-pulse',
     },
@@ -141,9 +141,9 @@ function StatusBadge({ status }: { status: SystemStatus }) {
 
 function SeverityBadge({ severity }: { severity: Severity }) {
   const config: Record<Severity, { bg: string; text: string; icon: 'error' | 'warning' | 'info' }> = {
-    critical: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300', icon: 'error' },
-    warning: { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-300', icon: 'warning' },
-    info: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300', icon: 'info' },
+    critical: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700', icon: 'error' },
+    warning: { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700', icon: 'warning' },
+    info: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700', icon: 'info' },
   };
   const c = config[severity] ?? config.info;
 
@@ -159,9 +159,9 @@ function SeverityBadge({ severity }: { severity: Severity }) {
 
 function IncidentStatusBadge({ status }: { status: IncidentStatus }) {
   const styles: Record<IncidentStatus, string> = {
-    open: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
-    escalated: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300',
-    resolved: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
+    open: 'bg-red-100 dark:bg-red-900/30 text-red-700',
+    escalated: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700',
+    resolved: 'bg-green-100 dark:bg-green-900/30 text-green-700',
   };
 
   return (
@@ -253,9 +253,9 @@ export default function OpsStatusPage() {
           <h2 className="text-3xl font-bold text-[var(--foreground)]">Ops Status</h2>
           <p className="mt-2 text-[var(--foreground-secondary)]">Autonomous operations monitoring</p>
         </div>
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 text-center">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-error-ink/30 rounded-lg p-6 text-center">
           <Icon name="error" size="3xl" className="mx-auto text-red-500 mb-3" />
-          <p className="text-red-700 dark:text-red-300 font-medium">{error}</p>
+          <p className="text-red-700 font-medium">{error}</p>
           <button
             onClick={fetchOpsStatus}
             className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm font-medium"
@@ -364,11 +364,11 @@ export default function OpsStatusPage() {
                       <p className="text-xs text-[var(--foreground-tertiary)]">Found</p>
                     </div>
                     <div className="bg-[var(--surface-hover)] rounded-md p-2">
-                      <p className="text-lg font-bold text-green-600 dark:text-green-400">{result.issuesFixed}</p>
+                      <p className="text-lg font-bold text-green-600">{result.issuesFixed}</p>
                       <p className="text-xs text-[var(--foreground-tertiary)]">Fixed</p>
                     </div>
                     <div className="bg-[var(--surface-hover)] rounded-md p-2">
-                      <p className={`text-lg font-bold ${result.issuesEscalated > 0 ? 'text-red-600 dark:text-red-400' : 'text-[var(--foreground)]'}`}>
+                      <p className={`text-lg font-bold ${result.issuesEscalated > 0 ? 'text-red-600' : 'text-[var(--foreground)]'}`}>
                         {result.issuesEscalated}
                       </p>
                       <p className="text-xs text-[var(--foreground-tertiary)]">Escalated</p>
@@ -398,10 +398,10 @@ export default function OpsStatusPage() {
         </h3>
 
         {activeIncidents.length === 0 ? (
-          <div className="bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg p-6 text-center">
+          <div className="bg-green-50 dark:bg-green-900/10 border border-success-ink/30 rounded-lg p-6 text-center">
             <Icon name="success" size="3xl" className="mx-auto text-green-500 mb-2" />
-            <p className="text-green-700 dark:text-green-300 font-medium">No active incidents</p>
-            <p className="text-sm text-green-600 dark:text-green-400 mt-1">All systems operating normally</p>
+            <p className="text-green-700 font-medium">No active incidents</p>
+            <p className="text-sm text-green-600 mt-1">All systems operating normally</p>
           </div>
         ) : (
           <div className="bg-[var(--surface)] rounded-lg shadow border border-[var(--border)] overflow-hidden">
@@ -503,12 +503,12 @@ export default function OpsStatusPage() {
                     <tr key={`${rem.agent}-${rem.timestamp}-${idx}`} className="hover:bg-[var(--surface-hover)] transition">
                       <td className="px-4 py-3 whitespace-nowrap">
                         {rem.success ? (
-                          <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400 text-sm font-medium">
+                          <span className="inline-flex items-center gap-1 text-green-600 text-sm font-medium">
                             <Icon name="success" size="sm" />
                             Success
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-red-600 dark:text-red-400 text-sm font-medium">
+                          <span className="inline-flex items-center gap-1 text-red-600 text-sm font-medium">
                             <Icon name="error" size="sm" />
                             Failed
                           </span>

@@ -355,7 +355,7 @@ export default function SettingsPage() {
          <button
            onClick={handleRemoveAvatar}
            disabled={avatarUploading}
-           className="px-3 py-1.5 text-sm font-medium text-red-500 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition disabled:opacity-50"
+           className="px-3 py-1.5 text-sm font-medium text-red-500 border border-error-ink/30 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition disabled:opacity-50"
          >
            Remove
          </button>
@@ -613,7 +613,7 @@ export default function SettingsPage() {
            {brandingForm.logoPreview && (
              <button
                onClick={() => setBrandingForm({ ...brandingForm, logoPreview: null })}
-               className="px-3 py-1.5 text-sm font-medium text-red-500 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition"
+               className="px-3 py-1.5 text-sm font-medium text-red-500 border border-error-ink/30 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition"
              >
                Remove
              </button>
@@ -842,9 +842,9 @@ export default function SettingsPage() {
  </button>
  <button
    onClick={() => setShowDeleteAccountModal(true)}
-   className="w-full px-4 py-3 text-sm bg-red-50 dark:bg-red-900 text-red-600 dark:text-red-300 rounded-lg hover:bg-red-100 dark:hover:bg-red-800 transition font-medium text-left flex items-center gap-2"
+   className="w-full px-4 py-3 text-sm bg-red-50 dark:bg-red-900 text-red-600 rounded-lg hover:bg-red-100 dark:hover:bg-red-800 transition font-medium text-left flex items-center gap-2"
  >
- <Icon name="warning" size="md" className="text-red-600 dark:text-red-300" />
+ <Icon name="warning" size="md" className="text-red-600" />
  Delete Account
  </button>
  </div>
@@ -951,11 +951,11 @@ export default function SettingsPage() {
    title="Delete Account"
  >
    <div className="space-y-4">
-     <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
-       <p className="text-sm text-red-700 dark:text-red-300 font-medium mb-2">
+     <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-error-ink/30 rounded-lg">
+       <p className="text-sm text-red-700 font-medium mb-2">
          This action is permanent and cannot be undone.
        </p>
-       <ul className="text-sm text-red-600 dark:text-red-400 list-disc list-inside space-y-1">
+       <ul className="text-sm text-red-600 list-disc list-inside space-y-1">
          <li>All your content, playlists, and schedules will be deleted</li>
          <li>All paired devices will be unpaired and removed</li>
          <li>Your organization will be permanently deleted if you are the sole admin</li>
@@ -963,13 +963,13 @@ export default function SettingsPage() {
        </ul>
      </div>
      {deleteError && (
-       <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-         <p className="text-sm text-red-600 dark:text-red-400">{deleteError}</p>
+       <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-error-ink/30 rounded-lg">
+         <p className="text-sm text-red-600">{deleteError}</p>
        </div>
      )}
      <div>
        <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-1">
-         Type <span className="font-mono font-bold text-red-600 dark:text-red-400">DELETE MY ACCOUNT</span> to confirm
+         Type <span className="font-mono font-bold text-red-600">DELETE MY ACCOUNT</span> to confirm
        </label>
        <input
          type="text"

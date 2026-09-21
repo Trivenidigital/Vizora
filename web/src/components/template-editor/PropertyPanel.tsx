@@ -40,7 +40,7 @@ export default function PropertyPanel({
         <span className="mb-3 text-4xl" role="img" aria-label="Point left">
           👈
         </span>
-        <p className="text-sm text-gray-400">
+        <p className="text-sm text-[var(--foreground-tertiary)]">
           Click any element on the template to start editing
         </p>
       </div>
@@ -52,7 +52,7 @@ export default function PropertyPanel({
     <div className="flex h-full flex-col overflow-y-auto">
       {/* Header: tag badge + undo/redo */}
       <div className="flex items-center justify-between border-b border-gray-700 px-4 py-3">
-        <span className="rounded bg-gray-700 px-2 py-0.5 text-xs font-mono text-gray-400">
+        <span className="rounded bg-gray-700 px-2 py-0.5 text-xs font-mono text-[var(--foreground-tertiary)]">
           &lt;{selected.tagName}&gt;
         </span>
         <div className="flex gap-1">

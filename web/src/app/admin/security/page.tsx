@@ -95,10 +95,10 @@ export default function AdminSecurityPage() {
 
   const getActionColor = (action: string) => {
     if (action.includes('delete') || action.includes('suspend') || action.includes('block')) {
-      return 'text-red-600 dark:text-red-400';
+      return 'text-red-600';
     }
     if (action.includes('create') || action.includes('enable') || action.includes('unblock')) {
-      return 'text-green-600 dark:text-green-400';
+      return 'text-green-600';
     }
     return 'text-[#00E5A0]';
   };
@@ -325,7 +325,7 @@ export default function AdminSecurityPage() {
                         <div className="flex justify-end">
                           <button
                             onClick={() => setUnblockingId(entry.id)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition"
                           >
                             <Trash2 className="w-4 h-4" />
                             Unblock

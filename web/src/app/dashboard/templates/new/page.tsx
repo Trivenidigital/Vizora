@@ -195,10 +195,10 @@ export default function CreateTemplatePage() {
       {error && (
         <div className="flex items-center gap-3 px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-lg">
           <Icon name="error" size="md" className="text-red-500 shrink-0" />
-          <p className="text-sm text-red-400 flex-1">{error}</p>
+          <p className="text-sm text-[var(--error-ink)] flex-1">{error}</p>
           <button
             onClick={() => setError(null)}
-            className="text-red-400 hover:text-red-300 transition"
+            className="text-[var(--error-ink)] hover:text-[var(--error-ink)] transition"
             aria-label="Dismiss error"
           >
             <Icon name="close" size="sm" />
@@ -216,7 +216,7 @@ export default function CreateTemplatePage() {
               htmlFor="template-name"
               className="block text-sm font-medium text-[var(--foreground)] mb-2"
             >
-              Template Name <span className="text-red-400">*</span>
+              Template Name <span className="text-[var(--error-ink)]">*</span>
             </label>
             <input
               id="template-name"

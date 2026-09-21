@@ -131,7 +131,7 @@ export default function PlansPage() {
  }`}
  >
  Yearly
- <span className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 text-xs px-2 py-0.5 rounded-full">
+ <span className="bg-green-100 dark:bg-green-900 text-green-700 text-xs px-2 py-0.5 rounded-full">
  Annual pricing
  </span>
  </button>
@@ -140,7 +140,7 @@ export default function PlansPage() {
 
  {/* Plans Grid */}
  {plansError && (
- <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
+ <div className="rounded-lg border border-error-ink/30 bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/20">
  Unable to load {billingInterval} plans. Please try again.
  </div>
  )}

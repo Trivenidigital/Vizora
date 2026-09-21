@@ -31,13 +31,13 @@ const priorityDotColors: Record<SupportPriority, string> = {
 };
 
 const categoryBadgeColors: Record<SupportCategory, { bg: string; text: string }> = {
-  bug_report: { bg: 'bg-red-500/20', text: 'text-red-400' },
-  feature_request: { bg: 'bg-blue-500/20', text: 'text-blue-400' },
+  bug_report: { bg: 'bg-red-500/20', text: 'text-[var(--error-ink)]' },
+  feature_request: { bg: 'bg-blue-500/20', text: 'text-[var(--info-ink)]' },
   help_question: { bg: 'bg-purple-500/20', text: 'text-purple-400' },
-  template_request: { bg: 'bg-cyan-500/20', text: 'text-cyan-400' },
-  feedback: { bg: 'bg-green-500/20', text: 'text-green-400' },
-  urgent_issue: { bg: 'bg-red-500/20', text: 'text-red-400' },
-  account_issue: { bg: 'bg-orange-500/20', text: 'text-orange-400' },
+  template_request: { bg: 'bg-cyan-500/20', text: 'text-[var(--info-ink)]' },
+  feedback: { bg: 'bg-green-500/20', text: 'text-[var(--success-ink)]' },
+  urgent_issue: { bg: 'bg-red-500/20', text: 'text-[var(--error-ink)]' },
+  account_issue: { bg: 'bg-orange-500/20', text: 'text-[var(--warning-ink)]' },
 };
 
 const categoryLabels: Record<SupportCategory, string> = {
@@ -51,11 +51,11 @@ const categoryLabels: Record<SupportCategory, string> = {
 };
 
 const statusBadgeColors: Record<SupportStatus, string> = {
-  open: 'bg-blue-500/20 text-blue-400',
-  in_progress: 'bg-yellow-500/20 text-yellow-400',
-  resolved: 'bg-green-500/20 text-green-400',
-  closed: 'bg-gray-500/20 text-gray-400',
-  wont_fix: 'bg-red-500/20 text-red-400',
+  open: 'bg-blue-500/20 text-[var(--info-ink)]',
+  in_progress: 'bg-yellow-500/20 text-[var(--warning-ink)]',
+  resolved: 'bg-green-500/20 text-[var(--success-ink)]',
+  closed: 'bg-gray-500/20 text-[var(--foreground-tertiary)]',
+  wont_fix: 'bg-red-500/20 text-[var(--error-ink)]',
 };
 
 const statusLabels: Record<SupportStatus, string> = {
@@ -68,7 +68,7 @@ const statusLabels: Record<SupportStatus, string> = {
 
 export function SupportRequestCard({ request, onSelect }: SupportRequestCardProps) {
   const displayTitle = request.title || (request.description?.slice(0, 80) + (request.description?.length > 80 ? '...' : ''));
-  const catColors = categoryBadgeColors[request.category] || { bg: 'bg-gray-500/20', text: 'text-gray-400' };
+  const catColors = categoryBadgeColors[request.category] || { bg: 'bg-gray-500/20', text: 'text-[var(--foreground-tertiary)]' };
   const userName = request.user
     ? `${request.user.firstName} ${request.user.lastName}`
     : 'Unknown User';

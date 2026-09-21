@@ -85,7 +85,7 @@ export default function DisplayPickerModal({
         {fetching && (
           <div className="flex items-center justify-center py-12">
             <svg
-              className="h-6 w-6 animate-spin text-gray-400"
+              className="h-6 w-6 animate-spin text-[var(--foreground-tertiary)]"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -104,18 +104,18 @@ export default function DisplayPickerModal({
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
               />
             </svg>
-            <span className="ml-3 text-sm text-gray-400">Loading displays...</span>
+            <span className="ml-3 text-sm text-[var(--foreground-tertiary)]">Loading displays...</span>
           </div>
         )}
 
         {/* Error state */}
         {!fetching && error && (
-          <div className="py-8 text-center text-sm text-red-400">{error}</div>
+          <div className="py-8 text-center text-sm text-[var(--error-ink)]">{error}</div>
         )}
 
         {/* Empty state */}
         {!fetching && !error && displays.length === 0 && (
-          <div className="py-8 text-center text-sm text-gray-400">
+          <div className="py-8 text-center text-sm text-[var(--foreground-tertiary)]">
             No displays found. Pair a display device first.
           </div>
         )}
@@ -186,7 +186,7 @@ export default function DisplayPickerModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg bg-gray-700 px-4 py-2 text-sm font-medium text-gray-300 transition hover:bg-gray-600"
+            className="rounded-lg bg-gray-700 px-4 py-2 text-sm font-medium text-[var(--foreground-tertiary)] transition hover:bg-gray-600"
           >
             Cancel
           </button>

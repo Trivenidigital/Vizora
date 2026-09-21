@@ -191,7 +191,7 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
       <div className="flex h-screen items-center justify-center bg-gray-950">
         <div className="flex flex-col items-center gap-3">
           <svg
-            className="h-8 w-8 animate-spin text-emerald-400"
+            className="h-8 w-8 animate-spin text-[var(--success-ink)]"
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
@@ -210,7 +210,7 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
             />
           </svg>
-          <span className="text-sm text-gray-400">Loading template...</span>
+          <span className="text-sm text-[var(--foreground-tertiary)]">Loading template...</span>
         </div>
       </div>
     );
@@ -220,8 +220,8 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-950">
         <div className="max-w-sm text-center">
-          <p className="text-sm font-semibold text-gray-200">Template editing is not available</p>
-          <p className="mt-2 text-sm text-gray-400">
+          <p className="text-sm font-semibold text-[var(--foreground-tertiary)]">Template editing is not available</p>
+          <p className="mt-2 text-sm text-[var(--foreground-tertiary)]">
             Clone this template into your organization before editing it, or use a platform super-admin account for global library templates.
           </p>
           <button
@@ -239,10 +239,10 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-950">
         <div className="text-center">
-          <p className="text-gray-400">No template preview available</p>
+          <p className="text-[var(--foreground-tertiary)]">No template preview available</p>
           <button
             onClick={() => router.back()}
-            className="mt-4 rounded-lg bg-gray-700 px-4 py-2 text-sm text-gray-300 transition hover:bg-gray-600"
+            className="mt-4 rounded-lg bg-gray-700 px-4 py-2 text-sm text-[var(--foreground-tertiary)] transition hover:bg-gray-600"
           >
             Go Back
           </button>
@@ -261,7 +261,7 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
         <div className="flex items-center gap-4">
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-gray-400 transition hover:bg-gray-800 hover:text-white"
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-[var(--foreground-tertiary)] transition hover:bg-gray-800 hover:text-white"
           >
             <svg
               className="h-4 w-4"
@@ -274,7 +274,7 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
             </svg>
             Back
           </button>
-          <h1 className="text-sm font-semibold text-gray-200 truncate max-w-xs">
+          <h1 className="text-sm font-semibold text-[var(--foreground-tertiary)] truncate max-w-xs">
             {templateName}
           </h1>
           {!editorReady && (
@@ -293,7 +293,7 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
               className={`rounded px-2.5 py-1 text-xs font-medium transition ${
                 zoom.zoomPreset === preset
                   ? 'bg-emerald-600 text-white'
-                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                  : 'text-[var(--foreground-tertiary)] hover:bg-gray-800 hover:text-white'
               }`}
             >
               {preset === 'fit' ? 'Fit' : `${preset}%`}
@@ -309,7 +309,7 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
           <button
             onClick={handleSaveDraft}
             disabled={saving || !editorReady}
-            className="rounded-lg bg-gray-700 px-4 py-2 text-sm font-medium text-gray-300 transition hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-gray-700 px-4 py-2 text-sm font-medium text-[var(--foreground-tertiary)] transition hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving ? 'Saving...' : 'Save as Draft'}
           </button>

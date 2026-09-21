@@ -76,7 +76,7 @@ export default function AdminUsersClient({ initialUsers, initialTotal }: AdminUs
   const getRoleBadgeColor = (role: string) => {
     switch (role.toLowerCase()) {
       case 'admin':
-        return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400';
+        return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30';
       case 'owner':
         return 'bg-[#00E5A0]/10 text-[#00E5A0] dark:bg-[#00E5A0]/10 dark:text-[#00E5A0]';
       default:
@@ -204,7 +204,7 @@ export default function AdminUsersClient({ initialUsers, initialTotal }: AdminUs
                               setActionType('disable');
                             }}
                             disabled={user.isSuperAdmin}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
                             title={user.isSuperAdmin ? 'Cannot disable super admin' : 'Disable user'}
                           >
                             <UserX className="w-4 h-4" />
@@ -216,7 +216,7 @@ export default function AdminUsersClient({ initialUsers, initialTotal }: AdminUs
                               setActionUser(user);
                               setActionType('enable');
                             }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition"
                           >
                             <UserCheck className="w-4 h-4" />
                             Enable

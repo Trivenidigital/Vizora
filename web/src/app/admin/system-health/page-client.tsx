@@ -116,14 +116,14 @@ function Sparkline({ data, color = '#00E5A0', height = 32 }: {
 
 function StatusBadge({ status }: { status: string }) {
   const config: Record<string, { bg: string; text: string; icon: typeof CheckCircle }> = {
-    healthy: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', icon: CheckCircle },
-    passed: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', icon: CheckCircle },
-    warning: { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400', icon: AlertTriangle },
-    degraded: { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-400', icon: AlertTriangle },
-    critical: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', icon: XCircle },
-    failed: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', icon: XCircle },
-    pending: { bg: 'bg-gray-100 dark:bg-gray-900/30', text: 'text-gray-700 dark:text-gray-400', icon: Clock },
-    running: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-400', icon: RefreshCw },
+    healthy: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700', icon: CheckCircle },
+    passed: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700', icon: CheckCircle },
+    warning: { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700', icon: AlertTriangle },
+    degraded: { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700', icon: AlertTriangle },
+    critical: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700', icon: XCircle },
+    failed: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700', icon: XCircle },
+    pending: { bg: 'bg-gray-100 dark:bg-gray-900/30', text: 'text-gray-700', icon: Clock },
+    running: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700', icon: RefreshCw },
   };
   const c = config[status] || config.pending;
   const Icon = c.icon;
@@ -241,10 +241,10 @@ export default function SystemHealthClient() {
       <div
         className={`p-6 rounded-xl border-2 ${
           monitorOverall === 'healthy'
-            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+            ? 'bg-green-50 dark:bg-green-900/20 border-success-ink/30'
             : monitorOverall === 'warning'
-            ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
-            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+            ? 'bg-yellow-50 dark:bg-yellow-900/20 border-warning-ink/30'
+            : 'bg-red-50 dark:bg-red-900/20 border-error-ink/30'
         }`}
       >
         <div className="flex items-center justify-between">
@@ -358,8 +358,8 @@ export default function SystemHealthClient() {
                   key={name}
                   className={`p-3 rounded-lg border ${
                     check.passed
-                      ? 'border-green-200 dark:border-green-800/50 bg-green-50/50 dark:bg-green-900/10'
-                      : 'border-red-200 dark:border-red-800/50 bg-red-50/50 dark:bg-red-900/10'
+                      ? 'border-success-ink/50 bg-green-50/50 dark:bg-green-900/10'
+                      : 'border-error-ink/50 bg-red-50/50 dark:bg-red-900/10'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
@@ -375,7 +375,7 @@ export default function SystemHealthClient() {
                   {check.failures && check.failures.length > 0 && (
                     <ul className="mt-2 space-y-1">
                       {check.failures.map((f, i) => (
-                        <li key={i} className="text-xs text-red-600 dark:text-red-400">
+                        <li key={i} className="text-xs text-red-600">
                           {f}
                         </li>
                       ))}
@@ -384,7 +384,7 @@ export default function SystemHealthClient() {
                   {check.mismatches && check.mismatches.length > 0 && (
                     <ul className="mt-2 space-y-1">
                       {check.mismatches.map((m, i) => (
-                        <li key={i} className="text-xs text-red-600 dark:text-red-400">
+                        <li key={i} className="text-xs text-red-600">
                           {m}
                         </li>
                       ))}

@@ -1115,15 +1115,15 @@ export default function ContentClient() {
  case 'error':
  return 'eh-badge-danger';
  case 'flagged':
- return 'bg-amber-500/20 text-amber-400 border border-amber-500/30';
+ return 'bg-amber-500/20 text-[var(--warning-ink)] border border-amber-500/30';
  case 'rejected':
- return 'bg-red-500/20 text-red-400 border border-red-500/30';
+ return 'bg-red-500/20 text-[var(--error-ink)] border border-red-500/30';
  case 'expired':
- return 'bg-orange-500/20 text-orange-400 border border-orange-500/30';
+ return 'bg-orange-500/20 text-[var(--warning-ink)] border border-orange-500/30';
  case 'pending_approval':
- return 'bg-blue-500/20 text-blue-400 border border-blue-500/30';
+ return 'bg-blue-500/20 text-[var(--info-ink)] border border-blue-500/30';
  case 'draft':
- return 'bg-slate-500/20 text-slate-400 border border-slate-500/30';
+ return 'bg-slate-500/20 text-[var(--foreground-tertiary)] border border-slate-500/30';
  case 'archived':
  return 'eh-badge-muted';
  default:
@@ -1370,7 +1370,7 @@ export default function ContentClient() {
  <div className="text-sm text-[var(--foreground-secondary)]">Loading tags...</div>
  ) : tagsLoadError ? (
  <div className="flex items-center justify-between gap-3">
- <p className="text-sm text-red-600 dark:text-red-400">{tagsLoadError}</p>
+ <p className="text-sm text-red-600">{tagsLoadError}</p>
  <button
  type="button"
  onClick={loadContentTags}
@@ -1690,7 +1690,7 @@ export default function ContentClient() {
  <button
  onClick={() => handleReview(item)}
  disabled={isContentDetailLoading(item.id)}
- className="eh-icon-btn text-amber-400"
+ className="eh-icon-btn text-[var(--warning-ink)]"
  title="Review flagged content"
  >
  <Icon name="shield" size="md" />
@@ -1812,7 +1812,7 @@ export default function ContentClient() {
  <button
  onClick={() => handleReview(item)}
  disabled={isContentDetailLoading(item.id)}
- className="eh-icon-btn text-sm py-2 rounded-lg font-medium flex items-center justify-center gap-1 text-amber-400 col-span-2"
+ className="eh-icon-btn text-sm py-2 rounded-lg font-medium flex items-center justify-center gap-1 text-[var(--warning-ink)] col-span-2"
  >
  <Icon name="shield" size="sm" />
  Review
@@ -1916,7 +1916,7 @@ export default function ContentClient() {
  autoComplete="off"
  />
  {formErrors.title && (
- <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.title}</p>
+ <p className="mt-1 text-sm text-red-600">{formErrors.title}</p>
  )}
  </div>
  <div>
@@ -1994,7 +1994,7 @@ export default function ContentClient() {
  <div
  key={`${rejection.fileName}-${rejection.reason}`}
  role="alert"
- className="rounded border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-600 dark:text-red-300"
+ className="rounded border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-600"
  >
  <p className="font-medium">{rejection.fileName}</p>
  <p className="text-xs">{rejection.reason}</p>
@@ -2013,7 +2013,7 @@ export default function ContentClient() {
  <button
  onClick={clearUploadQueue}
  disabled={actionLoading}
- className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
+ className="text-xs text-red-600 hover:text-red-700 dark:hover:text-[var(--error-ink)] disabled:opacity-50 disabled:cursor-not-allowed"
  >
  Clear All
  </button>
@@ -2040,7 +2040,7 @@ export default function ContentClient() {
  </div>
  )}
  {item.status === 'error' && item.error && (
- <p className="mt-1 text-xs text-red-600 dark:text-red-400">{item.error}</p>
+ <p className="mt-1 text-xs text-red-600">{item.error}</p>
  )}
  </div>
  <div className="ml-4 flex items-center gap-2">
@@ -2054,16 +2054,16 @@ export default function ContentClient() {
  </span>
  )}
  {item.status === 'success' && (
- <span className="text-green-600 dark:text-green-400">✓</span>
+ <span className="text-green-600">✓</span>
  )}
  {item.status === 'error' && (
- <span className="text-red-600 dark:text-red-400" title={item.error}>✗</span>
+ <span className="text-red-600" title={item.error}>✗</span>
  )}
  <button
  onClick={() => removeUploadQueueItem(idx)}
  disabled={actionLoading}
  aria-label={`Remove ${item.file.name} from upload queue`}
- className="text-[var(--foreground-tertiary)] hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50 disabled:cursor-not-allowed"
+ className="text-[var(--foreground-tertiary)] hover:text-red-600 dark:hover:text-[var(--error-ink)] disabled:opacity-50 disabled:cursor-not-allowed"
  >
  ×
  </button>
@@ -2104,7 +2104,7 @@ export default function ContentClient() {
  autoComplete="off"
  />
  {formErrors.url && (
- <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.url}</p>
+ <p className="mt-1 text-sm text-red-600">{formErrors.url}</p>
  )}
  </div>
  )}
@@ -2192,7 +2192,7 @@ export default function ContentClient() {
  autoComplete="off"
  />
  {formErrors.title && (
- <p className="mt-1 text-sm text-red-600 dark:text-red-400">{formErrors.title}</p>
+ <p className="mt-1 text-sm text-red-600">{formErrors.title}</p>
  )}
  </div>
  
@@ -2652,7 +2652,7 @@ export default function ContentClient() {
  >
  <div className="space-y-4">
  <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
- <p className="text-amber-400 text-sm font-medium flex items-center gap-2">
+ <p className="text-[var(--warning-ink)] text-sm font-medium flex items-center gap-2">
  <Icon name="warning" size="md" />
  This content has been flagged for review
  </p>

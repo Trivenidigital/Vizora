@@ -116,7 +116,7 @@ export default function FloatingToolbar({
       {/* Bold */}
       <button
         className={`h-7 w-7 rounded text-sm font-bold transition ${
-          isBold ? 'bg-emerald-600 text-white' : 'text-gray-300 hover:bg-gray-700'
+          isBold ? 'bg-emerald-600 text-white' : 'text-[var(--foreground-tertiary)] hover:bg-gray-700'
         }`}
         onClick={() => change('fontWeight', styles.fontWeight || '400', isBold ? '400' : '700')}
         title="Bold"
@@ -127,7 +127,7 @@ export default function FloatingToolbar({
       {/* Italic */}
       <button
         className={`h-7 w-7 rounded text-sm italic transition ${
-          isItalic ? 'bg-emerald-600 text-white' : 'text-gray-300 hover:bg-gray-700'
+          isItalic ? 'bg-emerald-600 text-white' : 'text-[var(--foreground-tertiary)] hover:bg-gray-700'
         }`}
         onClick={() => change('fontStyle', styles.fontStyle || 'normal', isItalic ? 'normal' : 'italic')}
         title="Italic"
@@ -153,7 +153,7 @@ export default function FloatingToolbar({
         <button
           key={a}
           className={`h-7 w-7 rounded text-xs transition ${
-            align === a ? 'bg-emerald-600 text-white' : 'text-gray-300 hover:bg-gray-700'
+            align === a ? 'bg-emerald-600 text-white' : 'text-[var(--foreground-tertiary)] hover:bg-gray-700'
           }`}
           onClick={() => change('textAlign', styles.textAlign || 'left', a)}
           title={`Align ${a}`}

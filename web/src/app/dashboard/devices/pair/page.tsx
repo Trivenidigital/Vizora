@@ -97,7 +97,7 @@ export default function PairDevicePage() {
  <toast.ToastContainer />
  <div className="bg-[var(--surface)] rounded-lg shadow-md p-8 text-center space-y-4">
  <div className="mx-auto h-12 w-12 rounded-full bg-yellow-500/10 flex items-center justify-center">
- <Icon name="warning" size="xl" className="text-yellow-600 dark:text-yellow-400" />
+ <Icon name="warning" size="xl" className="text-yellow-600" />
  </div>
  <div>
  <h2 className="text-2xl font-bold text-[var(--foreground)]">
@@ -269,11 +269,11 @@ export default function PairDevicePage() {
 
  {/* Help Section */}
  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-6">
- <h4 className="font-semibold text-yellow-700 dark:text-yellow-300 mb-3 flex items-center gap-2">
- <Icon name="info" size="md" className="text-yellow-600 dark:text-yellow-400" />
+ <h4 className="font-semibold text-yellow-700 mb-3 flex items-center gap-2">
+ <Icon name="info" size="md" className="text-yellow-600" />
  Troubleshooting Tips
  </h4>
- <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-2">
+ <ul className="text-sm text-yellow-700 space-y-2">
  <li>• Make sure the Vizora Display App is installed and running on your device</li>
  <li>• Ensure your device is connected to the internet</li>
  <li>• Pairing codes expire after 5 minutes - generate a new one if needed</li>

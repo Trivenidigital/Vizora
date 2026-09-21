@@ -279,13 +279,13 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
     switch (status) {
       case 'up':
       case 'healthy':
-        return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400';
+        return 'bg-green-100 dark:bg-green-900/30 text-green-700';
       case 'degraded':
-        return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400';
+        return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700';
       case 'unknown':
-        return 'bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-400';
+        return 'bg-gray-100 dark:bg-gray-900/30 text-gray-700';
       default:
-        return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400';
+        return 'bg-red-100 dark:bg-red-900/30 text-red-700';
     }
   };
 
@@ -325,10 +325,10 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
       <div
         className={`p-6 rounded-xl border-2 ${
           healthData.status === 'healthy'
-            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+            ? 'bg-green-50 dark:bg-green-900/20 border-success-ink/30'
             : healthData.status === 'degraded'
-            ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
-            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+            ? 'bg-yellow-50 dark:bg-yellow-900/20 border-warning-ink/30'
+            : 'bg-red-50 dark:bg-red-900/20 border-error-ink/30'
         }`}
       >
         <div className="flex items-center gap-4">
