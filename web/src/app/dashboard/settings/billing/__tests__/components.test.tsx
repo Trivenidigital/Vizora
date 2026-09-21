@@ -105,21 +105,21 @@ describe('QuotaBar', () => {
     expect(screen.getByText('15 remaining')).toBeInTheDocument();
   });
 
-  it('shows green color for normal usage', () => {
+  it('shows the brand tone for normal usage', () => {
     const { container } = render(<QuotaBar used={10} total={25} />);
-    const progressBar = container.querySelector('.bg-\\[\\#00E5A0\\]');
+    const progressBar = container.querySelector('.bg-brand');
     expect(progressBar).toBeInTheDocument();
   });
 
-  it('shows yellow color for 75%+ usage', () => {
+  it('shows the warning tone at 75%+ usage', () => {
     const { container } = render(<QuotaBar used={80} total={100} />);
-    const progressBar = container.querySelector('.bg-yellow-500');
+    const progressBar = container.querySelector('.bg-warning');
     expect(progressBar).toBeInTheDocument();
   });
 
-  it('shows red color for 90%+ usage', () => {
+  it('shows the error tone at 90%+ usage', () => {
     const { container } = render(<QuotaBar used={95} total={100} />);
-    const progressBar = container.querySelector('.bg-red-500');
+    const progressBar = container.querySelector('.bg-error');
     expect(progressBar).toBeInTheDocument();
   });
 

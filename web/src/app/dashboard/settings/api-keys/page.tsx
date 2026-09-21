@@ -155,7 +155,7 @@ export default function ApiKeysPage() {
  </div>
  <button
  onClick={() => setIsCreateModalOpen(true)}
- className="bg-[#00E5A0] text-[#061A21] px-6 py-3 rounded-lg hover:bg-[#00CC8E] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+ className="bg-[var(--primary)] text-[var(--lw-on-forest)] px-6 py-3 rounded-lg hover:bg-[var(--primary-light)] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
  >
  <Icon name="add" size="lg" className="text-white" />
  <span>Create API Key</span>
@@ -262,7 +262,7 @@ export default function ApiKeysPage() {
  {key.scopes.slice(0, 3).map((scope) => (
  <span
  key={scope}
- className="px-2 py-0.5 text-xs font-medium bg-[#00E5A0]/10 text-[#00E5A0] rounded"
+ className="px-2 py-0.5 text-xs font-medium bg-brand/10 text-[var(--primary-ink)] rounded"
  >
  {scope}
  </span>
@@ -309,7 +309,7 @@ export default function ApiKeysPage() {
  {/* Usage Instructions */}
  <div className="bg-[var(--background)] rounded-lg p-6">
  <h3 className="text-lg font-semibold text-[var(--foreground)] mb-3 flex items-center gap-2">
- <Icon name="info" size="md" className="text-[#00E5A0]" />
+ <Icon name="info" size="md" className="text-[var(--primary-ink)]" />
  How to use API Keys
  </h3>
  <div className="text-sm text-[var(--foreground-secondary)] space-y-2">
@@ -317,7 +317,7 @@ export default function ApiKeysPage() {
  Include your API key in the <code className="bg-[var(--background-tertiary)] px-1 rounded">X-API-Key</code>{' '}
  header with each request:
  </p>
- <pre className="bg-[#061A21] text-[#F0ECE8] p-4 rounded-lg overflow-x-auto">
+ <pre className="bg-[var(--surface-secondary)] text-[var(--foreground)] p-4 rounded-lg overflow-x-auto">
 {`curl -X GET "https://vizora.cloud/api/v1/content" \\
  -H "X-API-Key: vz_live_your_api_key_here"`}
  </pre>
@@ -340,7 +340,7 @@ export default function ApiKeysPage() {
  type="text"
  value={createForm.name}
  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-[var(--foreground)]"
  placeholder="e.g., Production API Key"
  autoComplete="off"
  />
@@ -361,7 +361,7 @@ export default function ApiKeysPage() {
  type="checkbox"
  checked={createForm.scopes.includes(scope.value)}
  onChange={() => handleScopeToggle(scope.value)}
- className="h-4 w-4 text-[#00E5A0] border-[var(--border)] rounded focus:ring-[#00E5A0]"
+ className="h-4 w-4 text-[var(--primary-ink)] border-[var(--border)] rounded focus:ring-[var(--primary-ink)]"
  />
  <div className="ml-3">
  <span className="text-sm font-medium text-[var(--foreground)]">{scope.label}</span>
@@ -380,7 +380,7 @@ export default function ApiKeysPage() {
  type="datetime-local"
  value={createForm.expiresAt}
  onChange={(e) => setCreateForm({ ...createForm, expiresAt: e.target.value })}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-[var(--foreground)]"
  min={new Date().toISOString().slice(0, 16)}
  />
  <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
@@ -398,7 +398,7 @@ export default function ApiKeysPage() {
  <button
  onClick={handleCreate}
  disabled={actionLoading || !createForm.name || createForm.scopes.length === 0}
- className="px-4 py-2 text-sm font-medium text-white bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
  Create Key

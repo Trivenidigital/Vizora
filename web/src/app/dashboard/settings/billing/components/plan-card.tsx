@@ -38,13 +38,13 @@ export function PlanCard({ plan, onSelect, onContactSales, isCurrentPlan, isLoad
     <div
       className={`relative flex flex-col bg-[var(--surface)] rounded-xl border-2 transition-all ${
         isCurrentPlan
-          ? 'border-[#00E5A0] shadow-lg ring-2 ring-[#00E5A0]/30'
+          ? 'border-[var(--primary)] shadow-lg ring-2 ring-brand/30'
           : 'border-[var(--border)] hover:border-[var(--border-dark)]'
       }`}
     >
       {isCurrentPlan && (
         <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-          <span className="bg-[#00E5A0] text-[#061A21] text-xs font-semibold px-3 py-1 rounded-full">
+          <span className="bg-brand text-[var(--lw-on-forest)] text-xs font-semibold px-3 py-1 rounded-full">
             Current Plan
           </span>
         </div>
@@ -111,7 +111,7 @@ export function PlanCard({ plan, onSelect, onContactSales, isCurrentPlan, isLoad
           <button
             onClick={onSelect}
             disabled={isLoading}
-            className="w-full py-3 px-4 bg-[#00E5A0] text-[#061A21] font-semibold rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full py-3 px-4 bg-brand text-[var(--lw-on-forest)] font-semibold rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {isLoading ? (
               <>

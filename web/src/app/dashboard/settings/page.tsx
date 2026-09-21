@@ -332,8 +332,8 @@ export default function SettingsPage() {
          className="w-20 h-20 rounded-full object-cover border-2 border-[var(--border)]"
        />
      ) : (
-       <div className="w-20 h-20 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] rounded-full flex items-center justify-center border-2 border-[var(--border)]">
-         <span className="text-[#061A21] text-2xl font-semibold">{getUserInitials()}</span>
+       <div className="w-20 h-20 bg-gradient-to-br from-[var(--primary)] to-[var(--primary-light)] rounded-full flex items-center justify-center border-2 border-[var(--border)]">
+         <span className="text-[var(--lw-on-forest)] text-2xl font-semibold">{getUserInitials()}</span>
        </div>
      )}
      {avatarUploading && (
@@ -382,7 +382,7 @@ export default function SettingsPage() {
  type="text"
  value={profileForm.firstName}
  onChange={(e) => setProfileForm({ ...profileForm, firstName: e.target.value })}
- className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
  />
  </div>
  <div>
@@ -393,7 +393,7 @@ export default function SettingsPage() {
  type="text"
  value={profileForm.lastName}
  onChange={(e) => setProfileForm({ ...profileForm, lastName: e.target.value })}
- className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
  />
  </div>
  </div>
@@ -423,7 +423,7 @@ export default function SettingsPage() {
  onChange={(e) =>
  setSettings({ ...settings, organizationName: e.target.value })
  }
- className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
  />
  </div>
  <div>
@@ -454,7 +454,7 @@ export default function SettingsPage() {
    <select
      value={settings.country || 'US'}
      onChange={(e) => setSettings({ ...settings, country: e.target.value })}
-     className="eh-select w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+     className="eh-select w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
    >
      <option value="US">United States (USD)</option>
      <option value="IN">India (INR)</option>
@@ -530,7 +530,7 @@ export default function SettingsPage() {
        onChange={(e) => setBrandingForm({ ...brandingForm, companyName: e.target.value })}
        placeholder="Vizora"
        maxLength={100}
-       className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+       className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
      />
      <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
        Replaces &quot;Vizora&quot; in the sidebar and header
@@ -559,7 +559,7 @@ export default function SettingsPage() {
            }
          }}
          maxLength={7}
-         className="eh-input w-32 px-3 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent font-mono text-sm"
+         className="eh-input w-32 px-3 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent font-mono text-sm"
        />
        {/* Quick presets */}
        <div className="flex gap-1.5">
@@ -688,7 +688,7 @@ export default function SettingsPage() {
  onChange={(e) =>
  setSettings({ ...settings, defaultDuration: parseInt(e.target.value) })
  }
- className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
  />
  <p className="mt-2 text-xs text-[var(--foreground-tertiary)]">
  How long each piece of content displays by default
@@ -701,7 +701,7 @@ export default function SettingsPage() {
  <select
  value={settings.timezone}
  onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
- className="eh-select w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="eh-select w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
  >
  <option value="America/New_York">Eastern Time (US & Canada)</option>
  <option value="America/Chicago">Central Time (US & Canada)</option>
@@ -827,9 +827,9 @@ export default function SettingsPage() {
  <div className="space-y-3">
  <button
    onClick={() => setShowChangePasswordModal(true)}
-   className="w-full px-4 py-3 text-sm bg-[#00E5A0]/5 dark:bg-[#00E5A0]/10 text-[#00E5A0] dark:text-[#00E5A0] rounded-lg hover:bg-[#00E5A0]/10 dark:hover:bg-[#00E5A0]/10 transition font-medium text-left flex items-center gap-2"
+   className="w-full px-4 py-3 text-sm bg-brand/5 text-[var(--primary-ink)] rounded-lg hover:bg-brand/10 transition font-medium text-left flex items-center gap-2"
  >
- <Icon name="settings" size="md" className="text-[#00E5A0] dark:text-[#00E5A0]" />
+ <Icon name="settings" size="md" className="text-[var(--primary-ink)]" />
  Change Password
  </button>
  <button
@@ -899,7 +899,7 @@ export default function SettingsPage() {
          type="password"
          value={passwordForm.currentPassword}
          onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-         className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+         className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
        />
      </div>
      <div>
@@ -908,7 +908,7 @@ export default function SettingsPage() {
          type="password"
          value={passwordForm.newPassword}
          onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-         className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+         className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
        />
      </div>
      <div>
@@ -917,7 +917,7 @@ export default function SettingsPage() {
          type="password"
          value={passwordForm.confirmPassword}
          onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-         className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+         className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
        />
      </div>
      <div className="flex justify-end gap-3 pt-4">

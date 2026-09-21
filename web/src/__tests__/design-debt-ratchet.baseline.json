@@ -1,12 +1,12 @@
 {
   "_": "Colour-debt high-water marks. Numbers may only be LOWERED, and only in the same commit that removes the usages. See design-debt-ratchet.test.ts for how.",
-  "measuredOn": "2026-09-18",
+  "measuredOn": "2026-09-21",
   "measuredOver": "319 .ts/.tsx/.js/.cjs/.mjs files under web/src, excluding components/landing, theme/palette.js, __tests__, *.test.*, *.spec.*, *.d.ts",
   "counts": {
-    "hexLiterals": 707,
-    "tailwindArbitraryColors": 500,
-    "rawPaletteClasses": 535,
-    "darkVariants": 159,
+    "hexLiterals": 538,
+    "tailwindArbitraryColors": 331,
+    "rawPaletteClasses": 529,
+    "darkVariants": 140,
     "darkThemeForegroundShades": 0,
     "midShadeText": 48
   }
