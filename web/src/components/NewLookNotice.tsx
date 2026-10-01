@@ -30,6 +30,57 @@ import { useEffect, useState } from 'react';
  * Mounted in the dashboard layout only, so it never reaches the public
  * marketing or legal pages, where "your data and settings are unchanged" would
  * be addressed to someone who has neither.
+ *
+ * ── IN THE PAGE FLOW, AND THAT IS THE WHOLE POINT (B20) ──────────────────────
+ *
+ * This was a fixed card pinned to the bottom-right corner, above every other
+ * layer, and it swallowed clicks meant for whatever sat beneath it. Three
+ * end-to-end specs caught it — delete a display, create URL content, assign a
+ * playlist to a display — each timing out for 30s with Playwright reporting that
+ * the notice's subtree "intercepts pointer events". Pre-redesign `main` had zero
+ * occurrences. Every existing customer would have hit it once, on their first
+ * login after deploy, with the bottom-right of every dashboard page dead until
+ * they dismissed it.
+ *
+ * (The old z-index is described rather than quoted on purpose: Tailwind scans
+ * comments, and this component was the only consumer of that arbitrary value, so
+ * naming it would keep a dead rule in the bundle. Trap T4.)
+ *
+ * The previous fix moved the card from `bottom-4` to `bottom-24` because it was
+ * covering the support FAB and the Cmd-K hint. That treated the symptom. The
+ * cause is that a cosmetic announcement was in the overlay layer at all, and
+ * there is no fixed position on a dashboard that is safe: the corners hold the
+ * support FAB and the command hint, the top holds the header and the billing
+ * banners, and every inner region is content a user clicks.
+ *
+ * So it is no longer positioned. It renders in the flow at the top of `<main>`,
+ * takes layout space like any other block, and pushes the page down instead of
+ * covering it. An in-flow element cannot intercept a click meant for something
+ * else — not as a property it is careful about, but as one it cannot violate.
+ * `pointer-events-none` would NOT have been enough on its own: the card needs to
+ * receive its own dismiss click, so the interactive panel would have kept
+ * blocking its own footprint, which is exactly where the button is. That is the
+ * difference between this and the Cmd-K hint two corners over, which IS a fixed
+ * overlay and IS safe — it carries `pointer-events-none` and has nothing to
+ * click, so it can afford to. A dismissible card cannot.
+ *
+ * Do not give this component `fixed`, `absolute` or a `z-` class again.
+ * `NewLookNotice.test.tsx` fails if any of them comes back.
+ *
+ * ── SEMANTICS: role unchanged, deliberately ─────────────────────────────────
+ *
+ * Still `role="status"`. The role was never the defect, and ARIA's definition
+ * fits the new shape as well as the old one — "advisory information for the user
+ * but not important enough to justify an alert" — since "transient" is a
+ * convention around `status`, not a requirement of it. It is inserted after
+ * mount, so the polite live region still does the one job D2 asks for: the user
+ * is TOLD, once.
+ *
+ * What did change is navigability, which the overlay never had. The title is an
+ * `<h2>` now rather than a styled `<p>`, so the notice appears in the heading
+ * outline and a screen-reader user can reach it again after the announcement has
+ * passed — which matters more for persistent content than for a card that used
+ * to sit outside the document's reading order.
  */
 const SEEN_KEY = 'vizora_new_look_seen';
 
@@ -60,28 +111,20 @@ export function NewLookNotice() {
     <div
       role="status"
       aria-live="polite"
-      /*
-       * Sits ABOVE the support-chat FAB, not on top of it. That corner is
-       * already occupied twice over: `SupportChatButton` is `fixed bottom-6
-       * right-6 z-40` (24px up, 56px tall, so it fills 24-80px) and the
-       * CommandPalette's Ctrl-K hint is `fixed bottom-4 right-4 z-40`. At
-       * `bottom-4 right-4` this card covered BOTH — and since it outranks them
-       * at z-70, support became unreachable until the card was dismissed.
-       * Blocking a live control with a cosmetic announcement is the wrong way
-       * round. bottom-24 clears the FAB entirely.
-       */
-      className="fixed bottom-24 right-6 z-[70] max-w-sm rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 shadow-lg"
-      style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
+      data-new-look-notice
+      className="mb-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:flex sm:items-center sm:justify-between sm:gap-4"
     >
-      <p className="text-sm font-semibold text-[var(--foreground)]">Vizora has a new look</p>
-      <p className="mt-1 text-sm text-[var(--foreground-secondary)]">
-        We&apos;ve refreshed the interface with a lighter, calmer design. Your data and settings are
-        unchanged.
-      </p>
+      <div className="min-w-0">
+        <h2 className="text-sm font-semibold text-[var(--foreground)]">Vizora has a new look</h2>
+        <p className="mt-1 text-sm text-[var(--foreground-secondary)]">
+          We&apos;ve refreshed the interface with a lighter, calmer design. Your data and settings
+          are unchanged.
+        </p>
+      </div>
       <button
         type="button"
         onClick={dismiss}
-        className="eh-btn-neon mt-3 rounded-lg px-3 py-1.5 text-sm"
+        className="eh-btn-neon mt-3 shrink-0 rounded-lg px-3 py-1.5 text-sm sm:mt-0"
       >
         Got it
       </button>

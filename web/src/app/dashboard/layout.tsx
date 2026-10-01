@@ -372,6 +372,17 @@ export default function DashboardLayout({
             <DeviceStatusProvider user={user}>
               <main id="main-content" className="flex-1 p-6 sm:p-8 lg:p-10 min-h-[calc(100vh-4rem)] overflow-x-hidden">
                 <div className="max-w-7xl mx-auto">
+                  {/*
+                    One-time "new look" notice. IN THE FLOW, above the
+                    breadcrumbs — not in the overlay layer, which is where it
+                    used to be and where it intercepted clicks meant for the
+                    page (B20; three e2e specs). It is still mounted on the
+                    AUTHENTICATED shell only: it exists for people who knew the
+                    old interface, and a first-time visitor to a public page has
+                    nothing to be told, which also keeps the public baselines
+                    pixel-identical.
+                  */}
+                  <NewLookNotice />
                   <Breadcrumbs />
                   <div className="animate-[fadeIn_0.2s_ease-out] space-y-0">
                     {children}
@@ -392,13 +403,6 @@ export default function DashboardLayout({
       {/* Support Chat Widget */}
       <SupportChat />
 
-      {/*
-        One-time "new look" notice. Mounted on the AUTHENTICATED shell, not the
-        root layout: it exists for people who knew the old interface, and a
-        first-time visitor to a public page has nothing to be told. Keeping it
-        off the public routes also keeps those baselines pixel-identical.
-      */}
-      <NewLookNotice />
     </div>
     </SocketProvider>
     </SupportChatProvider>
