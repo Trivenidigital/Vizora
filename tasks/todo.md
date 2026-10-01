@@ -51,7 +51,11 @@ PNGs OPENED, not just diffed · FROZEN set untouched (`tasks/redesign-colour-map
   - **52/52 changed, 0 identical** — every route moved, as a full rebrand should.
   - **Horizontal overflow at 390: 3 routes before (admin 459/485/507px), 0 after.** The admin mobile overflow carried as an unfixed finding since September is resolved.
   - The before set is the honest one: dark Electric Horizon with the Light/Dark toggle still mounted, which is what production serves today.
-- [ ] Phase 5e: full web jest, prod build, Playwright critical path
+- [x] Phase 5e Playwright — critical path (auth + dashboard + command palette) **33 passed, 0 failed**. Wider slice (displays, content, playlists, settings, admin, api-keys, team-audit) run on the redesign AND on pre-redesign `main` served on the same port, like for like: **main 9 failures, redesign 12**. The 3 extra are all one cause → B20.
+- [ ] B20 the new-look notice intercepts clicks (coder-b6, `feat/app-redesign-b20`) — `NewLookNotice` is `fixed bottom-24 right-6 z-[70]` and swallows clicks meant for the page. Every existing customer sees it once on first login after deploy; until dismissed the bottom-right of every dashboard page is dead. `main` has ZERO pointer interceptions. Caught only because the e2e suite was run on both trees.
+- [ ] B18 audit ground hit-test (coder-b7) — B17 fixed the foreground but its `isPointInFill` ground matches shapes the glyph is not over: pie labels reported 1.37:1 against forest `#1f4230`, a fill belonging to a DIFFERENT chart; live DOM shows warm ink on the ivory card (~14.8:1).
+- [ ] B19 chart axis titles (coder-b11) — `label={{ value }}` is passed with no fill so recharts paints its default grey `#808080`, 3.82:1. Verified against the live DOM, independent of the audit.
+- [ ] Phase 5e: re-run the full suite + build + e2e after B18/B19/B20
 - [ ] Update PR #387 title/body (no longer WIP), un-draft #386 + #387
 - [ ] Merge #386 → main; merge #387 → main (sequence, CI fully green on exact head — gate on ALLGREEN)
 - [ ] Deploy via CI artifact → `pm2-guard app-reload --env production` → `await-readiness-cli` → `deploy-verify` diff → public-edge marker checks
