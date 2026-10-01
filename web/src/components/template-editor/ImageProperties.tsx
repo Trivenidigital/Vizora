@@ -33,7 +33,7 @@ export default function ImageProperties({
 
   const labelClass = 'block text-xs font-medium text-[var(--foreground-tertiary)] mb-1';
   const inputClass =
-    'w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500';
+    'w-full bg-[var(--surface)] border border-[var(--border)] rounded px-2 py-1.5 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary-ink)]';
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -65,7 +65,7 @@ export default function ImageProperties({
           <img
             src={src}
             alt="Element preview"
-            className="h-24 w-full rounded border border-gray-600 object-cover"
+            className="h-24 w-full rounded border border-[var(--border)] object-cover"
           />
         </div>
       )}
@@ -81,7 +81,7 @@ export default function ImageProperties({
           onChange={handleFileChange}
         />
         <button
-          className="w-full rounded bg-gray-700 px-3 py-2 text-sm text-[var(--foreground-tertiary)] transition-colors hover:bg-gray-600 disabled:opacity-50"
+          className="w-full rounded bg-[var(--surface-hover)] px-3 py-2 text-sm text-[var(--foreground)] transition-colors hover:bg-[var(--background-tertiary)] disabled:opacity-50"
           disabled={uploading}
           onClick={() => fileInputRef.current?.click()}
         >
@@ -127,14 +127,14 @@ export default function ImageProperties({
       {/* Border Radius */}
       <div>
         <label className={labelClass}>
-          Border Radius <span className="text-gray-500">{borderRadius}px</span>
+          Border Radius <span className="text-[var(--foreground-tertiary)]">{borderRadius}px</span>
         </label>
         <input
           type="range"
           min={0}
           max={50}
           value={borderRadius}
-          className="w-full accent-emerald-500"
+          className="w-full accent-[var(--primary-ink)]"
           onChange={(e) =>
             onPropertyChange(
               elementId,

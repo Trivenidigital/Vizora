@@ -78,10 +78,14 @@ export default function TemplateDetailModal({
   };
 
   const getDifficultyConfig = (d: string) => {
-    if (d === 'beginner') return { label: 'Beginner', dot: 'bg-green-400', bg: 'bg-green-400/10 text-[var(--success-ink)]' };
-    if (d === 'intermediate') return { label: 'Intermediate', dot: 'bg-yellow-400', bg: 'bg-yellow-400/10 text-[var(--warning-ink)]' };
-    if (d === 'advanced') return { label: 'Advanced', dot: 'bg-red-400', bg: 'bg-red-400/10 text-[var(--error-ink)]' };
-    return { label: d, dot: 'bg-gray-400', bg: 'bg-gray-400/10 text-[var(--foreground-tertiary)]' };
+    // Difficulty is an ORDERED scale, so it takes the semantic status pairs
+    // rather than --cat-* (same call as TemplateCard's DIFFICULTY_CONFIG). Each
+    // fill is the one its ink was measured against in globals.css:
+    // success 5.47:1, warning 5.41:1, error 4.89:1, neutral 4.75:1.
+    if (d === 'beginner') return { label: 'Beginner', dot: 'bg-[var(--success-ink)]', bg: 'bg-[var(--status-online-bg)] text-[var(--success-ink)]' };
+    if (d === 'intermediate') return { label: 'Intermediate', dot: 'bg-[var(--warning-ink)]', bg: 'bg-[var(--status-error-bg)] text-[var(--warning-ink)]' };
+    if (d === 'advanced') return { label: 'Advanced', dot: 'bg-[var(--error-ink)]', bg: 'bg-[var(--status-offline-bg)] text-[var(--error-ink)]' };
+    return { label: d, dot: 'bg-[var(--foreground-tertiary)]', bg: 'bg-[var(--status-neutral-bg)] text-[var(--foreground-tertiary)]' };
   };
 
   return (
@@ -101,12 +105,12 @@ export default function TemplateDetailModal({
 
         {loading ? (
           <div className="flex items-center justify-center py-32">
-            <div className="w-8 h-8 border-2 border-[#00E5A0]/20 border-t-[#00E5A0] rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-brand/20 border-t-[var(--primary-ink)] rounded-full animate-spin" />
           </div>
         ) : template ? (
           <>
             {/* Preview area */}
-            <div className="relative h-80 sm:h-96 bg-gradient-to-br from-[#0A2A33] to-[#061A21] rounded-t-2xl overflow-hidden">
+            <div className="relative h-80 sm:h-96 bg-gradient-to-br from-[var(--viewport-surface)] to-[var(--viewport-bg)] rounded-t-2xl overflow-hidden">
               {previewHtml ? (
                 <iframe
                   srcDoc={previewHtml}
@@ -116,7 +120,7 @@ export default function TemplateDetailModal({
                 />
               ) : (
                 <div className="flex items-center justify-center h-full">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-[var(--foreground-tertiary)] opacity-30">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-[var(--viewport-ink-muted)] opacity-60">
                     <rect x="3" y="3" width="18" height="18" rx="2" />
                     <path d="M3 15l4-4a3 5 0 0 1 3 0l5 5" />
                   </svg>
@@ -144,7 +148,7 @@ export default function TemplateDetailModal({
                         onClose();
                         router.push(`/dashboard/templates/${template.id}/edit`);
                       }}
-                      className="px-5 py-2.5 rounded-lg bg-[#00E5A0] text-[#061A21] font-semibold text-sm hover:bg-[#00CC8E] transition-all hover:shadow-[0_0_20px_rgba(0,229,160,0.3)]"
+                      className="px-5 py-2.5 rounded-lg bg-[var(--primary)] text-[var(--lw-on-forest)] font-semibold text-sm hover:bg-[var(--primary-light)] transition-all hover:shadow-md"
                     >
                       Edit Visually
                     </button>
@@ -222,15 +226,15 @@ export default function TemplateDetailModal({
                             window.dispatchEvent(event);
                           }, 100);
                         }}
-                        className="bg-[var(--background)] rounded-lg border border-[var(--border)] overflow-hidden hover:border-[#00E5A0]/20 transition-all group/similar"
+                        className="bg-[var(--background)] rounded-lg border border-[var(--border)] overflow-hidden hover:border-brand/20 transition-all group/similar"
                       >
-                        <div className="h-20 bg-gradient-to-br from-[#0A2A33] to-[#061A21] flex items-center justify-center">
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-[var(--foreground-tertiary)] opacity-30">
+                        <div className="h-20 bg-gradient-to-br from-[var(--viewport-surface)] to-[var(--viewport-bg)] flex items-center justify-center">
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-[var(--viewport-ink-muted)] opacity-60">
                             <rect x="3" y="3" width="18" height="18" rx="2" />
                           </svg>
                         </div>
                         <div className="p-2">
-                          <p className="text-xs font-medium text-[var(--foreground)] truncate group-hover/similar:text-[#00E5A0] transition-colors">
+                          <p className="text-xs font-medium text-[var(--foreground)] truncate group-hover/similar:text-[var(--primary-ink)] transition-colors">
                             {t.name}
                           </p>
                         </div>

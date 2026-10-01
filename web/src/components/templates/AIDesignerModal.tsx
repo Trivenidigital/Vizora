@@ -20,7 +20,7 @@ export default function AIDesignerModal({ onClose }: AIDesignerModalProps) {
       <div className="fixed inset-0 bg-black/70 backdrop-blur-md" onClick={onClose} />
 
       <div className="relative bg-[var(--surface)] rounded-2xl border border-[var(--border)] w-full max-w-lg mx-4 shadow-2xl overflow-hidden animate-[fadeIn_0.2s_ease-out]">
-        <div className="h-1 bg-gradient-to-r from-[#00E5A0] via-[#00B4D8] to-[#00E5A0]" />
+        <div className="h-1 bg-gradient-to-r from-[var(--primary)] via-[var(--accent-brass)] to-[var(--primary)]" />
 
         <button
           onClick={onClose}
@@ -34,8 +34,8 @@ export default function AIDesignerModal({ onClose }: AIDesignerModalProps) {
         </button>
 
         <div className="p-8 sm:p-10 flex flex-col items-center justify-center min-h-[360px] text-center">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#00E5A0]/10 to-[#00B4D8]/10 border border-[#00E5A0]/15 flex items-center justify-center mb-6">
-            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" className="text-[#00E5A0]">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand/10 to-brand/5 border border-brand/15 flex items-center justify-center mb-6">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" className="text-[var(--primary-ink)]">
               <path d="M12 2L14.09 8.26L20 9.27L15.55 13.97L16.91 20L12 16.9L7.09 20L8.45 13.97L4 9.27L9.91 8.26L12 2Z" fill="currentColor" opacity="0.85" />
               <path d="M19 2L19.5 3.5L21 4L19.5 4.5L19 6L18.5 4.5L17 4L18.5 3.5L19 2Z" fill="currentColor" opacity="0.5" />
             </svg>
@@ -50,7 +50,7 @@ export default function AIDesignerModal({ onClose }: AIDesignerModalProps) {
 
           <button
             onClick={onClose}
-            className="px-5 py-2.5 rounded-lg bg-[#00E5A0] text-[#061A21] font-semibold text-sm hover:bg-[#00CC8E] transition-all"
+            className="px-5 py-2.5 rounded-lg bg-[var(--primary)] text-[var(--lw-on-forest)] font-semibold text-sm hover:bg-[var(--primary-light)] transition-all"
           >
             Browse Templates
           </button>

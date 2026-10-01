@@ -132,15 +132,15 @@ export default function DisplayPickerModal({
                   if (el) el.indeterminate = someSelected;
                 }}
                 onChange={toggleSelectAll}
-                className="h-4 w-4 rounded border-gray-600 bg-gray-700 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0"
+                className="h-4 w-4 rounded border-[var(--border)] bg-[var(--surface)] text-[var(--primary-ink)] focus:ring-[var(--primary-ink)] focus:ring-offset-0"
               />
-              <span className="text-sm font-medium text-white">
+              <span className="text-sm font-medium text-[var(--foreground)]">
                 Select All ({displays.length})
               </span>
             </label>
 
             {/* Divider */}
-            <div className="border-t border-gray-700" />
+            <div className="border-t border-[var(--border)]" />
 
             {/* Scrollable list */}
             <div className="max-h-64 overflow-y-auto pr-1">
@@ -148,20 +148,20 @@ export default function DisplayPickerModal({
                 {displays.map((display) => (
                   <label
                     key={display.id}
-                    className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 hover:bg-gray-700/50"
+                    className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 hover:bg-[var(--surface-hover)]"
                   >
                     <input
                       type="checkbox"
                       checked={selectedIds.has(display.id)}
                       onChange={() => toggleDisplay(display.id)}
-                      className="h-4 w-4 shrink-0 rounded border-gray-600 bg-gray-700 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-0"
+                      className="h-4 w-4 shrink-0 rounded border-[var(--border)] bg-[var(--surface)] text-[var(--primary-ink)] focus:ring-[var(--primary-ink)] focus:ring-offset-0"
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium text-white">
+                      <div className="truncate text-sm font-medium text-[var(--foreground)]">
                         {display.nickname || display.id}
                       </div>
                       {display.location && (
-                        <div className="truncate text-xs text-gray-500">
+                        <div className="truncate text-xs text-[var(--foreground-tertiary)]">
                           {display.location}
                         </div>
                       )}
@@ -169,8 +169,8 @@ export default function DisplayPickerModal({
                     <span
                       className={`h-2.5 w-2.5 shrink-0 rounded-full ${
                         display.status === 'online'
-                          ? 'bg-emerald-400'
-                          : 'bg-gray-600'
+                          ? 'bg-[var(--success-ink)]'
+                          : 'bg-[var(--foreground-tertiary)]'
                       }`}
                       title={display.status === 'online' ? 'Online' : 'Offline'}
                     />
@@ -182,11 +182,11 @@ export default function DisplayPickerModal({
         )}
 
         {/* Actions */}
-        <div className="flex items-center justify-end gap-3 border-t border-gray-700 pt-4">
+        <div className="flex items-center justify-end gap-3 border-t border-[var(--border)] pt-4">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg bg-gray-700 px-4 py-2 text-sm font-medium text-[var(--foreground-tertiary)] transition hover:bg-gray-600"
+            className="rounded-lg bg-[var(--surface-hover)] px-4 py-2 text-sm font-medium text-[var(--foreground)] transition hover:bg-[var(--border)]"
           >
             Cancel
           </button>
@@ -194,7 +194,7 @@ export default function DisplayPickerModal({
             type="button"
             onClick={handleConfirm}
             disabled={selectedIds.size === 0 || loading}
-            className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--lw-on-forest)] transition hover:bg-[var(--primary-light)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? (
               <span className="flex items-center gap-2">

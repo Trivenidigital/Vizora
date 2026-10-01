@@ -339,7 +339,7 @@ export default function TemplateLibraryPage() {
               <button
                 onClick={() => { setViewMode('home'); setPage(1); }}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                  viewMode === 'home' ? 'bg-[#00E5A0]/10 text-[#00E5A0] border-[#00E5A0]/20' : 'text-[var(--foreground-secondary)] border-[var(--border)]'
+                  viewMode === 'home' ? 'bg-brand/10 text-[var(--primary-ink)] border-brand/20' : 'text-[var(--foreground-secondary)] border-[var(--border)]'
                 }`}
               >
                 Library
@@ -347,14 +347,14 @@ export default function TemplateLibraryPage() {
               <button
                 onClick={() => { setViewMode('your-templates'); setPage(1); }}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-all border ${
-                  viewMode === 'your-templates' ? 'bg-[#00E5A0]/10 text-[#00E5A0] border-[#00E5A0]/20' : 'text-[var(--foreground-secondary)] border-[var(--border)]'
+                  viewMode === 'your-templates' ? 'bg-brand/10 text-[var(--primary-ink)] border-brand/20' : 'text-[var(--foreground-secondary)] border-[var(--border)]'
                 }`}
               >
                 Your Templates
               </button>
               <button
                 onClick={() => setShowAIDesigner(true)}
-                className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-[#00E5A0] border border-[#00E5A0]/20 hover:bg-[#00E5A0]/5 transition-all"
+                className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-[var(--primary-ink)] border border-brand/20 hover:bg-brand/5 transition-all"
               >
                 AI Designer coming soon
               </button>
@@ -390,30 +390,30 @@ export default function TemplateLibraryPage() {
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs text-[var(--foreground-tertiary)]">Filters:</span>
               {debouncedSearch && (
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-[#00E5A0]/10 text-[#00E5A0] rounded-md text-xs">
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-brand/10 text-[var(--primary-ink)] rounded-md text-xs">
                   &ldquo;{debouncedSearch}&rdquo;
-                  <button onClick={() => setSearchQuery('')} className="hover:text-white ml-0.5">&times;</button>
+                  <button onClick={() => setSearchQuery('')} className="hover:text-[var(--foreground)] ml-0.5">&times;</button>
                 </span>
               )}
               {selectedCategory && (
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-[#00E5A0]/10 text-[#00E5A0] rounded-md text-xs capitalize">
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-brand/10 text-[var(--primary-ink)] rounded-md text-xs capitalize">
                   {selectedCategory}
-                  <button onClick={() => setSelectedCategory('')} className="hover:text-white ml-0.5">&times;</button>
+                  <button onClick={() => setSelectedCategory('')} className="hover:text-[var(--foreground)] ml-0.5">&times;</button>
                 </span>
               )}
               {selectedDifficulty && (
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-[#00E5A0]/10 text-[#00E5A0] rounded-md text-xs capitalize">
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-brand/10 text-[var(--primary-ink)] rounded-md text-xs capitalize">
                   {selectedDifficulty}
-                  <button onClick={() => setSelectedDifficulty('')} className="hover:text-white ml-0.5">&times;</button>
+                  <button onClick={() => setSelectedDifficulty('')} className="hover:text-[var(--foreground)] ml-0.5">&times;</button>
                 </span>
               )}
               {selectedOrientation && (
-                <span className="inline-flex items-center gap-1 px-2 py-1 bg-[#00E5A0]/10 text-[#00E5A0] rounded-md text-xs capitalize">
+                <span className="inline-flex items-center gap-1 px-2 py-1 bg-brand/10 text-[var(--primary-ink)] rounded-md text-xs capitalize">
                   {selectedOrientation}
-                  <button onClick={() => setSelectedOrientation('')} className="hover:text-white ml-0.5">&times;</button>
+                  <button onClick={() => setSelectedOrientation('')} className="hover:text-[var(--foreground)] ml-0.5">&times;</button>
                 </span>
               )}
-              <button onClick={clearFilters} className="text-xs text-[var(--foreground-tertiary)] hover:text-[#00E5A0] transition-colors ml-auto">
+              <button onClick={clearFilters} className="text-xs text-[var(--foreground-tertiary)] hover:text-[var(--primary-ink)] transition-colors ml-auto">
                 Clear all
               </button>
             </div>
@@ -426,7 +426,7 @@ export default function TemplateLibraryPage() {
               {featuredTemplates.length > 0 && (
                 <section>
                   <div className="flex items-center justify-between mb-3">
-                    <h2 className="eh-dash-subtitle font-sora text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
+                    <h2 className="eh-dash-subtitle font-sora text-base font-semibold flex items-center gap-2">
                       <span className="w-1 h-4 rounded-full bg-[var(--primary)]" />
                       Featured
                     </h2>
@@ -465,7 +465,7 @@ export default function TemplateLibraryPage() {
               {popularTemplates.length > 0 && (
                 <section>
                   <div className="flex items-center justify-between mb-3">
-                    <h2 className="eh-dash-subtitle font-sora text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
+                    <h2 className="eh-dash-subtitle font-sora text-base font-semibold flex items-center gap-2">
                       <span className="w-1 h-4 rounded-full bg-[var(--primary)]" />
                       Popular
                     </h2>
@@ -497,7 +497,7 @@ export default function TemplateLibraryPage() {
           <section>
             {viewMode === 'home' && (
               <div className="flex items-center justify-between mb-3">
-                <h2 className="eh-dash-subtitle font-sora text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
+                <h2 className="eh-dash-subtitle font-sora text-base font-semibold flex items-center gap-2">
                   <span className="w-1 h-4 rounded-full bg-[var(--primary)]" />
                   {hasActiveFilters ? 'Search Results' : 'All Templates'}
                   {!loading && <span className="text-xs font-normal text-[var(--foreground-tertiary)] ml-1">({currentTotal})</span>}
@@ -506,7 +506,7 @@ export default function TemplateLibraryPage() {
             )}
             {viewMode === 'your-templates' && (
               <div className="flex items-center justify-between mb-3">
-                <h2 className="eh-dash-subtitle font-sora text-base font-semibold text-[var(--foreground)] flex items-center gap-2">
+                <h2 className="eh-dash-subtitle font-sora text-base font-semibold flex items-center gap-2">
                   <span className="w-1 h-4 rounded-full bg-[var(--primary)]" />
                   Your Templates
                   {!loading && <span className="text-xs font-normal text-[var(--foreground-tertiary)] ml-1">({userTotalCount})</span>}
@@ -564,7 +564,7 @@ export default function TemplateLibraryPage() {
                       </button>
                       <button
                         onClick={() => setShowAIDesigner(true)}
-                        className="px-4 py-2 rounded-lg border border-[#00E5A0]/20 text-[#00E5A0] font-medium text-sm hover:bg-[#00E5A0]/5 transition-all"
+                        className="px-4 py-2 rounded-lg border border-brand/20 text-[var(--primary-ink)] font-medium text-sm hover:bg-brand/5 transition-all"
                       >
                         AI Designer coming soon
                       </button>
@@ -634,7 +634,7 @@ export default function TemplateLibraryPage() {
                             onClick={() => setPage(item as number)}
                             className={`w-9 h-9 rounded-lg text-sm font-medium transition-all ${
                               page === item
-                                ? 'bg-[var(--primary)] text-[#061A21]'
+                                ? 'bg-[var(--primary)] text-[var(--lw-on-forest)]'
                                 : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]'
                             }`}
                           >
@@ -704,7 +704,7 @@ export default function TemplateLibraryPage() {
               >
                 {cloning ? (
                   <>
-                    <div className="w-3.5 h-3.5 border-2 border-[#061A21]/30 border-t-[#061A21] rounded-full animate-spin" />
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     Cloning...
                   </>
                 ) : (
@@ -736,7 +736,7 @@ export default function TemplateLibraryPage() {
               <button
                 onClick={handleDelete}
                 disabled={deleting}
-                className="px-5 py-2 text-sm font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all disabled:opacity-50 flex items-center gap-2"
+                className="px-5 py-2 text-sm font-semibold bg-[var(--danger-solid)] text-white rounded-lg hover:bg-[var(--danger-solid-hover)] transition-all disabled:opacity-50 flex items-center gap-2"
               >
                 {deleting ? (
                   <>

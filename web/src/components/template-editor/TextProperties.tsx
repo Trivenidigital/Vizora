@@ -83,12 +83,17 @@ export default function TextProperties({
   }, [localText, propagateText]);
 
   const fontSize = parseInt(styles.fontSize || '16', 10);
+  /*
+   * NOT chrome — do not tokenise. This is the fallback handed to
+   * `<input type="color">` for the CUSTOMER'S own design value when the
+   * selected element carries none. Customer content (plan D4/D7).
+   */
   const colorHex = rgbToHex(styles.color || '#ffffff');
   const currentAlign = styles.textAlign || 'left';
 
   const labelClass = 'block text-xs font-medium text-[var(--foreground-tertiary)] mb-1';
   const inputClass =
-    'w-full bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500';
+    'w-full bg-[var(--surface)] border border-[var(--border)] rounded px-2 py-1.5 text-sm text-[var(--foreground)] focus:outline-none focus:border-[var(--primary-ink)]';
 
   return (
     <div className="space-y-4">
@@ -135,14 +140,14 @@ export default function TextProperties({
       {/* Font Size */}
       <div>
         <label className={labelClass}>
-          Font Size <span className="text-gray-500">{fontSize}px</span>
+          Font Size <span className="text-[var(--foreground-tertiary)]">{fontSize}px</span>
         </label>
         <input
           type="range"
           min={12}
           max={120}
           value={fontSize}
-          className="w-full accent-emerald-500"
+          className="w-full accent-[var(--primary-ink)]"
           onChange={(e) =>
             onPropertyChange(
               elementId,
@@ -179,7 +184,7 @@ export default function TextProperties({
           <input
             type="color"
             value={colorHex}
-            className="h-8 w-8 cursor-pointer rounded border border-gray-600 bg-transparent p-0"
+            className="h-8 w-8 cursor-pointer rounded border border-[var(--border)] bg-transparent p-0"
             onChange={(e) =>
               onPropertyChange(elementId, 'color', styles.color || '', e.target.value)
             }
@@ -197,8 +202,8 @@ export default function TextProperties({
               key={a.value}
               className={`flex-1 rounded px-2 py-1.5 text-sm font-medium transition-colors ${
                 currentAlign === a.value
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-gray-700 text-[var(--foreground-tertiary)] hover:bg-gray-600'
+                  ? 'bg-[var(--primary)] text-[var(--lw-on-forest)]'
+                  : 'bg-[var(--surface-hover)] text-[var(--foreground-secondary)] hover:bg-[var(--background-tertiary)]'
               }`}
               onClick={() =>
                 onPropertyChange(elementId, 'textAlign', styles.textAlign || 'left', a.value)

@@ -69,7 +69,7 @@ export default function CreateTemplatePage() {
   if (user?.isSuperAdmin !== true) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-        <Icon name="shield" size="3xl" className="text-red-500 mb-4" />
+        <Icon name="shield" size="3xl" className="text-[var(--error-ink)] mb-4" />
         <h2 className="text-xl font-semibold text-[var(--foreground)] mb-2">
           Access Denied
         </h2>
@@ -78,7 +78,7 @@ export default function CreateTemplatePage() {
         </p>
         <Link
           href="/dashboard/templates"
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition font-semibold text-sm"
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition font-semibold text-sm"
         >
           <Icon name="chevronLeft" size="sm" />
           Back to Templates
@@ -177,7 +177,7 @@ export default function CreateTemplatePage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition font-semibold shadow-md hover:shadow-lg text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition font-semibold shadow-md hover:shadow-lg text-sm disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {saving ? (
               <>
@@ -193,8 +193,8 @@ export default function CreateTemplatePage() {
 
       {/* Error Banner */}
       {error && (
-        <div className="flex items-center gap-3 px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-          <Icon name="error" size="md" className="text-red-500 shrink-0" />
+        <div className="flex items-center gap-3 px-4 py-3 bg-[var(--status-offline-bg)] border border-error-ink/30 rounded-lg">
+          <Icon name="error" size="md" className="text-[var(--error-ink)] shrink-0" />
           <p className="text-sm text-[var(--error-ink)] flex-1">{error}</p>
           <button
             onClick={() => setError(null)}
@@ -224,7 +224,7 @@ export default function CreateTemplatePage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Restaurant Daily Specials"
-              className="w-full px-4 py-2.5 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0]/50 focus:border-[#00E5A0] text-[var(--foreground)] bg-[var(--background)] placeholder:text-[var(--foreground-tertiary)]"
+              className="w-full px-4 py-2.5 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-brand/50 focus:border-[var(--primary-ink)] text-[var(--foreground)] bg-[var(--background)] placeholder:text-[var(--foreground-tertiary)]"
             />
           </div>
 
@@ -242,7 +242,7 @@ export default function CreateTemplatePage() {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe what this template is for and how to use it..."
               rows={3}
-              className="w-full px-4 py-2.5 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0]/50 focus:border-[#00E5A0] text-[var(--foreground)] bg-[var(--background)] placeholder:text-[var(--foreground-tertiary)] resize-none"
+              className="w-full px-4 py-2.5 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-brand/50 focus:border-[var(--primary-ink)] text-[var(--foreground)] bg-[var(--background)] placeholder:text-[var(--foreground-tertiary)] resize-none"
             />
           </div>
 
@@ -284,7 +284,7 @@ export default function CreateTemplatePage() {
                 id="template-category"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0]/50 focus:border-[#00E5A0] text-[var(--foreground)] bg-[var(--background)] text-sm"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-brand/50 focus:border-[var(--primary-ink)] text-[var(--foreground)] bg-[var(--background)] text-sm"
               >
                 {CATEGORIES.map((c) => (
                   <option key={c.value} value={c.value}>
@@ -306,7 +306,7 @@ export default function CreateTemplatePage() {
                 id="template-difficulty"
                 value={difficulty}
                 onChange={(e) => setDifficulty(e.target.value)}
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0]/50 focus:border-[#00E5A0] text-[var(--foreground)] bg-[var(--background)] text-sm"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-brand/50 focus:border-[var(--primary-ink)] text-[var(--foreground)] bg-[var(--background)] text-sm"
               >
                 {DIFFICULTIES.map((d) => (
                   <option key={d.value} value={d.value}>
@@ -328,7 +328,7 @@ export default function CreateTemplatePage() {
                 id="template-orientation"
                 value={orientation}
                 onChange={(e) => setOrientation(e.target.value)}
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0]/50 focus:border-[#00E5A0] text-[var(--foreground)] bg-[var(--background)] text-sm"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-brand/50 focus:border-[var(--primary-ink)] text-[var(--foreground)] bg-[var(--background)] text-sm"
               >
                 {ORIENTATIONS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -352,7 +352,7 @@ export default function CreateTemplatePage() {
                 value={tags}
                 onChange={(e) => setTags(e.target.value)}
                 placeholder="e.g., food, menu, daily"
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0]/50 focus:border-[#00E5A0] text-[var(--foreground)] bg-[var(--background)] text-sm placeholder:text-[var(--foreground-tertiary)]"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-brand/50 focus:border-[var(--primary-ink)] text-[var(--foreground)] bg-[var(--background)] text-sm placeholder:text-[var(--foreground-tertiary)]"
               />
               <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
                 Comma-separated
@@ -378,7 +378,7 @@ export default function CreateTemplatePage() {
                 }
                 min={1}
                 max={300}
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0]/50 focus:border-[#00E5A0] text-[var(--foreground)] bg-[var(--background)] text-sm"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-brand/50 focus:border-[var(--primary-ink)] text-[var(--foreground)] bg-[var(--background)] text-sm"
               />
               <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
                 1 - 300 seconds
@@ -399,7 +399,7 @@ export default function CreateTemplatePage() {
                 value={thumbnailUrl}
                 onChange={(e) => setThumbnailUrl(e.target.value)}
                 placeholder="https://example.com/thumbnail.png"
-                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0]/50 focus:border-[#00E5A0] text-[var(--foreground)] bg-[var(--background)] text-sm placeholder:text-[var(--foreground-tertiary)]"
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-brand/50 focus:border-[var(--primary-ink)] text-[var(--foreground)] bg-[var(--background)] text-sm placeholder:text-[var(--foreground-tertiary)]"
               />
             </div>
           </div>
