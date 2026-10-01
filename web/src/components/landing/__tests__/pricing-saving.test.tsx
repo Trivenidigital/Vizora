@@ -35,6 +35,25 @@ const INR: PricingData = {
   locale: 'en-IN',
 };
 
+/*
+ * SYNTHETIC, and deliberately not a real region.
+ *
+ * Both live regions now have Pro as their best tier, so the real fixtures can no
+ * longer prove that the function takes a MAXIMUM rather than reading a fixed
+ * index — a `pricing.pro` hardcode would pass every USD and INR case above.
+ * Pinning that against invented numbers is also stronger than relying on two
+ * real regions happening to disagree, which is a property of this quarter prices
+ * rather than of the code.
+ */
+const BASIC_WINS: PricingData = {
+  region: 'US',
+  currency: 'USD',
+  symbol: '$',
+  basic: { monthly: 10, annual: 5 },
+  pro: { monthly: 10, annual: 8 },
+  locale: 'en-US',
+};
+
 const pct = (annual: number, monthly: number) => Math.round((1 - annual / monthly) * 100);
 
 describe('annualSavingPercent', () => {
@@ -53,6 +72,12 @@ describe('annualSavingPercent', () => {
     expect(pct(525, 749)).toBe(30);
     expect(annualSavingPercent(INR)).toBe(30);
     expect(annualSavingPercent(INR)).toBe(annualSavingPercent(USD));
+  });
+
+  it('takes BASIC when basic is the better tier, so it is a maximum not an index', () => {
+    expect(pct(5, 10)).toBe(50);
+    expect(pct(8, 10)).toBe(20);
+    expect(annualSavingPercent(BASIC_WINS)).toBe(50);
   });
 
   it('claims nothing when there is no pricing to claim it from', () => {
