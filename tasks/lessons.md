@@ -426,3 +426,23 @@ Three corrections were needed this session, all the same shape — a conclusion 
      someone, and expect them to go and measure instead.
   4. Distinguish "measured and passing" from "not measured" in the output. The fixed harness
      reports `unmeasurable=N` separately, so "no findings" can no longer mean two different things.
+
+## 2026-10-01 — Grep the shared stylesheet before writing a per-component override
+
+- During B19 a coder measured two chart legend colours as failing AA, wrote a per-wrapper
+  correction, and then found `globals.css:1672` already did exactly that — same two numbers in its
+  docblock, same reasoning, same note about needing `!important` because the colour is inline.
+  They deleted their duplicate.
+- Their own framing is the right one and better than praising the deletion: *deleting the
+  duplicate was only the harder call because it had already been written.* The cheap version of
+  the discipline is to grep the shared stylesheet for the selector BEFORE writing a component-level
+  override. That saves the work instead of requiring the judgment to throw it away.
+- This codebase makes the trap likely: `globals.css` already carries a number of measured
+  corrections for third-party markup (recharts legend items, pie labels, the consent bar), each
+  with its reasoning in a docblock. A component-level copy of one of them is invisible in review,
+  silently doubles the rule, and drifts the moment the shared one is retuned.
+- **Rule:** before adding a colour/contrast override for a third-party component, grep
+  `web/src/app/globals.css` for the selector and for the component's class prefix. If a rule
+  exists, extend or fix it there. If your independent measurement disagrees with its docblock,
+  that is a finding worth reporting either way — agreeing numbers cross-check the existing fix,
+  disagreeing numbers mean one of you is measuring the wrong thing.
