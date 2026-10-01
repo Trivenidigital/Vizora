@@ -24,7 +24,7 @@ export default async function SchedulesPage() {
         </p>
         <Link
           href="/dashboard/devices"
-          className="inline-block px-4 py-2 bg-[#00E5A0] text-[#061A21] text-sm font-semibold rounded-md hover:bg-[#00CC8E] transition-colors"
+          className="inline-block px-4 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] text-sm font-semibold rounded-md hover:bg-[var(--primary-light)] transition-colors"
         >
           Go to Devices
         </Link>

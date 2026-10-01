@@ -147,12 +147,20 @@ export default function ScheduleCalendar({
      * so the ordering survives a greyscale screenshot. Each fill carries an ink
      * measured against it: inactive 4.75:1, low 11.89:1, medium 4.79:1,
      * high 9.70:1.
+     *
+     * The inactive chip carried `opacity: 0.6` as well, and that made the 4.75:1
+     * above FALSE: group opacity composites the fill AND its label toward the
+     * calendar surface together, so the label actually rendered at 2.26:1 on its
+     * own chip. The quiet is already carried by the fill — `--status-neutral-bg`
+     * is the lightest of the four — so the opacity was buying nothing and
+     * costing the schedule name. Removing it is what makes the measured number
+     * the rendered one. Do not reintroduce it: dimming a whole element is not a
+     * contrast-safe way to say "inactive".
      */
     if (!schedule.isActive) {
       return {
         style: {
           backgroundColor: 'var(--status-neutral-bg)',
-          opacity: 0.6,
           color: 'var(--foreground-tertiary)',
           borderRadius: '4px',
           border: 'none',

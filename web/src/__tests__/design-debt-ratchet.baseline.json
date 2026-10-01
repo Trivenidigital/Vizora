@@ -3,11 +3,11 @@
   "measuredOn": "2026-10-01",
   "measuredOver": "319 .ts/.tsx/.js/.cjs/.mjs files under web/src, excluding components/landing, theme/palette.js, __tests__, *.test.*, *.spec.*, *.d.ts",
   "counts": {
-    "hexLiterals": 336,
-    "tailwindArbitraryColors": 132,
-    "rawPaletteClasses": 385,
-    "darkVariants": 129,
+    "hexLiterals": 304,
+    "tailwindArbitraryColors": 100,
+    "rawPaletteClasses": 346,
+    "darkVariants": 114,
     "darkThemeForegroundShades": 0,
-    "midShadeText": 37
+    "midShadeText": 29
   }
 }
