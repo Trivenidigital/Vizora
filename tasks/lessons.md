@@ -396,3 +396,33 @@ Three corrections were needed this session, all the same shape — a conclusion 
   a no-op, a live one as a conversion, and a shorthand collision (`border` vs `border-l-4` /
   `border-red-500`) as the correctness bug it is — the validation border and the active stripe
   had never rendered.
+
+## 2026-10-01 — A measuring instrument needs a control that fails, and a back-calculated cause is still a hypothesis
+
+- Phase 5 of the web redesign rested on `scripts/design/audit-surface.mjs`, which computes WCAG
+  contrast on live nodes. It was wrong **twice**, in two unrelated ways, and both times the thing
+  that caught it was comparing its output against the rendered page rather than trusting it.
+  1. It read CSS `color`. SVG text is painted by `fill`. That produced one false positive and
+     **three false negatives** — including that a genuine 2.45:1 chart label was invisible to it,
+     so the harness would have MISSED the defect it later reported once the defect was fixed. It
+     only ever caught the real one because that node happened to inherit a failing `color`.
+  2. The replacement ground hit-test accepted a `<defs><clipPath><rect>`: never painted, fill
+     defaults to black, bbox covers the plot area. The UA `display: none` sits on `<defs>`, not on
+     its children, so the child's own computed display is normal.
+- **I back-calculated the phantom ground from the ratio and concluded "forest `#1f4230`".** The
+  real ground was black. The two differ by 0.005 at two decimals (1.3739 vs 1.3685). The coder
+  ignored my confident cause, reproduced the markup from the real components, and found the actual
+  element. Had they taken my word, the fix would have targeted a coordinate-transform bug that did
+  not exist.
+- **Rules:**
+  1. A tool that reports "no findings" must be able to prove it would have reported a finding.
+     Every control set needs a case that FAILS on the old code and a deliberately-naive variant
+     that fails *backwards*, or the controls are agreeing with both implementations and proving
+     nothing.
+  2. Build the fixture from the real components, not from your model of their markup. The B17
+     control set was written from a remembered picture of recharts' output and was missing the one
+     element that caused the bug.
+  3. A cause derived by arithmetic from a symptom is a hypothesis. Say so when handing it to
+     someone, and expect them to go and measure instead.
+  4. Distinguish "measured and passing" from "not measured" in the output. The fixed harness
+     reports `unmeasurable=N` separately, so "no findings" can no longer mean two different things.
