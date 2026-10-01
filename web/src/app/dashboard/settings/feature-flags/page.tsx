@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useToast } from '@/lib/hooks/useToast';
+import { Switch } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -113,26 +114,11 @@ export default function FeatureFlagsPage() {
                 <div className="font-medium text-[var(--foreground)]">{name}</div>
                 <div className="text-sm text-[var(--foreground-secondary)]">{description}</div>
               </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={flags[key] !== false}
+              <Switch
+                checked={flags[key] !== false}
                 disabled={!isAdmin}
-                onClick={() => handleToggle(key)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--primary-ink)] focus:ring-offset-2 disabled:opacity-50 ${
-                  flags[key] !== false
-                    ? 'bg-brand'
-                    : 'bg-[var(--border-dark)]'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full transition-transform ${
-                    flags[key] !== false
-                      ? 'bg-white translate-x-6'
-                      : 'bg-[var(--foreground-tertiary)] translate-x-1'
-                  }`}
-                />
-              </button>
+                onChange={() => handleToggle(key)}
+              />
             </label>
           ))}
         </div>
