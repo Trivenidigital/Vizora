@@ -6196,7 +6196,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - same cause as templates/new/page.tsx:162; marked 2026-10-01, row kept",
+    "whyNotANoOp": "`.eh-heading` sets font-family, letter-spacing and line-height and NO colour (globals.css:947, and it is the only `.eh-heading` rule in the file). Nothing overrides the utility, so `text-[var(--foreground)]` here is load-bearing and must NOT be deleted. The scan that built this list matched on co-occurrence with an `.eh-*` class rather than on whether that class sets the same PROPERTY; check the rule before acting on any other row."
    },
    {
     "file": "app/(auth)/forgot-password-content.tsx",
@@ -6206,7 +6208,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - same cause as templates/new/page.tsx:162; marked 2026-10-01, row kept",
+    "whyNotANoOp": "`.eh-heading` sets font-family, letter-spacing and line-height and NO colour (globals.css:947, and it is the only `.eh-heading` rule in the file). Nothing overrides the utility, so `text-[var(--foreground)]` here is load-bearing and must NOT be deleted. The scan that built this list matched on co-occurrence with an `.eh-*` class rather than on whether that class sets the same PROPERTY; check the rule before acting on any other row."
    },
    {
     "file": "app/(auth)/login-content.tsx",
@@ -6216,7 +6220,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - same cause as templates/new/page.tsx:162; marked 2026-10-01, row kept",
+    "whyNotANoOp": "`.eh-heading` sets font-family, letter-spacing and line-height and NO colour (globals.css:947, and it is the only `.eh-heading` rule in the file). Nothing overrides the utility, so `text-[var(--foreground)]` here is load-bearing and must NOT be deleted. The scan that built this list matched on co-occurrence with an `.eh-*` class rather than on whether that class sets the same PROPERTY; check the rule before acting on any other row."
    },
    {
     "file": "app/(auth)/login-content.tsx",
@@ -6226,7 +6232,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - same cause as templates/new/page.tsx:162; marked 2026-10-01, row kept",
+    "whyNotANoOp": "`.eh-heading` sets font-family, letter-spacing and line-height and NO colour (globals.css:947, and it is the only `.eh-heading` rule in the file). Nothing overrides the utility, so `text-[var(--foreground)]` here is load-bearing and must NOT be deleted. The scan that built this list matched on co-occurrence with an `.eh-*` class rather than on whether that class sets the same PROPERTY; check the rule before acting on any other row."
    },
    {
     "file": "app/(auth)/register-content.tsx",
@@ -6236,7 +6244,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - same cause as templates/new/page.tsx:162; marked 2026-10-01, row kept",
+    "whyNotANoOp": "`.eh-heading` sets font-family, letter-spacing and line-height and NO colour (globals.css:947, and it is the only `.eh-heading` rule in the file). Nothing overrides the utility, so `text-[var(--foreground)]` here is load-bearing and must NOT be deleted. The scan that built this list matched on co-occurrence with an `.eh-*` class rather than on whether that class sets the same PROPERTY; check the rule before acting on any other row."
    },
    {
     "file": "app/(auth)/reset-password-content.tsx",
@@ -6246,7 +6256,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - same cause as templates/new/page.tsx:162; marked 2026-10-01, row kept",
+    "whyNotANoOp": "`.eh-heading` sets font-family, letter-spacing and line-height and NO colour (globals.css:947, and it is the only `.eh-heading` rule in the file). Nothing overrides the utility, so `text-[var(--foreground)]` here is load-bearing and must NOT be deleted. The scan that built this list matched on co-occurrence with an `.eh-*` class rather than on whether that class sets the same PROPERTY; check the rule before acting on any other row."
    },
    {
     "file": "app/(auth)/reset-password-content.tsx",
@@ -6256,7 +6268,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - same cause as templates/new/page.tsx:162; marked 2026-10-01, row kept",
+    "whyNotANoOp": "`.eh-heading` sets font-family, letter-spacing and line-height and NO colour (globals.css:947, and it is the only `.eh-heading` rule in the file). Nothing overrides the utility, so `text-[var(--foreground)]` here is load-bearing and must NOT be deleted. The scan that built this list matched on co-occurrence with an `.eh-*` class rather than on whether that class sets the same PROPERTY; check the rule before acting on any other row."
    },
    {
     "file": "app/(auth)/reset-password-content.tsx",
@@ -6266,7 +6280,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - same cause as templates/new/page.tsx:162; marked 2026-10-01, row kept",
+    "whyNotANoOp": "`.eh-heading` sets font-family, letter-spacing and line-height and NO colour (globals.css:947, and it is the only `.eh-heading` rule in the file). Nothing overrides the utility, so `text-[var(--foreground)]` here is load-bearing and must NOT be deleted. The scan that built this list matched on co-occurrence with an `.eh-*` class rather than on whether that class sets the same PROPERTY; check the rule before acting on any other row."
    },
    {
     "file": "app/admin/components/AdminSidebar.tsx",
@@ -6659,7 +6675,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - same cause as templates/new/page.tsx:162; marked 2026-10-01, row kept",
+    "whyNotANoOp": "`.eh-heading` sets font-family, letter-spacing and line-height and NO colour (globals.css:947, and it is the only `.eh-heading` rule in the file). Nothing overrides the utility, so `text-[var(--foreground)]` here is load-bearing and must NOT be deleted. The scan that built this list matched on co-occurrence with an `.eh-*` class rather than on whether that class sets the same PROPERTY; check the rule before acting on any other row."
    },
    {
     "file": "app/dashboard/settings/api-keys/page.tsx",
@@ -6669,7 +6687,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - same cause as templates/new/page.tsx:162; marked 2026-10-01, row kept",
+    "whyNotANoOp": "`.eh-heading` sets font-family, letter-spacing and line-height and NO colour (globals.css:947, and it is the only `.eh-heading` rule in the file). Nothing overrides the utility, so `text-[var(--foreground)]` here is load-bearing and must NOT be deleted. The scan that built this list matched on co-occurrence with an `.eh-*` class rather than on whether that class sets the same PROPERTY; check the rule before acting on any other row."
    },
    {
     "file": "app/dashboard/settings/audit-log/page-client.tsx",
@@ -6679,7 +6699,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - same cause as templates/new/page.tsx:162; marked 2026-10-01, row kept",
+    "whyNotANoOp": "`.eh-heading` sets font-family, letter-spacing and line-height and NO colour (globals.css:947, and it is the only `.eh-heading` rule in the file). Nothing overrides the utility, so `text-[var(--foreground)]` here is load-bearing and must NOT be deleted. The scan that built this list matched on co-occurrence with an `.eh-*` class rather than on whether that class sets the same PROPERTY; check the rule before acting on any other row."
    },
    {
     "file": "app/dashboard/settings/billing/history/page.tsx",
@@ -6689,7 +6711,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - same cause as templates/new/page.tsx:162; marked 2026-10-01, row kept",
+    "whyNotANoOp": "`.eh-heading` sets font-family, letter-spacing and line-height and NO colour (globals.css:947, and it is the only `.eh-heading` rule in the file). Nothing overrides the utility, so `text-[var(--foreground)]` here is load-bearing and must NOT be deleted. The scan that built this list matched on co-occurrence with an `.eh-*` class rather than on whether that class sets the same PROPERTY; check the rule before acting on any other row."
    },
    {
     "file": "app/dashboard/settings/billing/history/page.tsx",
@@ -6699,7 +6723,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - same cause as templates/new/page.tsx:162; marked 2026-10-01, row kept",
+    "whyNotANoOp": "`.eh-heading` sets font-family, letter-spacing and line-height and NO colour (globals.css:947, and it is the only `.eh-heading` rule in the file). Nothing overrides the utility, so `text-[var(--foreground)]` here is load-bearing and must NOT be deleted. The scan that built this list matched on co-occurrence with an `.eh-*` class rather than on whether that class sets the same PROPERTY; check the rule before acting on any other row."
    },
    {
     "file": "app/dashboard/settings/billing/page.tsx",
@@ -6709,7 +6735,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - same cause as templates/new/page.tsx:162; marked 2026-10-01, row kept",
+    "whyNotANoOp": "`.eh-heading` sets font-family, letter-spacing and line-height and NO colour (globals.css:947, and it is the only `.eh-heading` rule in the file). Nothing overrides the utility, so `text-[var(--foreground)]` here is load-bearing and must NOT be deleted. The scan that built this list matched on co-occurrence with an `.eh-*` class rather than on whether that class sets the same PROPERTY; check the rule before acting on any other row."
    },
    {
     "file": "app/dashboard/settings/billing/page.tsx",
@@ -6719,7 +6747,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - same cause as templates/new/page.tsx:162; marked 2026-10-01, row kept",
+    "whyNotANoOp": "`.eh-heading` sets font-family, letter-spacing and line-height and NO colour (globals.css:947, and it is the only `.eh-heading` rule in the file). Nothing overrides the utility, so `text-[var(--foreground)]` here is load-bearing and must NOT be deleted. The scan that built this list matched on co-occurrence with an `.eh-*` class rather than on whether that class sets the same PROPERTY; check the rule before acting on any other row."
    },
    {
     "file": "app/dashboard/settings/billing/plans/page.tsx",
@@ -6729,7 +6759,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - same cause as templates/new/page.tsx:162; marked 2026-10-01, row kept",
+    "whyNotANoOp": "`.eh-heading` sets font-family, letter-spacing and line-height and NO colour (globals.css:947, and it is the only `.eh-heading` rule in the file). Nothing overrides the utility, so `text-[var(--foreground)]` here is load-bearing and must NOT be deleted. The scan that built this list matched on co-occurrence with an `.eh-*` class rather than on whether that class sets the same PROPERTY; check the rule before acting on any other row."
    },
    {
     "file": "app/dashboard/settings/billing/plans/page.tsx",
@@ -6739,7 +6771,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - same cause as templates/new/page.tsx:162; marked 2026-10-01, row kept",
+    "whyNotANoOp": "`.eh-heading` sets font-family, letter-spacing and line-height and NO colour (globals.css:947, and it is the only `.eh-heading` rule in the file). Nothing overrides the utility, so `text-[var(--foreground)]` here is load-bearing and must NOT be deleted. The scan that built this list matched on co-occurrence with an `.eh-*` class rather than on whether that class sets the same PROPERTY; check the rule before acting on any other row."
    },
    {
     "file": "app/dashboard/settings/customization/page.tsx",
@@ -6749,7 +6783,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - same cause as templates/new/page.tsx:162; marked 2026-10-01, row kept",
+    "whyNotANoOp": "`.eh-heading` sets font-family, letter-spacing and line-height and NO colour (globals.css:947, and it is the only `.eh-heading` rule in the file). Nothing overrides the utility, so `text-[var(--foreground)]` here is load-bearing and must NOT be deleted. The scan that built this list matched on co-occurrence with an `.eh-*` class rather than on whether that class sets the same PROPERTY; check the rule before acting on any other row."
    },
    {
     "file": "app/dashboard/settings/feature-flags/page.tsx",
@@ -7280,7 +7316,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - same cause as templates/new/page.tsx:162; marked 2026-10-01, row kept",
+    "whyNotANoOp": "`.eh-heading` sets font-family, letter-spacing and line-height and NO colour (globals.css:947, and it is the only `.eh-heading` rule in the file). Nothing overrides the utility, so `text-[var(--foreground)]` here is load-bearing and must NOT be deleted. The scan that built this list matched on co-occurrence with an `.eh-*` class rather than on whether that class sets the same PROPERTY; check the rule before acting on any other row."
    },
    {
     "file": "app/dashboard/templates/new/page.tsx",
@@ -7494,7 +7532,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - same cause as templates/new/page.tsx:162; marked 2026-10-01, row kept",
+    "whyNotANoOp": "`.eh-heading` sets font-family, letter-spacing and line-height and NO colour (globals.css:947, and it is the only `.eh-heading` rule in the file). Nothing overrides the utility, so `text-[var(--foreground)]` here is load-bearing and must NOT be deleted. The scan that built this list matched on co-occurrence with an `.eh-*` class rather than on whether that class sets the same PROPERTY; check the rule before acting on any other row."
    },
    {
     "file": "components/auth/MfaChallengeForm.tsx",
@@ -7540,7 +7580,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - same cause as templates/new/page.tsx:162; marked 2026-10-01, row kept",
+    "whyNotANoOp": "`.eh-heading` sets font-family, letter-spacing and line-height and NO colour (globals.css:947, and it is the only `.eh-heading` rule in the file). Nothing overrides the utility, so `text-[var(--foreground)]` here is load-bearing and must NOT be deleted. The scan that built this list matched on co-occurrence with an `.eh-*` class rather than on whether that class sets the same PROPERTY; check the rule before acting on any other row."
    },
    {
     "file": "components/CommandPalette.tsx",
