@@ -38,8 +38,8 @@ const IN_PRICING = {
   region: 'IN',
   currency: 'INR',
   symbol: '₹',
-  basic: { monthly: 399, annual: 317 },
-  pro: { monthly: 599, annual: 483 },
+  basic: { monthly: 499, annual: 375 },
+  pro: { monthly: 749, annual: 525 },
   locale: 'en-IN',
 };
 
@@ -303,7 +303,7 @@ describe('geo-aware pricing', () => {
     const user = userEvent.setup();
     render(<Index />);
 
-    expect(await screen.findByText('₹599', undefined, WAIT)).toBeInTheDocument();
+    expect(await screen.findByText('₹749', undefined, WAIT)).toBeInTheDocument();
 
     const monthly = screen.getByRole('button', { name: /^Monthly$/ });
     const annual = screen.getByRole('button', { name: /Annual/ });
@@ -311,7 +311,7 @@ describe('geo-aware pricing', () => {
     expect(annual).toHaveAttribute('aria-pressed', 'false');
 
     await user.click(annual);
-    expect(screen.getByText('₹483')).toBeInTheDocument();
+    expect(screen.getByText('₹525')).toBeInTheDocument();
     expect(monthly).toHaveAttribute('aria-pressed', 'false');
     expect(annual).toHaveAttribute('aria-pressed', 'true');
 

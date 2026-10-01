@@ -13,8 +13,8 @@ const PRICING = {
     region: 'IN',
     currency: 'INR',
     symbol: '\u20B9',
-    basic: { monthly: 399, annual: 317 },
-    pro: { monthly: 599, annual: 483 },
+    basic: { monthly: 499, annual: 375 },
+    pro: { monthly: 749, annual: 525 },
     locale: 'en-IN',
   },
 };

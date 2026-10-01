@@ -30,8 +30,8 @@ const INR: PricingData = {
   region: 'IN',
   currency: 'INR',
   symbol: '₹',
-  basic: { monthly: 399, annual: 317 },
-  pro: { monthly: 599, annual: 483 },
+  basic: { monthly: 499, annual: 375 },
+  pro: { monthly: 749, annual: 525 },
   locale: 'en-IN',
 };
 
@@ -45,12 +45,14 @@ describe('annualSavingPercent', () => {
     expect(annualSavingPercent(USD)).toBe(30);
   });
 
-  it('takes the BEST tier for INR, which is Basic', () => {
-    // The tiers swap which one leads, so this is not the same assertion twice:
-    // basic 20.6% rounds to 21, pro 19.4% rounds to 19.
-    expect(pct(317, 399)).toBe(21);
-    expect(pct(483, 599)).toBe(19);
-    expect(annualSavingPercent(INR)).toBe(21);
+  it('takes the BEST tier for INR, which is Pro, and lands on the same ceiling', () => {
+    // basic 24.85% rounds to 25, pro 29.91% rounds to 30 — the same pair of
+    // figures USD gives, which is the point: the page must not advertise a
+    // different best saving depending on where the visitor is.
+    expect(pct(375, 499)).toBe(25);
+    expect(pct(525, 749)).toBe(30);
+    expect(annualSavingPercent(INR)).toBe(30);
+    expect(annualSavingPercent(INR)).toBe(annualSavingPercent(USD));
   });
 
   it('claims nothing when there is no pricing to claim it from', () => {
@@ -84,12 +86,12 @@ describe('the rendered badge matches the data it was computed from', () => {
     expect(screen.getByText('Save up to 30%')).toBeInTheDocument();
   });
 
-  it('reads 21% for an India visitor, from the same code path', () => {
+  it('reads 30% for an India visitor too, from the same code path', () => {
     render(
       <PricingSection billingCycle="monthly" setBillingCycle={noop} pricing={INR} setPricing={noop} />,
     );
     expect(screen.getByText(`Save up to ${annualSavingPercent(INR)}%`)).toBeInTheDocument();
-    expect(screen.getByText('Save up to 21%')).toBeInTheDocument();
+    expect(screen.getByText('Save up to 30%')).toBeInTheDocument();
   });
 
   it('renders NO badge before the pricing arrives, rather than a zero', () => {
