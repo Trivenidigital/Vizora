@@ -136,7 +136,7 @@ export default function TeamClient() {
  const getRoleBadgeColor = (role: string) => {
  switch (role) {
  case 'admin':
- return 'bg-purple-500/10 text-purple-700';
+ return 'bg-[var(--cat-purple-bg)] text-[var(--cat-purple)]';
  case 'manager':
  return 'bg-brand/10 text-[var(--primary-ink)]';
  case 'viewer':
@@ -148,8 +148,8 @@ export default function TeamClient() {
 
  const getStatusBadgeColor = (isActive: boolean) => {
  return isActive
- ? 'bg-green-500/10 text-green-700'
- : 'bg-red-500/10 text-red-700';
+ ? 'bg-success/10 text-[var(--success-ink)]'
+ : 'bg-error/10 text-[var(--error-ink)]';
  };
 
  const formatDate = (dateStr: string | null) => {
@@ -185,17 +185,17 @@ export default function TeamClient() {
 
  {/* Temp Password Alert */}
  {tempPasswordInfo && (
- <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+ <div className="bg-warning/10 border border-warning/20 rounded-lg p-4">
  <div className="flex items-start gap-3">
- <Icon name="warning" size="lg" className="text-yellow-600 flex-shrink-0 mt-0.5" />
+ <Icon name="warning" size="lg" className="text-[var(--warning-ink)] flex-shrink-0 mt-0.5" />
  <div className="flex-1">
- <h4 className="font-semibold text-yellow-800">Temporary Password Created</h4>
- <p className="text-sm text-yellow-700 mt-1">
+ <h4 className="font-semibold text-[var(--warning-ink)]">Temporary Password Created</h4>
+ <p className="text-sm text-[var(--warning-ink)] mt-1">
  A temporary password has been generated for <strong>{tempPasswordInfo.email}</strong>.
  Share this password securely - it will not be shown again.
  </p>
  <div className="mt-2 flex items-center gap-2">
- <code className="bg-yellow-500/15 px-3 py-1 rounded text-sm font-mono text-yellow-900">
+ <code className="bg-warning/15 px-3 py-1 rounded text-sm font-mono text-[var(--warning-ink)]">
  {tempPasswordInfo.password}
  </code>
  <button
@@ -203,14 +203,14 @@ export default function TeamClient() {
  navigator.clipboard.writeText(tempPasswordInfo.password);
  toast.success('Password copied to clipboard');
  }}
- className="text-sm text-yellow-700 hover:text-yellow-900 dark:hover:text-yellow-100 underline"
+ className="text-sm text-[var(--warning-ink)] hover:text-[var(--foreground)] underline"
  >
  Copy
  </button>
  </div>
  <button
  onClick={() => setTempPasswordInfo(null)}
- className="mt-2 text-sm text-yellow-600 hover:text-yellow-800 dark:hover:text-[var(--warning-ink)]"
+ className="mt-2 text-sm text-[var(--warning-ink)] hover:text-[var(--foreground)]"
  >
  Dismiss
  </button>
@@ -301,7 +301,7 @@ export default function TeamClient() {
  {user.isActive && (
  <button
  onClick={() => handleDeactivateClick(user)}
- className="text-red-600 hover:text-red-800 dark:hover:text-[var(--error-ink)] hover:bg-red-500/10 px-2 py-1 rounded transition"
+ className="text-[var(--error-ink)] hover:text-[var(--foreground)] hover:bg-error/10 px-2 py-1 rounded transition"
  title="Deactivate"
  >
  <Icon name="delete" size="md" />

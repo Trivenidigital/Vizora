@@ -199,12 +199,12 @@ export default function SecuritySettingsPage() {
                   value={disableCode}
                   onChange={(e) => setDisableCode(e.target.value)}
                   placeholder="123456"
-                  className="eh-input px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  className="eh-input px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--error-ink)] focus:border-transparent"
                 />
                 <button
                   onClick={handleDisable}
                   disabled={busy || disableCode.trim().length < 4}
-                  className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium bg-[var(--danger-solid)] text-white rounded-lg hover:bg-[var(--danger-solid-hover)] transition disabled:opacity-50"
                 >
                   Disable
                 </button>

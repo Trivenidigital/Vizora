@@ -84,7 +84,7 @@ export function PlanCard({ plan, onSelect, onContactSales, isCurrentPlan, isLoad
         <ul className="mt-4 space-y-3">
           {plan.features.map((feature, idx) => (
             <li key={idx} className="flex items-start gap-2 text-sm text-[var(--foreground-secondary)]">
-              <Icon name="check" size="sm" className="text-green-500 flex-shrink-0 mt-0.5" />
+              <Icon name="check" size="sm" className="text-[var(--success-ink)] flex-shrink-0 mt-0.5" />
               <span>{feature}</span>
             </li>
           ))}

@@ -355,7 +355,7 @@ export default function SettingsPage() {
          <button
            onClick={handleRemoveAvatar}
            disabled={avatarUploading}
-           className="px-3 py-1.5 text-sm font-medium text-red-500 border border-error-ink/30 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition disabled:opacity-50"
+           className="px-3 py-1.5 text-sm font-medium text-[var(--error-ink)] border border-error-ink/30 rounded-lg hover:bg-error/10 transition disabled:opacity-50"
          >
            Remove
          </button>
@@ -613,7 +613,7 @@ export default function SettingsPage() {
            {brandingForm.logoPreview && (
              <button
                onClick={() => setBrandingForm({ ...brandingForm, logoPreview: null })}
-               className="px-3 py-1.5 text-sm font-medium text-red-500 border border-error-ink/30 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition"
+               className="px-3 py-1.5 text-sm font-medium text-[var(--error-ink)] border border-error-ink/30 rounded-lg hover:bg-error/10 transition"
              >
                Remove
              </button>
@@ -842,9 +842,9 @@ export default function SettingsPage() {
  </button>
  <button
    onClick={() => setShowDeleteAccountModal(true)}
-   className="w-full px-4 py-3 text-sm bg-red-50 dark:bg-red-900 text-red-600 rounded-lg hover:bg-red-100 dark:hover:bg-red-800 transition font-medium text-left flex items-center gap-2"
+   className="w-full px-4 py-3 text-sm bg-error/10 text-[var(--error-ink)] rounded-lg hover:bg-error/20 transition font-medium text-left flex items-center gap-2"
  >
- <Icon name="warning" size="md" className="text-red-600" />
+ <Icon name="warning" size="md" className="text-[var(--error-ink)]" />
  Delete Account
  </button>
  </div>
@@ -951,11 +951,11 @@ export default function SettingsPage() {
    title="Delete Account"
  >
    <div className="space-y-4">
-     <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-error-ink/30 rounded-lg">
-       <p className="text-sm text-red-700 font-medium mb-2">
+     <div className="p-4 bg-error/10 border border-error-ink/30 rounded-lg">
+       <p className="text-sm text-[var(--error-ink)] font-medium mb-2">
          This action is permanent and cannot be undone.
        </p>
-       <ul className="text-sm text-red-600 list-disc list-inside space-y-1">
+       <ul className="text-sm text-[var(--error-ink)] list-disc list-inside space-y-1">
          <li>All your content, playlists, and schedules will be deleted</li>
          <li>All paired devices will be unpaired and removed</li>
          <li>Your organization will be permanently deleted if you are the sole admin</li>
@@ -963,20 +963,20 @@ export default function SettingsPage() {
        </ul>
      </div>
      {deleteError && (
-       <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-error-ink/30 rounded-lg">
-         <p className="text-sm text-red-600">{deleteError}</p>
+       <div className="p-3 bg-error/10 border border-error-ink/30 rounded-lg">
+         <p className="text-sm text-[var(--error-ink)]">{deleteError}</p>
        </div>
      )}
      <div>
        <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-1">
-         Type <span className="font-mono font-bold text-red-600">DELETE MY ACCOUNT</span> to confirm
+         Type <span className="font-mono font-bold text-[var(--error-ink)]">DELETE MY ACCOUNT</span> to confirm
        </label>
        <input
          type="text"
          value={deleteForm.confirmation}
          onChange={(e) => setDeleteForm({ ...deleteForm, confirmation: e.target.value })}
          placeholder="DELETE MY ACCOUNT"
-         className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+         className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--error-ink)] focus:border-transparent"
        />
      </div>
      <div>
@@ -986,7 +986,7 @@ export default function SettingsPage() {
          value={deleteForm.password}
          onChange={(e) => setDeleteForm({ ...deleteForm, password: e.target.value })}
          placeholder="Enter your password"
-         className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+         className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--error-ink)] focus:border-transparent"
        />
      </div>
      <div className="flex justify-end gap-3 pt-4">
@@ -1003,7 +1003,7 @@ export default function SettingsPage() {
        <button
          onClick={handleDeleteAccount}
          disabled={deleteLoading || deleteForm.confirmation !== 'DELETE MY ACCOUNT' || !deleteForm.password}
-         className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+         className="px-4 py-2 text-sm font-medium bg-[var(--danger-solid)] text-white rounded-lg hover:bg-[var(--danger-solid-hover)] transition disabled:opacity-50 disabled:cursor-not-allowed"
        >
          {deleteLoading ? 'Deleting...' : 'Permanently Delete Account'}
        </button>

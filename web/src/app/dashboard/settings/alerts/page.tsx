@@ -389,8 +389,8 @@ export default function AlertsPage() {
       </div>
 
       {!isAdmin && (
-        <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-warning-ink/30 rounded-lg">
-          <p className="text-sm text-yellow-700">
+        <div className="p-4 bg-warning/10 border border-warning-ink/30 rounded-lg">
+          <p className="text-sm text-[var(--warning-ink)]">
             Only administrators can create or modify alert rules. Contact your admin to change these settings.
           </p>
         </div>
@@ -478,7 +478,7 @@ export default function AlertsPage() {
                       </button>
                       <button
                         onClick={() => setRuleToDelete(rule)}
-                        className="text-red-600 hover:text-red-800 dark:hover:text-[var(--error-ink)] hover:bg-red-500/10 px-3 py-1 rounded transition"
+                        className="text-[var(--error-ink)] hover:text-[var(--foreground)] hover:bg-error/10 px-3 py-1 rounded transition"
                       >
                         Delete
                       </button>
@@ -501,7 +501,7 @@ export default function AlertsPage() {
         <div className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
-              Rule Name <span className="text-red-500">*</span>
+              Rule Name <span className="text-[var(--error-ink)]">*</span>
             </label>
             <input
               type="text"
@@ -561,7 +561,7 @@ export default function AlertsPage() {
             {form.scope === 'display' && (
               <div>
                 <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
-                  Device <span className="text-red-500">*</span>
+                  Device <span className="text-[var(--error-ink)]">*</span>
                 </label>
                 <select
                   value={form.scopeDisplayId}
@@ -578,7 +578,7 @@ export default function AlertsPage() {
             {form.scope === 'group' && (
               <div>
                 <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
-                  Device Group <span className="text-red-500">*</span>
+                  Device Group <span className="text-[var(--error-ink)]">*</span>
                 </label>
                 <select
                   value={form.scopeGroupId}
@@ -607,7 +607,7 @@ export default function AlertsPage() {
           {/* Recipients */}
           <div className="border-t border-[var(--border)] pt-4">
             <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-3">
-              Recipients {!editingRule && <span className="text-red-500">*</span>}
+              Recipients {!editingRule && <span className="text-[var(--error-ink)]">*</span>}
             </label>
 
             {editingRule ? (
@@ -705,7 +705,7 @@ function DraftRecipientsEditor({
             onClick={() => removeRow(i)}
             disabled={recipients.length === 1}
             aria-label="Remove recipient"
-            className="p-2 text-red-500 hover:bg-red-500/10 rounded transition disabled:opacity-30"
+            className="p-2 text-[var(--error-ink)] hover:bg-error/10 rounded transition disabled:opacity-30"
           >
             <Icon name="delete" size="md" />
           </button>
@@ -768,7 +768,7 @@ function RecipientsEditor({
             onClick={() => onRemove(r.id)}
             disabled={actionLoading}
             aria-label="Remove recipient"
-            className="p-1.5 text-red-500 hover:bg-red-500/10 rounded transition disabled:opacity-40"
+            className="p-1.5 text-[var(--error-ink)] hover:bg-error/10 rounded transition disabled:opacity-40"
           >
             <Icon name="delete" size="sm" />
           </button>

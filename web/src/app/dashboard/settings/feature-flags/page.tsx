@@ -90,8 +90,8 @@ export default function FeatureFlagsPage() {
       </div>
 
       {!isAdmin && (
-        <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-warning-ink/30 rounded-lg">
-          <p className="text-sm text-yellow-700">
+        <div className="p-4 bg-warning/10 border border-warning-ink/30 rounded-lg">
+          <p className="text-sm text-[var(--warning-ink)]">
             Only administrators can modify feature flags. Contact your admin to change these settings.
           </p>
         </div>
@@ -122,12 +122,14 @@ export default function FeatureFlagsPage() {
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--primary-ink)] focus:ring-offset-2 disabled:opacity-50 ${
                   flags[key] !== false
                     ? 'bg-brand'
-                    : 'bg-gray-300 dark:bg-gray-600'
+                    : 'bg-[var(--border-dark)]'
                 }`}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    flags[key] !== false ? 'translate-x-6' : 'translate-x-1'
+                  className={`inline-block h-4 w-4 transform rounded-full transition-transform ${
+                    flags[key] !== false
+                      ? 'bg-white translate-x-6'
+                      : 'bg-[var(--foreground-tertiary)] translate-x-1'
                   }`}
                 />
               </button>

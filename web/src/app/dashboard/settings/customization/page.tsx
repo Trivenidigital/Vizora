@@ -99,16 +99,16 @@ export default function CustomizationPage() {
 
  {/* Success Message */}
  {saveSuccess && (
- <div className="bg-success-100 dark:bg-success-900 border border-success-300 dark:border-success-700 rounded-lg p-4">
- <p className="text-success-800 dark:text-success-100 font-medium">
+ <div className="bg-success/10 border border-success-ink/30 rounded-lg p-4">
+ <p className="text-[var(--success-ink)] font-medium">
  Brand configuration saved successfully!
  </p>
  </div>
  )}
 
  {saveError && (
- <div className="bg-red-100 dark:bg-red-900 border border-error-ink/30 rounded-lg p-4">
- <p className="text-red-800 font-medium">
+ <div className="bg-error/10 border border-error-ink/30 rounded-lg p-4">
+ <p className="text-[var(--error-ink)] font-medium">
  {saveError}
  </p>
  </div>
@@ -157,7 +157,7 @@ export default function CustomizationPage() {
  )}
  </div>
  {logoUploadError && (
-   <p className="text-xs text-red-500 mt-1">{logoUploadError}</p>
+   <p className="text-xs text-[var(--error-ink)] mt-1">{logoUploadError}</p>
  )}
  <p className="text-xs text-[var(--foreground-secondary)] mt-1">
  PNG, JPEG, or WebP. Max 2MB.
