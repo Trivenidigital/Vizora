@@ -89,13 +89,26 @@ const KPICard: React.FC<KPICardProps> = ({
  {value}
  </p>
  {change && (
+ /*
+  * All three branches are INKS now. The neutral one was `--accent-warm`, the
+  * brass FILL, which measured 3.10:1 as 14px text on the card — brass is
+  * declared for fills and hairlines and has never been a text token.
+  *
+  * It becomes `--foreground-tertiary` (5.89:1) rather than a warning ink or a
+  * darker brass, for two reasons. `changeType` is hardcoded per call site and
+  * knows nothing about the ratio, so this one branch renders "5/9 devices
+  * online", "9/9 devices online" AND the literal "Unavailable" — a warning ink
+  * would assert an alarm on all three. And `--accent-brass-ink` (6.28:1) does
+  * clear AA, but it would leave a gold beside the green and the red, reading as
+  * a third signal where the prop's own name says there is none.
+  */
  <p
  className={`text-sm mt-2 ${
  changeType === 'positive'
  ? 'text-[var(--success-ink)]'
  : changeType === 'negative'
  ? 'text-[var(--error-ink)]'
- : 'text-[var(--accent-warm)]'
+ : 'text-[var(--foreground-tertiary)]'
  }`}
  >
  {changeType === 'positive' && '↑ '}
