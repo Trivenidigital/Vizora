@@ -7290,7 +7290,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - resolved in B6, row kept so a later reader sees why",
+    "whyNotANoOp": "`.eh-heading` sets font-family, letter-spacing and line-height and NO colour (globals.css:947, and it is the only `.eh-heading` rule in the file). Nothing overrides the utility, so `text-[var(--foreground)]` here is load-bearing and must NOT be deleted. The scan that built this list matched on co-occurrence with an `.eh-*` class rather than on whether that class sets the same PROPERTY; check the rule before acting on any other row."
    },
    {
     "file": "app/dashboard/templates/page.tsx",

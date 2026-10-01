@@ -545,10 +545,13 @@ const TemplateEditorCanvas = forwardRef<CanvasHandle, TemplateEditorCanvasProps>
     const scaledW = TEMPLATE_WIDTH * scale;
     const scaledH = TEMPLATE_HEIGHT * scale;
 
+    // The FRAME is Vizora chrome and takes the viewport tokens — a letterbox
+    // around customer media, the same job as the playlist preview's; everything
+    // inside the iframe below is the customer's design and stays untouched.
     return (
       <div
         ref={containerRef}
-        className={`relative w-full h-full bg-gray-900 rounded-xl border border-gray-700 ${
+        className={`relative w-full h-full bg-[var(--viewport-bg)] rounded-xl border border-[var(--viewport-border)] ${
           isScrollable ? 'overflow-auto' : 'overflow-hidden'
         }`}
       >
