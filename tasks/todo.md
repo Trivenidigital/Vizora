@@ -47,7 +47,10 @@ PNGs OPENED, not just diffed · FROZEN set untouched (`tasks/redesign-colour-map
 - [ ] Phase 5a: computed contrast matrix for every token pairing (light only)
 - [ ] Phase 5b: responsive pass 320/390/768/1440/1920; keyboard + focus-visible; reduced motion
 - [ ] Phase 5c: white-label matrix — 3 tenants (dark brand, light brand, neon) — `readableInk` against the real surface
-- [ ] Phase 5d: final full before/after re-capture (the committed `before/` predates the final harness)
+- [x] Phase 5d final project-level before/after — the committed `before/` predated the final harness, so I re-captured BOTH ends with the SAME harness: `final-before` is pre-redesign `main` (a8df6c16) served from a dedicated worktree on :3105 via `CAPTURE_BASE_URL`, `final-after` is the integration head. 52/52 routes each.
+  - **52/52 changed, 0 identical** — every route moved, as a full rebrand should.
+  - **Horizontal overflow at 390: 3 routes before (admin 459/485/507px), 0 after.** The admin mobile overflow carried as an unfixed finding since September is resolved.
+  - The before set is the honest one: dark Electric Horizon with the Light/Dark toggle still mounted, which is what production serves today.
 - [ ] Phase 5e: full web jest, prod build, Playwright critical path
 - [ ] Update PR #387 title/body (no longer WIP), un-draft #386 + #387
 - [ ] Merge #386 → main; merge #387 → main (sequence, CI fully green on exact head — gate on ALLGREEN)
