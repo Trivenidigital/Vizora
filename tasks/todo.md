@@ -1,5 +1,38 @@
 # Vizora - Task Tracker
 
+## Active Workstream: Full-web Little Worlds redesign — finish and ship (resumed 2026-10-01)
+
+**Owner decisions 2026-10-01 (Sri):** Astra gate on #386 treated as cleared — merge it.
+Scope = B6–B12 + Phase 5 QA; W6 (emails, TV installer) follows as separate PRs. Deploy shape =
+ONE cutover at the end: merge #386 → #387, deploy once via the CI-artifact path.
+
+**Per-batch bar (unchanged):** homepage byte-identical · contrast COMPUTED (`scripts/design/contrast.mjs`),
+never asserted · ratchet re-tightened in the same commit · `no-var-opacity` gate + web suite +
+`next build` exit 0 · harness capture (`scripts/design/baseline.mjs --label after-bN`) with the
+PNGs OPENED, not just diffed · FROZEN set untouched (`tasks/redesign-colour-map.json` → batches[FROZEN]).
+
+- [x] B6 templates — `30eedf87` + follow-up `6f75a033` (letterbox → viewport tokens) + `5ce7b21c` (colour-map: 22 `.eh-heading` override rows are FALSE POSITIVES — the class paints no colour). Evidence: `pre-b6-templates`→`after-b6` (library/new/detail/edit, 8 shots), `pre-b6-editor3`→`after-b6-editor3` (editor via a local org-owned probe template, needs `metadata.isLibraryTemplate=false`). Three live contrast bugs fixed (1.16:1 hero title, white-on-ivory display picker, 1.30:1 placeholder glyph). Ratchet 538/331/529/140/48 → 384/180/426/134/37.
+  - Also closed retroactively: B5 had NO capture; `after-b5` (settings ×5 routes) captured + opened 2026-10-01.
+  - Pre-existing, NOT colour, recorded for later: editor overflows-x 756px at 390 (same before B6); zoom bar lists "50%" twice; "Loading editor…" pill never clears in the harness; `/dashboard/templates` logs 24 thumbnail 404s locally (same before B6).
+- [x] B7 content library — `de2ade2f` (cherry-picked from `feat/app-redesign-b7` 5442bf36; ratchet re-measured on integration: 336/132/385/129/0/37) + `cb9a2dc3` (`.eh-td` row false positive). Four live bugs fixed (invisible Upload plus glyph 1.60:1, three status badges with non-existent `eh-badge-*` classes, 2px realtime dots at 1.7–3.3:1, three confirm buttons under AA). Evidence `pre-b7b8`→`after-b7` (content 1440/390), opened: neon gradient tiles → dark viewport letterboxes, archived badge now styled. Colour-map counts for B7 were stale (60/14 recorded, 41/5 real).
+- [x] B8 schedules — `5364f837` (cherry-picked from `feat/app-redesign-b8` f1efbbc5; ratchet on integration 304/100/346/114/0/29). Four things that had NEVER rendered fixed: validation border on 4 fields (`.eh-input` sets the `border` shorthand later in the cascade → `!border-[var(--error-ink)]` 5.35:1), the active/inactive left stripe on every schedule card (same cause, missed by the colour map), the Tips heading accent, and the calendar's inactive chip (opacity 0.6 compounded to 2.26:1, docblock claimed 4.75). Gate page (`page.tsx`, what prod shows while `NEXT_PUBLIC_SCHEDULES_ENABLED` is unset) button 9.70:1. Evidence `pre-b8-schedules2`→`after-b8` (flag ON, two local fixture schedules), opened.
+  - Backlog (not colour): the four invalid schedule fields set no `aria-invalid`/`aria-describedby`.
+  - Colour-map per-file counts were stale again (69/38 recorded vs 39/15 real) — re-measure before every batch.
+- [ ] B9 widgets configuration chrome (`app/dashboard/widgets/` ONLY; `components/widgets/` is FROZEN); fix the gallery type-map fall-through while there
+- [ ] B10 health, ops, analytics, devices, layouts, playlists, dashboard home/layout (status colours hand-mapped)
+- [ ] B11 display pairing screen + StatusBar + FullscreenButton (renderers FROZEN; viewports stay dark)
+- [ ] B12 global-error.tsx — hand-edit the 4 irreducible literals to Little Worlds values
+- [ ] Phase 5a: computed contrast matrix for every token pairing (light only)
+- [ ] Phase 5b: responsive pass 320/390/768/1440/1920; keyboard + focus-visible; reduced motion
+- [ ] Phase 5c: white-label matrix — 3 tenants (dark brand, light brand, neon) — `readableInk` against the real surface
+- [ ] Phase 5d: final full before/after re-capture (the committed `before/` predates the final harness)
+- [ ] Phase 5e: full web jest, prod build, Playwright critical path
+- [ ] Update PR #387 title/body (no longer WIP), un-draft #386 + #387
+- [ ] Merge #386 → main; merge #387 → main (sequence, CI fully green on exact head — gate on ALLGREEN)
+- [ ] Deploy via CI artifact → `pm2-guard app-reload --env production` → `await-readiness-cli` → `deploy-verify` diff → public-edge marker checks
+- [ ] Post-deploy: homepage markers, login renders light, `/api/v1/docs` → 404, no OOM in dmesg
+- [ ] Record lessons + memory; open W6 as follow-up PRs
+
 ## Active Workstream: FULL homepage redesign — Little Worlds + Studio (2026-09-16)
 
 **Supersedes** the 2026-09-15 residual-gaps workstream below (kept as the record of

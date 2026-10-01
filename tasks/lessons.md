@@ -379,3 +379,20 @@ Three corrections were needed this session, all the same shape — a conclusion 
   experiment loop; the commit is the undo. (3) A script that mutates tracked source must
   restore in a `finally`, and must not run anything that can throw between the mutation and
   the restore.
+
+## 2026-10-01 — A `focus:` ring beside an `.eh-input` is LIVE; a border/colour utility beside it is usually dead
+
+- Found in B8 (schedules). The colour map's T1 list ("component class declared after
+  `@tailwind utilities` wins") lumped every colour utility co-occurring with an `.eh-*` class
+  together. Verified in the emitted bundle by byte offset: base utilities (~31.8k) lose to
+  `.eh-input` (~75.2k), but Tailwind emits `focus:` variants at ~97.8k — AFTER the component
+  rules — so `focus:ring-[#00E5A0]` beat `.eh-input:focus` and the neon ring was live.
+- Second half of the same lesson: the scan matched CO-OCCURRENCE, not SAME PROPERTY. 23 rows
+  (`.eh-heading`, `.eh-td`) named classes that paint no colour at all; deleting on their word
+  would have removed load-bearing utilities. B2–B5 happened not to act on them.
+- **Rule:** never classify a cascade override from the source order of the stylesheet alone.
+  Check (1) that the component class sets the SAME property, (2) the variant layer the utility
+  lives in, and where it matters (3) the byte offset in the emitted CSS. Report a dead utility as
+  a no-op, a live one as a conversion, and a shorthand collision (`border` vs `border-l-4` /
+  `border-red-500`) as the correctness bug it is — the validation border and the active stripe
+  had never rendered.
