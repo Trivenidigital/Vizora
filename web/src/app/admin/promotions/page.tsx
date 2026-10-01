@@ -249,7 +249,7 @@ export default function AdminPromotionsPage() {
                       </button>
                       <button
                         onClick={() => setDeletingPromotion(promo)}
-                        className="p-2 text-[var(--error-ink)] hover:text-[var(--error-ink)] dark:hover:text-[var(--error-ink)] hover:bg-[var(--status-offline-bg)] dark:hover:bg-red-900/20 rounded-lg transition"
+                        className="p-2 text-[var(--error-ink)] hover:bg-[var(--status-offline-bg)] rounded-lg transition"
                         title="Delete"
                       >
                         <Trash2 className="w-4 h-4" />

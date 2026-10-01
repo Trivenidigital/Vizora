@@ -28,13 +28,25 @@ const statusStyles: Record<StepStatus, { circle: string; label: string }> = {
     circle: 'bg-brand text-[var(--lw-on-forest)] animate-pulse',
     label: 'text-[var(--primary-ink)] font-semibold',
   },
+  /*
+   * The LABELS move to the inks, the CIRCLES do not, and the split is measured
+   * rather than stylistic. `text-success-600` is 2.92:1 on the page ground as
+   * 14px bold text, which is not large text and so needs 4.5:1 - a live AA
+   * failure; `text-error-600` was 4.28:1, also short. The inks are 6.33:1 and
+   * 5.74:1. The circles are filled graphics holding a 24px icon, so the 3:1 bar
+   * applies and white on them (3.30:1 and 4.83:1) already clears it - repainting
+   * them would be a visual change with no correctness payoff.
+   *
+   * The connector line between two complete steps DOES move: it is a 2px
+   * graphic on `--background-tertiary` at 2.55:1, under the same 3:1 bar.
+   */
   complete: {
-    circle: 'bg-success-600 dark:bg-success-500 text-white',
-    label: 'text-success-600 dark:text-success-500 font-semibold',
+    circle: 'bg-success-600 text-white',
+    label: 'text-[var(--success-ink)] font-semibold',
   },
   error: {
-    circle: 'bg-error-600 dark:bg-error-500 text-white',
-    label: 'text-error-600 dark:text-error-500 font-semibold',
+    circle: 'bg-error-600 text-white',
+    label: 'text-[var(--error-ink)] font-semibold',
   },
 };
 
@@ -75,7 +87,7 @@ export const Stepper: React.FC<StepperProps> = ({
               <div
                 className={`absolute top-5 left-0 w-12 h-0.5 transform translate-x-10 ${
                   step.status === 'complete'
-                    ? 'bg-success-600 dark:bg-success-500'
+                    ? 'bg-[var(--success-ink)]'
                     : 'bg-[var(--background-tertiary)]'
                 }`}
               />

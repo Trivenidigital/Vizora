@@ -123,7 +123,7 @@ export default function SupportMessage({
         {/* Admin badge */}
         {role === 'admin' && (
           <div className="mb-1">
-            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/20 text-[var(--info-ink)] uppercase tracking-wide">
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[var(--status-pairing-bg)] text-[var(--info-ink)] uppercase tracking-wide">
               Admin
             </span>
           </div>
@@ -133,7 +133,7 @@ export default function SupportMessage({
         <div
           className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
             isUser
-              ? 'bg-brand/15 text-[#d1fae5] rounded-br-md'
+              ? 'bg-brand/15 text-[var(--foreground)] rounded-br-md'
               : 'bg-[var(--background-secondary)] text-[var(--foreground)] rounded-bl-md'
           }`}
         >

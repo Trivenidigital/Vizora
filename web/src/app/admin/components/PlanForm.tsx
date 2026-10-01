@@ -271,7 +271,7 @@ export function PlanForm({ plan, onSubmit, onCancel, isLoading = false }: PlanFo
                   <button
                     type="button"
                     onClick={() => removeFeature(index)}
-                    className="p-2 text-[var(--error-ink)] hover:bg-[var(--status-offline-bg)] dark:hover:bg-red-900/30 rounded-lg transition"
+                    className="p-2 text-[var(--error-ink)] hover:bg-[var(--status-offline-bg)] rounded-lg transition"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>

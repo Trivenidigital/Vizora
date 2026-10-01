@@ -142,7 +142,7 @@ function SortablePlaylistItem({
       {canRemove && (
         <button
           onClick={onRemove}
-          className="text-[var(--error-ink)] hover:text-[var(--error-ink)] p-1 hover:bg-red-50 rounded transition"
+          className="text-[var(--error-ink)] p-1 hover:bg-[var(--status-offline-bg)] rounded transition"
           aria-label="Remove playlist item"
         >
           <Icon name="delete" size="sm" className="text-[var(--error-ink)]" />

@@ -140,7 +140,7 @@ export default function DashboardSectionError({
           Something went wrong loading this section. Please try again.
         </p>
         {process.env.NODE_ENV === 'development' && error.message && (
-          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded text-left">
+          <div className="mb-4 p-3 bg-error/10 border border-error/30 rounded text-left">
             <p className="text-xs text-[var(--error-ink)] font-mono break-words">{error.message}</p>
           </div>
         )}

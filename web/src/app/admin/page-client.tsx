@@ -125,7 +125,7 @@ export default function AdminDashboardClient({ initialStats }: AdminDashboardCli
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-3 h-3 rounded-full bg-green-500" />
+                <div className="w-3 h-3 rounded-full bg-[var(--success)]" />
                 <span className="text-[var(--foreground-secondary)]">Online</span>
               </div>
               <span className="font-semibold text-[var(--foreground)]">

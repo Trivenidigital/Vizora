@@ -86,6 +86,13 @@ interface SparklinePoint {
  * why those live in theme/palette.js. The values here are the semantic inks by
  * value — forest #1f4230, warning #92400e, error #b91c1c — so they track the
  * palette even though they cannot reference it.
+ *
+ * One value in this file was NOT a Little Worlds ink and is now: the DB-latency
+ * card carried a Tailwind blue-500 left over from the old palette, on a card the
+ * rest of which is already tokenised. It takes `--cat-blue` by value - the
+ * ivory-safe identity blue, 7.45:1 on `--surface` - because latency here is an
+ * identity series, not a status. Each literal names its token in a trailing
+ * comment so a palette change can find it.
  */
 function Sparkline({ data, color = '#1f4230', height = 32 }: {
   data: number[];
@@ -304,7 +311,7 @@ export default function SystemHealthClient() {
             value={monitor?.checks?.database ? `${monitor.checks.database.value}ms` : 'N/A'}
             icon={<Database className="w-5 h-5" />}
             sparkData={history.map((h) => h.d)}
-            color="#3B82F6"
+            color="#1d5490" /* = --cat-blue */
           />
         </div>
       )}

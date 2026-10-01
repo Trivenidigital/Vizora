@@ -44,15 +44,22 @@ export function ContentGrid({
     }
   };
 
+  /*
+   * Status tints take the documented `--status-*-bg` pairs. The inks here were
+   * already correct; what moved is the fill under them, from a channel tint of
+   * the semantic colour to the warm badge fill the palette declares, each
+   * measured ink-on-fill in globals.css: online 5.47:1, error 5.41:1,
+   * offline 4.89:1.
+   */
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'ready':
       case 'active':
-        return 'bg-success-500/10 text-success-700 dark:text-success-400';
+        return 'bg-[var(--status-online-bg)] text-[var(--success-ink)]';
       case 'processing':
-        return 'bg-warning-500/10 text-warning-700 dark:text-warning-400';
+        return 'bg-[var(--status-error-bg)] text-[var(--warning-ink)]';
       case 'error':
-        return 'bg-error-500/10 text-error-700 dark:text-error-400';
+        return 'bg-[var(--status-offline-bg)] text-[var(--error-ink)]';
       default:
         return 'bg-[var(--background-secondary)] text-[var(--foreground)]';
     }
@@ -84,6 +91,16 @@ export function ContentGrid({
                 }}
               />
             ) : null}
+            {/*
+              * `text-white` STAYS, and it was measured rather than assumed. This
+              * placeholder sits on a forest-to-brass gradient, so its ground runs
+              * from `--primary` to `--accent-brass`. White measures 4.45:1 at the
+              * gradient midpoint and 3.21:1 at the brass end; `--lw-on-forest`
+              * measures 3.87:1 and 2.78:1 on the same two points, i.e. it drops
+              * BELOW the 3:1 a meaningful graphic needs. globals.css already
+              * names white as brass's companion for large text and icons, so the
+              * tokenised-looking option is the worse one here.
+              */}
             <Icon
               name={getTypeIcon(item.type)}
               size="6xl"
@@ -125,14 +142,14 @@ export function ContentGrid({
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => onPushToDevice(item)}
-                className="text-sm bg-success-500/10 text-success-600 dark:text-success-400 py-2 rounded hover:bg-success-500/20 transition font-medium flex items-center justify-center gap-1"
+                className="text-sm bg-success/10 text-[var(--success-ink)] py-2 rounded hover:bg-success/20 transition font-medium flex items-center justify-center gap-1"
               >
                 <Icon name="push" size="sm" />
                 Push
               </button>
               <button
                 onClick={() => onAddToPlaylist(item)}
-                className="text-sm bg-purple-500/10 text-[var(--accent-brass-ink)] py-2 rounded hover:bg-purple-500/20 transition font-medium flex items-center justify-center gap-1"
+                className="text-sm bg-[var(--surface-secondary)] text-[var(--accent-brass-ink)] py-2 rounded hover:bg-[var(--surface-hover)] transition font-medium flex items-center justify-center gap-1"
               >
                 <Icon name="add" size="sm" />
                 Playlist
@@ -146,7 +163,7 @@ export function ContentGrid({
               </button>
               <button
                 onClick={() => onDelete(item)}
-                className="text-sm bg-error-500/10 text-error-600 dark:text-error-400 py-2 rounded hover:bg-error-500/20 transition font-medium flex items-center justify-center gap-1"
+                className="text-sm bg-error/10 text-[var(--error-ink)] py-2 rounded hover:bg-error/20 transition font-medium flex items-center justify-center gap-1"
               >
                 <Icon name="delete" size="sm" />
                 Delete

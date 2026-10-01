@@ -41,10 +41,24 @@ export const metadata = {
   manifest: '/manifest.json',
 };
 
+/*
+ * `themeColor` is a LITERAL, and it has to be: it is a metadata string handed to
+ * the browser, not a CSS value, so `var(--background)` would resolve to nothing.
+ * Copied from `globals.css` `:root` with the token named beside it.
+ *
+ * It was the Electric Horizon neon, and `public/manifest.json` separately said
+ * Tailwind blue-500 - two different colours for the same browser chrome, neither
+ * of them this product's. Both are now the page ground, so the Android toolbar
+ * and the PWA splash continue the page instead of banding against it, and the
+ * splash no longer flashes pure white before an ivory app paints. The two files
+ * are one decision and are changed together; the alternative reading - a branded
+ * forest bar - would introduce a dark element nothing asked for, which is why
+ * the ground won.
+ */
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#00E5A0',
+  themeColor: '#f5f1e8' /* = --background */,
 };
 
 export default function RootLayout({

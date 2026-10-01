@@ -17,18 +17,28 @@ function formatDate(dateString: string): string {
   return date.toLocaleDateString();
 }
 
+/*
+ * ONE STATUS VOCABULARY across the product, which this did not have. The
+ * customer-facing panel painted `open` amber and `in_progress` blue, while the
+ * admin list (`SupportRequestCard`) painted `open` blue and `in_progress` amber -
+ * so a request looked like a different state depending on who was looking at it.
+ * The summary row above the admin list disagreed with both. All three now use
+ * the documented `--status-*-bg` pairs, measured ink-on-fill in globals.css:
+ * pairing 4.51:1, error 5.41:1, online 5.47:1, neutral 6.46:1 with the
+ * secondary ink this panel already carried.
+ */
 function statusColor(status: string): string {
   switch (status) {
     case 'open':
-      return 'bg-yellow-500/20 text-[var(--warning-ink)]';
+      return 'bg-[var(--status-pairing-bg)] text-[var(--info-ink)]';
     case 'in_progress':
-      return 'bg-blue-500/20 text-[var(--info-ink)]';
+      return 'bg-[var(--status-error-bg)] text-[var(--warning-ink)]';
     case 'resolved':
-      return 'bg-green-500/20 text-[var(--success-ink)]';
+      return 'bg-[var(--status-online-bg)] text-[var(--success-ink)]';
     case 'closed':
-      return 'bg-gray-500/20 text-[var(--foreground-secondary)]';
+      return 'bg-[var(--status-neutral-bg)] text-[var(--foreground-secondary)]';
     default:
-      return 'bg-gray-500/20 text-[var(--foreground-secondary)]';
+      return 'bg-[var(--status-neutral-bg)] text-[var(--foreground-secondary)]';
   }
 }
 

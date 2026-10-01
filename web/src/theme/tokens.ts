@@ -111,11 +111,22 @@ export const tokens = {
     },
   } as const,
 
-  // Focus ring styles — EH neon green
+  /*
+   * Focus ring. The value was still the Electric Horizon neon, which is 1.65:1
+   * on ivory and so could never have been a visible ring on this substrate.
+   *
+   * It is a LITERAL and not `var(--primary-ink)` because this object is consumed
+   * as plain data, not as CSS. It is also currently consumed by NOTHING - a
+   * repo-wide search for `tokens.focus` and `.focus.ring` finds no reader - so
+   * correcting the value is a data fix, not a behaviour change. The live focus
+   * ring is `--accent-ring`, applied by the `.eh-*` component rules in
+   * globals.css. Deleting this is a separate call; leaving it holding a retired
+   * palette value is not.
+   */
   focus: {
     ring: '2px',
     ringOffset: '2px',
-    ringColor: '#00E5A0',
+    ringColor: '#1f4230' /* = --primary / --lw-forest */,
   } as const,
 
   // Container widths

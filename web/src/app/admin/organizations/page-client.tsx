@@ -201,7 +201,7 @@ export default function AdminOrganizationsClient({ initialOrganizations, initial
                               {org.subscriptionStatus !== 'suspended' ? (
                                 <button
                                   onClick={() => { setActionOrg(org); setActionType('suspend'); setMenuOpen(null); }}
-                                  className="w-full text-left px-4 py-2 text-sm text-[var(--error-ink)] hover:bg-[var(--status-offline-bg)] dark:hover:bg-red-900/20 flex items-center gap-2"
+                                  className="w-full text-left px-4 py-2 text-sm text-[var(--error-ink)] hover:bg-[var(--status-offline-bg)] flex items-center gap-2"
                                 >
                                   <Ban className="w-4 h-4" />
                                   Suspend
@@ -209,7 +209,7 @@ export default function AdminOrganizationsClient({ initialOrganizations, initial
                               ) : (
                                 <button
                                   onClick={() => { setActionOrg(org); setActionType('unsuspend'); setMenuOpen(null); }}
-                                  className="w-full text-left px-4 py-2 text-sm text-[var(--success-ink)] hover:bg-[var(--status-online-bg)] dark:hover:bg-green-900/20 flex items-center gap-2"
+                                  className="w-full text-left px-4 py-2 text-sm text-[var(--success-ink)] hover:bg-[var(--status-online-bg)] flex items-center gap-2"
                                 >
                                   <Play className="w-4 h-4" />
                                   Reactivate

@@ -163,7 +163,7 @@ export default function AdminAnalyticsClient({ initialStats }: AdminAnalyticsCli
               </div>
               <div className="h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-green-500 rounded-full transition-all"
+                  className="h-full bg-[var(--success-ink)] rounded-full transition-all"
                   style={{ width: `${stats?.totalScreens ? ((stats.onlineScreens || 0) / stats.totalScreens) * 100 : 0}%` }}
                 />
               </div>

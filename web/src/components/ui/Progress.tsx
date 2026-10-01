@@ -16,12 +16,25 @@ interface ProgressProps {
   className?: string;
 }
 
+/*
+ * The INKS, not the `-600` fills, and that is a correctness fix rather than a
+ * palette preference. The filled portion of a progress bar is a meaningful
+ * graphic, so WCAG 1.4.11 asks 3:1 against the track it sits in - and the track
+ * is `--background-tertiary`. Measured there, three of the four failed:
+ * success-600 2.55:1, warning-600 2.47:1, info-600 2.66:1; only error-600
+ * (3.74:1) and `bg-brand` (8.66:1) cleared. The inks clear comfortably:
+ * success 5.53:1, warning 5.49:1, error 5.01:1, info 4.51:1.
+ *
+ * None of this was visible to the colour-debt ratchet - its regex lists the
+ * Tailwind hue families and not `success|warning|error|info`, so these classes
+ * are uncounted either way. The dark-variant partners went with the dark theme.
+ */
 const variantStyles: Record<ProgressVariant, string> = {
   primary: 'bg-brand',
-  success: 'bg-success-600 dark:bg-success-500',
-  warning: 'bg-warning-600 dark:bg-warning-400',
-  error: 'bg-error-600 dark:bg-error-500',
-  info: 'bg-info-600 dark:bg-info-400',
+  success: 'bg-[var(--success-ink)]',
+  warning: 'bg-[var(--warning-ink)]',
+  error: 'bg-[var(--error-ink)]',
+  info: 'bg-[var(--info-ink)]',
 };
 
 const sizeStyles: Record<ProgressSize, string> = {

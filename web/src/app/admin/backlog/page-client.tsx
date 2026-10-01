@@ -432,12 +432,23 @@ export default function BacklogClient() {
         </h3>
         <div className="space-y-3">
           {[
-            { phase: 'Customer-1 launch gates', desc: 'C1-C4: SMTP verification, org provisioning, real hardware walkthrough, prod smoke', color: 'bg-red-500' },
-            { phase: 'Soft launch', desc: 'After operator gates clear, invite 5-10 beta users', color: 'bg-orange-500' },
-            { phase: 'Launch week', desc: 'Manual uptime monitoring setup and customer-1 follow-through', color: 'bg-yellow-500' },
-            { phase: 'Month 1', desc: 'CDN, template expansion, and post-launch backlog hardening', color: 'bg-blue-500' },
-            { phase: 'Quarter 1', desc: 'Per-user flags, AI designer when budgeted, and deeper template work', color: 'bg-indigo-500' },
-            { phase: 'Future', desc: '2FA, SSO, Fire TV, Chromecast, kiosk, video wall', color: 'bg-gray-500' },
+            /*
+             * Roadmap phases are IDENTITY labels on a timeline, not status, so
+             * they take the `--cat-*` set rather than the semantic families -
+             * painting 'Soft launch' with `--warning` would claim a state it
+             * does not have. Each on `--surface`: red 6.39:1, orange 6.16:1,
+             * yellow 6.02:1, blue 7.45:1, indigo 8.62:1, and 'Future' takes the
+             * quiet `--foreground-tertiary` at 5.89:1 because there is no
+             * categorical grey and it is deliberately the least loud step.
+             * Separability over this consuming map: closest pair red/orange at
+             * 40.1, the floor globals.css already accepts.
+             */
+            { phase: 'Customer-1 launch gates', desc: 'C1-C4: SMTP verification, org provisioning, real hardware walkthrough, prod smoke', color: 'bg-[var(--cat-red)]' },
+            { phase: 'Soft launch', desc: 'After operator gates clear, invite 5-10 beta users', color: 'bg-[var(--cat-orange)]' },
+            { phase: 'Launch week', desc: 'Manual uptime monitoring setup and customer-1 follow-through', color: 'bg-[var(--cat-yellow)]' },
+            { phase: 'Month 1', desc: 'CDN, template expansion, and post-launch backlog hardening', color: 'bg-[var(--cat-blue)]' },
+            { phase: 'Quarter 1', desc: 'Per-user flags, AI designer when budgeted, and deeper template work', color: 'bg-[var(--cat-indigo)]' },
+            { phase: 'Future', desc: '2FA, SSO, Fire TV, Chromecast, kiosk, video wall', color: 'bg-[var(--foreground-tertiary)]' },
           ].map((r, i) => (
             <div key={i} className="flex items-start gap-3">
               <div className={`w-3 h-3 rounded-full ${r.color} mt-1 flex-shrink-0`} />

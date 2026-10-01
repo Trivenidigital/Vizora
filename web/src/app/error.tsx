@@ -55,7 +55,7 @@ export default function Error({
       <div role="alert" className="min-h-screen flex items-center justify-center bg-[var(--background)]">
         <div className="max-w-md w-full bg-[var(--surface)] rounded-lg shadow-lg border border-[var(--border)] p-8 text-center">
           <div className="mb-4 flex justify-center">
-            <div className="animate-spin w-10 h-10 border-4 border-[var(--border)] border-t-[#00E5A0] rounded-full" />
+            <div className="animate-spin w-10 h-10 border-4 border-[var(--border)] border-t-[var(--primary-ink)] rounded-full" />
           </div>
           <h2 className="text-2xl font-bold text-[var(--foreground)] mb-4">
             Loading the latest version…
@@ -78,7 +78,7 @@ export default function Error({
   return (
     <div role="alert" className="min-h-screen flex items-center justify-center bg-[var(--background)]">
       <div className="max-w-md w-full bg-[var(--surface)] rounded-lg shadow-lg border border-[var(--border)] p-8 text-center">
-        <Icon name="error" size="6xl" className="mx-auto mb-4 text-red-500" />
+        <Icon name="error" size="6xl" className="mx-auto mb-4 text-[var(--error-ink)]" />
         <h2 className="text-2xl font-bold text-[var(--foreground)] mb-4">
           Something went wrong!
         </h2>
@@ -86,8 +86,8 @@ export default function Error({
           We apologize for the inconvenience. An unexpected error occurred.
         </p>
         {process.env.NODE_ENV === 'development' && error.message && (
-          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-left">
-            <p className="text-sm text-red-500 font-mono break-words">
+          <div className="mb-6 p-4 bg-error/10 border border-error/30 rounded-lg text-left">
+            <p className="text-sm text-[var(--error-ink)] font-mono break-words">
               {error.message}
             </p>
           </div>

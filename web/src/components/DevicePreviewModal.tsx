@@ -225,7 +225,7 @@ export default function DevicePreviewModal({
                 <span
                   className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                     device.status === 'online'
-                      ? 'bg-success-100 text-success-800 dark:bg-success-900 dark:text-success-200'
+                      ? 'bg-success-100 text-success-800'
                       : 'bg-[var(--background-secondary)] text-[var(--foreground)]'
                   }`}
                 >
@@ -292,7 +292,7 @@ export default function DevicePreviewModal({
                 className="w-full h-full object-contain"
               />
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
-                <div className="flex items-center justify-between text-white text-sm">
+                <div className="flex items-center justify-between text-[var(--viewport-ink)] text-sm">
                   <span>
                     Captured: {formatTimestamp(screenshot.capturedAt)}
                   </span>
@@ -325,9 +325,9 @@ export default function DevicePreviewModal({
 
         {/* Info Message */}
         {canRequestScreenshot && device.status !== 'online' && (
-          <div className="bg-warning-50 dark:bg-warning-900 border border-warning-200 dark:border-warning-700 rounded-lg p-3">
-            <p className="text-sm text-warning-800 dark:text-warning-200 flex items-center gap-2">
-              <Icon name="warning" size="lg" className="text-warning-600 dark:text-warning-400" />
+          <div className="bg-warning-50 border border-warning-200 rounded-lg p-3">
+            <p className="text-sm text-warning-800 flex items-center gap-2">
+              <Icon name="warning" size="lg" className="text-warning-600" />
               Device is currently offline. Screenshots can only be captured from online devices.
             </p>
           </div>

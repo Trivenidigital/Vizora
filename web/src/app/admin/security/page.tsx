@@ -252,9 +252,17 @@ export default function AdminSecurityPage() {
       {activeTab === 'blocklist' && (
         <div className="space-y-4">
           <div className="flex justify-end">
+            {/*
+              * The app's primary action pair, replacing an identity hue whose
+              * hover was a NO-OP - `hover:bg-[var(--cat-purple)]` restated the
+              * base value, so this button has never had hover feedback. The
+              * destructive step is the modal's confirm below, not this trigger,
+              * so an ordinary primary button is the right weight. Label 9.70:1
+              * on the fill, 6.99:1 on the hover.
+              */}
             <button
               onClick={() => setShowBlockModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-[var(--cat-purple)] text-white rounded-lg hover:bg-[var(--cat-purple)] transition"
+              className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition"
             >
               <Plus className="w-5 h-5" />
               Block IP
@@ -325,7 +333,7 @@ export default function AdminSecurityPage() {
                         <div className="flex justify-end">
                           <button
                             onClick={() => setUnblockingId(entry.id)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--success-ink)] hover:bg-[var(--status-online-bg)] dark:hover:bg-green-900/20 rounded-lg transition"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--success-ink)] hover:bg-[var(--status-online-bg)] rounded-lg transition"
                           >
                             <Trash2 className="w-4 h-4" />
                             Unblock
@@ -405,7 +413,7 @@ export default function AdminSecurityPage() {
               <button
                 onClick={handleBlockIp}
                 disabled={blockLoading}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition"
+                className="flex items-center gap-2 px-4 py-2 bg-[var(--danger-solid)] text-white rounded-lg hover:bg-[var(--danger-solid-hover)] disabled:opacity-50 transition"
               >
                 {blockLoading ? (
                   <>

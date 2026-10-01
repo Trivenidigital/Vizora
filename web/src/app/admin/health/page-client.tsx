@@ -449,7 +449,7 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
               </div>
               <div className="mt-2 h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-red-500 rounded-full transition-all"
+                  className="h-full bg-[var(--error-ink)] rounded-full transition-all"
                   style={{ width: getBarWidth(healthData.redis.memory, healthData.redis.maxMemory) }}
                 />
               </div>
@@ -472,7 +472,7 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
               </div>
               <div className="mt-2 h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-purple-500 rounded-full transition-all"
+                  className="h-full bg-[var(--cat-purple)] rounded-full transition-all"
                   style={{ width: getBarWidth(healthData.storage.used, healthData.storage.total) }}
                 />
               </div>

@@ -28,19 +28,31 @@ function timeAgo(dateStr: string): string {
   return `${diffDay}d ago`;
 }
 
+/*
+ * The same four-step priority vocabulary as the dot in `SupportRequestCard`,
+ * expressed as the documented tint + ink pairs: red -> amber -> grey -> green,
+ * monotonic in alarm. `high` and `medium` both mapped to the warning family
+ * would have rendered two of the four levels identically, which is why `medium`
+ * takes the neutral pair rather than a second amber.
+ *
+ * Each ink measured on its own fill in globals.css: offline 4.89:1,
+ * error 5.41:1, neutral 4.75:1, online 5.47:1. The badge carries the level as a
+ * WORD, so hue is not the only signal here.
+ */
 const priorityColors: Record<SupportPriority, string> = {
-  critical: 'bg-red-500/20 text-[var(--error-ink)]',
-  high: 'bg-orange-500/20 text-[var(--warning-ink)]',
-  medium: 'bg-yellow-500/20 text-[var(--warning-ink)]',
-  low: 'bg-green-500/20 text-[var(--success-ink)]',
+  critical: 'bg-[var(--status-offline-bg)] text-[var(--error-ink)]',
+  high: 'bg-[var(--status-error-bg)] text-[var(--warning-ink)]',
+  medium: 'bg-[var(--status-neutral-bg)] text-[var(--foreground-tertiary)]',
+  low: 'bg-[var(--status-online-bg)] text-[var(--success-ink)]',
 };
 
+/* Status, same five documented pairs as `SupportRequestCard`. */
 const statusColors: Record<SupportStatus, string> = {
-  open: 'bg-blue-500/20 text-[var(--info-ink)]',
-  in_progress: 'bg-yellow-500/20 text-[var(--warning-ink)]',
-  resolved: 'bg-green-500/20 text-[var(--success-ink)]',
-  closed: 'bg-gray-500/20 text-[var(--foreground-tertiary)]',
-  wont_fix: 'bg-red-500/20 text-[var(--error-ink)]',
+  open: 'bg-[var(--status-pairing-bg)] text-[var(--info-ink)]',
+  in_progress: 'bg-[var(--status-error-bg)] text-[var(--warning-ink)]',
+  resolved: 'bg-[var(--status-online-bg)] text-[var(--success-ink)]',
+  closed: 'bg-[var(--status-neutral-bg)] text-[var(--foreground-tertiary)]',
+  wont_fix: 'bg-[var(--status-offline-bg)] text-[var(--error-ink)]',
 };
 
 const statusLabels: Record<SupportStatus, string> = {

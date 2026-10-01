@@ -78,7 +78,7 @@ export default function AdminUsersClient({ initialUsers, initialTotal }: AdminUs
       case 'admin':
         return 'bg-[var(--cat-purple-bg)] text-[var(--cat-purple)]';
       case 'owner':
-        return 'bg-brand/10 text-[var(--primary-ink)] dark:bg-brand/10 dark:text-[var(--primary-ink)]';
+        return 'bg-brand/10 text-[var(--primary-ink)]';
       default:
         return 'bg-[var(--background-tertiary)] text-[var(--foreground-secondary)]';
     }
@@ -204,7 +204,7 @@ export default function AdminUsersClient({ initialUsers, initialTotal }: AdminUs
                               setActionType('disable');
                             }}
                             disabled={user.isSuperAdmin}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--error-ink)] hover:bg-[var(--status-offline-bg)] dark:hover:bg-red-900/20 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--error-ink)] hover:bg-[var(--status-offline-bg)] rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
                             title={user.isSuperAdmin ? 'Cannot disable super admin' : 'Disable user'}
                           >
                             <UserX className="w-4 h-4" />
@@ -216,7 +216,7 @@ export default function AdminUsersClient({ initialUsers, initialTotal }: AdminUs
                               setActionUser(user);
                               setActionType('enable');
                             }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--success-ink)] hover:bg-[var(--status-online-bg)] dark:hover:bg-green-900/20 rounded-lg transition"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--success-ink)] hover:bg-[var(--status-online-bg)] rounded-lg transition"
                           >
                             <UserCheck className="w-4 h-4" />
                             Enable

@@ -45,15 +45,22 @@ export function ContentList({
     }
   };
 
+  /*
+   * Status tints take the documented `--status-*-bg` pairs. The inks here were
+   * already correct; what moved is the fill under them, from a channel tint of
+   * the semantic colour to the warm badge fill the palette declares, each
+   * measured ink-on-fill in globals.css: online 5.47:1, error 5.41:1,
+   * offline 4.89:1.
+   */
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'ready':
       case 'active':
-        return 'bg-success-500/10 text-success-700 dark:text-success-400';
+        return 'bg-[var(--status-online-bg)] text-[var(--success-ink)]';
       case 'processing':
-        return 'bg-warning-500/10 text-warning-700 dark:text-warning-400';
+        return 'bg-[var(--status-error-bg)] text-[var(--warning-ink)]';
       case 'error':
-        return 'bg-error-500/10 text-error-700 dark:text-error-400';
+        return 'bg-[var(--status-offline-bg)] text-[var(--error-ink)]';
       default:
         return 'bg-[var(--background-secondary)] text-[var(--foreground)]';
     }
@@ -117,6 +124,10 @@ export function ContentList({
                       <Icon
                         name={getTypeIcon(item.type)}
                         size="xl"
+                        /* White, not the on-forest ink - see the measured note
+                           in ContentGrid: on this forest-to-brass gradient the
+                           ink drops to 2.78:1 at the brass end and white holds
+                           3.21:1. */
                         className="text-white"
                       />
                     )}
@@ -157,14 +168,14 @@ export function ContentList({
                 <div className="flex justify-end gap-2">
                   <button
                     onClick={() => onPushToDevice(item)}
-                    className="text-success-600 dark:text-success-400 hover:text-success-700 dark:hover:text-success-300 hover:bg-success-500/10 px-2 py-1 rounded transition"
+                    className="text-[var(--success-ink)] hover:bg-success/10 px-2 py-1 rounded transition"
                     title="Push to device"
                   >
                     <Icon name="push" size="md" />
                   </button>
                   <button
                     onClick={() => onAddToPlaylist(item)}
-                    className="text-[var(--accent-brass-ink)] hover:text-[var(--accent-brass-ink)] dark:hover:text-[var(--accent-brass-ink)] hover:bg-purple-500/10 px-2 py-1 rounded transition"
+                    className="text-[var(--accent-brass-ink)] hover:bg-[var(--surface-hover)] px-2 py-1 rounded transition"
                     title="Add to playlist"
                   >
                     <Icon name="add" size="md" />
@@ -178,7 +189,7 @@ export function ContentList({
                   </button>
                   <button
                     onClick={() => onDelete(item)}
-                    className="text-error-600 dark:text-error-400 hover:text-error-700 dark:hover:text-error-300 hover:bg-error-500/10 px-2 py-1 rounded transition"
+                    className="text-[var(--error-ink)] hover:bg-error/10 px-2 py-1 rounded transition"
                     title="Delete"
                   >
                     <Icon name="delete" size="md" />

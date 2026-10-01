@@ -246,7 +246,7 @@ export default function AdminAnnouncementsClient({ initialAnnouncements }: Admin
                   </button>
                   <button
                     onClick={() => setDeletingAnnouncement(announcement)}
-                    className="p-2 text-[var(--error-ink)] hover:text-[var(--error-ink)] dark:hover:text-[var(--error-ink)] hover:bg-[var(--surface-hover)] rounded-lg transition"
+                    className="p-2 text-[var(--error-ink)] hover:bg-[var(--surface-hover)] rounded-lg transition"
                     title="Delete"
                   >
                     <Trash2 className="w-5 h-5" />
