@@ -147,6 +147,17 @@ function contrastRatio(a: string, b: string): number {
  */
 const BLACK_HEX = '#000000';
 const WHITE_HEX = '#ffffff';
+
+/*
+ * The light theme's card surface, named once.
+ *
+ * `--brand-ink-light` is derived against this, and the comment at that call site
+ * used to say "keep these two arguments equal to `--surface`" — an instruction a
+ * reader has to obey by hand. Naming it makes that structural instead, which
+ * matters now that the settings branding PREVIEW derives the same ink: a preview
+ * whose ground disagreed with the app's would be confidently wrong.
+ */
+const LIGHT_SURFACE = '#fdfbf5';
 const BLACK_RGB = { r: 0, g: 0, b: 0 };
 const WHITE_RGB = { r: 255, g: 255, b: 255 };
 
@@ -220,6 +231,20 @@ export function onFillInk(fill: string, minRatio = 4.5): string {
   // Mid-tone fill: neither end of the pair clears the bar, so push the better
   // one the rest of the way using the same blend `readableInk` uses.
   return readableInk(best, fill, minRatio);
+}
+
+/**
+ * The ink the APP will paint a brand-coloured label in, for anything that needs
+ * to show that answer rather than recompute it.
+ *
+ * Exists for the settings branding preview, which painted the org name in the
+ * raw `primaryColor`: 1.47:1 for the unbranded default, 1.20:1 for a neon brand.
+ * A preview is a promise about what the product will do, so it has to resolve
+ * the colour the same way `--brand-ink-light` does — against the same surface,
+ * which is why that value is a constant above and not an argument here.
+ */
+export function brandTextInk(color: string): string {
+  return readableInk(color, LIGHT_SURFACE);
 }
 
 /**
@@ -337,7 +362,7 @@ export function applyCSSVariables(config: BrandConfig = currentBrandConfig): voi
     // card is ivory, so deriving against white returns an ink a shade short of
     // AA on the surface it actually lands on. Keep these two arguments equal to
     // `--surface` in each theme.
-    root.style.setProperty('--brand-ink-light', readableInk(config.primaryColor, '#fdfbf5'));
+    root.style.setProperty('--brand-ink-light', readableInk(config.primaryColor, LIGHT_SURFACE));
     /*
      * The INVERSE pairing, which nobody had checked until Phase 5's white-label
      * matrix: our ink ON the tenant's fill. `--lw-on-forest` is a fixed ivory

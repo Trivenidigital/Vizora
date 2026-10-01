@@ -9,6 +9,7 @@ import { semanticColors } from '@/theme/colors';
 import Modal from '@/components/Modal';
 import { useToast } from '@/lib/hooks/useToast';
 import { useCustomization } from '@/components/providers/CustomizationProvider';
+import { brandTextInk, onFillInk } from '@/lib/customization';
 
 export const dynamic = 'force-dynamic';
 
@@ -647,14 +648,31 @@ export default function SettingsPage() {
              className="w-8 h-8 rounded-lg flex items-center justify-center"
              style={{ background: `linear-gradient(135deg, ${brandingForm.primaryColor}, #00B4D8)` }}
            >
-             <span className="text-white font-bold text-lg">
+             {/* Same panel, inverse pairing: this letter sits ON the fill, so it
+                 takes the on-fill ink. White measured 1.65:1 on the unbranded
+                 default and 1.36:1 on neon. RESIDUAL: the gradient's second stop
+                 is a hardcoded cyan unrelated to the tenant, and for a DARK brand
+                 no single ink clears both ends (ivory is 11.50 on navy and 2.14 on
+                 the cyan; the dark ink is the reverse). The fix for that is the
+                 stop, not the ink — it should read `secondaryColor`, which B5
+                 already recorded as a functional bug. Left as recorded. */}
+             <span
+               className="font-bold text-lg"
+               style={{ color: onFillInk(brandingForm.primaryColor) }}
+             >
                {(brandingForm.companyName || 'V').charAt(0).toUpperCase()}
              </span>
            </div>
          )}
+         {/* The preview is a promise about what the app will render, so the name
+             resolves through the same derivation the app uses rather than the raw
+             fill. Raw, the server's unbranded default measured 1.47:1 here and a
+             neon brand 1.20:1; derived, the four matrix tenants are 4.52 / 11.75
+             / 4.60 / 4.50 on this panel. The swatches and the hex field below
+             keep showing the literal — those are the DATA. */}
          <span
            className="text-2xl font-bold"
-           style={{ color: brandingForm.primaryColor }}
+           style={{ color: brandTextInk(brandingForm.primaryColor) }}
          >
            {brandingForm.companyName || 'Vizora'}
          </span>
