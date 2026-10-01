@@ -202,7 +202,7 @@ export default function TextProperties({
               key={a.value}
               className={`flex-1 rounded px-2 py-1.5 text-sm font-medium transition-colors ${
                 currentAlign === a.value
-                  ? 'bg-[var(--primary)] text-[var(--lw-on-forest)]'
+                  ? 'bg-[var(--primary)] text-[var(--primary-contrast)]'
                   : 'bg-[var(--surface-hover)] text-[var(--foreground-secondary)] hover:bg-[var(--background-tertiary)]'
               }`}
               onClick={() =>

@@ -162,7 +162,7 @@ export default function TemplateEditor({
         type="button"
         onClick={onPreviewRequest}
         disabled={previewLoading}
-        className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+        className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition font-medium disabled:opacity-60 disabled:cursor-not-allowed"
       >
         {previewLoading ? (
           <LoadingSpinner size="sm" />

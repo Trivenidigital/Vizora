@@ -245,7 +245,7 @@ export default function SupportChatPanel() {
             <button
               onClick={handleSend}
               disabled={!inputText.trim() || isLoading}
-              className="flex-shrink-0 w-9 h-9 max-sm:w-10 max-sm:h-10 flex items-center justify-center rounded-xl bg-[var(--primary)] text-[var(--lw-on-forest)] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
+              className="flex-shrink-0 w-9 h-9 max-sm:w-10 max-sm:h-10 flex items-center justify-center rounded-xl bg-[var(--primary)] text-[var(--primary-contrast)] hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
               aria-label="Send message"
             >
               <Send className="w-4 h-4" />

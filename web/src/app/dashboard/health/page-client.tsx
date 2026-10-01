@@ -219,9 +219,9 @@ export default function HealthMonitoringClient() {
  </div>
  <button
  onClick={() => loadDevicesAndHealth()}
- className="bg-[var(--primary)] text-[var(--lw-on-forest)] px-6 py-3 rounded-lg hover:bg-[var(--primary-light)] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+ className="bg-[var(--primary)] text-[var(--primary-contrast)] px-6 py-3 rounded-lg hover:bg-[var(--primary-light)] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
  >
- <Icon name="download" size="lg" className="text-[var(--lw-on-forest)]" />
+ <Icon name="download" size="lg" className="text-[var(--primary-contrast)]" />
  <span>Refresh</span>
  </button>
  </div>

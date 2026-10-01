@@ -160,7 +160,7 @@ export default function AdminAnnouncementsClient({ initialAnnouncements }: Admin
         </div>
         <button
           onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition"
+          className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition"
         >
           <Plus className="w-5 h-5" />
           Create Announcement
@@ -269,7 +269,7 @@ export default function AdminAnnouncementsClient({ initialAnnouncements }: Admin
           </p>
           <button
             onClick={handleCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition"
           >
             <Plus className="w-5 h-5" />
             Create Announcement

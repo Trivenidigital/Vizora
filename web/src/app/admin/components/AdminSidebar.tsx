@@ -73,7 +73,7 @@ export function AdminSidebar({ collapsed, onToggle }: AdminSidebarProps) {
               data-brand-mark
               className="w-8 h-8 bg-[var(--primary)] rounded-lg flex items-center justify-center"
             >
-              <span className="text-[var(--lw-on-forest)] font-bold text-lg">V</span>
+              <span className="text-[var(--primary-contrast)] font-bold text-lg">V</span>
             </div>
             <span className="text-[var(--foreground)] font-semibold">Admin</span>
           </div>

@@ -78,7 +78,7 @@ export default function CreateTemplatePage() {
         </p>
         <Link
           href="/dashboard/templates"
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition font-semibold text-sm"
+          className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition font-semibold text-sm"
         >
           <Icon name="chevronLeft" size="sm" />
           Back to Templates
@@ -177,7 +177,7 @@ export default function CreateTemplatePage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition font-semibold shadow-md hover:shadow-lg text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition font-semibold shadow-md hover:shadow-lg text-sm disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {saving ? (
               <>

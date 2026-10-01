@@ -214,7 +214,7 @@ export default function PlansPage() {
  </div>
 
  {/* Enterprise CTA */}
- <div className="bg-gradient-to-r from-[var(--primary)] to-[var(--primary-light)] rounded-lg p-6 text-[var(--lw-on-forest)]">
+ <div className="bg-gradient-to-r from-[var(--primary)] to-[var(--primary-light)] rounded-lg p-6 text-[var(--primary-contrast)]">
  <div className="flex flex-col md:flex-row items-center justify-between gap-4">
  <div>
  <h3 className="text-xl font-bold">Need more than 100 screens?</h3>
@@ -270,7 +270,7 @@ export default function PlansPage() {
  </button>
  <a
  href="mailto:sales@vizora.io?subject=Enterprise%20Plan%20Inquiry"
- className="px-5 py-2 text-sm font-semibold bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition"
+ className="px-5 py-2 text-sm font-semibold bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition"
  >
  Open Email Client
  </a>

@@ -312,7 +312,7 @@ export default function OpsStatusPage() {
           <StatusBadge status={opsData.systemStatus} />
           <button
             onClick={fetchOpsStatus}
-            className="bg-[var(--primary)] text-[var(--lw-on-forest)] px-5 py-2.5 rounded-lg hover:bg-[var(--primary-light)] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+            className="bg-[var(--primary)] text-[var(--primary-contrast)] px-5 py-2.5 rounded-lg hover:bg-[var(--primary-light)] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
           >
             <Icon name="refresh" size="md" />
             <span>Refresh</span>

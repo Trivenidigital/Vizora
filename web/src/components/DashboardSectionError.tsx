@@ -98,7 +98,7 @@ export default function DashboardSectionError({
           <button
             onClick={handleHardReload}
             disabled={isReloading}
-            className="bg-[var(--primary)] text-[var(--lw-on-forest)] px-6 py-2 rounded-lg hover:bg-[var(--primary-light)] transition font-semibold text-sm disabled:opacity-50"
+            className="bg-[var(--primary)] text-[var(--primary-contrast)] px-6 py-2 rounded-lg hover:bg-[var(--primary-light)] transition font-semibold text-sm disabled:opacity-50"
           >
             {isReloading ? 'Refreshing…' : 'Refresh Now'}
           </button>
@@ -120,7 +120,7 @@ export default function DashboardSectionError({
           </p>
           <button
             onClick={reset}
-            className="bg-[var(--primary)] text-[var(--lw-on-forest)] px-6 py-2 rounded-lg hover:bg-[var(--primary-light)] transition font-semibold text-sm"
+            className="bg-[var(--primary)] text-[var(--primary-contrast)] px-6 py-2 rounded-lg hover:bg-[var(--primary-light)] transition font-semibold text-sm"
           >
             Try Again
           </button>
@@ -147,7 +147,7 @@ export default function DashboardSectionError({
         <div className="flex gap-3 justify-center">
           <button
             onClick={reset}
-            className="bg-[var(--primary)] text-[var(--lw-on-forest)] px-6 py-2 rounded-lg hover:bg-[var(--primary-light)] transition font-semibold text-sm"
+            className="bg-[var(--primary)] text-[var(--primary-contrast)] px-6 py-2 rounded-lg hover:bg-[var(--primary-light)] transition font-semibold text-sm"
           >
             Try Again
           </button>

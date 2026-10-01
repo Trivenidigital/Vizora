@@ -271,7 +271,7 @@ export function SupportRequestDetail({
             <button
               onClick={handleReply}
               disabled={!replyContent.trim() || replying}
-              className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
             >
               <Send className="w-4 h-4" />
               {replying ? 'Sending...' : 'Send Reply'}
@@ -331,7 +331,7 @@ export function SupportRequestDetail({
               <button
                 onClick={handleSaveChanges}
                 disabled={saving}
-                className="px-4 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+                className="px-4 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
               >
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>

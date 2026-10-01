@@ -155,7 +155,7 @@ export default function ApiKeysPage() {
  </div>
  <button
  onClick={() => setIsCreateModalOpen(true)}
- className="bg-[var(--primary)] text-[var(--lw-on-forest)] px-6 py-3 rounded-lg hover:bg-[var(--primary-light)] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+ className="bg-[var(--primary)] text-[var(--primary-contrast)] px-6 py-3 rounded-lg hover:bg-[var(--primary-light)] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
  >
  <Icon name="add" size="lg" className="text-white" />
  <span>Create API Key</span>
@@ -398,7 +398,7 @@ export default function ApiKeysPage() {
  <button
  onClick={handleCreate}
  disabled={actionLoading || !createForm.name || createForm.scopes.length === 0}
- className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
  Create Key

@@ -63,7 +63,7 @@ export const BANNER_TONE: Record<BannerTone, ToneStyle> = {
     text: 'text-[var(--foreground)]',
     dot: 'bg-[var(--foreground-tertiary)]',
     action:
-      'bg-[var(--primary)] text-[var(--lw-on-forest)] hover:bg-[var(--primary-light)]',
+      'bg-[var(--primary)] text-[var(--primary-contrast)] hover:bg-[var(--primary-light)]',
     quiet:
       'text-[var(--foreground)] bg-[var(--surface)] border border-[var(--border-dark)] hover:bg-[var(--surface-hover)]',
   },
@@ -72,7 +72,7 @@ export const BANNER_TONE: Record<BannerTone, ToneStyle> = {
     text: 'text-[var(--foreground)]',
     dot: 'bg-[var(--primary-ink)]',
     action:
-      'bg-[var(--primary)] text-[var(--lw-on-forest)] hover:bg-[var(--primary-light)]',
+      'bg-[var(--primary)] text-[var(--primary-contrast)] hover:bg-[var(--primary-light)]',
     quiet:
       'text-[var(--foreground)] bg-[var(--surface)] border border-[var(--border-dark)] hover:bg-[var(--surface-hover)]',
   },
@@ -81,7 +81,7 @@ export const BANNER_TONE: Record<BannerTone, ToneStyle> = {
     text: 'text-[var(--foreground)]',
     dot: 'bg-[var(--warning-ink)]',
     action:
-      'bg-[var(--primary)] text-[var(--lw-on-forest)] hover:bg-[var(--primary-light)]',
+      'bg-[var(--primary)] text-[var(--primary-contrast)] hover:bg-[var(--primary-light)]',
     quiet:
       'text-[var(--foreground)] bg-[var(--surface)] border border-[var(--border-dark)] hover:bg-[var(--surface-hover)]',
   },

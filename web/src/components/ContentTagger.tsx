@@ -146,7 +146,7 @@ export default function ContentTagger({
                 <button
                   onClick={handleCreateTag}
                   disabled={!newTagName.trim()}
-                  className="flex-1 px-3 py-1.5 text-sm bg-[var(--primary)] text-[var(--lw-on-forest)] rounded hover:bg-[var(--primary-light)] disabled:opacity-50 transition"
+                  className="flex-1 px-3 py-1.5 text-sm bg-[var(--primary)] text-[var(--primary-contrast)] rounded hover:bg-[var(--primary-light)] disabled:opacity-50 transition"
                 >
                   Create
                 </button>

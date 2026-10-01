@@ -176,7 +176,7 @@ export default function TeamClient() {
  </div>
  <button
  onClick={() => setIsInviteModalOpen(true)}
- className="bg-[var(--primary)] text-[var(--lw-on-forest)] px-6 py-3 rounded-lg hover:bg-[var(--primary-light)] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+ className="bg-[var(--primary)] text-[var(--primary-contrast)] px-6 py-3 rounded-lg hover:bg-[var(--primary-light)] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
  >
  <Icon name="add" size="lg" className="text-white" />
  <span>Invite User</span>
@@ -412,7 +412,7 @@ export default function TeamClient() {
  <button
  onClick={handleInvite}
  disabled={actionLoading || !inviteForm.email || !inviteForm.firstName || !inviteForm.lastName}
- className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
  Send Invite
@@ -465,7 +465,7 @@ export default function TeamClient() {
  <button
  onClick={handleSaveRole}
  disabled={actionLoading || editRole === selectedUser.role}
- className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
  Save Changes

@@ -520,6 +520,33 @@
     --lw-forest: #1f4230;
     --lw-forest-deep: #142c20;
     --lw-on-forest: #f2efe4;
+
+    /*
+     * INK FOR TEXT ON THE BRAND FILL — the inverse of `--primary-ink`.
+     *
+     * `--primary-ink` answers "the brand colour as text on our surface".
+     * This answers the other direction: "our text on the brand colour as a
+     * fill". They are different questions and one token cannot serve both.
+     *
+     * It defaults to the on-forest ivory, which is 9.70:1 on Vizora's own
+     * forest. The reason it exists as a separate name is white-label: when a
+     * tenant picks a LIGHT or BRIGHT `--primary`, fixed ivory collapses on it.
+     * Measured on the three matrix tenants, ivory on their fill:
+     *   #1a237e navy    11.86:1   fine
+     *   #ffd54f yellow    1.23:1   invisible
+     *   #39ff14 neon      1.18:1   invisible
+     * `applyCSSVariables` therefore derives a per-tenant value and sets it
+     * inline alongside `--brand-ink-light`.
+     *
+     * NOT the same thing as re-pointing `--lw-on-forest` itself. That token has
+     * 30 consumers sitting on STATIC grounds — the urgent banner's brass bar,
+     * three states of the dashboard health tile, `.lw-btn-forest`, the `bg-brand`
+     * buttons, the calendar's forest chips, the marketing sections. A
+     * tenant-aware `--lw-on-forest` would flip all of those to a dark ink on a
+     * dark ground, which is a worse bug than the one being fixed. Only the
+     * consumers whose fill is `--primary` point here.
+     */
+    --primary-contrast: #f2efe4;
     --lw-brass: #b08a3e;
     --lw-brass-ink: #77591f;
     --lw-coral: #d96a4c;
@@ -968,7 +995,8 @@ body {
  */
 .eh-btn-neon {
   background: var(--primary);
-  color: var(--lw-on-forest);
+  /* Tenant-overridable fill, so the label takes the derived on-fill ink. */
+  color: var(--primary-contrast);
   box-shadow: 0 8px 24px rgba(31, 66, 48, 0.26);
   font-weight: 600;
   transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
@@ -1519,12 +1547,12 @@ body {
 }
 .eh-filter-pill-active {
   background: var(--primary);
-  color: var(--lw-on-forest);
+  color: var(--primary-contrast);
   font-weight: 600;
 }
 .eh-filter-pill-active:hover {
   background: var(--primary-light);
-  color: var(--lw-on-forest);
+  color: var(--primary-contrast);
 }
 
 /* Active filter chip — removable tag */

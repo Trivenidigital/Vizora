@@ -722,7 +722,7 @@ export default function SchedulesClient() {
  onClick={openCreateModal}
  className="eh-btn-neon rounded-xl px-6 py-3 transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2 active:scale-95"
  >
- <Icon name="add" size="lg" className="text-[var(--lw-on-forest)]" />
+ <Icon name="add" size="lg" className="text-[var(--primary-contrast)]" />
  <span>Create Schedule</span>
  </button>
  )}
@@ -1015,7 +1015,7 @@ export default function SchedulesClient() {
  onClick={() => handleTargetTypeChange('device')}
  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition ${
  targetType === 'device'
- ? 'bg-[var(--primary)] text-[var(--lw-on-forest)]'
+ ? 'bg-[var(--primary)] text-[var(--primary-contrast)]'
  : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
  }`}
  >
@@ -1026,7 +1026,7 @@ export default function SchedulesClient() {
  onClick={() => handleTargetTypeChange('group')}
  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition ${
  targetType === 'group'
- ? 'bg-[var(--primary)] text-[var(--lw-on-forest)]'
+ ? 'bg-[var(--primary)] text-[var(--primary-contrast)]'
  : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
  }`}
  >

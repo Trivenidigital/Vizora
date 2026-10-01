@@ -194,7 +194,7 @@ export default function DisplayPickerModal({
             type="button"
             onClick={handleConfirm}
             disabled={selectedIds.size === 0 || loading}
-            className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--lw-on-forest)] transition hover:bg-[var(--primary-light)] disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-contrast)] transition hover:bg-[var(--primary-light)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? (
               <span className="flex items-center gap-2">

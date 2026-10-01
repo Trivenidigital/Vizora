@@ -42,7 +42,7 @@ export function FilterPanel({
               onClick={() => onFilterTypeChange(type)}
               className={`px-4 py-2 rounded-md text-sm font-medium transition ${
                 filterType === type
-                  ? 'bg-[var(--primary)] text-[var(--lw-on-forest)]'
+                  ? 'bg-[var(--primary)] text-[var(--primary-contrast)]'
                   : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
               }`}
             >

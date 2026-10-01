@@ -79,7 +79,7 @@ export default function DaySelector({
             onClick={toggleAll}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               selected.length === 7
-                ? 'bg-[var(--primary)] text-[var(--lw-on-forest)]'
+                ? 'bg-[var(--primary)] text-[var(--primary-contrast)]'
                 : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
@@ -90,7 +90,7 @@ export default function DaySelector({
             onClick={toggleWeekdays}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               allWeekdaysSelected
-                ? 'bg-[var(--primary)] text-[var(--lw-on-forest)]'
+                ? 'bg-[var(--primary)] text-[var(--primary-contrast)]'
                 : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
@@ -101,7 +101,7 @@ export default function DaySelector({
             onClick={toggleWeekends}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               allWeekendsSelected
-                ? 'bg-[var(--primary)] text-[var(--lw-on-forest)]'
+                ? 'bg-[var(--primary)] text-[var(--primary-contrast)]'
                 : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
@@ -119,7 +119,7 @@ export default function DaySelector({
                 onClick={() => toggleDay(day.id)}
                 className={`py-3 px-2 rounded-lg font-semibold text-sm transition-all ${
                   isSelected
-                    ? 'bg-[var(--primary)] text-[var(--lw-on-forest)] shadow-md'
+                    ? 'bg-[var(--primary)] text-[var(--primary-contrast)] shadow-md'
                     : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
                 }`}
                 title={day.fullLabel}

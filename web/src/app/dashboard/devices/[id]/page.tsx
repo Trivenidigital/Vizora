@@ -85,7 +85,7 @@ export default function DeviceDetailPage() {
           <p className="text-[var(--foreground-secondary)] mb-6">{error}</p>
           <button
             onClick={() => router.push('/dashboard/devices')}
-            className="px-6 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition font-medium"
+            className="px-6 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition font-medium"
           >
             Return to Devices
           </button>

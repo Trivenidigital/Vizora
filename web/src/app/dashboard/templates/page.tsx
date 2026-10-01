@@ -634,7 +634,7 @@ export default function TemplateLibraryPage() {
                             onClick={() => setPage(item as number)}
                             className={`w-9 h-9 rounded-lg text-sm font-medium transition-all ${
                               page === item
-                                ? 'bg-[var(--primary)] text-[var(--lw-on-forest)]'
+                                ? 'bg-[var(--primary)] text-[var(--primary-contrast)]'
                                 : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]'
                             }`}
                           >

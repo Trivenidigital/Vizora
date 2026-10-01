@@ -86,7 +86,7 @@ export default function ValuePanel({ variant }: ValuePanelProps) {
         {/* Logo */}
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg bg-[var(--primary)] flex items-center justify-center">
-            <span className="text-[var(--lw-on-forest)] font-bold text-sm font-mono">V</span>
+            <span className="text-[var(--primary-contrast)] font-bold text-sm font-mono">V</span>
           </div>
           <span className="text-[var(--foreground)] font-semibold tracking-tight">Vizora</span>
         </div>

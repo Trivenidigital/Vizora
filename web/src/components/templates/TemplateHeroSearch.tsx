@@ -105,7 +105,7 @@ export default function TemplateHeroSearch({
             />
             <button
               type="submit"
-              className="absolute right-2 px-6 py-2.5 rounded-lg bg-[var(--primary)] text-[var(--lw-on-forest)] font-semibold text-sm hover:bg-[var(--primary-light)] transition-all hover:shadow-md"
+              className="absolute right-2 px-6 py-2.5 rounded-lg bg-[var(--primary)] text-[var(--primary-contrast)] font-semibold text-sm hover:bg-[var(--primary-light)] transition-all hover:shadow-md"
             >
               Search
             </button>

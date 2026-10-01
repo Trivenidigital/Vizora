@@ -101,10 +101,10 @@ const getHealthSummary = (health: DashboardSystemHealth | null) => {
  return {
  label: 'Healthy',
  detail: 'All systems operational',
- dotClassName: 'bg-[var(--lw-on-forest)] animate-pulse',
+ dotClassName: 'bg-[var(--primary-contrast)] animate-pulse',
  cardClassName: 'bg-gradient-to-br from-[var(--primary)] to-[var(--primary-light)]',
- textClassName: 'text-[var(--lw-on-forest)]',
- iconClassName: 'text-[var(--lw-on-forest)]',
+ textClassName: 'text-[var(--primary-contrast)]',
+ iconClassName: 'text-[var(--primary-contrast)]',
  };
  case 'degraded':
  return {
@@ -541,13 +541,16 @@ export default function DashboardClient({
      scripts/design/baseline.mjs. */}
  <div
  data-live-telemetry
- className={`${healthSummary.cardClassName} p-6 rounded-lg border border-[var(--border)] hover:-translate-y-[2px] hover:shadow-md transition-all duration-300 text-[var(--lw-on-forest)] animate-[fadeIn_0.6s_ease-out]`}
+ /* No base ink here. One declaration cannot serve four states once the `ok`
+    fill is tenant-overridable and the other three are static, so the ink is
+    decided per state in the config above and the 4xl label names it too. */
+ className={`${healthSummary.cardClassName} p-6 rounded-lg border border-[var(--border)] hover:-translate-y-[2px] hover:shadow-md transition-all duration-300 animate-[fadeIn_0.6s_ease-out]`}
  >
  <div className="flex items-center justify-between mb-4">
  <p className={`text-sm font-medium ${healthSummary.textClassName}`}>System Status</p>
  <Icon name="power" size="2xl" className={healthSummary.iconClassName} />
  </div>
- <p className="text-4xl font-bold mb-2">{healthSummary.label}</p>
+ <p className={`text-4xl font-bold mb-2 ${healthSummary.textClassName}`}>{healthSummary.label}</p>
  <div className="flex items-center gap-2">
  <span className={`w-2 h-2 rounded-full ${healthSummary.dotClassName}`}></span>
  <p className={`text-sm ${healthSummary.textClassName}`}>{healthSummary.detail}</p>
@@ -683,9 +686,9 @@ export default function DashboardClient({
 
  {/* Getting Started Guide */}
  {stats.devices.total === 0 && (
- <div className="bg-gradient-to-r from-[var(--primary)] to-[var(--primary-light)] rounded-lg shadow-lg p-8 text-[var(--lw-on-forest)]">
- <h3 className="eh-dash-subtitle !text-[var(--lw-on-forest)] text-2xl font-bold mb-4 flex items-center gap-2"><Icon name="power" size="xl" className="text-[var(--lw-on-forest)]" /> Getting Started</h3>
- <p className="mb-6 text-[var(--lw-on-forest)]">
+ <div className="bg-gradient-to-r from-[var(--primary)] to-[var(--primary-light)] rounded-lg shadow-lg p-8 text-[var(--primary-contrast)]">
+ <h3 className="eh-dash-subtitle !text-[var(--primary-contrast)] text-2xl font-bold mb-4 flex items-center gap-2"><Icon name="power" size="xl" className="text-[var(--primary-contrast)]" /> Getting Started</h3>
+ <p className="mb-6 text-[var(--primary-contrast)]">
  Welcome to Vizora! Follow these steps to get your digital signage system up and running:
  </p>
  <div className="space-y-4">
@@ -695,7 +698,7 @@ export default function DashboardClient({
  </div>
  <div>
  <div className="font-semibold mb-1">Pair Your First Device</div>
- <div className="text-sm text-[var(--lw-on-forest)]">
+ <div className="text-sm text-[var(--primary-contrast)]">
  Connect a display device to start showing content
  </div>
  </div>
@@ -706,7 +709,7 @@ export default function DashboardClient({
  </div>
  <div>
  <div className="font-semibold mb-1">Upload Your Content</div>
- <div className="text-sm text-[var(--lw-on-forest)]">
+ <div className="text-sm text-[var(--primary-contrast)]">
  Add images, videos, or other media to your library
  </div>
  </div>
@@ -717,7 +720,7 @@ export default function DashboardClient({
  </div>
  <div>
  <div className="font-semibold mb-1">Create a Playlist</div>
- <div className="text-sm text-[var(--lw-on-forest)]">
+ <div className="text-sm text-[var(--primary-contrast)]">
  Organize your content into playlists
  </div>
  </div>
@@ -728,7 +731,7 @@ export default function DashboardClient({
  </div>
  <div>
  <div className="font-semibold mb-1">Assign & Schedule</div>
- <div className="text-sm text-[var(--lw-on-forest)]">
+ <div className="text-sm text-[var(--primary-contrast)]">
  Assign playlists to devices and set schedules
  </div>
  </div>

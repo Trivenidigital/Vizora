@@ -333,7 +333,7 @@ export default function SettingsPage() {
        />
      ) : (
        <div className="w-20 h-20 bg-gradient-to-br from-[var(--primary)] to-[var(--primary-light)] rounded-full flex items-center justify-center border-2 border-[var(--border)]">
-         <span className="text-[var(--lw-on-forest)] text-2xl font-semibold">{getUserInitials()}</span>
+         <span className="text-[var(--primary-contrast)] text-2xl font-semibold">{getUserInitials()}</span>
        </div>
      )}
      {avatarUploading && (

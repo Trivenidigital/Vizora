@@ -148,7 +148,7 @@ export default function TemplateDetailModal({
                         onClose();
                         router.push(`/dashboard/templates/${template.id}/edit`);
                       }}
-                      className="px-5 py-2.5 rounded-lg bg-[var(--primary)] text-[var(--lw-on-forest)] font-semibold text-sm hover:bg-[var(--primary-light)] transition-all hover:shadow-md"
+                      className="px-5 py-2.5 rounded-lg bg-[var(--primary)] text-[var(--primary-contrast)] font-semibold text-sm hover:bg-[var(--primary-light)] transition-all hover:shadow-md"
                     >
                       Edit Visually
                     </button>

@@ -150,7 +150,7 @@ export function ConfigEditor({ config, onSave, isLoading = false }: ConfigEditor
           <button
             onClick={handleSave}
             disabled={isLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] disabled:opacity-50 transition"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] disabled:opacity-50 transition"
           >
             <Save className="w-4 h-4" />
             Save

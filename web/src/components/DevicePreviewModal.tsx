@@ -248,7 +248,7 @@ export default function DevicePreviewModal({
             <button
               onClick={handleRefresh}
               disabled={refreshing || device.status !== 'online'}
-              className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
+              className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] disabled:opacity-50 disabled:cursor-not-allowed transition font-medium"
             >
               {refreshing ? (
                 <>
@@ -257,7 +257,7 @@ export default function DevicePreviewModal({
                 </>
               ) : (
                 <>
-                  <Icon name="refresh" size="lg" className="text-[var(--lw-on-forest)]" />
+                  <Icon name="refresh" size="lg" className="text-[var(--primary-contrast)]" />
                   <span>Refresh Screenshot</span>
                 </>
               )}

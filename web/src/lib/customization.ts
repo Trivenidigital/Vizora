@@ -137,6 +137,19 @@ function contrastRatio(a: string, b: string): number {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
+/*
+ * The two endpoints every derivation here blends toward, named ONCE.
+ *
+ * This module is the one place on the client that has to hold colour VALUES
+ * rather than `var()` references: it does arithmetic on them at runtime to
+ * compute contrast, and `var(--x)` is a string to JS. `readableInk` and
+ * `hoverFill` both need them, so they live here instead of twice each.
+ */
+const BLACK_HEX = '#000000';
+const WHITE_HEX = '#ffffff';
+const BLACK_RGB = { r: 0, g: 0, b: 0 };
+const WHITE_RGB = { r: 255, g: 255, b: 255 };
+
 function toHex({ r, g, b }: { r: number; g: number; b: number }): string {
   const h = (v: number) => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0');
   return `#${h(r)}${h(g)}${h(b)}`;
@@ -167,10 +180,10 @@ export function readableInk(color: string, background: string, minRatio = 4.5): 
    * black is strictly better, and since the loop below returns the endpoint if
    * nothing clears the threshold, it would hand back the WORSE of the two.
    */
-  const BLACK = { r: 0, g: 0, b: 0 };
-  const WHITE = { r: 255, g: 255, b: 255 };
   const target =
-    contrastRatio('#000000', background) >= contrastRatio('#ffffff', background) ? BLACK : WHITE;
+    contrastRatio(BLACK_HEX, background) >= contrastRatio(WHITE_HEX, background)
+      ? BLACK_RGB
+      : WHITE_RGB;
   for (let t = 0.05; t <= 1.0001; t += 0.05) {
     const candidate = toHex({
       r: base.r + (target.r - base.r) * t,
@@ -180,6 +193,64 @@ export function readableInk(color: string, background: string, minRatio = 4.5): 
     if (contrastRatio(candidate, background) >= minRatio) return candidate;
   }
   return toHex(target);
+}
+
+/**
+ * Return the ink to paint TEXT ON `fill` — the inverse of `readableInk`.
+ *
+ * `readableInk` answers "the brand colour as text on our surface". This answers
+ * the other direction, and the two cannot share a token: Phase 5's white-label
+ * matrix found ivory-on-fill at 1.18:1 for a neon tenant and 1.23:1 for a pale
+ * yellow one, while the derived TEXT ink on the same tenants was fine.
+ *
+ * Prefers the Little Worlds pair over a computed grey, so most tenants land on
+ * real palette values. Picks between them by MEASURED contrast rather than by
+ * `luminance > 0.5` — see the note in `readableInk` for why that shortcut is
+ * wrong — and only falls through to blending when a mid-tone fill carries
+ * neither endpoint.
+ *
+ * Exported for tests: the ratios must be computed, not asserted by hand.
+ */
+export function onFillInk(fill: string, minRatio = 4.5): string {
+  const IVORY = '#f2efe4'; // = --lw-on-forest
+  const INK = '#23261f'; // = --foreground
+  if (!hexToRgb(fill)) return IVORY;
+  const best = contrastRatio(IVORY, fill) >= contrastRatio(INK, fill) ? IVORY : INK;
+  if (contrastRatio(best, fill) >= minRatio) return best;
+  // Mid-tone fill: neither end of the pair clears the bar, so push the better
+  // one the rest of the way using the same blend `readableInk` uses.
+  return readableInk(best, fill, minRatio);
+}
+
+/**
+ * Return the HOVER fill for a tenant's `--primary`, moved away from `ink`.
+ *
+ * This exists because fixing the resting ink alone would have displaced the bug
+ * rather than removed it. `--primary-light` is declared once in `:root` as
+ * Vizora's forest-light and was never derived per tenant, so 72 buttons pair a
+ * tenant-coloured base with a Vizora-green hover. Measured, the ink chosen for a
+ * light tenant reads 1.91:1 on that static hover — unreadable at exactly the
+ * moment the pointer is over the control.
+ *
+ * Moving the fill AWAY from the ink means the ink's contrast on hover is at
+ * least what it is at rest, so one derived ink is correct in both states. The
+ * step is small (12%) because a hover is a shift, not a second colour. Falls
+ * back to the base fill if the result somehow fails, which can never be worse
+ * than no hover change at all.
+ */
+export function hoverFill(fill: string, ink: string, minRatio = 4.5): string {
+  const base = hexToRgb(fill);
+  if (!base) return fill;
+  // Is the ink nearer white or nearer black? Asked by contrast, not luminance.
+  const inkIsLight = contrastRatio(ink, BLACK_HEX) >= contrastRatio(ink, WHITE_HEX);
+  const target = inkIsLight ? BLACK_RGB : WHITE_RGB;
+  const t = 0.12;
+  const candidate = toHex({
+    r: base.r + (target.r - base.r) * t,
+    g: base.g + (target.g - base.g) * t,
+    b: base.b + (target.b - base.b) * t,
+  });
+  return contrastRatio(ink, candidate) >= minRatio ? candidate : fill;
 }
 
 /**
@@ -268,6 +339,26 @@ export function applyCSSVariables(config: BrandConfig = currentBrandConfig): voi
     // `--surface` in each theme.
     root.style.setProperty('--brand-ink-light', readableInk(config.primaryColor, '#fdfbf5'));
     /*
+     * The INVERSE pairing, which nobody had checked until Phase 5's white-label
+     * matrix: our ink ON the tenant's fill. `--lw-on-forest` is a fixed ivory
+     * chosen for Vizora's forest (9.70:1 there) and collapses to 1.18:1 on a
+     * neon brand, 1.23:1 on a pale yellow one. `--primary-contrast` is derived
+     * per tenant and consumed only where the fill is `--primary`; the ~30 sites
+     * sitting on STATIC forest or dark grounds keep the ivory, which is why this
+     * is a new token rather than a re-point of `--lw-on-forest`.
+     */
+    const onFill = onFillInk(config.primaryColor);
+    root.style.setProperty('--primary-contrast', onFill);
+    /*
+     * And the hover fill, for the same reason one step along. `--primary-light`
+     * was static forest-light for every tenant, so a derived ink that is correct
+     * at rest measured 1.91:1 on hover for a light brand — the bug displaced,
+     * not fixed. Deriving it from the tenant colour also settles a branding
+     * oddity that predates this: a neon tenant's buttons used to hover to
+     * Vizora green.
+     */
+    root.style.setProperty('--primary-light', hoverFill(config.primaryColor, onFill));
+    /*
      * `--brand-ink-dark` is NOT set any more. Dark mode was removed (D1), which
      * took the `.dark` block — the only thing that ever read it — with it.
      * Writing it would leave a live-looking custom property on <html> that
@@ -293,6 +384,10 @@ export function applyCSSVariables(config: BrandConfig = currentBrandConfig): voi
      */
     root.style.removeProperty('--primary');
     root.style.removeProperty('--brand-ink-light');
+    // Same reasoning as above: these are inline writes on <html>, so they have
+    // to be actively undone, not skipped.
+    root.style.removeProperty('--primary-contrast');
+    root.style.removeProperty('--primary-light');
   }
 
   // Font family

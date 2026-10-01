@@ -381,7 +381,7 @@ export default function AlertsPage() {
         {isAdmin && (
           <button
             onClick={openCreate}
-            className="bg-[var(--primary)] text-[var(--lw-on-forest)] px-6 py-3 rounded-lg hover:bg-[var(--primary-light)] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+            className="bg-[var(--primary)] text-[var(--primary-contrast)] px-6 py-3 rounded-lg hover:bg-[var(--primary-light)] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
           >
             <Icon name="add" size="lg" />
             <span>New Alert Rule</span>
@@ -634,7 +634,7 @@ export default function AlertsPage() {
             <button
               onClick={handleSave}
               disabled={actionLoading || !form.name.trim()}
-              className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
+              className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
             >
               {actionLoading && <LoadingSpinner size="sm" />}
               {editingRule ? 'Save Changes' : 'Create Rule'}
@@ -786,7 +786,7 @@ function RecipientsEditor({
             setNewTarget('');
           }}
           disabled={actionLoading || !newTarget.trim()}
-          className="px-3 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 whitespace-nowrap"
+          className="px-3 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 whitespace-nowrap"
         >
           Add
         </button>

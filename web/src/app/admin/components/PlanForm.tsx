@@ -289,7 +289,7 @@ export function PlanForm({ plan, onSubmit, onCancel, isLoading = false }: PlanFo
                 <button
                   type="button"
                   onClick={addFeature}
-                  className="p-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition"
+                  className="p-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition"
                 >
                   <Plus className="w-5 h-5" />
                 </button>
@@ -358,7 +358,7 @@ export function PlanForm({ plan, onSubmit, onCancel, isLoading = false }: PlanFo
             <button
               type="submit"
               disabled={isLoading}
-              className="px-4 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
+              className="px-4 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
             >
               {isLoading ? (
                 <>

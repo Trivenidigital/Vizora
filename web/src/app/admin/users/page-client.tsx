@@ -148,7 +148,7 @@ export default function AdminUsersClient({ initialUsers, initialTotal }: AdminUs
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--accent-brass)] flex items-center justify-center">
-                          <span className="text-[var(--lw-on-forest)] text-sm font-semibold">
+                          <span className="text-[var(--primary-contrast)] text-sm font-semibold">
                             {user.firstName[0]}
                             {user.lastName[0]}
                           </span>

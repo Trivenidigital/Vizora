@@ -219,7 +219,7 @@ export function PromotionForm({ promotion, onSubmit, onCancel, isLoading = false
             <button
               type="submit"
               disabled={isLoading}
-              className="px-4 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
+              className="px-4 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
             >
               {isLoading ? (
                 <>

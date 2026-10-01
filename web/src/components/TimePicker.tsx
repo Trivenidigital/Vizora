@@ -110,7 +110,7 @@ export default function TimePicker({
                     }}
                     className={`w-full text-left px-4 py-2 text-sm transition-colors ${
                       value === option.value
-                        ? 'bg-[var(--primary)] text-[var(--lw-on-forest)] font-semibold'
+                        ? 'bg-[var(--primary)] text-[var(--primary-contrast)] font-semibold'
                         : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
                     }`}
                   >

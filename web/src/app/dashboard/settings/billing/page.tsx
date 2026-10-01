@@ -220,7 +220,7 @@ export default function BillingPage() {
  </div>
  <Link
  href="/dashboard/settings/billing/plans"
- className="px-4 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition font-medium text-sm"
+ className="px-4 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition font-medium text-sm"
  >
  {isPaidPlan ? 'Change Plan' : 'Upgrade'}
  </Link>
@@ -318,7 +318,7 @@ export default function BillingPage() {
    <button
     onClick={handleSaveGstin}
     disabled={gstinSaving}
-    className="mt-3 px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition flex items-center gap-2"
+    className="mt-3 px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition flex items-center gap-2"
    >
     {gstinSaving && <LoadingSpinner size="sm" />}
     Save GSTIN

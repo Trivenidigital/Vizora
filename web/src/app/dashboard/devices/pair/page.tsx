@@ -248,7 +248,7 @@ export default function PairDevicePage() {
  </button>
  <button
  onClick={handlePairing}
- className="flex-1 px-6 py-3 text-sm font-medium bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center justify-center gap-2"
+ className="flex-1 px-6 py-3 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center justify-center gap-2"
  disabled={loading || !form.pairingCode || form.pairingCode.length !== 6 || !form.deviceName.trim()}
  >
  {loading ? (
@@ -258,7 +258,7 @@ export default function PairDevicePage() {
  </>
  ) : (
  <>
- <Icon name="success" size="md" className="text-[var(--lw-on-forest)]" />
+ <Icon name="success" size="md" className="text-[var(--primary-contrast)]" />
  <span>Pair Device</span>
  </>
  )}

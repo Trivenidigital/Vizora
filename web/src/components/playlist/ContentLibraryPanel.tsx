@@ -116,7 +116,7 @@ export default function ContentLibraryPanel({
               className={`
                 px-3 py-1 text-xs font-medium rounded-full transition
                 ${typeFilter === type
-                  ? 'bg-[var(--primary)] text-[var(--lw-on-forest)]'
+                  ? 'bg-[var(--primary)] text-[var(--primary-contrast)]'
                   : 'bg-[var(--background-tertiary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
                 }
               `}

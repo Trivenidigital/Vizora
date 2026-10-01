@@ -59,7 +59,7 @@ export default function UpgradeBanner() {
         <div className="flex items-center gap-2 shrink-0">
           <Link
             href="/dashboard/settings/billing/plans"
-            className="px-4 py-1.5 bg-[var(--primary)] text-[var(--lw-on-forest)] text-sm font-semibold rounded-md hover:bg-[var(--primary-light)] transition-colors"
+            className="px-4 py-1.5 bg-[var(--primary)] text-[var(--primary-contrast)] text-sm font-semibold rounded-md hover:bg-[var(--primary-light)] transition-colors"
           >
             Upgrade
           </Link>

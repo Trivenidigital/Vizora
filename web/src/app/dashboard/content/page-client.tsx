@@ -2162,7 +2162,7 @@ export default function ContentClient() {
  </button>
  <button
  onClick={handleUpload}
- className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  disabled={actionLoading || (uploadQueue.length > 0 ? retryableUploadCount === 0 : (!uploadForm.title || !uploadForm.url))}
  >
  {actionLoading && <LoadingSpinner size="sm" />}
@@ -2276,7 +2276,7 @@ export default function ContentClient() {
  </button>
  <button
  onClick={handleSaveEdit}
- className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  disabled={actionLoading || !uploadForm.title}
  >
  {actionLoading && <LoadingSpinner size="sm" />}
@@ -2318,7 +2318,7 @@ export default function ContentClient() {
  onClick={() => setPushDuration(min)}
  className={`px-2 py-1 text-xs rounded ${
  pushDuration === min
- ? 'bg-[var(--primary)] text-[var(--lw-on-forest)]'
+ ? 'bg-[var(--primary)] text-[var(--primary-contrast)]'
  : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
  }`}
  >
@@ -2403,7 +2403,7 @@ export default function ContentClient() {
  </button>
  <button
  onClick={confirmPush}
- className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  disabled={actionLoading || selectedDevices.length === 0}
  >
  {actionLoading && <LoadingSpinner size="sm" />}
@@ -2464,7 +2464,7 @@ export default function ContentClient() {
  </button>
  <button
  onClick={confirmAddToPlaylist}
- className="px-4 py-2 text-sm font-medium text-[var(--lw-on-forest)] bg-[var(--primary)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium text-[var(--primary-contrast)] bg-[var(--primary)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  disabled={actionLoading || !selectedPlaylist}
  >
  {actionLoading && <LoadingSpinner size="sm" />}
@@ -2538,7 +2538,7 @@ export default function ContentClient() {
  <button
  onClick={confirmBulkSetDuration}
  disabled={actionLoading}
- className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
  Apply
@@ -2602,7 +2602,7 @@ export default function ContentClient() {
  <button
  onClick={handleCreateFolder}
  disabled={actionLoading || !newFolderName.trim()}
- className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
  Create Folder
@@ -2722,7 +2722,7 @@ export default function ContentClient() {
  <button
  onClick={() => confirmReview('approve')}
  disabled={actionLoading}
- className="px-4 py-2 text-sm font-medium text-[var(--lw-on-forest)] bg-[var(--primary)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium text-[var(--primary-contrast)] bg-[var(--primary)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
  <Icon name="check" size="md" />
@@ -2775,7 +2775,7 @@ export default function ContentClient() {
  <button
  onClick={handleMoveToFolder}
  disabled={actionLoading || !targetFolderId}
- className="px-4 py-2 text-sm font-medium text-[var(--lw-on-forest)] bg-[var(--primary)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium text-[var(--primary-contrast)] bg-[var(--primary)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
  <Icon name="folder" size="md" />

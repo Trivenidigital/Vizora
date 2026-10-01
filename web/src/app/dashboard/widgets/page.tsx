@@ -746,7 +746,7 @@ export default function WidgetsPage() {
                         openWizard(wType);
                       }}
                       disabled={wType.available === false}
-                      className="w-full py-2 text-sm font-medium rounded-lg border border-[var(--primary-ink)] text-[var(--primary-ink)] hover:bg-[var(--primary)] hover:text-[var(--lw-on-forest)] transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[var(--primary-ink)]"
+                      className="w-full py-2 text-sm font-medium rounded-lg border border-[var(--primary-ink)] text-[var(--primary-ink)] hover:bg-[var(--primary)] hover:text-[var(--primary-contrast)] transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[var(--primary-ink)]"
                     >
                       <Icon name="add" size="sm" />
                       Create {wType.name} Widget

@@ -241,7 +241,7 @@ export default function ContentLifecyclePanel({
             type="button"
             onClick={handleSetExpiration}
             disabled={busy || !expiresAt}
-            className="bg-[var(--primary)] text-[var(--lw-on-forest)] hover:bg-[var(--primary-light)] transition rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+            className="bg-[var(--primary)] text-[var(--primary-contrast)] hover:bg-[var(--primary-light)] transition rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-50 flex items-center gap-2"
           >
             {savingExpiration && <LoadingSpinner size="sm" />}
             Schedule expiration
@@ -290,7 +290,7 @@ export default function ContentLifecyclePanel({
             type="button"
             onClick={handleReplaceFile}
             disabled={busy || !replaceFile}
-            className="bg-[var(--primary)] text-[var(--lw-on-forest)] hover:bg-[var(--primary-light)] transition rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+            className="bg-[var(--primary)] text-[var(--primary-contrast)] hover:bg-[var(--primary-light)] transition rounded-lg px-3 py-1.5 text-sm font-medium disabled:opacity-50 flex items-center gap-2"
           >
             {replacing && <LoadingSpinner size="sm" />}
             Replace file

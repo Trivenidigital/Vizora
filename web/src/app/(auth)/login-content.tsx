@@ -169,7 +169,7 @@ export default function LoginContent() {
         <div className="md:hidden mb-8">
           <div className="flex items-center gap-2.5 mb-4">
             <div className="w-7 h-7 rounded-lg bg-[var(--primary)] flex items-center justify-center">
-              <span className="text-[var(--lw-on-forest)] font-bold text-xs font-mono">V</span>
+              <span className="text-[var(--primary-contrast)] font-bold text-xs font-mono">V</span>
             </div>
             <span className="text-[var(--foreground)] font-semibold text-sm">Vizora</span>
           </div>

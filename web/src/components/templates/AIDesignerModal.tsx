@@ -50,7 +50,7 @@ export default function AIDesignerModal({ onClose }: AIDesignerModalProps) {
 
           <button
             onClick={onClose}
-            className="px-5 py-2.5 rounded-lg bg-[var(--primary)] text-[var(--lw-on-forest)] font-semibold text-sm hover:bg-[var(--primary-light)] transition-all"
+            className="px-5 py-2.5 rounded-lg bg-[var(--primary)] text-[var(--primary-contrast)] font-semibold text-sm hover:bg-[var(--primary-light)] transition-all"
           >
             Browse Templates
           </button>

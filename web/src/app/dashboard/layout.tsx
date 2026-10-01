@@ -195,7 +195,7 @@ export default function DashboardLayout({
                     data-brand-mark
                     className="w-8 h-8 bg-[var(--primary)] rounded-lg flex items-center justify-center"
                   >
-                    <span className="text-[var(--lw-on-forest)] font-bold text-lg">{brandInitial}</span>
+                    <span className="text-[var(--primary-contrast)] font-bold text-lg">{brandInitial}</span>
                   </div>
                 )}
                 <h1 className="text-2xl font-bold eh-gradient eh-heading">
@@ -222,7 +222,7 @@ export default function DashboardLayout({
                         className="w-8 h-8 bg-[var(--primary)] rounded-full flex items-center justify-center"
                         aria-label={`${user.email} avatar`}
                       >
-                        <span className="text-[var(--lw-on-forest)] text-sm font-semibold">{getUserInitials()}</span>
+                        <span className="text-[var(--primary-contrast)] text-sm font-semibold">{getUserInitials()}</span>
                       </div>
                     )}
                     <div className="hidden md:block text-left">

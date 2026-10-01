@@ -120,7 +120,7 @@ export default function AdminPlansClient({ initialPlans }: AdminPlansClientProps
         </div>
         <button
           onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition"
+          className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition"
         >
           <Plus className="w-5 h-5" />
           Create Plan
@@ -139,7 +139,7 @@ export default function AdminPlansClient({ initialPlans }: AdminPlansClientProps
             } overflow-hidden relative`}
           >
             {plan.highlightText && (
-              <div className="absolute top-0 left-0 right-0 bg-[var(--primary)] text-[var(--lw-on-forest)] text-center text-sm font-medium py-1">
+              <div className="absolute top-0 left-0 right-0 bg-[var(--primary)] text-[var(--primary-contrast)] text-center text-sm font-medium py-1">
                 {plan.highlightText}
               </div>
             )}
@@ -249,7 +249,7 @@ export default function AdminPlansClient({ initialPlans }: AdminPlansClientProps
           </p>
           <button
             onClick={handleCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition"
           >
             <Plus className="w-5 h-5" />
             Create Plan

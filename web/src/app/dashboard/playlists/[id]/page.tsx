@@ -364,10 +364,10 @@ export default function PlaylistBuilderPage() {
  <button
  onClick={handleSave}
  disabled={saving}
- className="px-6 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition font-medium flex items-center gap-2 disabled:opacity-50"
+ className="px-6 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition font-medium flex items-center gap-2 disabled:opacity-50"
  >
  {saving && <LoadingSpinner size="sm" />}
- <Icon name="check" size="sm" className="text-[var(--lw-on-forest)]" />
+ <Icon name="check" size="sm" className="text-[var(--primary-contrast)]" />
  Save
  </button>
  )}

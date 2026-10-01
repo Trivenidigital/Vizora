@@ -126,7 +126,7 @@ export default function DeviceGroupSelector({
                 <button
                   onClick={handleCreateGroup}
                   disabled={!newGroupName.trim()}
-                  className="flex-1 px-3 py-2 text-sm bg-[var(--primary)] text-[var(--lw-on-forest)] rounded hover:bg-[var(--primary-light)] disabled:opacity-50 transition"
+                  className="flex-1 px-3 py-2 text-sm bg-[var(--primary)] text-[var(--primary-contrast)] rounded hover:bg-[var(--primary-light)] disabled:opacity-50 transition"
                 >
                   Create
                 </button>

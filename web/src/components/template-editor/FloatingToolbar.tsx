@@ -121,7 +121,7 @@ export default function FloatingToolbar({
       {/* Bold */}
       <button
         className={`h-7 w-7 rounded text-sm font-bold transition ${
-          isBold ? 'bg-[var(--primary)] text-[var(--lw-on-forest)]' : 'text-[var(--foreground-tertiary)] hover:bg-[var(--surface-hover)]'
+          isBold ? 'bg-[var(--primary)] text-[var(--primary-contrast)]' : 'text-[var(--foreground-tertiary)] hover:bg-[var(--surface-hover)]'
         }`}
         onClick={() => change('fontWeight', styles.fontWeight || '400', isBold ? '400' : '700')}
         title="Bold"
@@ -132,7 +132,7 @@ export default function FloatingToolbar({
       {/* Italic */}
       <button
         className={`h-7 w-7 rounded text-sm italic transition ${
-          isItalic ? 'bg-[var(--primary)] text-[var(--lw-on-forest)]' : 'text-[var(--foreground-tertiary)] hover:bg-[var(--surface-hover)]'
+          isItalic ? 'bg-[var(--primary)] text-[var(--primary-contrast)]' : 'text-[var(--foreground-tertiary)] hover:bg-[var(--surface-hover)]'
         }`}
         onClick={() => change('fontStyle', styles.fontStyle || 'normal', isItalic ? 'normal' : 'italic')}
         title="Italic"
@@ -158,7 +158,7 @@ export default function FloatingToolbar({
         <button
           key={a}
           className={`h-7 w-7 rounded text-xs transition ${
-            align === a ? 'bg-[var(--primary)] text-[var(--lw-on-forest)]' : 'text-[var(--foreground-tertiary)] hover:bg-[var(--surface-hover)]'
+            align === a ? 'bg-[var(--primary)] text-[var(--primary-contrast)]' : 'text-[var(--foreground-tertiary)] hover:bg-[var(--surface-hover)]'
           }`}
           onClick={() => change('textAlign', styles.textAlign || 'left', a)}
           title={`Align ${a}`}

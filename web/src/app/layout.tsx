@@ -72,7 +72,7 @@ export default function RootLayout({
         {/* z-[60]: the marketing nav is `fixed z-50` and later in the DOM, so at
             equal z-index it painted over the focused skip link (measured with
             elementFromPoint). Nothing else in the app sits above 60. */}
-        <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-0 focus:left-0 focus:z-[60] focus:p-4 focus:bg-[var(--primary)] focus:text-[var(--lw-on-forest)]">
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-0 focus:left-0 focus:z-[60] focus:p-4 focus:bg-[var(--primary)] focus:text-[var(--primary-contrast)]">
           Skip to main content
         </a>
         <ErrorBoundary>

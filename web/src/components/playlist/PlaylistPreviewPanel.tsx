@@ -173,13 +173,13 @@ export default function PlaylistPreviewPanel({ items }: PlaylistPreviewPanelProp
 
             <button
               onClick={togglePlayPause}
-              className="p-3 bg-[var(--primary)] hover:bg-[var(--primary-light)] text-[var(--lw-on-forest)] rounded-lg transition"
+              className="p-3 bg-[var(--primary)] hover:bg-[var(--primary-light)] text-[var(--primary-contrast)] rounded-lg transition"
               title={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
-                <Icon name="clock" size="md" className="text-[var(--lw-on-forest)]" />
+                <Icon name="clock" size="md" className="text-[var(--primary-contrast)]" />
               ) : (
-                <Icon name="power" size="md" className="text-[var(--lw-on-forest)]" />
+                <Icon name="power" size="md" className="text-[var(--primary-contrast)]" />
               )}
             </button>
 

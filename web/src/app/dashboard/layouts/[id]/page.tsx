@@ -256,7 +256,7 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
         <p className="text-[var(--foreground-secondary)]">Layout not found.</p>
         <button
           onClick={() => router.push('/dashboard/layouts')}
-          className="mt-4 px-4 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition"
+          className="mt-4 px-4 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition"
         >
           Back to Layouts
         </button>
@@ -300,7 +300,7 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-6 py-2 text-sm font-semibold bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
+            className="px-6 py-2 text-sm font-semibold bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
           >
             {saving && <LoadingSpinner size="sm" />}
             Save Layout

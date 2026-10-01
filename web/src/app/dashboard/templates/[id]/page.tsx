@@ -256,7 +256,7 @@ export default function TemplateDetailPage() {
           <p className="text-[var(--foreground-secondary)]">{error || 'Template not found'}</p>
           <button
             onClick={loadTemplate}
-            className="mt-4 px-4 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition font-medium text-sm"
+            className="mt-4 px-4 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition font-medium text-sm"
           >
             Try Again
           </button>
@@ -282,7 +282,7 @@ export default function TemplateDetailPage() {
           <div className="flex items-center gap-3 mb-2">
             <h2 className="text-3xl font-bold text-[var(--foreground)]">{template.name}</h2>
             {template.isFeatured && (
-              <span className="px-3 py-1 text-xs font-semibold bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-full">
+              <span className="px-3 py-1 text-xs font-semibold bg-[var(--primary)] text-[var(--primary-contrast)] rounded-full">
                 Featured
               </span>
             )}
@@ -359,7 +359,7 @@ export default function TemplateDetailPage() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50"
               >
                 {saving ? <><LoadingSpinner size="sm" /> Saving...</> : 'Save Changes'}
               </button>
@@ -369,7 +369,7 @@ export default function TemplateDetailPage() {
               {canEditTemplate && (
                 <Link
                   href={`/dashboard/templates/${templateId}/edit`}
-                  className="px-4 py-2 rounded-lg bg-[var(--primary)] text-[var(--lw-on-forest)] hover:bg-[var(--primary-light)] text-sm font-medium inline-flex items-center gap-2"
+                  className="px-4 py-2 rounded-lg bg-[var(--primary)] text-[var(--primary-contrast)] hover:bg-[var(--primary-light)] text-sm font-medium inline-flex items-center gap-2"
                 >
                   <Icon name="edit" size="sm" />
                   Edit Visually
@@ -378,7 +378,7 @@ export default function TemplateDetailPage() {
               {canCloneTemplate && (
                 <button
                   onClick={() => setShowCloneModal(true)}
-                  className="px-6 py-3 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+                  className="px-6 py-3 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
                 >
                   <Icon name="copy" size="md" />
                   Clone to My Content
@@ -626,7 +626,7 @@ export default function TemplateDetailPage() {
                   </p>
                   <button
                     onClick={() => setShowCloneModal(true)}
-                    className="w-full px-4 py-2.5 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition font-semibold text-sm flex items-center justify-center gap-2"
+                    className="w-full px-4 py-2.5 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition font-semibold text-sm flex items-center justify-center gap-2"
                   >
                     <Icon name="copy" size="sm" />
                     Clone Template
@@ -715,7 +715,7 @@ export default function TemplateDetailPage() {
                   <button
                     onClick={handleClone}
                     disabled={cloning}
-                    className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
+                    className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
                   >
                     {cloning ? (
                       <>

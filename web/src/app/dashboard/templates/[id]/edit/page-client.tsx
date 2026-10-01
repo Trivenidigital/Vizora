@@ -226,7 +226,7 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
           </p>
           <button
             onClick={() => router.push('/dashboard/templates')}
-            className="mt-5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--lw-on-forest)] transition hover:bg-[var(--primary-light)]"
+            className="mt-5 rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-contrast)] transition hover:bg-[var(--primary-light)]"
           >
             Back to Templates
           </button>
@@ -312,7 +312,7 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
               onClick={() => zoom.setZoomPreset(preset)}
               className={`rounded px-2.5 py-1 text-xs font-medium transition ${
                 zoom.zoomPreset === preset
-                  ? 'bg-[var(--primary)] text-[var(--lw-on-forest)]'
+                  ? 'bg-[var(--primary)] text-[var(--primary-contrast)]'
                   : 'text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)] hover:text-[var(--foreground)]'
               }`}
             >
@@ -336,7 +336,7 @@ export default function EditPageClient({ templateId }: EditPageClientProps) {
           <button
             onClick={() => setShowDisplayPicker(true)}
             disabled={!editorReady}
-            className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--lw-on-forest)] transition hover:bg-[var(--primary-light)] disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-contrast)] transition hover:bg-[var(--primary-light)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             Push to Screen →
           </button>

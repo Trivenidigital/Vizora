@@ -133,7 +133,7 @@ export default function TemplateCard({
                 e.stopPropagation();
                 onUseTemplate(id);
               }}
-              className="opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300 px-5 py-2 rounded-lg bg-[var(--primary)] text-[var(--lw-on-forest)] font-semibold text-sm hover:bg-[var(--primary-light)] shadow-lg"
+              className="opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300 px-5 py-2 rounded-lg bg-[var(--primary)] text-[var(--primary-contrast)] font-semibold text-sm hover:bg-[var(--primary-light)] shadow-lg"
             >
               Use Template
             </button>
@@ -143,7 +143,7 @@ export default function TemplateCard({
         {/* Badges */}
         <div className="absolute top-2.5 left-2.5 flex gap-1.5">
           {isFeatured && (
-            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-md">
+            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-[var(--primary)] text-[var(--primary-contrast)] rounded-md">
               Featured
             </span>
           )}
