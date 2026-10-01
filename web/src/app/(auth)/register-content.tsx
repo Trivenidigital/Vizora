@@ -3,7 +3,8 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { apiClient } from '@/lib/api';
-import { registerSchema } from '@/lib/validation';
+import { registerSchema, validateRegisterField } from '@/lib/validation';
+import { fieldErrorsFromApiError, userFacingMessage } from '@/lib/error-handler';
 import { z } from 'zod';
 import ValuePanel from '@/components/auth/ValuePanel';
 import FormField from '@/components/auth/FormField';
@@ -94,6 +95,18 @@ export default function RegisterContent() {
     }
   };
 
+  /*
+   * The only keys the server's messages may be attached to. Passed explicitly so
+   * arbitrary backend text cannot invent a form field.
+   */
+  const REGISTER_FIELDS = [
+    'email',
+    'password',
+    'firstName',
+    'lastName',
+    'organizationName',
+  ] as const;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
@@ -138,9 +151,35 @@ export default function RegisterContent() {
         window.location.href = '/dashboard';
       }, 800);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Registration failed';
+      /*
+       * Show what the server actually said, and never a bare status phrase.
+       *
+       * This path used to render `err.message` directly, which for a production
+       * DTO rejection is the literal string "Bad Request" — the pipe runs with
+       * `disableErrorMessages: true` there, so no field detail is sent at all.
+       * That is what a real sign-up attempt saw.
+       *
+       * Two things changed. Per-field messages, WHEN the server sends them, are
+       * attached to their field so the correction appears where the user is
+       * looking. And a bare status phrase is never shown as an explanation;
+       * `userFacingMessage` falls through to the status-derived copy instead.
+       *
+       * The field mapping is deliberately forward-compatible rather than
+       * currently load-bearing: production sends nothing to map. It activates the
+       * moment that flag changes, and it is what makes the client's own contract
+       * mirror checkable against the server's real complaints.
+       */
+      const { fieldErrors, rest } = fieldErrorsFromApiError(err, REGISTER_FIELDS);
+      if (Object.keys(fieldErrors).length > 0) {
+        setErrors((prev) => ({ ...prev, ...fieldErrors }));
+      }
+      const message = userFacingMessage(err, 'Registration failed. Please check your details and try again.');
       if (message.toLowerCase().includes('already exists') || message.toLowerCase().includes('duplicate')) {
         setError('An account with this email already exists.');
+      } else if (rest.length > 0) {
+        setError(rest.join(' '));
+      } else if (Object.keys(fieldErrors).length > 0) {
+        setError('Please correct the highlighted fields.');
       } else {
         setError(message);
       }
@@ -228,7 +267,7 @@ export default function RegisterContent() {
                 onChange={(v) => update('firstName', v)}
                 error={errors.firstName}
                 onClearError={() => clearFieldError('firstName')}
-                validate={(v) => (v.trim().length === 0 ? 'First name is required' : null)}
+                validate={(v) => validateRegisterField('firstName', v)}
                 placeholder="John"
                 autoComplete="given-name"
                 enterKeyHint="next"
@@ -240,7 +279,7 @@ export default function RegisterContent() {
                 onChange={(v) => update('lastName', v)}
                 error={errors.lastName}
                 onClearError={() => clearFieldError('lastName')}
-                validate={(v) => (v.trim().length === 0 ? 'Last name is required' : null)}
+                validate={(v) => validateRegisterField('lastName', v)}
                 placeholder="Doe"
                 autoComplete="family-name"
                 enterKeyHint="next"
@@ -253,7 +292,7 @@ export default function RegisterContent() {
                   onChange={(v) => update('organizationName', v)}
                   error={errors.organizationName}
                   onClearError={() => clearFieldError('organizationName')}
-                  validate={(v) => (v.trim().length === 0 ? 'Organization name is required' : null)}
+                  validate={(v) => validateRegisterField('organizationName', v)}
                   placeholder="Acme Corp"
                   autoComplete="organization"
                   enterKeyHint="next"
@@ -276,11 +315,7 @@ export default function RegisterContent() {
                   }}
                   error={errors.email}
                   onClearError={() => clearFieldError('email')}
-                  validate={(v) => {
-                    if (!v.trim()) return 'Email is required';
-                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return 'Please enter a valid email';
-                    return null;
-                  }}
+                  validate={(v) => validateRegisterField('email', v)}
                   placeholder="john@acmecorp.com"
                   autoComplete="email"
                   inputMode="email"

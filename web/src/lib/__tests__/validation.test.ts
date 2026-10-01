@@ -159,16 +159,25 @@ describe('registerSchema', () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       const pwError = result.error.errors.find(e => e.path[0] === 'password');
-      expect(pwError?.message).toBe('Password must contain at least one uppercase letter');
+      // The DTO states ONE combined rule, so the client states one too. The old
+      // per-rule messages were also misleading: they named a number as
+      // mandatory when `@StrongPassword()` accepts a special character instead.
+      expect(pwError?.message).toBe(
+        'Password must contain an uppercase letter, a lowercase letter, and a number or special character',
+      );
     }
   });
 
-  it('rejects password without a number', () => {
+  it('rejects password with neither a number nor a special character', () => {
+    // 'Passwordx' has upper and lower but no digit and no special, so the DTO
+    // rejects it too — the rejection was right and only the reason was wrong.
     const result = registerSchema.safeParse({ ...validRegister, password: 'Passwordx', confirmPassword: 'Passwordx' });
     expect(result.success).toBe(false);
     if (!result.success) {
       const pwError = result.error.errors.find(e => e.path[0] === 'password');
-      expect(pwError?.message).toBe('Password must contain at least one number');
+      expect(pwError?.message).toBe(
+        'Password must contain an uppercase letter, a lowercase letter, and a number or special character',
+      );
     }
   });
 
@@ -191,12 +200,22 @@ describe('registerSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects firstName exceeding 50 characters', () => {
-    const result = registerSchema.safeParse({ ...validRegister, firstName: 'x'.repeat(51) });
+  it('rejects a one-character firstName, as the DTO does', () => {
+    // No case covered the MINIMUM, which is why `lastName: "Y"` reached the
+    // server and came back a bare 400.
+    const result = registerSchema.safeParse({ ...validRegister, firstName: 'S' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects firstName exceeding the DTO ceiling of 100', () => {
+    // Was 51, asserting the client's own stricter cap — a test pinning a false
+    // rejection. `@MaxLength(100)` is the contract; see register-contract.test.ts
+    // for the 60-character surname this used to refuse.
+    const result = registerSchema.safeParse({ ...validRegister, firstName: 'x'.repeat(101) });
     expect(result.success).toBe(false);
     if (!result.success) {
       const err = result.error.errors.find(e => e.path[0] === 'firstName');
-      expect(err?.message).toBe('First name must be less than 50 characters');
+      expect(err?.message).toBe('First name must be at most 100 characters');
     }
   });
 
@@ -205,8 +224,8 @@ describe('registerSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects lastName exceeding 50 characters', () => {
-    const result = registerSchema.safeParse({ ...validRegister, lastName: 'x'.repeat(51) });
+  it('rejects lastName exceeding the DTO ceiling of 100', () => {
+    const result = registerSchema.safeParse({ ...validRegister, lastName: 'x'.repeat(101) });
     expect(result.success).toBe(false);
   });
 
@@ -215,12 +234,12 @@ describe('registerSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejects organizationName exceeding 100 characters', () => {
-    const result = registerSchema.safeParse({ ...validRegister, organizationName: 'x'.repeat(101) });
+  it('rejects organizationName exceeding the DTO ceiling of 255', () => {
+    const result = registerSchema.safeParse({ ...validRegister, organizationName: 'x'.repeat(256) });
     expect(result.success).toBe(false);
     if (!result.success) {
       const err = result.error.errors.find(e => e.path[0] === 'organizationName');
-      expect(err?.message).toBe('Organization name must be less than 100 characters');
+      expect(err?.message).toBe('Organization name must be at most 255 characters');
     }
   });
 });
