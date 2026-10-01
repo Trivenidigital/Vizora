@@ -157,13 +157,67 @@ export const SCAN = ({ vw, isMobile }) => {
    * a label 20px outside it (a sector's bbox is huge), and hit testing via
    * `elementsFromPoint` would MISS shapes, because recharts sets `pointer-events` on
    * chart layers. Document order breaks ties, so the shape painted last wins.
+   *
+   * ── THREE CONSTRAINTS, EACH FOR A FAILURE THIS GOT WRONG ────────────────────
+   *
+   * 1. SAME `<svg>` ROOT. Candidates come from `el.ownerSVGElement`, never from the
+   *    document, so a shape in another chart cannot win no matter what the geometry
+   *    says. The analytics page stacks several charts in one column and the series
+   *    colour of one of them is `#1f4230`; a cross-root match there reports a dark
+   *    ground under a glyph that is sitting on ivory.
+   *
+   * 2. IN THE PAINTING TREE. This is the one that actually bit. recharts emits
+   *    `<defs><clipPath><rect …>` covering the whole plot area, and that rect is
+   *    never painted — but `<defs>` carries the UA `display: none`, not its
+   *    children, so the child rect's own computed `display` is perfectly normal, its
+   *    `fill` defaults to black (or inherits whatever an ancestor set), and its box
+   *    contains every label in the chart. So EVERY pie label matched it. Measured on
+   *    real recharts SSR output: three labels, three hits, each
+   *    `DEFS rect fill=rgb(0, 0, 0) bbox=5,5 390x290`. Excluding non-painted
+   *    containers takes those to zero hits, which is what makes the ground fall
+   *    through to the card where it belongs.
+   *
+   * 3. ACTUALLY PAINTS SOMETHING. A shape whose composited fill alpha is 0 covers
+   *    the glyph with nothing and must not become its ground.
+   *
+   * KNOWN LIMITATION, recorded rather than solved: a shape inside the painting tree
+   * whose paint is clipped AWAY at the glyph's point (a `clip-path` on it or on an
+   * ancestor `<g>`, which recharts does use for plot areas) is still treated as
+   * ground. Evaluating clip geometry properly is out of scope here, and on the
+   * current surface it does not change an answer — recharts' clipped shapes do not
+   * extend beyond the plot area their clip defines.
    */
+  const PAINT_EXCLUDING_PARENTS = ['defs', 'clippath', 'mask', 'pattern', 'marker', 'symbol'];
+
+  /** Is this shape in the painting tree of its own `<svg>`, or only referenced? */
+  const isPainted = (shape) => {
+    for (let p = shape.parentNode; p && p.nodeType === 1; p = p.parentNode) {
+      const t = p.tagName.toLowerCase();
+      if (PAINT_EXCLUDING_PARENTS.includes(t)) return false;
+      if (t === 'svg') break;
+    }
+    return true;
+  };
+
   const svgGround = (el, rect) => {
     const svg = el.ownerSVGElement || (isSvg(el) && el.tagName.toLowerCase() === 'svg' ? el : null);
     if (!svg) return { useHtml: true };
 
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
+    /*
+     * CLIENT -> THAT SHAPE'S OWN USER SPACE, per shape.
+     *
+     * `isPointInFill` takes a point in the element's local user coordinate system,
+     * which is NOT client space whenever a `viewBox` scales or a `transform` moves
+     * the geometry — and every recharts chart has both. `getScreenCTM()` maps that
+     * element's user space to client space, so its inverse is the conversion, and it
+     * has to be recomputed per shape because each one can sit under a different
+     * transform. Passing the client point straight in is the bug this replaces; the
+     * `viewBox`-scaled control cases exist precisely because the naive and correct
+     * forms agree at scale 1 and only diverge once user space differs from screen
+     * space.
+     */
     const toUserSpace = (shape) => {
       const ctm = typeof shape.getScreenCTM === 'function' ? shape.getScreenCTM() : null;
       if (!ctm) return null;
@@ -185,6 +239,7 @@ export const SCAN = ({ vw, isMobile }) => {
       const raw = String(scs.fill || '').trim();
       if (!raw || raw === 'none') continue;
       if (scs.visibility === 'hidden' || scs.display === 'none' || scs.opacity === '0') continue;
+      if (!isPainted(shape)) continue;
       const pt = toUserSpace(shape);
       if (!pt) continue;
       let inside = false;
@@ -199,6 +254,8 @@ export const SCAN = ({ vw, isMobile }) => {
 
     const paint = paintColor(hit.raw, hit.scs);
     if (paint.skip) return { skip: `svg-ground-${paint.skip}` };
+    // A fully transparent fill covers the glyph with nothing, so it is not a ground.
+    if (!paint.color || paint.color.a === 0) return { useHtml: true };
     return { shape: hit.shape, fill: paint.color };
   };
 

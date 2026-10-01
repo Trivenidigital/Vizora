@@ -85,6 +85,57 @@ const FIXTURE = `<!doctype html>
     <!-- 8. Plain HTML text, unreadable, to prove the HTML path still works. -->
     <p style="color:#e9e2d2">html-control-label</p>
 
+    <!-- 10. THE CLIP-PATH RECT. recharts emits <defs><clipPath><rect> spanning the
+             whole plot area; it is NEVER painted, but <defs> carries the UA
+             display:none and its CHILD does not, so the rect's own computed display
+             is normal, its fill defaults to black and its box contains every label.
+             This is what made every pie label report a dark ground. Measured on real
+             recharts SSR output before the fix: 3 labels, 3 hits, each
+             'DEFS rect fill=rgb(0, 0, 0) bbox=5,5 390x290'. -->
+    <svg id="clipped" width="300" height="80" viewBox="0 0 300 80">
+      <defs><clipPath id="cp1"><rect x="0" y="0" width="300" height="80" /></clipPath></defs>
+      <g clip-path="url(#cp1)"></g>
+      <text class="recharts-text" x="10" y="45" fill="${INK}"><tspan>over-clip-rect</tspan></text>
+    </svg>
+
+    <!-- 11. A filled shape ELSEWHERE IN THE SAME SVG that the glyph is not over. -->
+    <svg id="same-svg-elsewhere" width="300" height="80" viewBox="0 0 300 80">
+      <rect x="0" y="0" width="90" height="80" fill="#1f4230" />
+      <text class="recharts-text" x="150" y="45" fill="${INK}"><tspan>beside-shape</tspan></text>
+    </svg>
+
+    <!-- 12. A filled shape in a DIFFERENT SVG. Candidates come from the glyph's own
+             ownerSVGElement, so this must never win however the geometry lines up. -->
+    <svg id="other-svg-fill" width="300" height="80" viewBox="0 0 300 80">
+      <rect x="0" y="0" width="300" height="80" fill="#1f4230" />
+    </svg>
+    <svg id="other-svg-text" width="300" height="80" viewBox="0 0 300 80">
+      <text class="recharts-text" x="10" y="45" fill="${INK}"><tspan>other-svg-label</tspan></text>
+    </svg>
+
+    <!-- 13. USER SPACE != SCREEN SPACE. The viewBox is 10x the rendered size, so the
+             shape's geometry lives at user coordinates nowhere near the glyph's
+             client coordinates. Testing the client point directly reports no hit
+             here and a hit in case 14 — exactly backwards — so these two cases are
+             what prove the per-shape inverse CTM is applied. -->
+    <svg id="scaled-off" width="300" height="80" viewBox="0 0 3000 800">
+      <rect x="0" y="0" width="900" height="800" fill="#1f4230" />
+      <text class="recharts-text" x="1500" y="450" font-size="120" fill="${INK}"><tspan>scaled-beside</tspan></text>
+    </svg>
+
+    <!-- 14. Same scaling, but the glyph IS over the shape: must be measured against
+             the forest fill, not the card. -->
+    <svg id="scaled-on" width="300" height="80" viewBox="0 0 3000 800">
+      <rect x="0" y="0" width="3000" height="800" fill="#1f4230" />
+      <text class="recharts-text" x="200" y="450" font-size="120" fill="${INK}"><tspan>scaled-on-shape</tspan></text>
+    </svg>
+
+    <!-- 15. A shape with fill-opacity:0 paints nothing and is not a ground. -->
+    <svg id="invisible-fill" width="300" height="80" viewBox="0 0 300 80">
+      <rect x="0" y="0" width="300" height="80" fill="#1f4230" fill-opacity="0" />
+      <text class="recharts-text" x="10" y="45" fill="${INK}"><tspan>over-invisible</tspan></text>
+    </svg>
+
     <!-- 9. THE FALSE POSITIVE, reproduced. 'fill' paints a perfectly readable ink
             while the inherited 'color' is unreadable. The old scanner read 'color'
             and reported a failure nobody could see; this is the shape of what the
@@ -113,6 +164,12 @@ const CASES = [
     fails: false,
     why: 'the painted ink is readable; only the inherited `color` is not — reading `color` reported a failure nobody could see',
   },
+  { text: 'over-clip-rect', fails: false, why: 'a clipPath rect is never painted, so the ground is the card — the B18 defect' },
+  { text: 'beside-shape', fails: false, why: 'a filled shape elsewhere in the same SVG must not win' },
+  { text: 'other-svg-label', fails: false, why: 'a filled shape in a DIFFERENT SVG must never win' },
+  { text: 'scaled-beside', fails: false, why: 'under a 10x viewBox, the glyph is beside the shape in USER space' },
+  { text: 'scaled-on-shape', fails: true, why: 'under the same 10x viewBox the glyph IS over the shape — 1.37:1 on forest' },
+  { text: 'over-invisible', fails: false, why: 'fill-opacity:0 paints nothing, so it is not a ground' },
 ];
 
 const browser = await chromium.launch();
