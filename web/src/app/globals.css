@@ -527,6 +527,228 @@ body {
   box-shadow: 0 18px 44px rgba(10, 34, 46, 0.12);
 }
 
+/* `.eh-reveal` starts at opacity 0 and only animates in, so a user who asked
+   for reduced motion would otherwise get a page of invisible sections if the
+   transition were merely removed. Show them outright instead. The base rule
+   declares its transition with !important, so the override needs it too, and
+   the whole thing is `.mkt`-scoped because `.eh-reveal` is shared with the
+   dashboard. */
+@media (prefers-reduced-motion: reduce) {
+  .mkt .eh-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none !important;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   LITTLE WORLDS SCOPE (.lw) — warm editorial homepage direction
+   ------------------------------------------------------------------
+   Applied ON TOP of `.mkt` by the HOMEPAGE wrapper only
+   (`className="mkt lw"`). `.mkt` stays for the consent bar's
+   `body:has(.mkt)` selector and the base token reset; `.lw` re-tunes
+   the palette to ivory/limestone + forest green + ink with restrained
+   brass/coral. Legal and auth pages carry `.mkt` WITHOUT `.lw`, so
+   they are untouched.
+
+   Text-safety: brass/coral base hues are FILL colours. Small text on
+   the ivory substrate uses the `-ink` variants only.
+   ══════════════════════════════════════════════════════════════════ */
+
+.lw {
+  --lw-paper: #f5f1e8; /* ivory page */
+  --lw-paper-2: #efe9dc; /* limestone tint */
+  --lw-stone: #e4dccb; /* deeper limestone (plinths, wells) */
+  --lw-card: #fdfbf5; /* raised card surface */
+  --lw-screen: #fffdf4; /* signage screen face */
+
+  --lw-ink: #23261f; /* warm ink — headings/body */
+  --lw-ink-2: #4b5045; /* secondary copy */
+  --lw-muted: #5f6456; /* micro labels */
+  --lw-hair: rgba(35, 38, 31, 0.14);
+  --lw-hair-2: rgba(35, 38, 31, 0.08);
+
+  --lw-forest: #1f4230; /* primary brand */
+  --lw-forest-deep: #142c20;
+  --lw-on-forest: #f2efe4; /* text on forest fills */
+  --lw-brass: #b08a3e; /* fills only */
+  --lw-brass-ink: #77591f; /* brass as small text */
+  --lw-coral: #d96a4c; /* fills only */
+  --lw-coral-ink: #a63d20; /* coral as small text */
+
+  --lw-serif: var(--font-fraunces), 'Iowan Old Style', Georgia, serif;
+
+  /* ONE vertical rhythm for every landing section's top AND bottom padding, so
+     the gap between two sections is exactly 2x this and changing the page's
+     breathing is a one-line edit. Each section used to carry its own
+     clamp(56px,7vw,104px), which put 202px between every pair at 1440.
+     Homepage-only: `.lw` is applied by the homepage wrapper alone, so the
+     legal/auth pages (plain `.mkt`) are untouched. */
+  --lw-sec-y: clamp(40px, 4.6vw, 68px);
+
+  background: var(--lw-paper);
+  color: var(--lw-ink);
+
+  /* Base-token re-point so any shared component rendered inside the
+     homepage (dialogs, consent-adjacent UI) sits on the warm palette. */
+  --background: #f5f1e8;
+  --background-secondary: #efe9dc;
+  --background-tertiary: #e9e2d2;
+  --foreground: #23261f;
+  --foreground-secondary: #4b5045;
+  --foreground-tertiary: #5f6456;
+  --surface: #fdfbf5;
+  --surface-secondary: #f3eee1;
+  --surface-hover: #efe9dc;
+  --border: #ddd5c2;
+  --border-light: #e9e2d2;
+  --primary: #1f4230;
+  --primary-light: #2b5942;
+  --primary-ink: #1f4230;
+  --focus-ring-color: var(--primary-ink);
+  color-scheme: light;
+
+  /* Legacy `.mkt` token remap: components that survived iteration 1
+     (pricing internals, the FAQ disclosure, the tour dialog) read
+     `--mkt-*`. The wrapper carries BOTH classes and this block comes
+     later in the sheet, so these warm values win on the homepage while
+     the legal/auth pages (plain `.mkt`) keep the cool-grey originals. */
+  --mkt-page: #f5f1e8;
+  --mkt-page-2: #efe9dc;
+  --mkt-canvas-1: #efe9dc;
+  --mkt-canvas-2: #e4dccb;
+  --mkt-surface: #fdfbf5;
+  --mkt-surface-2: #f3eee1;
+  --mkt-ink: #23261f;
+  --mkt-ink-2: #4b5045;
+  --mkt-muted: #5f6456;
+  --mkt-hair: rgba(35, 38, 31, 0.14);
+  --mkt-hair-2: rgba(35, 38, 31, 0.08);
+  --mkt-mint: #1f4230;
+  --mkt-mint-hot: #2b5942;
+  --mkt-mint-ink: #1f4230;
+  --mkt-cyan: #1f4230;
+  --mkt-cyan-ink: #1f4230;
+  --mkt-violet: #77591f;
+  --mkt-violet-ink: #77591f;
+  --mkt-amber: #b08a3e;
+  --mkt-amber-ink: #77591f;
+}
+
+/* ---- shared primitives, re-tuned under .lw ---- */
+.lw ::selection {
+  background: rgba(31, 66, 48, 0.18);
+}
+.lw .eh-gradient {
+  /* the old neon gradient wordmark reads alien on ivory; solid forest */
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: var(--lw-forest);
+}
+
+/* ---- type ---- */
+.lw-display {
+  font-family: var(--lw-serif);
+  font-weight: 480;
+  letter-spacing: -0.015em;
+  line-height: 1.06;
+  font-variation-settings: 'opsz' 60, 'SOFT' 40;
+  color: var(--lw-ink);
+}
+.lw-display em {
+  font-style: italic;
+  font-weight: 440;
+  color: var(--lw-forest);
+}
+.lw-h2 {
+  font-family: var(--lw-serif);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.12;
+  font-variation-settings: 'opsz' 40;
+}
+.lw-mono {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.62rem;
+  font-weight: 500;
+  color: var(--lw-muted);
+}
+.lw-kicker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--lw-brass-ink);
+}
+.lw-kicker::before {
+  content: '';
+  width: 22px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.6;
+}
+
+/* ---- layout ---- */
+.lw-wrap {
+  max-width: 1280px;
+  margin-inline: auto;
+  padding-inline: clamp(20px, 3.6vw, 48px);
+}
+
+/* ---- controls ---- */
+.lw-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  padding: 13px 26px;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+.lw-btn-forest {
+  background: var(--lw-forest);
+  color: var(--lw-on-forest);
+  box-shadow: 0 10px 26px rgba(20, 44, 32, 0.24);
+}
+.lw-btn-forest:hover {
+  background: var(--lw-forest-deep);
+  box-shadow: 0 14px 32px rgba(20, 44, 32, 0.3);
+}
+.lw-btn-ghost {
+  border: 1px solid var(--lw-hair);
+  color: var(--lw-ink);
+  background: rgba(255, 253, 244, 0.55);
+}
+.lw-btn-ghost:hover {
+  background: var(--lw-card);
+  border-color: rgba(35, 38, 31, 0.26);
+}
+.lw-link {
+  color: var(--lw-ink-2);
+  transition: color 0.2s ease;
+}
+.lw-link:hover {
+  color: var(--lw-ink);
+}
+
+/* ---- surfaces ---- */
+.lw-card-surface {
+  background: var(--lw-card);
+  border: 1px solid var(--lw-hair-2);
+  border-radius: 18px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset,
+    0 22px 48px rgba(35, 38, 31, 0.07);
+}
+.lw-well {
+  background: linear-gradient(180deg, var(--lw-paper-2), var(--lw-stone));
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 24px;
+}
+
 /* ── Cookie consent bar — context-aware chrome ──────────────────────────────
    The consent bar is rendered from the ROOT layout, so it is a sibling of the
    page content, not a descendant of `.mkt`. That means it cannot pick up the
@@ -592,6 +814,22 @@ body:has(.mkt) .consent-bar {
   --consent-fill: #00B27C;
   --consent-fill-hover: #00A171;
   --consent-on-fill: #04241B;
+}
+
+/* On the Little Worlds homepage the same bar follows the warm palette —
+   otherwise the emerald pill is the most saturated object on first paint.
+   Same mechanism as above; `.lw` only ever appears alongside `.mkt`. */
+body:has(.lw) .consent-bar {
+  --consent-surface: #fdfbf5;
+  --consent-ink: #23261f;
+  --consent-ink-2: #4b5045;
+  --consent-hair: rgba(35, 38, 31, 0.14);
+  --consent-hair-strong: rgba(35, 38, 31, 0.34);
+  --consent-accent: #1f4230;
+  --consent-accent-hover: #142c20;
+  --consent-fill: #1f4230;
+  --consent-fill-hover: #142c20;
+  --consent-on-fill: #f2efe4;
 }
 
 /* ── Electric Horizon Global Utilities ── */
