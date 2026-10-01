@@ -19,7 +19,8 @@ PNGs OPENED, not just diffed · FROZEN set untouched (`tasks/redesign-colour-map
   - Backlog (not colour): the four invalid schedule fields set no `aria-invalid`/`aria-describedby`.
   - Colour-map per-file counts were stale again (69/38 recorded vs 39/15 real) — re-measure before every batch.
 - [ ] B9 widgets configuration chrome (`app/dashboard/widgets/` ONLY; `components/widgets/` is FROZEN); fix the gallery type-map fall-through while there
-- [ ] B10 health, ops, analytics, devices, layouts, playlists, dashboard home/layout (status colours hand-mapped)
+- [x] B10a health + ops + analytics — `f32aa2cd` (cherry-picked from `feat/app-redesign-b10a` f9a03ed6; ratchet 284/80/251/82/0/24). One status vocabulary mapped by meaning. Decided: the four-rung health ladder (Excellent/Good/Fair/Poor) BORROWS `--primary-ink` as its top rung (8.40/5.47/5.41/4.89:1 by ink depth) because only three AA-safe status inks exist and the tint fills are not monotonic; the pre-existing open(red)/escalated(amber) incident inversion is PRESERVED on purpose — re-ranking incident states is a product decision. Evidence `pre-b10`→`after-b10a`: health changed and opened (reads well); analytics pixel-identical (only inert utilities + spinners changed); ops pixel-identical because the page hits its error boundary locally ("Cannot convert undefined or null to object") — see finding below.
+- [ ] B10b overview, devices, layouts, playlists, help (coder-b6, branch `feat/app-redesign-b10b`)
 - [ ] B11 display pairing screen + StatusBar + FullscreenButton (renderers FROZEN; viewports stay dark)
 - [ ] B12 global-error.tsx — hand-edit the 4 irreducible literals to Little Worlds values
 - [ ] Phase 5a: computed contrast matrix for every token pairing (light only)
