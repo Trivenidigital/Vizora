@@ -94,8 +94,8 @@ export default function ForgotPasswordContent() {
         {/* Mobile-only compact trust banner */}
         <div className="md:hidden mb-8">
           <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-7 h-7 rounded-lg bg-[#00E5A0]/10 border border-[#00E5A0]/20 flex items-center justify-center">
-              <span className="text-[#00E5A0] font-bold text-xs font-mono">V</span>
+            <div className="w-7 h-7 rounded-lg bg-[var(--primary)] flex items-center justify-center">
+              <span className="text-[var(--primary-contrast)] font-bold text-xs font-mono">V</span>
             </div>
             <span className="text-[var(--foreground)] font-semibold text-sm">Vizora</span>
           </div>
@@ -116,7 +116,7 @@ export default function ForgotPasswordContent() {
               </p>
 
               {error && (
-                <div className="flex items-start gap-3 bg-[var(--error)]/10 border border-[var(--error)]/30 text-[var(--error-ink)] px-4 py-3 rounded-lg mb-6">
+                <div className="flex items-start gap-3 bg-error/10 border border-error/30 text-[var(--error-ink)] px-4 py-3 rounded-lg mb-6">
                   <svg className="w-5 h-5 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
                   </svg>
@@ -174,7 +174,7 @@ export default function ForgotPasswordContent() {
                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                     <path d="M7 11V7a5 5 0 0110 0v4" />
                   </svg>
-                  256-bit encrypted
+                  Encrypted connection
                 </span>
                 <span className="text-[var(--border)]">|</span>
                 <span>Free 30-day trial</span>
@@ -207,7 +207,7 @@ export default function ForgotPasswordContent() {
           ) : (
             /* Success state */
             <div className="text-center auth-field-enter">
-              <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-[var(--success)]/10 border border-[var(--success)]/30 flex items-center justify-center">
+              <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-success/10 border border-success/30 flex items-center justify-center">
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--success-ink)]">
                   <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
                   <polyline points="22,6 12,13 2,6" />

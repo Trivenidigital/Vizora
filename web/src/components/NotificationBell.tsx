@@ -84,7 +84,7 @@ export default function NotificationBell() {
         {/* Unread badge */}
         {unreadCount > 0 && (
           <span
-            className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-xs font-bold text-white bg-red-500 rounded-full"
+            className="absolute -top-0.5 -right-0.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-xs font-bold text-white bg-[var(--danger-solid)] rounded-full"
             data-testid="notification-badge"
           >
             {unreadCount > 99 ? '99+' : unreadCount}

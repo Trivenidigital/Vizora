@@ -111,13 +111,13 @@ export default function AdminAnnouncementsClient({ initialAnnouncements }: Admin
   const getTypeStyles = (type: SystemAnnouncement['type']) => {
     switch (type) {
       case 'info':
-        return 'bg-[#00E5A0]/10 text-[#00E5A0] border-[#00E5A0]/20';
+        return 'bg-brand/10 text-[var(--primary-ink)] border-brand/20';
       case 'warning':
-        return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800';
+        return 'bg-[var(--status-error-bg)] text-[var(--warning-ink)] border-warning-ink/30';
       case 'critical':
-        return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800';
+        return 'bg-[var(--status-offline-bg)] text-[var(--error-ink)] border-error-ink/30';
       case 'maintenance':
-        return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800';
+        return 'bg-[var(--cat-purple-bg)] text-[var(--cat-purple)] border-[var(--cat-purple-edge)]';
       default:
         return 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] border-[var(--border)]';
     }
@@ -160,7 +160,7 @@ export default function AdminAnnouncementsClient({ initialAnnouncements }: Admin
         </div>
         <button
           onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition"
+          className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition"
         >
           <Plus className="w-5 h-5" />
           Create Announcement
@@ -196,7 +196,7 @@ export default function AdminAnnouncementsClient({ initialAnnouncements }: Admin
                         {announcement.title}
                       </h3>
                       {isScheduled(announcement) && (
-                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-[#00E5A0]/10 text-[#00E5A0]">
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-brand/10 text-[var(--primary-ink)]">
                           Scheduled
                         </span>
                       )}
@@ -246,7 +246,7 @@ export default function AdminAnnouncementsClient({ initialAnnouncements }: Admin
                   </button>
                   <button
                     onClick={() => setDeletingAnnouncement(announcement)}
-                    className="p-2 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-[var(--surface-hover)] rounded-lg transition"
+                    className="p-2 text-[var(--error-ink)] hover:bg-[var(--surface-hover)] rounded-lg transition"
                     title="Delete"
                   >
                     <Trash2 className="w-5 h-5" />
@@ -269,7 +269,7 @@ export default function AdminAnnouncementsClient({ initialAnnouncements }: Admin
           </p>
           <button
             onClick={handleCreate}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition"
           >
             <Plus className="w-5 h-5" />
             Create Announcement

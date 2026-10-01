@@ -11,12 +11,17 @@ export function QuotaBar({ used, total, label }: QuotaBarProps) {
   const safeTotal = Number(total) || 0;
   const percentage = safeTotal > 0 ? Math.min((safeUsed / safeTotal) * 100, 100) : 0;
 
-  // Determine color based on usage
-  let barColor = 'bg-[#00E5A0]';
+  /*
+   * The three tones are a SEMANTIC ladder -- normal / approaching the quota /
+   * at it -- so they take the status tokens rather than palette shades. The
+   * hue is the information here: a user reads "am I about to run out" from the
+   * colour before they read the number, which is why these are not brand tints.
+   */
+  let barColor = 'bg-brand';
   if (percentage >= 90) {
-    barColor = 'bg-red-500';
+    barColor = 'bg-error';
   } else if (percentage >= 75) {
-    barColor = 'bg-yellow-500';
+    barColor = 'bg-warning';
   }
 
   return (

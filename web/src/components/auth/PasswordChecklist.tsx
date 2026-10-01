@@ -30,7 +30,7 @@ export default function PasswordChecklist({ password }: PasswordChecklistProps) 
             <span
               className={`inline-flex items-center justify-center w-4 h-4 rounded-full transition-all duration-200 ${
                 met
-                  ? 'bg-[var(--success)] text-white scale-100'
+                  ? 'bg-[var(--success-ink)] text-white scale-100'
                   : 'border border-[var(--border)] scale-90'
               }`}
             >

@@ -84,12 +84,6 @@ jest.mock('@/components/Breadcrumbs', () => {
   };
 });
 
-jest.mock('@/components/ThemeToggle', () => {
-  return function MockThemeToggle() {
-    return <button type="button">Theme</button>;
-  };
-});
-
 jest.mock('@/theme/icons', () => ({
   Icon: ({ name }: { name: string }) => <span data-testid={`icon-${name}`}>{name}</span>,
 }));

@@ -112,18 +112,45 @@ export default function HealthMonitoringClient() {
  }
  };
 
+ /*
+  * A FOUR-RUNG LADDER ON A THREE-INK VOCABULARY.
+  *
+  * Excellent / Good / Fair / Poor is ordinal, and the palette has exactly three
+  * AA-safe status inks (success / warning / error). Two measured facts decided
+  * where the fourth rung comes from, rather than taste:
+  *
+  * 1. A second green INK is not available. `--success` as text on the Good fill
+  *    measures 2.78:1, so the only AA-safe green in the family is
+  *    `--success-ink` itself.
+  * 2. A fill ramp is not available either. The status tints are deliberately
+  *    low-chroma washes of the page, so all four sit between 0.74 and 0.83
+  *    relative luminance and are NOT monotonic. The fills cannot carry an
+  *    order, which is the same reason globals.css says status has to survive a
+  *    greyscale screenshot by glyph and label rather than by hue.
+  *
+  * So the top rung BORROWS `--primary-ink`, a deeper green of the same family:
+  * deep green -> green -> brown -> red reads as a severity ramp by ink depth,
+  * at 8.40 / 5.47 / 5.41 / 4.89:1, each measured on its own fill. No new hue is
+  * introduced. The borrow is the part worth knowing about, since `--primary-ink`
+  * is the brand ink doing double duty here. The alternative — giving Excellent
+  * and Good the same ink and separating them by fill — was rejected because
+  * fact 2 makes that a flattening wearing two class names.
+  *
+  * The rung is never carried by colour alone: the card renders the score and
+  * the word as well.
+  */
  const getHealthStatusColor = (score: number) => {
- if (score >= 90) return 'bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-700';
- if (score >= 70) return 'bg-[#00E5A0]/5 dark:bg-[#00E5A0]/10 border-[#00E5A0]/30 dark:border-[#00E5A0]/30';
- if (score >= 50) return 'bg-yellow-50 dark:bg-yellow-900 border-yellow-200 dark:border-yellow-700';
- return 'bg-red-50 dark:bg-red-900 border-red-200 dark:border-red-700';
+ if (score >= 90) return 'bg-[var(--badge-brand-bg)] border-brand/30';
+ if (score >= 70) return 'bg-[var(--status-online-bg)] border-success-ink/30';
+ if (score >= 50) return 'bg-[var(--status-error-bg)] border-warning-ink/30';
+ return 'bg-[var(--status-offline-bg)] border-error-ink/30';
  };
 
  const getHealthStatusLabel = (score: number) => {
- if (score >= 90) return { label: 'Excellent', color: 'text-green-700 dark:text-green-300' };
- if (score >= 70) return { label: 'Good', color: 'text-[#00E5A0] dark:text-[#00E5A0]' };
- if (score >= 50) return { label: 'Fair', color: 'text-yellow-700 dark:text-yellow-300' };
- return { label: 'Poor', color: 'text-red-700 dark:text-red-300' };
+ if (score >= 90) return { label: 'Excellent', color: 'text-[var(--primary-ink)]' };
+ if (score >= 70) return { label: 'Good', color: 'text-[var(--success-ink)]' };
+ if (score >= 50) return { label: 'Fair', color: 'text-[var(--warning-ink)]' };
+ return { label: 'Poor', color: 'text-[var(--error-ink)]' };
  };
 
  // Filter devices
@@ -177,14 +204,14 @@ export default function HealthMonitoringClient() {
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Monitor device performance and system health
  {realtimeStatus === 'connected' && (
- <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
- <span className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full animate-pulse"></span>
+ <span className="ml-2 inline-flex items-center gap-1 text-xs text-[var(--success-ink)]">
+ <span className="w-2 h-2 bg-[var(--success-ink)] rounded-full animate-pulse"></span>
  Real-time monitoring active
  </span>
  )}
  {realtimeStatus === 'offline' && (
- <span className="ml-2 inline-flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-400">
- <span className="w-2 h-2 bg-yellow-600 dark:bg-yellow-400 rounded-full"></span>
+ <span className="ml-2 inline-flex items-center gap-1 text-xs text-[var(--warning-ink)]">
+ <span className="w-2 h-2 bg-[var(--warning-ink)] rounded-full"></span>
  Polling mode
  </span>
  )}
@@ -192,16 +219,16 @@ export default function HealthMonitoringClient() {
  </div>
  <button
  onClick={() => loadDevicesAndHealth()}
- className="bg-[#00E5A0] text-[#061A21] px-6 py-3 rounded-lg hover:bg-[#00CC8E] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+ className="bg-[var(--primary)] text-[var(--primary-contrast)] px-6 py-3 rounded-lg hover:bg-[var(--primary-light)] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
  >
- <Icon name="download" size="lg" className="text-white" />
+ <Icon name="download" size="lg" className="text-[var(--primary-contrast)]" />
  <span>Refresh</span>
  </button>
  </div>
 
  {/* Health Statistics Cards */}
  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
- <div className="bg-[var(--surface)] rounded-lg shadow p-6 border-t-4 border-[#00E5A0]">
+ <div className="bg-[var(--surface)] rounded-lg shadow p-6 border-t-4 border-[var(--primary-ink)]">
  <div className="flex items-center justify-between">
  <div>
  <p className="text-sm font-medium text-[var(--foreground-secondary)]">Total Devices</p>
@@ -209,43 +236,43 @@ export default function HealthMonitoringClient() {
  {stats.totalDevices}
  </p>
  </div>
- <Icon name="devices" size="3xl" className="text-[#00E5A0] opacity-20" />
+ <Icon name="devices" size="3xl" className="text-[var(--primary-ink)] opacity-20" />
  </div>
  </div>
 
- <div className="bg-[var(--surface)] rounded-lg shadow p-6 border-t-4 border-green-500">
+ <div className="bg-[var(--surface)] rounded-lg shadow p-6 border-t-4 border-[var(--success-ink)]">
  <div className="flex items-center justify-between">
  <div>
  <p className="text-sm font-medium text-[var(--foreground-secondary)]">Healthy</p>
- <p className="text-2xl font-bold text-green-600 dark:text-green-400 mt-2">
+ <p className="text-2xl font-bold text-[var(--success-ink)] mt-2">
  {stats.healthy}
  </p>
  </div>
- <Icon name="success" size="3xl" className="text-green-500 opacity-20" />
+ <Icon name="success" size="3xl" className="text-[var(--success-ink)] opacity-20" />
  </div>
  </div>
 
- <div className="bg-[var(--surface)] rounded-lg shadow p-6 border-t-4 border-yellow-500">
+ <div className="bg-[var(--surface)] rounded-lg shadow p-6 border-t-4 border-[var(--warning-ink)]">
  <div className="flex items-center justify-between">
  <div>
  <p className="text-sm font-medium text-[var(--foreground-secondary)]">Warnings</p>
- <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mt-2">
+ <p className="text-2xl font-bold text-[var(--warning-ink)] mt-2">
  {stats.warning}
  </p>
  </div>
- <Icon name="warning" size="3xl" className="text-yellow-500 opacity-20" />
+ <Icon name="warning" size="3xl" className="text-[var(--warning-ink)] opacity-20" />
  </div>
  </div>
 
- <div className="bg-[var(--surface)] rounded-lg shadow p-6 border-t-4 border-red-500">
+ <div className="bg-[var(--surface)] rounded-lg shadow p-6 border-t-4 border-[var(--error-ink)]">
  <div className="flex items-center justify-between">
  <div>
  <p className="text-sm font-medium text-[var(--foreground-secondary)]">Critical</p>
- <p className="text-2xl font-bold text-red-600 dark:text-red-400 mt-2">
+ <p className="text-2xl font-bold text-[var(--error-ink)] mt-2">
  {stats.critical}
  </p>
  </div>
- <Icon name="error" size="3xl" className="text-red-500 opacity-20" />
+ <Icon name="error" size="3xl" className="text-[var(--error-ink)] opacity-20" />
  </div>
  </div>
  </div>
@@ -263,7 +290,7 @@ export default function HealthMonitoringClient() {
  <select
  value={sortBy}
  onChange={(e) => setSortBy(e.target.value as any)}
- className="px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0]"
+ className="px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[var(--primary-ink)]"
  >
  <option value="health">Sort by Health</option>
  <option value="name">Sort by Name</option>
@@ -335,19 +362,19 @@ export default function HealthMonitoringClient() {
 
  {/* Additional Info */}
  <div className="grid grid-cols-2 gap-3 text-sm">
- <div className="bg-[var(--surface)]/50/50 p-2 rounded">
+ <div className="bg-surface/50 p-2 rounded">
  <p className="text-[var(--foreground-secondary)] text-xs">Uptime</p>
  <p className="font-medium text-[var(--foreground)]">
  {typeof health.uptime === 'number' ? `${Math.floor(health.uptime / 24)}d ${health.uptime % 24}h` : 'Not reported'}
  </p>
  </div>
- <div className="bg-[var(--surface)]/50/50 p-2 rounded">
+ <div className="bg-surface/50 p-2 rounded">
  <p className="text-[var(--foreground-secondary)] text-xs">Temp</p>
  <p className="font-medium text-[var(--foreground)]">
  {typeof health.temperature === 'number' ? `${health.temperature}°C` : 'Not reported'}
  </p>
  </div>
- <div className="bg-[var(--surface)]/50/50 p-2 rounded col-span-2">
+ <div className="bg-surface/50 p-2 rounded col-span-2">
  <p className="text-[var(--foreground-secondary)] text-xs mb-1">Last Heartbeat</p>
  <p className="font-medium text-[var(--foreground)] text-xs">
  {health.lastHeartbeat ? `${Math.round((Date.now() - health.lastHeartbeat.getTime()) / 1000)}s ago` : 'Never'}
@@ -360,19 +387,19 @@ export default function HealthMonitoringClient() {
  <div
  className={`mt-4 border rounded p-3 animate-pulse ${
  activeAlerts[device.id].severity === 'critical'
- ? 'bg-red-100 dark:bg-red-900 border-red-300 dark:border-red-700'
+ ? 'bg-[var(--status-offline-bg)] border-error-ink/30'
  : activeAlerts[device.id].severity === 'warning'
- ? 'bg-yellow-100 dark:bg-yellow-900 border-yellow-300 dark:border-yellow-700'
- : 'bg-[#00E5A0]/10 dark:bg-[#00E5A0]/10 border-[#00E5A0]/30'
+ ? 'bg-[var(--status-error-bg)] border-warning-ink/30'
+ : 'bg-[var(--status-pairing-bg)] border-info-ink/30'
  }`}
  >
  <p
  className={`text-sm font-semibold ${
  activeAlerts[device.id].severity === 'critical'
- ? 'text-red-800 dark:text-red-200'
+ ? 'text-[var(--error-ink)]'
  : activeAlerts[device.id].severity === 'warning'
- ? 'text-yellow-800 dark:text-yellow-200'
- : 'text-[#00E5A0] dark:text-[#00E5A0]'
+ ? 'text-[var(--warning-ink)]'
+ : 'text-[var(--info-ink)]'
  }`}
  >
  🔴 {activeAlerts[device.id].message}
@@ -382,15 +409,15 @@ export default function HealthMonitoringClient() {
 
  {/* Static Alert Banners */}
  {!activeAlerts[device.id] && health.score < 50 && (
- <div className="mt-4 bg-red-100 dark:bg-red-900 border border-red-300 dark:border-red-700 rounded p-3">
- <p className="text-sm font-semibold text-red-800 dark:text-red-200">
+ <div className="mt-4 bg-[var(--status-offline-bg)] border border-error-ink/30 rounded p-3">
+ <p className="text-sm font-semibold text-[var(--error-ink)]">
  ⚠️ Critical: Device performance degraded. Consider maintenance.
  </p>
  </div>
  )}
  {!activeAlerts[device.id] && health.score < 70 && health.score >= 50 && (
- <div className="mt-4 bg-yellow-100 dark:bg-yellow-900 border border-yellow-300 dark:border-yellow-700 rounded p-3">
- <p className="text-sm font-semibold text-yellow-800 dark:text-yellow-200">
+ <div className="mt-4 bg-[var(--status-error-bg)] border border-warning-ink/30 rounded p-3">
+ <p className="text-sm font-semibold text-[var(--warning-ink)]">
  ⚡ Warning: Some metrics need attention.
  </p>
  </div>

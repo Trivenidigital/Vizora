@@ -16,34 +16,34 @@ interface StatCardProps {
 
 const colorStyles = {
   blue: {
-    bg: 'bg-[#00E5A0]/5',
-    icon: 'bg-[#00E5A0]/10 text-[#00E5A0]',
-    border: 'border-[#00E5A0]/20',
+    bg: 'bg-brand/5',
+    icon: 'bg-brand/10 text-[var(--primary-ink)]',
+    border: 'border-brand/20',
   },
   green: {
-    bg: 'bg-green-50 dark:bg-green-900/20',
-    icon: 'bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400',
-    border: 'border-green-200 dark:border-green-800',
+    bg: 'bg-[var(--status-online-bg)]',
+    icon: 'bg-[var(--status-online-bg)] text-[var(--success-ink)]',
+    border: 'border-success-ink/30',
   },
   yellow: {
-    bg: 'bg-yellow-50 dark:bg-yellow-900/20',
-    icon: 'bg-yellow-100 dark:bg-yellow-900 text-yellow-600 dark:text-yellow-400',
-    border: 'border-yellow-200 dark:border-yellow-800',
+    bg: 'bg-[var(--status-error-bg)]',
+    icon: 'bg-[var(--status-error-bg)] text-[var(--warning-ink)]',
+    border: 'border-warning-ink/30',
   },
   red: {
-    bg: 'bg-red-50 dark:bg-red-900/20',
-    icon: 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-400',
-    border: 'border-red-200 dark:border-red-800',
+    bg: 'bg-[var(--status-offline-bg)]',
+    icon: 'bg-[var(--status-offline-bg)] text-[var(--error-ink)]',
+    border: 'border-error-ink/30',
   },
   purple: {
-    bg: 'bg-purple-50 dark:bg-purple-900/20',
-    icon: 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-400',
-    border: 'border-purple-200 dark:border-purple-800',
+    bg: 'bg-[var(--cat-purple-bg)]',
+    icon: 'bg-[var(--cat-purple-edge)] text-[var(--cat-purple)]',
+    border: 'border-[var(--cat-purple-edge)]',
   },
   orange: {
-    bg: 'bg-orange-50 dark:bg-orange-900/20',
-    icon: 'bg-orange-100 dark:bg-orange-900 text-orange-600 dark:text-orange-400',
-    border: 'border-orange-200 dark:border-orange-800',
+    bg: 'bg-[var(--status-error-bg)]',
+    icon: 'bg-[var(--status-error-bg)] text-[var(--warning-ink)]',
+    border: 'border-warning-ink/30',
   },
 };
 
@@ -64,13 +64,13 @@ export function StatCard({ title, value, subtitle, trend, icon, color = 'blue' }
           {trend && (
             <div className="mt-2 flex items-center gap-1">
               {trend.isPositive ? (
-                <TrendingUp className="w-4 h-4 text-green-500" />
+                <TrendingUp className="w-4 h-4 text-[var(--success-ink)]" />
               ) : (
-                <TrendingDown className="w-4 h-4 text-red-500" />
+                <TrendingDown className="w-4 h-4 text-[var(--error-ink)]" />
               )}
               <span
                 className={`text-sm font-medium ${
-                  trend.isPositive ? 'text-green-600' : 'text-red-600'
+                  trend.isPositive ? 'text-[var(--success-ink)]' : 'text-[var(--error-ink)]'
                 }`}
               >
                 {trend.isPositive ? '+' : ''}

@@ -57,9 +57,9 @@ export default function PlaylistPreview({ items, autoPlay = true, onClose }: Pla
   const progressPercent = ((duration - timeRemaining) / duration) * 100;
 
   return (
-    <div className="relative bg-black rounded-lg overflow-hidden">
+    <div className="relative bg-[var(--viewport-bg)] rounded-lg overflow-hidden">
       {/* Content Display */}
-      <div className="relative aspect-video flex items-center justify-center bg-[#061A21]">
+      <div className="relative aspect-video flex items-center justify-center bg-[var(--viewport-bg)]">
         {currentItem?.content?.thumbnailUrl ? (
           <img
             src={currentItem.content.thumbnailUrl}
@@ -67,20 +67,20 @@ export default function PlaylistPreview({ items, autoPlay = true, onClose }: Pla
             className="max-w-full max-h-full object-contain"
           />
         ) : (
-          <div className="text-center text-white">
+          <div className="text-center text-[var(--viewport-ink)]">
             <div className="text-6xl mb-4">
               {currentItem?.content?.type === 'video' ? (
-                <Icon name="video" size="6xl" className="text-white" />
+                <Icon name="video" size="6xl" className="text-[var(--viewport-ink)]" />
               ) : currentItem?.content?.type === 'image' ? (
-                <Icon name="image" size="6xl" className="text-white" />
+                <Icon name="image" size="6xl" className="text-[var(--viewport-ink)]" />
               ) : (
-                <Icon name="document" size="6xl" className="text-white" />
+                <Icon name="document" size="6xl" className="text-[var(--viewport-ink)]" />
               )}
             </div>
             <p className="text-lg font-medium">
               {currentItem?.content?.title || `Item ${currentIndex + 1}`}
             </p>
-            <p className="text-sm text-[#8A8278] mt-1">
+            <p className="text-sm text-[var(--viewport-ink-muted)] mt-1">
               {currentItem?.content?.type || 'content'}
             </p>
           </div>
@@ -88,36 +88,36 @@ export default function PlaylistPreview({ items, autoPlay = true, onClose }: Pla
       </div>
 
       {/* Progress Bar */}
-      <div className="h-1 bg-[#1B3D47]">
+      <div className="h-1 bg-[var(--viewport-border)]">
         <div
-          className="h-full bg-[#00E5A0] transition-all duration-1000 ease-linear"
+          className="h-full bg-[var(--viewport-ink)] transition-all duration-1000 ease-linear"
           style={{ width: `${progressPercent}%` }}
         />
       </div>
 
       {/* Controls Bar */}
-      <div className="flex items-center justify-between px-4 py-3 bg-[#081E28] text-white">
+      <div className="flex items-center justify-between px-4 py-3 bg-[var(--viewport-surface)] text-[var(--viewport-ink)]">
         <div className="flex items-center gap-3">
           <button
             onClick={goToPrev}
-            className="p-1 hover:bg-[#122D35] rounded transition"
+            className="p-1 hover:bg-[var(--viewport-hover)] rounded transition"
             title="Previous"
           >
-            <Icon name="chevronLeft" size="sm" className="text-white" />
+            <Icon name="chevronLeft" size="sm" className="text-[var(--viewport-ink)]" />
           </button>
           <button
             onClick={() => setIsPlaying(!isPlaying)}
-            className="p-1 hover:bg-[#122D35] rounded transition"
+            className="p-1 hover:bg-[var(--viewport-hover)] rounded transition"
             title={isPlaying ? 'Pause' : 'Play'}
           >
-            <Icon name={isPlaying ? 'clock' : 'power'} size="sm" className="text-white" />
+            <Icon name={isPlaying ? 'clock' : 'power'} size="sm" className="text-[var(--viewport-ink)]" />
           </button>
           <button
             onClick={goToNext}
-            className="p-1 hover:bg-[#122D35] rounded transition"
+            className="p-1 hover:bg-[var(--viewport-hover)] rounded transition"
             title="Next"
           >
-            <Icon name="chevronRight" size="sm" className="text-white" />
+            <Icon name="chevronRight" size="sm" className="text-[var(--viewport-ink)]" />
           </button>
         </div>
 
@@ -125,12 +125,12 @@ export default function PlaylistPreview({ items, autoPlay = true, onClose }: Pla
           <span className="font-medium">
             {currentItem?.content?.title || `Item ${currentIndex + 1}`}
           </span>
-          <span className="text-[#8A8278] ml-2">
+          <span className="text-[var(--viewport-ink-muted)] ml-2">
             {currentIndex + 1} / {items.length}
           </span>
         </div>
 
-        <div className="text-sm text-[#8A8278]">
+        <div className="text-sm text-[var(--viewport-ink-muted)]">
           {timeRemaining}s remaining
         </div>
       </div>
@@ -139,9 +139,9 @@ export default function PlaylistPreview({ items, autoPlay = true, onClose }: Pla
       {onClose && (
         <button
           onClick={onClose}
-          className="absolute top-2 right-2 p-1 bg-black/50 hover:bg-black/70 rounded-full text-white transition"
+          className="absolute top-2 right-2 p-1 bg-black/50 hover:bg-black/70 rounded-full text-[var(--viewport-ink)] transition"
         >
-          <Icon name="close" size="sm" className="text-white" />
+          <Icon name="close" size="sm" className="text-[var(--viewport-ink)]" />
         </button>
       )}
     </div>

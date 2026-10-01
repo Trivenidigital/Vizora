@@ -90,7 +90,7 @@ function renderMessageContent(text: string): React.ReactNode[] {
             href={linkMatch[2]}
             target="_blank"
             rel="noopener noreferrer"
-            className="underline text-[#00E5A0] hover:text-[#00CC8E]"
+            className="underline text-[var(--primary-ink)] hover:text-[var(--foreground)]"
           >
             {linkMatch[1]}
           </a>
@@ -123,7 +123,7 @@ export default function SupportMessage({
         {/* Admin badge */}
         {role === 'admin' && (
           <div className="mb-1">
-            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 uppercase tracking-wide">
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[var(--status-pairing-bg)] text-[var(--info-ink)] uppercase tracking-wide">
               Admin
             </span>
           </div>
@@ -133,27 +133,27 @@ export default function SupportMessage({
         <div
           className={`px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
             isUser
-              ? 'bg-[#00E5A0]/15 text-[#d1fae5] rounded-br-md'
-              : 'bg-[#1F2937] text-gray-200 rounded-bl-md'
+              ? 'bg-brand/15 text-[var(--foreground)] rounded-br-md'
+              : 'bg-[var(--background-secondary)] text-[var(--foreground)] rounded-bl-md'
           }`}
         >
           {renderMessageContent(content)}
         </div>
 
         {/* Timestamp */}
-        <div className={`mt-1 text-xs text-gray-500 ${isUser ? 'text-right' : 'text-left'}`}>
+        <div className={`mt-1 text-xs text-[var(--foreground-tertiary)] ${isUser ? 'text-right' : 'text-left'}`}>
           {formatTimeAgo(createdAt)}
         </div>
 
         {failed && (
-          <div className={`mt-1 flex items-center gap-2 text-xs text-red-300 ${isUser ? 'justify-end' : 'justify-start'}`}>
+          <div className={`mt-1 flex items-center gap-2 text-xs text-[var(--error-ink)] ${isUser ? 'justify-end' : 'justify-start'}`}>
             <span>{errorMessage || 'Message not sent'}</span>
             {onRetry && (
               <button
                 type="button"
                 onClick={onRetry}
                 aria-label="Retry message"
-                className="inline-flex items-center gap-1 rounded-md border border-red-400/30 px-2 py-1 text-red-100 hover:bg-red-500/10 transition"
+                className="inline-flex items-center gap-1 rounded-md border border-error-ink/30 px-2 py-1 text-[var(--error-ink)] hover:bg-error/10 transition"
               >
                 <RefreshCw className="h-3 w-3" />
                 <span>Retry</span>

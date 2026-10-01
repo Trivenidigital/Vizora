@@ -6,7 +6,7 @@ export function FieldError({ error }: FieldErrorProps) {
   if (!error) return null;
   
   return (
-    <p className="text-sm text-red-600 mt-1" role="alert">
+    <p className="text-sm text-[var(--error-ink)] mt-1" role="alert">
       {error}
     </p>
   );

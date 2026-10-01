@@ -207,41 +207,41 @@ const metrics: Array<{ label: string; start: string; current: string; target: st
 
 const colorMap: Record<string, { bg: string; border: string; text: string; badge: string }> = {
   red: {
-    bg: 'bg-red-50 dark:bg-red-900/10',
-    border: 'border-red-200 dark:border-red-800/40',
-    text: 'text-red-700 dark:text-red-400',
-    badge: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',
+    bg: 'bg-[var(--status-offline-bg)]',
+    border: 'border-error-ink/40',
+    text: 'text-[var(--error-ink)]',
+    badge: 'bg-[var(--status-offline-bg)] text-[var(--error-ink)]',
   },
   orange: {
-    bg: 'bg-orange-50 dark:bg-orange-900/10',
-    border: 'border-orange-200 dark:border-orange-800/40',
-    text: 'text-orange-700 dark:text-orange-400',
-    badge: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400',
+    bg: 'bg-[var(--status-error-bg)]',
+    border: 'border-warning-ink/40',
+    text: 'text-[var(--warning-ink)]',
+    badge: 'bg-[var(--status-error-bg)] text-[var(--warning-ink)]',
   },
   yellow: {
-    bg: 'bg-yellow-50 dark:bg-yellow-900/10',
-    border: 'border-yellow-200 dark:border-yellow-800/40',
-    text: 'text-yellow-700 dark:text-yellow-400',
-    badge: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400',
+    bg: 'bg-[var(--status-error-bg)]',
+    border: 'border-warning-ink/40',
+    text: 'text-[var(--warning-ink)]',
+    badge: 'bg-[var(--status-error-bg)] text-[var(--warning-ink)]',
   },
   blue: {
-    bg: 'bg-blue-50 dark:bg-blue-900/10',
-    border: 'border-blue-200 dark:border-blue-800/40',
-    text: 'text-blue-700 dark:text-blue-400',
-    badge: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
+    bg: 'bg-[var(--status-pairing-bg)]',
+    border: 'border-info-ink/40',
+    text: 'text-[var(--info-ink)]',
+    badge: 'bg-[var(--status-pairing-bg)] text-[var(--info-ink)]',
   },
   gray: {
-    bg: 'bg-gray-50 dark:bg-gray-900/10',
-    border: 'border-gray-200 dark:border-gray-800/40',
-    text: 'text-gray-600 dark:text-gray-400',
-    badge: 'bg-gray-100 dark:bg-gray-900/30 text-gray-600 dark:text-gray-400',
+    bg: 'bg-[var(--background-secondary)]',
+    border: 'border-border/40',
+    text: 'text-[var(--foreground-secondary)]',
+    badge: 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)]',
   },
 };
 
 function StatusIcon({ status }: { status: string }) {
-  if (status === 'FIXED') return <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />;
-  if (status === 'IN_PROGRESS') return <Clock className="w-4 h-4 text-blue-500 flex-shrink-0 animate-pulse" />;
-  if (status === 'BLOCKED') return <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />;
+  if (status === 'FIXED') return <CheckCircle className="w-4 h-4 text-[var(--success-ink)] flex-shrink-0" />;
+  if (status === 'IN_PROGRESS') return <Clock className="w-4 h-4 text-[var(--info-ink)] flex-shrink-0 animate-pulse" />;
+  if (status === 'BLOCKED') return <AlertTriangle className="w-4 h-4 text-[var(--error-ink)] flex-shrink-0" />;
   if (status === 'DEFERRED') return <Clock className="w-4 h-4 text-[var(--foreground-tertiary)] flex-shrink-0" />;
   return <Circle className="w-4 h-4 text-[var(--foreground-tertiary)] flex-shrink-0" />;
 }
@@ -277,7 +277,7 @@ function CollapsibleSection({ section }: { section: Section }) {
             {todoCount} open
           </span>
           {doneCount > 0 && (
-            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--status-online-bg)] text-[var(--success-ink)]">
               {doneCount} done
             </span>
           )}
@@ -306,7 +306,7 @@ function CollapsibleSection({ section }: { section: Section }) {
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 {item.owner && (
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${item.owner === 'YOU' ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400' : 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400'}`}>
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${item.owner === 'YOU' ? 'bg-[var(--cat-purple-bg)] text-[var(--cat-purple)]' : 'bg-[var(--status-pairing-bg)] text-[var(--info-ink)]'}`}>
                     {item.owner}
                   </span>
                 )}
@@ -354,7 +354,7 @@ export default function BacklogClient() {
               <div className="text-xs text-[var(--foreground-tertiary)]">{m.label}</div>
               <div className="text-lg font-bold text-[var(--foreground)] mt-0.5">{m.current}</div>
               <div className="text-xs text-[var(--foreground-tertiary)] mt-0.5">
-                {m.start} &rarr; <span className="text-[#00E5A0]">{m.target}</span>
+                {m.start} &rarr; <span className="text-[var(--primary-ink)]">{m.target}</span>
               </div>
             </div>
           ))}
@@ -368,7 +368,7 @@ export default function BacklogClient() {
       <div className="flex items-center gap-4 text-sm">
         <span className="text-[var(--foreground-secondary)]">{totalTodo} items remaining</span>
         <span className="text-[var(--foreground-tertiary)]">&middot;</span>
-        <span className="text-green-600 dark:text-green-400">{completed.length} historical completed items</span>
+        <span className="text-[var(--success-ink)]">{completed.length} historical completed items</span>
       </div>
 
       {/* Priority sections */}
@@ -398,17 +398,17 @@ export default function BacklogClient() {
       </div>
 
       {/* Completed (collapsible) */}
-      <div className="rounded-xl border border-green-200 dark:border-green-800/40 overflow-hidden">
+      <div className="rounded-xl border border-success-ink/40 overflow-hidden">
         <button
           onClick={() => setShowCompleted(!showCompleted)}
-          className="w-full flex items-center justify-between p-4 bg-green-50 dark:bg-green-900/10 hover:opacity-90 transition"
+          className="w-full flex items-center justify-between p-4 bg-[var(--status-online-bg)] hover:opacity-90 transition"
         >
           <div className="flex items-center gap-3">
             {showCompleted ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
-            <CheckCircle className="w-5 h-5 text-green-500" />
+            <CheckCircle className="w-5 h-5 text-[var(--success-ink)]" />
             <h3 className="text-base font-semibold text-[var(--foreground)]">Completed Historical Items</h3>
           </div>
-          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-[var(--status-online-bg)] text-[var(--success-ink)]">
             {completed.length} items
           </span>
         </button>
@@ -416,7 +416,7 @@ export default function BacklogClient() {
           <div className="divide-y divide-[var(--border)]">
             {completed.map((item) => (
               <div key={item.id} className="flex items-center gap-3 px-4 py-2.5">
-                <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                <CheckCircle className="w-4 h-4 text-[var(--success-ink)] flex-shrink-0" />
                 <span className="text-sm text-[var(--foreground)] flex-1">{item.title}</span>
                 {item.notes && <span className="text-xs text-[var(--foreground-tertiary)]">{item.notes}</span>}
               </div>
@@ -432,12 +432,23 @@ export default function BacklogClient() {
         </h3>
         <div className="space-y-3">
           {[
-            { phase: 'Customer-1 launch gates', desc: 'C1-C4: SMTP verification, org provisioning, real hardware walkthrough, prod smoke', color: 'bg-red-500' },
-            { phase: 'Soft launch', desc: 'After operator gates clear, invite 5-10 beta users', color: 'bg-orange-500' },
-            { phase: 'Launch week', desc: 'Manual uptime monitoring setup and customer-1 follow-through', color: 'bg-yellow-500' },
-            { phase: 'Month 1', desc: 'CDN, template expansion, and post-launch backlog hardening', color: 'bg-blue-500' },
-            { phase: 'Quarter 1', desc: 'Per-user flags, AI designer when budgeted, and deeper template work', color: 'bg-indigo-500' },
-            { phase: 'Future', desc: '2FA, SSO, Fire TV, Chromecast, kiosk, video wall', color: 'bg-gray-500' },
+            /*
+             * Roadmap phases are IDENTITY labels on a timeline, not status, so
+             * they take the `--cat-*` set rather than the semantic families -
+             * painting 'Soft launch' with `--warning` would claim a state it
+             * does not have. Each on `--surface`: red 6.39:1, orange 6.16:1,
+             * yellow 6.02:1, blue 7.45:1, indigo 8.62:1, and 'Future' takes the
+             * quiet `--foreground-tertiary` at 5.89:1 because there is no
+             * categorical grey and it is deliberately the least loud step.
+             * Separability over this consuming map: closest pair red/orange at
+             * 40.1, the floor globals.css already accepts.
+             */
+            { phase: 'Customer-1 launch gates', desc: 'C1-C4: SMTP verification, org provisioning, real hardware walkthrough, prod smoke', color: 'bg-[var(--cat-red)]' },
+            { phase: 'Soft launch', desc: 'After operator gates clear, invite 5-10 beta users', color: 'bg-[var(--cat-orange)]' },
+            { phase: 'Launch week', desc: 'Manual uptime monitoring setup and customer-1 follow-through', color: 'bg-[var(--cat-yellow)]' },
+            { phase: 'Month 1', desc: 'CDN, template expansion, and post-launch backlog hardening', color: 'bg-[var(--cat-blue)]' },
+            { phase: 'Quarter 1', desc: 'Per-user flags, AI designer when budgeted, and deeper template work', color: 'bg-[var(--cat-indigo)]' },
+            { phase: 'Future', desc: '2FA, SSO, Fire TV, Chromecast, kiosk, video wall', color: 'bg-[var(--foreground-tertiary)]' },
           ].map((r, i) => (
             <div key={i} className="flex items-start gap-3">
               <div className={`w-3 h-3 rounded-full ${r.color} mt-1 flex-shrink-0`} />

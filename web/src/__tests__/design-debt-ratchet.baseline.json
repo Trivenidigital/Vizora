@@ -1,0 +1,14 @@
+{
+  "_": "Colour-debt high-water marks. Numbers may only be LOWERED, and only in the same commit that removes the usages. See design-debt-ratchet.test.ts for how.",
+  "hexLiteralsRaisedBy2On2026-10-01": "lib/customization.ts must hold the two endpoint VALUES onFillInk chooses between (the on-forest ivory and the warm ink). It is the one client module that does contrast arithmetic at runtime, where a var() reference is just a string - the same reason it already named black, white and the card surface. See the B15 commit.",
+  "measuredOn": "2026-10-01",
+  "measuredOver": "319 .ts/.tsx/.js/.cjs/.mjs files under web/src, excluding components/landing, theme/palette.js, __tests__, *.test.*, *.spec.*, *.d.ts",
+  "counts": {
+    "hexLiterals": 182,
+    "tailwindArbitraryColors": 0,
+    "rawPaletteClasses": 0,
+    "darkVariants": 0,
+    "darkThemeForegroundShades": 0,
+    "midShadeText": 0
+  }
+}

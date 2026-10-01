@@ -22,6 +22,11 @@ interface FloatingToolbarProps {
 
 const FONT_SIZES = [16, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72, 96, 120];
 
+/*
+ * The white fallback below is NOT chrome and must not be tokenised: it is the
+ * value handed to a `<input type="color">` for the CUSTOMER'S text colour when
+ * the selected element carries none. Data for their design (plan D4/D7).
+ */
 function rgbToHex(rgb: string): string {
   const match = rgb.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/);
   if (!match) return rgb.startsWith('#') ? rgb : '#ffffff';
@@ -97,12 +102,12 @@ export default function FloatingToolbar({
   return (
     <div
       ref={toolbarRef}
-      className="fixed z-50 flex items-center gap-1 rounded-lg bg-gray-800 border border-gray-600 px-2 py-1.5 shadow-xl"
+      className="fixed z-50 flex items-center gap-1 rounded-lg bg-[var(--surface)] border border-[var(--border)] px-2 py-1.5 shadow-xl"
       style={{ top: position.top, left: position.left, transform: 'translateX(-50%)' }}
     >
       {/* Font Size */}
       <select
-        className="h-7 rounded bg-gray-700 border border-gray-600 px-1 text-xs text-white focus:outline-none"
+        className="h-7 rounded bg-[var(--surface)] border border-[var(--border)] px-1 text-xs text-[var(--foreground)] focus:outline-none"
         value={fontSize}
         onChange={(e) => change('fontSize', styles.fontSize || '16px', `${e.target.value}px`)}
       >
@@ -111,12 +116,12 @@ export default function FloatingToolbar({
         ))}
       </select>
 
-      <div className="w-px h-5 bg-gray-600 mx-0.5" />
+      <div className="w-px h-5 bg-[var(--border)] mx-0.5" />
 
       {/* Bold */}
       <button
         className={`h-7 w-7 rounded text-sm font-bold transition ${
-          isBold ? 'bg-emerald-600 text-white' : 'text-gray-300 hover:bg-gray-700'
+          isBold ? 'bg-[var(--primary)] text-[var(--primary-contrast)]' : 'text-[var(--foreground-tertiary)] hover:bg-[var(--surface-hover)]'
         }`}
         onClick={() => change('fontWeight', styles.fontWeight || '400', isBold ? '400' : '700')}
         title="Bold"
@@ -127,7 +132,7 @@ export default function FloatingToolbar({
       {/* Italic */}
       <button
         className={`h-7 w-7 rounded text-sm italic transition ${
-          isItalic ? 'bg-emerald-600 text-white' : 'text-gray-300 hover:bg-gray-700'
+          isItalic ? 'bg-[var(--primary)] text-[var(--primary-contrast)]' : 'text-[var(--foreground-tertiary)] hover:bg-[var(--surface-hover)]'
         }`}
         onClick={() => change('fontStyle', styles.fontStyle || 'normal', isItalic ? 'normal' : 'italic')}
         title="Italic"
@@ -135,25 +140,25 @@ export default function FloatingToolbar({
         I
       </button>
 
-      <div className="w-px h-5 bg-gray-600 mx-0.5" />
+      <div className="w-px h-5 bg-[var(--border)] mx-0.5" />
 
       {/* Color */}
       <input
         type="color"
-        className="h-7 w-7 cursor-pointer rounded border border-gray-600 bg-transparent p-0"
+        className="h-7 w-7 cursor-pointer rounded border border-[var(--border)] bg-transparent p-0"
         value={colorHex}
         onChange={(e) => change('color', styles.color || '', e.target.value)}
         title="Text Color"
       />
 
-      <div className="w-px h-5 bg-gray-600 mx-0.5" />
+      <div className="w-px h-5 bg-[var(--border)] mx-0.5" />
 
       {/* Alignment */}
       {(['left', 'center', 'right'] as const).map((a) => (
         <button
           key={a}
           className={`h-7 w-7 rounded text-xs transition ${
-            align === a ? 'bg-emerald-600 text-white' : 'text-gray-300 hover:bg-gray-700'
+            align === a ? 'bg-[var(--primary)] text-[var(--primary-contrast)]' : 'text-[var(--foreground-tertiary)] hover:bg-[var(--surface-hover)]'
           }`}
           onClick={() => change('textAlign', styles.textAlign || 'left', a)}
           title={`Align ${a}`}

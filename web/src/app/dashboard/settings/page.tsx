@@ -5,16 +5,15 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { Icon } from '@/theme/icons';
-import { useTheme } from '@/components/providers/ThemeProvider';
 import { semanticColors } from '@/theme/colors';
 import Modal from '@/components/Modal';
 import { useToast } from '@/lib/hooks/useToast';
 import { useCustomization } from '@/components/providers/CustomizationProvider';
+import { brandTextInk, onFillInk } from '@/lib/customization';
 
 export const dynamic = 'force-dynamic';
 
 export default function SettingsPage() {
- const { mode, setMode } = useTheme();
  const toast = useToast();
  const [settings, setSettings] = useState({
  organizationName: 'My Organization',
@@ -334,8 +333,8 @@ export default function SettingsPage() {
          className="w-20 h-20 rounded-full object-cover border-2 border-[var(--border)]"
        />
      ) : (
-       <div className="w-20 h-20 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] rounded-full flex items-center justify-center border-2 border-[var(--border)]">
-         <span className="text-[#061A21] text-2xl font-semibold">{getUserInitials()}</span>
+       <div className="w-20 h-20 bg-gradient-to-br from-[var(--primary)] to-[var(--primary-light)] rounded-full flex items-center justify-center border-2 border-[var(--border)]">
+         <span className="text-[var(--primary-contrast)] text-2xl font-semibold">{getUserInitials()}</span>
        </div>
      )}
      {avatarUploading && (
@@ -357,7 +356,7 @@ export default function SettingsPage() {
          <button
            onClick={handleRemoveAvatar}
            disabled={avatarUploading}
-           className="px-3 py-1.5 text-sm font-medium text-red-500 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition disabled:opacity-50"
+           className="px-3 py-1.5 text-sm font-medium text-[var(--error-ink)] border border-error-ink/30 rounded-lg hover:bg-error/10 transition disabled:opacity-50"
          >
            Remove
          </button>
@@ -384,7 +383,7 @@ export default function SettingsPage() {
  type="text"
  value={profileForm.firstName}
  onChange={(e) => setProfileForm({ ...profileForm, firstName: e.target.value })}
- className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
  />
  </div>
  <div>
@@ -395,7 +394,7 @@ export default function SettingsPage() {
  type="text"
  value={profileForm.lastName}
  onChange={(e) => setProfileForm({ ...profileForm, lastName: e.target.value })}
- className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
  />
  </div>
  </div>
@@ -425,7 +424,7 @@ export default function SettingsPage() {
  onChange={(e) =>
  setSettings({ ...settings, organizationName: e.target.value })
  }
- className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
  />
  </div>
  <div>
@@ -456,7 +455,7 @@ export default function SettingsPage() {
    <select
      value={settings.country || 'US'}
      onChange={(e) => setSettings({ ...settings, country: e.target.value })}
-     className="eh-select w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+     className="eh-select w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
    >
      <option value="US">United States (USD)</option>
      <option value="IN">India (INR)</option>
@@ -472,35 +471,12 @@ export default function SettingsPage() {
  <div className="eh-dash-card bg-[var(--surface)] rounded-lg shadow-md p-6">
  <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)] mb-4">Appearance</h3>
  <div className="space-y-4">
- <div>
- <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-3">
- Theme Preference
- </label>
- <div className="space-y-2">
- {[
- { value: 'light', label: 'Light', icon: 'light_mode' },
- { value: 'dark', label: 'Dark', icon: 'dark_mode' },
- { value: 'system', label: 'System', icon: 'settings' },
- ].map(({ value, label, icon }) => (
- <label
- key={value}
- className="flex items-center p-2.5 border border-[var(--border)] rounded-lg cursor-pointer hover:bg-[var(--surface-hover)] transition"
- >
- <input
- type="radio"
- name="theme"
- value={value}
- checked={mode === value}
- onChange={(e) => setMode(e.target.value as 'light' | 'dark' | 'system')}
- className="w-4 h-4 accent-primary cursor-pointer"
- />
- <Icon name={icon as any} size="lg" className="ml-3 text-[var(--foreground-secondary)]" />
- <span className="ml-3 text-sm font-medium text-[var(--foreground)]">{label}</span>
- </label>
- ))}
- </div>
- </div>
-
+ {/*
+ Theme preference control REMOVED — dark mode was dropped (plan §3 D1), so a
+ three-way light/dark/system radio would offer two options that no longer
+ exist. The card keeps its "Appearance" heading and the colour preview below,
+ which still describe something real.
+ */}
  {/* Color Preview */}
  <div>
  <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-3">
@@ -516,15 +492,17 @@ export default function SettingsPage() {
  ].map(({ name, color }) => (
  <div key={name} className="space-y-2">
  <div className="flex items-center gap-2">
+ {/*
+   One swatch, not two. This pair used to render color.light beside
+   color.dark as a theme pair. Dark mode was removed (plan D1), so the
+   second swatch showed a colour that can never appear anywhere in the
+   product -- a live-looking artefact of a theme that no longer exists,
+   the same shape as the --brand-ink-dark variable deleted in Phase 1.
+ */}
  <div
  className="w-8 h-8 rounded-md border border-[var(--border)]"
  style={{ backgroundColor: color.light }}
- title={`${name} light`}
- />
- <div
- className="w-8 h-8 rounded-md border border-[var(--border)]"
- style={{ backgroundColor: color.dark }}
- title={`${name} dark`}
+ title={name}
  />
  </div>
  <p className="text-xs font-medium text-[var(--foreground-secondary)] capitalize">{name}</p>
@@ -553,7 +531,7 @@ export default function SettingsPage() {
        onChange={(e) => setBrandingForm({ ...brandingForm, companyName: e.target.value })}
        placeholder="Vizora"
        maxLength={100}
-       className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+       className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
      />
      <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
        Replaces &quot;Vizora&quot; in the sidebar and header
@@ -582,7 +560,7 @@ export default function SettingsPage() {
            }
          }}
          maxLength={7}
-         className="eh-input w-32 px-3 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent font-mono text-sm"
+         className="eh-input w-32 px-3 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent font-mono text-sm"
        />
        {/* Quick presets */}
        <div className="flex gap-1.5">
@@ -636,7 +614,7 @@ export default function SettingsPage() {
            {brandingForm.logoPreview && (
              <button
                onClick={() => setBrandingForm({ ...brandingForm, logoPreview: null })}
-               className="px-3 py-1.5 text-sm font-medium text-red-500 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition"
+               className="px-3 py-1.5 text-sm font-medium text-[var(--error-ink)] border border-error-ink/30 rounded-lg hover:bg-error/10 transition"
              >
                Remove
              </button>
@@ -670,14 +648,31 @@ export default function SettingsPage() {
              className="w-8 h-8 rounded-lg flex items-center justify-center"
              style={{ background: `linear-gradient(135deg, ${brandingForm.primaryColor}, #00B4D8)` }}
            >
-             <span className="text-white font-bold text-lg">
+             {/* Same panel, inverse pairing: this letter sits ON the fill, so it
+                 takes the on-fill ink. White measured 1.65:1 on the unbranded
+                 default and 1.36:1 on neon. RESIDUAL: the gradient's second stop
+                 is a hardcoded cyan unrelated to the tenant, and for a DARK brand
+                 no single ink clears both ends (ivory is 11.50 on navy and 2.14 on
+                 the cyan; the dark ink is the reverse). The fix for that is the
+                 stop, not the ink — it should read `secondaryColor`, which B5
+                 already recorded as a functional bug. Left as recorded. */}
+             <span
+               className="font-bold text-lg"
+               style={{ color: onFillInk(brandingForm.primaryColor) }}
+             >
                {(brandingForm.companyName || 'V').charAt(0).toUpperCase()}
              </span>
            </div>
          )}
+         {/* The preview is a promise about what the app will render, so the name
+             resolves through the same derivation the app uses rather than the raw
+             fill. Raw, the server's unbranded default measured 1.47:1 here and a
+             neon brand 1.20:1; derived, the four matrix tenants are 4.52 / 11.75
+             / 4.60 / 4.50 on this panel. The swatches and the hex field below
+             keep showing the literal — those are the DATA. */}
          <span
            className="text-2xl font-bold"
-           style={{ color: brandingForm.primaryColor }}
+           style={{ color: brandTextInk(brandingForm.primaryColor) }}
          >
            {brandingForm.companyName || 'Vizora'}
          </span>
@@ -711,7 +706,7 @@ export default function SettingsPage() {
  onChange={(e) =>
  setSettings({ ...settings, defaultDuration: parseInt(e.target.value) })
  }
- className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
  />
  <p className="mt-2 text-xs text-[var(--foreground-tertiary)]">
  How long each piece of content displays by default
@@ -724,7 +719,7 @@ export default function SettingsPage() {
  <select
  value={settings.timezone}
  onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
- className="eh-select w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="eh-select w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
  >
  <option value="America/New_York">Eastern Time (US & Canada)</option>
  <option value="America/Chicago">Central Time (US & Canada)</option>
@@ -850,9 +845,9 @@ export default function SettingsPage() {
  <div className="space-y-3">
  <button
    onClick={() => setShowChangePasswordModal(true)}
-   className="w-full px-4 py-3 text-sm bg-[#00E5A0]/5 dark:bg-[#00E5A0]/10 text-[#00E5A0] dark:text-[#00E5A0] rounded-lg hover:bg-[#00E5A0]/10 dark:hover:bg-[#00E5A0]/10 transition font-medium text-left flex items-center gap-2"
+   className="w-full px-4 py-3 text-sm bg-brand/5 text-[var(--primary-ink)] rounded-lg hover:bg-brand/10 transition font-medium text-left flex items-center gap-2"
  >
- <Icon name="settings" size="md" className="text-[#00E5A0] dark:text-[#00E5A0]" />
+ <Icon name="settings" size="md" className="text-[var(--primary-ink)]" />
  Change Password
  </button>
  <button
@@ -865,9 +860,9 @@ export default function SettingsPage() {
  </button>
  <button
    onClick={() => setShowDeleteAccountModal(true)}
-   className="w-full px-4 py-3 text-sm bg-red-50 dark:bg-red-900 text-red-600 dark:text-red-300 rounded-lg hover:bg-red-100 dark:hover:bg-red-800 transition font-medium text-left flex items-center gap-2"
+   className="w-full px-4 py-3 text-sm bg-error/10 text-[var(--error-ink)] rounded-lg hover:bg-error/20 transition font-medium text-left flex items-center gap-2"
  >
- <Icon name="warning" size="md" className="text-red-600 dark:text-red-300" />
+ <Icon name="warning" size="md" className="text-[var(--error-ink)]" />
  Delete Account
  </button>
  </div>
@@ -922,7 +917,7 @@ export default function SettingsPage() {
          type="password"
          value={passwordForm.currentPassword}
          onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-         className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+         className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
        />
      </div>
      <div>
@@ -931,7 +926,7 @@ export default function SettingsPage() {
          type="password"
          value={passwordForm.newPassword}
          onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-         className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+         className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
        />
      </div>
      <div>
@@ -940,7 +935,7 @@ export default function SettingsPage() {
          type="password"
          value={passwordForm.confirmPassword}
          onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-         className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+         className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
        />
      </div>
      <div className="flex justify-end gap-3 pt-4">
@@ -974,11 +969,11 @@ export default function SettingsPage() {
    title="Delete Account"
  >
    <div className="space-y-4">
-     <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg">
-       <p className="text-sm text-red-700 dark:text-red-300 font-medium mb-2">
+     <div className="p-4 bg-error/10 border border-error-ink/30 rounded-lg">
+       <p className="text-sm text-[var(--error-ink)] font-medium mb-2">
          This action is permanent and cannot be undone.
        </p>
-       <ul className="text-sm text-red-600 dark:text-red-400 list-disc list-inside space-y-1">
+       <ul className="text-sm text-[var(--error-ink)] list-disc list-inside space-y-1">
          <li>All your content, playlists, and schedules will be deleted</li>
          <li>All paired devices will be unpaired and removed</li>
          <li>Your organization will be permanently deleted if you are the sole admin</li>
@@ -986,20 +981,20 @@ export default function SettingsPage() {
        </ul>
      </div>
      {deleteError && (
-       <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-         <p className="text-sm text-red-600 dark:text-red-400">{deleteError}</p>
+       <div className="p-3 bg-error/10 border border-error-ink/30 rounded-lg">
+         <p className="text-sm text-[var(--error-ink)]">{deleteError}</p>
        </div>
      )}
      <div>
        <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-1">
-         Type <span className="font-mono font-bold text-red-600 dark:text-red-400">DELETE MY ACCOUNT</span> to confirm
+         Type <span className="font-mono font-bold text-[var(--error-ink)]">DELETE MY ACCOUNT</span> to confirm
        </label>
        <input
          type="text"
          value={deleteForm.confirmation}
          onChange={(e) => setDeleteForm({ ...deleteForm, confirmation: e.target.value })}
          placeholder="DELETE MY ACCOUNT"
-         className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+         className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--error-ink)] focus:border-transparent"
        />
      </div>
      <div>
@@ -1009,7 +1004,7 @@ export default function SettingsPage() {
          value={deleteForm.password}
          onChange={(e) => setDeleteForm({ ...deleteForm, password: e.target.value })}
          placeholder="Enter your password"
-         className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+         className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--error-ink)] focus:border-transparent"
        />
      </div>
      <div className="flex justify-end gap-3 pt-4">
@@ -1026,7 +1021,7 @@ export default function SettingsPage() {
        <button
          onClick={handleDeleteAccount}
          disabled={deleteLoading || deleteForm.confirmation !== 'DELETE MY ACCOUNT' || !deleteForm.password}
-         className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+         className="px-4 py-2 text-sm font-medium bg-[var(--danger-solid)] text-white rounded-lg hover:bg-[var(--danger-solid-hover)] transition disabled:opacity-50 disabled:cursor-not-allowed"
        >
          {deleteLoading ? 'Deleting...' : 'Permanently Delete Account'}
        </button>

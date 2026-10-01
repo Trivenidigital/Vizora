@@ -29,6 +29,7 @@ import {
  sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
 import DraggableContentItem from '@/components/playlist/DraggableContentItem';
+import { Switch } from '@/components/ui';
 
 export default function PlaylistBuilderPage() {
  const router = useRouter();
@@ -316,10 +317,10 @@ export default function PlaylistBuilderPage() {
  )}
  {canManagePlaylist && (
  <label className="flex items-center gap-2 cursor-pointer select-none">
- <button
-   role="switch"
-   aria-checked={playlist.loop !== false}
-   onClick={async () => {
+ <Switch
+   size="sm"
+   checked={playlist.loop !== false}
+   onChange={async () => {
      const newLoop = playlist.loop === false;
      setPlaylist({ ...playlist, loop: newLoop });
      try {
@@ -330,16 +331,7 @@ export default function PlaylistBuilderPage() {
        toast.error('Failed to update loop setting');
      }
    }}
-   className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-     playlist.loop !== false ? 'bg-[#00E5A0]' : 'bg-[var(--border)]'
-   }`}
- >
-   <span
-     className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-       playlist.loop !== false ? 'translate-x-4' : 'translate-x-0.5'
-     }`}
-   />
- </button>
+ />
  <span className="text-xs text-[var(--foreground-tertiary)]">Loop</span>
  </label>
  )}
@@ -372,10 +364,10 @@ export default function PlaylistBuilderPage() {
  <button
  onClick={handleSave}
  disabled={saving}
- className="px-6 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition font-medium flex items-center gap-2 disabled:opacity-50"
+ className="px-6 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition font-medium flex items-center gap-2 disabled:opacity-50"
  >
  {saving && <LoadingSpinner size="sm" />}
- <Icon name="check" size="sm" className="text-white" />
+ <Icon name="check" size="sm" className="text-[var(--primary-contrast)]" />
  Save
  </button>
  )}

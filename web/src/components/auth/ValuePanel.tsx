@@ -9,7 +9,7 @@ interface ValuePanelProps {
 const content = {
   register: {
     headline: 'Every screen, managed.',
-    subtext: 'Join 2,500+ organizations running their displays on Vizora.',
+    subtext: 'Create your account and pair your first screen.',
   },
   login: {
     headline: 'Welcome back.',
@@ -43,7 +43,7 @@ const benefits = [
         <path d="M2 12l10 5 10-5" />
       </svg>
     ),
-    text: 'AI-powered content & scheduling',
+    text: 'Templates and scheduling built in',
   },
   {
     icon: (
@@ -51,41 +51,42 @@ const benefits = [
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
       </svg>
     ),
-    text: '99.9% uptime, enterprise security',
+    text: 'Encrypted connections, role-based access',
   },
 ];
 
 export default function ValuePanel({ variant }: ValuePanelProps) {
   const { headline, subtext } = content[variant];
 
-  // mkt-dark-panel: this panel is deliberately dark and lives inside the light
-  // `.mkt` auth scope. The class restores the dark token family locally so
-  // var(--foreground) etc. don't resolve to dark-ink-on-dark. See globals.css.
+  /*
+   * LIGHT. This panel is Vizora's own chrome, not a viewport onto customer
+   * media, so it follows the settled chrome-goes-light rule
+   * (`tasks/redesign-colour-map.json` notes.darkPanelDecision). It used to
+   * carry `mkt-dark-panel`, which re-declared the whole dark token family
+   * locally so that `var(--foreground)` would not resolve to dark-on-dark —
+   * that scaffolding is no longer needed and the class is gone with it.
+   *
+   * Ground is `--background-secondary`, not `--lw-stone`, and that is a
+   * measured choice rather than a taste one: this panel paints small text in
+   * `--foreground-tertiary`, which is 4.47:1 on stone (#e4dccb) and therefore
+   * below AA, against 5.04:1 on `--background-secondary`. The recessed
+   * panel / raised card relationship is the same one the dashboard rail uses.
+   *
+   * The two animated neon-and-cyan glow blobs are deleted rather than
+   * re-tinted. They existed to give a near-black slab some depth; on ivory
+   * they have nothing to do, and Little Worlds is calm by construction.
+   * `eh-grain` stays — it is a 3% neutral noise, not a colour.
+   */
   return (
-    <div className="mkt-dark-panel relative hidden md:flex flex-col p-10 lg:p-12 bg-[#061A21] overflow-hidden">
-      {/* Atmospheric background */}
+    <div className="relative hidden md:flex flex-col p-10 lg:p-12 bg-[var(--background-secondary)] border-r border-[var(--border)] overflow-hidden">
       <div className="absolute inset-0 eh-grain" />
-      <div
-        className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full opacity-30"
-        style={{
-          background: 'radial-gradient(circle, rgba(0,229,160,0.15) 0%, transparent 70%)',
-          animation: 'eh-glow-breathe 6s ease-in-out infinite',
-        }}
-      />
-      <div
-        className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full opacity-20"
-        style={{
-          background: 'radial-gradient(circle, rgba(0,180,216,0.15) 0%, transparent 70%)',
-          animation: 'eh-glow-breathe 8s ease-in-out infinite',
-        }}
-      />
 
       {/* Content */}
       <div className="relative z-10 space-y-8">
         {/* Logo */}
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-[#00E5A0]/10 border border-[#00E5A0]/20 flex items-center justify-center">
-            <span className="text-[#00E5A0] font-bold text-sm font-mono">V</span>
+          <div className="w-8 h-8 rounded-lg bg-[var(--primary)] flex items-center justify-center">
+            <span className="text-[var(--primary-contrast)] font-bold text-sm font-mono">V</span>
           </div>
           <span className="text-[var(--foreground)] font-semibold tracking-tight">Vizora</span>
         </div>
@@ -95,7 +96,7 @@ export default function ValuePanel({ variant }: ValuePanelProps) {
           <h2 className="text-3xl lg:text-4xl font-bold text-[var(--foreground)] eh-heading leading-tight">
             {headline}
           </h2>
-          <p className="mt-3 text-[var(--foreground-tertiary)] text-sm lg:text-base leading-relaxed max-w-sm">
+          <p className="mt-3 text-[var(--foreground-secondary)] text-sm lg:text-base leading-relaxed max-w-sm">
             {subtext}
           </p>
         </div>
@@ -104,7 +105,7 @@ export default function ValuePanel({ variant }: ValuePanelProps) {
         <div className="space-y-4">
           {benefits.map((b) => (
             <div key={b.text} className="flex items-center gap-3">
-              <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-[#00E5A0]/8 border border-[#00E5A0]/15 flex items-center justify-center text-[#00E5A0]">
+              <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-[var(--surface)] border border-[var(--border)] flex items-center justify-center text-[var(--primary-ink)]">
                 {b.icon}
               </div>
               <span className="text-sm text-[var(--foreground-secondary)]">{b.text}</span>
@@ -122,19 +123,19 @@ export default function ValuePanel({ variant }: ValuePanelProps) {
         )}
 
         {variant === 'login' && (
-          <div className="rounded-xl border border-[#1B3D47] bg-[#0C2229]/60 p-5">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#00E5A0] animate-pulse" />
+              <div className="w-2.5 h-2.5 rounded-full bg-[var(--primary-ink)]" />
               <span className="text-xs font-medium text-[var(--foreground)]">Your fleet is online</span>
             </div>
             <div className="grid grid-cols-3 gap-3 text-center">
               {[
                 { value: '24', label: 'Screens' },
                 { value: '148', label: 'Content' },
-                { value: '99.9%', label: 'Uptime' },
+                { value: '6', label: 'Playlists' },
               ].map((s) => (
                 <div key={s.label}>
-                  <p className="text-lg font-bold font-mono text-[#00E5A0]">{s.value}</p>
+                  <p className="text-lg font-bold font-mono text-[var(--primary-ink)]">{s.value}</p>
                   <p className="text-[10px] text-[var(--foreground-tertiary)]">{s.label}</p>
                 </div>
               ))}
@@ -143,18 +144,9 @@ export default function ValuePanel({ variant }: ValuePanelProps) {
         )}
 
         {variant === 'forgot-password' && (
-          <div className="rounded-xl border border-[#1B3D47] bg-[#0C2229]/60 p-6">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
             <div className="flex items-center justify-center">
               <div className="relative">
-                {/* Glow effect behind key */}
-                <div
-                  className="absolute inset-0 rounded-full opacity-40"
-                  style={{
-                    background: 'radial-gradient(circle, rgba(0,229,160,0.25) 0%, transparent 70%)',
-                    animation: 'eh-glow-breathe 4s ease-in-out infinite',
-                    transform: 'scale(2)',
-                  }}
-                />
                 <svg
                   width="64"
                   height="64"
@@ -163,13 +155,13 @@ export default function ValuePanel({ variant }: ValuePanelProps) {
                   className="relative z-10"
                 >
                   {/* Key body */}
-                  <circle cx="22" cy="24" r="10" stroke="#00E5A0" strokeWidth="2" fill="none" opacity="0.9" />
-                  <circle cx="22" cy="24" r="4" fill="#00E5A0" opacity="0.2" />
-                  <line x1="32" y1="24" x2="52" y2="24" stroke="#00E5A0" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
-                  <line x1="48" y1="24" x2="48" y2="32" stroke="#00E5A0" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
-                  <line x1="42" y1="24" x2="42" y2="30" stroke="#00E5A0" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
+                  <circle cx="22" cy="24" r="10" className="stroke-[var(--lw-forest)]" strokeWidth="2" fill="none" opacity="0.9" />
+                  <circle cx="22" cy="24" r="4" className="fill-[var(--lw-forest)]" opacity="0.2" />
+                  <line x1="32" y1="24" x2="52" y2="24" className="stroke-[var(--lw-forest)]" strokeWidth="2" strokeLinecap="round" opacity="0.9" />
+                  <line x1="48" y1="24" x2="48" y2="32" className="stroke-[var(--lw-forest)]" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
+                  <line x1="42" y1="24" x2="42" y2="30" className="stroke-[var(--lw-forest)]" strokeWidth="2" strokeLinecap="round" opacity="0.7" />
                   {/* Decorative dots */}
-                  <circle cx="22" cy="24" r="1.5" fill="#00E5A0" opacity="0.6" />
+                  <circle cx="22" cy="24" r="1.5" className="fill-[var(--lw-forest)]" opacity="0.6" />
                 </svg>
               </div>
             </div>
@@ -180,18 +172,9 @@ export default function ValuePanel({ variant }: ValuePanelProps) {
         )}
 
         {variant === 'reset-password' && (
-          <div className="rounded-xl border border-[#1B3D47] bg-[#0C2229]/60 p-6">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-6">
             <div className="flex items-center justify-center">
               <div className="relative">
-                {/* Glow effect behind shield */}
-                <div
-                  className="absolute inset-0 rounded-full opacity-40"
-                  style={{
-                    background: 'radial-gradient(circle, rgba(0,229,160,0.25) 0%, transparent 70%)',
-                    animation: 'eh-glow-breathe 4s ease-in-out infinite',
-                    transform: 'scale(2)',
-                  }}
-                />
                 <svg
                   width="64"
                   height="64"
@@ -202,15 +185,14 @@ export default function ValuePanel({ variant }: ValuePanelProps) {
                   {/* Shield */}
                   <path
                     d="M32 8L12 18v14c0 12.4 8.5 24 20 28 11.5-4 20-15.6 20-28V18L32 8z"
-                    stroke="#00E5A0"
+                    className="stroke-[var(--lw-forest)] fill-[var(--badge-brand-bg)]"
                     strokeWidth="2"
-                    fill="rgba(0,229,160,0.06)"
                     strokeLinejoin="round"
                   />
                   {/* Checkmark inside shield */}
                   <polyline
                     points="22,32 29,39 42,26"
-                    stroke="#00E5A0"
+                    className="stroke-[var(--lw-forest)]"
                     strokeWidth="2.5"
                     strokeLinecap="round"
                     strokeLinejoin="round"

@@ -161,13 +161,13 @@ export default function RegisterContent() {
         {/* Mobile-only compact trust banner */}
         <div className="md:hidden mb-8">
           <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-7 h-7 rounded-lg bg-[#00E5A0]/10 border border-[#00E5A0]/20 flex items-center justify-center">
-              <span className="text-[#00E5A0] font-bold text-xs font-mono">V</span>
+            <div className="w-7 h-7 rounded-lg bg-[var(--primary)] flex items-center justify-center">
+              <span className="text-[var(--primary-contrast)] font-bold text-xs font-mono">V</span>
             </div>
             <span className="text-[var(--foreground)] font-semibold text-sm">Vizora</span>
           </div>
           <p className="text-[var(--foreground-tertiary)] text-sm">
-            Join 2,500+ organizations managing their displays.{' '}
+            Manage every display from one place.{' '}
             <span className="text-[var(--primary-ink)] font-medium">Free for 30 days.</span>
           </p>
         </div>
@@ -181,7 +181,7 @@ export default function RegisterContent() {
           </p>
 
           {error && (
-            <div className="flex items-start gap-3 bg-[var(--error)]/10 border border-[var(--error)]/30 text-[var(--error-ink)] px-4 py-3 rounded-lg mb-6">
+            <div className="flex items-start gap-3 bg-error/10 border border-error/30 text-[var(--error-ink)] px-4 py-3 rounded-lg mb-6">
               <svg className="w-5 h-5 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z" clipRule="evenodd" />
               </svg>
@@ -197,7 +197,7 @@ export default function RegisterContent() {
           )}
 
           {success && (
-            <div className="flex items-center gap-3 bg-[var(--success)]/10 border border-[var(--success)]/30 text-[var(--success-ink)] px-4 py-3 rounded-lg mb-6">
+            <div className="flex items-center gap-3 bg-success/10 border border-success/30 text-[var(--success-ink)] px-4 py-3 rounded-lg mb-6">
               <svg className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
               </svg>
@@ -287,11 +287,11 @@ export default function RegisterContent() {
                   enterKeyHint="next"
                 />
                 {emailSuggestion && (
-                  <p className="text-xs text-amber-400 mt-1">
+                  <p className="text-xs text-[var(--warning-ink)] mt-1">
                     Did you mean{' '}
                     <button
                       type="button"
-                      className="underline font-medium hover:text-amber-300"
+                      className="underline font-medium hover:text-[var(--foreground)]"
                       onClick={() => {
                         update('email', emailSuggestion);
                         setEmailSuggestion(null);
@@ -397,7 +397,7 @@ export default function RegisterContent() {
                   setAgreeTerms(e.target.checked);
                   if (errors.agreeTerms) setErrors((prev) => ({ ...prev, agreeTerms: '' }));
                 }}
-                className="w-4 h-4 mt-0.5 rounded border-[var(--border)] bg-[var(--background)] text-[var(--primary-ink)] focus:ring-[var(--primary-ink)] focus:ring-2 accent-[#00E5A0] cursor-pointer"
+                className="w-4 h-4 mt-0.5 rounded border-[var(--border)] bg-[var(--background)] text-[var(--primary-ink)] focus:ring-[var(--primary-ink)] focus:ring-2 accent-[var(--primary-ink)] cursor-pointer"
               />
               <label htmlFor="agreeTerms" className="text-xs text-[var(--foreground-tertiary)] cursor-pointer select-none leading-relaxed">
                 I agree to the{' '}
@@ -465,7 +465,7 @@ export default function RegisterContent() {
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                 <path d="M7 11V7a5 5 0 0110 0v4" />
               </svg>
-              256-bit encrypted
+              Encrypted connection
             </span>
             <span className="text-[var(--border)]">|</span>
             <span>Free 30-day trial</span>

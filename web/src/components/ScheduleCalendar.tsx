@@ -138,24 +138,46 @@ export default function ScheduleCalendar({
   const eventPropGetter = useCallback((event: CalendarEvent) => {
     const schedule = event.resource;
 
+    /*
+     * Priority reads as WEIGHT, not as hue.
+     *
+     * The old ladder was grey -> green-500 -> neon, which put its two busiest
+     * levels a few degrees apart and its top level at 1.65:1 on ivory. These
+     * three step from a quiet limestone chip to brass to a solid forest block,
+     * so the ordering survives a greyscale screenshot. Each fill carries an ink
+     * measured against it: inactive 4.75:1, low 11.89:1, medium 4.79:1,
+     * high 9.70:1.
+     *
+     * The inactive chip carried `opacity: 0.6` as well, and that made the 4.75:1
+     * above FALSE: group opacity composites the fill AND its label toward the
+     * calendar surface together, so the label actually rendered at 2.26:1 on its
+     * own chip. The quiet is already carried by the fill — `--status-neutral-bg`
+     * is the lightest of the four — so the opacity was buying nothing and
+     * costing the schedule name. Removing it is what makes the measured number
+     * the rendered one. Do not reintroduce it: dimming a whole element is not a
+     * contrast-safe way to say "inactive".
+     */
     if (!schedule.isActive) {
       return {
         style: {
-          backgroundColor: '#D1D5DB', // gray-300
-          opacity: 0.6,
-          color: '#6B7280',
+          backgroundColor: 'var(--status-neutral-bg)',
+          color: 'var(--foreground-tertiary)',
           borderRadius: '4px',
           border: 'none',
         },
       };
     }
 
-    let backgroundColor = '#00E5A0'; // brand green (default / priority >= 3 / no priority)
+    // default / priority >= 3 / no priority
+    let backgroundColor = 'var(--lw-forest)';
+    let color = 'var(--lw-on-forest)';
 
     if (schedule.priority === 2) {
-      backgroundColor = '#22C55E'; // green-500
+      backgroundColor = 'var(--accent-brass)';
+      color = 'var(--lw-ink)';
     } else if (schedule.priority === 1) {
-      backgroundColor = '#6B7280'; // gray-500
+      backgroundColor = 'var(--background-tertiary)';
+      color = 'var(--lw-ink)';
     }
 
     return {
@@ -163,7 +185,7 @@ export default function ScheduleCalendar({
         backgroundColor,
         borderRadius: '4px',
         border: 'none',
-        color: '#061A21',
+        color,
       },
     };
   }, []);
@@ -200,86 +222,95 @@ export default function ScheduleCalendar({
       <style jsx global>{`
         .schedule-calendar .rbc-calendar {
           font-family: inherit;
+          color: var(--foreground);
         }
         .schedule-calendar .rbc-header {
           padding: 8px 4px;
-          font-weight: 600;
-          font-size: 0.875rem;
+          /* Mono kicker, same role as .eh-th: a weekday strip is a column
+             header, and the type scale gives those the mono face. */
+          font-family: var(--font-mono), ui-monospace, monospace;
+          font-weight: 500;
+          font-size: 0.72rem;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          color: var(--foreground-tertiary);
+          border-color: var(--border);
+        }
+        .schedule-calendar .rbc-month-view,
+        .schedule-calendar .rbc-time-view,
+        .schedule-calendar .rbc-agenda-view {
+          border-color: var(--border);
+          border-radius: 12px;
+        }
+        .schedule-calendar .rbc-month-row,
+        .schedule-calendar .rbc-day-bg,
+        .schedule-calendar .rbc-time-content,
+        .schedule-calendar .rbc-time-header,
+        .schedule-calendar .rbc-timeslot-group,
+        .schedule-calendar .rbc-time-slot,
+        .schedule-calendar .rbc-time-header-content {
+          border-color: var(--border-light);
         }
         .schedule-calendar .rbc-toolbar button {
           border-radius: 6px;
           padding: 6px 12px;
           font-size: 0.875rem;
+          color: var(--foreground-secondary);
+          border-color: var(--border);
         }
         .schedule-calendar .rbc-toolbar button:hover {
-          background-color: #E5E7EB;
+          background-color: var(--surface-hover);
+          color: var(--foreground);
         }
-        .schedule-calendar .rbc-toolbar button.rbc-active {
-          background-color: #00E5A0;
-          color: #061A21;
+        .schedule-calendar .rbc-toolbar button.rbc-active,
+        .schedule-calendar .rbc-toolbar button.rbc-active:hover,
+        .schedule-calendar .rbc-toolbar button.rbc-active:focus {
+          background-color: var(--lw-forest);
+          color: var(--lw-on-forest);
+          border-color: var(--lw-forest);
         }
-        .schedule-calendar .rbc-toolbar button.rbc-active:hover {
-          background-color: #00CC8E;
+        .schedule-calendar .rbc-toolbar-label {
+          font-family: var(--lw-serif);
+          font-weight: 500;
+          font-variation-settings: 'opsz' 24;
+          color: var(--foreground);
         }
         .schedule-calendar .rbc-event {
           font-size: 0.75rem;
           padding: 2px 6px;
         }
         .schedule-calendar .rbc-today {
-          background-color: #EFF6FF;
+          /* Warm brand tint. Was #EFF6FF, a cool blue wash left over from
+             react-big-calendar's own default sheet. */
+          background-color: var(--badge-brand-bg);
         }
-        .dark .schedule-calendar .rbc-header {
-          color: #F9FAFB;
-          border-color: #374151;
+        .schedule-calendar .rbc-off-range-bg {
+          background-color: var(--background-secondary);
         }
-        .dark .schedule-calendar .rbc-toolbar button {
-          color: #D1D5DB;
-          border-color: #4B5563;
+        .schedule-calendar .rbc-off-range {
+          color: var(--foreground-tertiary);
         }
-        .dark .schedule-calendar .rbc-toolbar button:hover {
-          background-color: #374151;
+        .schedule-calendar .rbc-date-cell,
+        .schedule-calendar .rbc-label {
+          color: var(--foreground-secondary);
+          font-variant-numeric: tabular-nums;
         }
-        .dark .schedule-calendar .rbc-toolbar button.rbc-active {
-          background-color: #00E5A0;
-          color: #061A21;
+        .schedule-calendar .rbc-current-time-indicator {
+          background-color: var(--accent-coral-ink);
         }
-        .dark .schedule-calendar .rbc-today {
-          background-color: #1E293B;
-        }
-        .dark .schedule-calendar .rbc-off-range-bg {
-          background-color: #111827;
-        }
-        .dark .schedule-calendar .rbc-month-view,
-        .dark .schedule-calendar .rbc-time-view,
-        .dark .schedule-calendar .rbc-agenda-view {
-          background-color: #111827;
-          border-color: #374151;
-        }
-        .dark .schedule-calendar .rbc-month-row,
-        .dark .schedule-calendar .rbc-day-bg,
-        .dark .schedule-calendar .rbc-time-content,
-        .dark .schedule-calendar .rbc-time-header,
-        .dark .schedule-calendar .rbc-timeslot-group {
-          border-color: #374151;
-        }
-        .dark .schedule-calendar .rbc-date-cell {
-          color: #D1D5DB;
-        }
-        .dark .schedule-calendar .rbc-off-range {
-          color: #6B7280;
-        }
-        .dark .schedule-calendar .rbc-toolbar-label {
-          color: #F9FAFB;
-        }
-        .dark .schedule-calendar .rbc-time-slot {
-          border-color: #374151;
-        }
-        .dark .schedule-calendar .rbc-label {
-          color: #9CA3AF;
-        }
-        .dark .schedule-calendar .rbc-current-time-indicator {
-          background-color: #EF4444;
-        }
+        /*
+         * NOTE: no backticks in this block. It is inside a template literal,
+         * so one would end the CSS early and hand the rest to the parser as
+         * JavaScript. That is how this file broke once already.
+         *
+         * The .dark .schedule-calendar block that used to sit here is GONE --
+         * 13 rules and 18 hex literals of a second, cool-grey palette. Dark
+         * mode was removed (plan section 3, D1) and .dark is never applied, so
+         * none of it could render; leaving a complete competing skin in the
+         * sheet for a stale bundle or an extension to land on is how a theme
+         * comes back from the dead. globals.css deletes its .dark token block
+         * for the same reason and says so.
+         */
       `}</style>
       <Calendar
         localizer={localizer}

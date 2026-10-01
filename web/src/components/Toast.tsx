@@ -48,9 +48,17 @@ export default function Toast({ message, type, onClose, duration = 5000 }: Toast
    * makes it a poor place to be unreadable. Each now takes the lightest shade
    * that passes, keeping as much of the colour as legibility allows.
    *
-   * These are fixed shades, not theme tokens, deliberately: a toast is a
-   * transient overlay that must stay legible in both themes, and the semantic
-   * tokens resolve to different values per theme.
+   * These are fixed shades, not theme tokens, deliberately — but the REASON
+   * changed with the redesign and the conclusion did not. It used to be "the
+   * semantic tokens resolve to different values per theme"; there is only one
+   * theme now (plan §3 D1). It still holds because a toast is a transient
+   * overlay that lands on whatever is underneath it, so its legibility must not
+   * depend on the substrate. The `-ink` tokens are the wrong tool here: they
+   * are text-on-light inks, and these are solid fills carrying white.
+   *
+   * Left on the semantic ramp rather than re-cut warm for the same reason a
+   * codemod must never touch status colour — these four carry MEANING, and the
+   * ratios above are the only reason they are the values they are.
    */
   const colors = {
     success: 'bg-success-700 text-white',

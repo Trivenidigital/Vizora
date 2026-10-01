@@ -265,13 +265,13 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
     switch (status) {
       case 'up':
       case 'healthy':
-        return <CheckCircle className="w-5 h-5 text-green-500" />;
+        return <CheckCircle className="w-5 h-5 text-[var(--success-ink)]" />;
       case 'degraded':
-        return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
+        return <AlertTriangle className="w-5 h-5 text-[var(--warning-ink)]" />;
       case 'unknown':
-        return <AlertTriangle className="w-5 h-5 text-gray-500" />;
+        return <AlertTriangle className="w-5 h-5 text-[var(--foreground-tertiary)]" />;
       default:
-        return <AlertTriangle className="w-5 h-5 text-red-500" />;
+        return <AlertTriangle className="w-5 h-5 text-[var(--error-ink)]" />;
     }
   };
 
@@ -279,13 +279,13 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
     switch (status) {
       case 'up':
       case 'healthy':
-        return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400';
+        return 'bg-[var(--status-online-bg)] text-[var(--success-ink)]';
       case 'degraded':
-        return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400';
+        return 'bg-[var(--status-error-bg)] text-[var(--warning-ink)]';
       case 'unknown':
-        return 'bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-400';
+        return 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)]';
       default:
-        return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400';
+        return 'bg-[var(--status-offline-bg)] text-[var(--error-ink)]';
     }
   };
 
@@ -325,10 +325,10 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
       <div
         className={`p-6 rounded-xl border-2 ${
           healthData.status === 'healthy'
-            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+            ? 'bg-[var(--status-online-bg)] border-success-ink/30'
             : healthData.status === 'degraded'
-            ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
-            : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+            ? 'bg-[var(--status-error-bg)] border-warning-ink/30'
+            : 'bg-[var(--status-offline-bg)] border-error-ink/30'
         }`}
       >
         <div className="flex items-center gap-4">
@@ -409,7 +409,7 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
             <div className="p-4 rounded-lg bg-[var(--background)]">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <Database className="w-5 h-5 text-[#00E5A0]" />
+                  <Database className="w-5 h-5 text-[var(--primary-ink)]" />
                   <span className="font-medium text-[var(--foreground)]">PostgreSQL</span>
                 </div>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(healthData.database.status)}`}>
@@ -426,7 +426,7 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
               </div>
               <div className="mt-2 h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-[#00E5A0] rounded-full transition-all"
+                  className="h-full bg-[var(--primary)] rounded-full transition-all"
                   style={{ width: getBarWidth(healthData.database.connections, healthData.database.maxConnections) }}
                 />
               </div>
@@ -436,7 +436,7 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
             <div className="p-4 rounded-lg bg-[var(--background)]">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <MemoryStick className="w-5 h-5 text-red-500" />
+                  <MemoryStick className="w-5 h-5 text-[var(--error-ink)]" />
                   <span className="font-medium text-[var(--foreground)]">Redis</span>
                 </div>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(healthData.redis.status)}`}>
@@ -449,7 +449,7 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
               </div>
               <div className="mt-2 h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-red-500 rounded-full transition-all"
+                  className="h-full bg-[var(--error-ink)] rounded-full transition-all"
                   style={{ width: getBarWidth(healthData.redis.memory, healthData.redis.maxMemory) }}
                 />
               </div>
@@ -459,7 +459,7 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
             <div className="p-4 rounded-lg bg-[var(--background)]">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <HardDrive className="w-5 h-5 text-purple-500" />
+                  <HardDrive className="w-5 h-5 text-[var(--cat-purple)]" />
                   <span className="font-medium text-[var(--foreground)]">MinIO Storage</span>
                 </div>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(healthData.storage.status)}`}>
@@ -472,7 +472,7 @@ export default function AdminHealthClient({ initialHealth }: AdminHealthClientPr
               </div>
               <div className="mt-2 h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-purple-500 rounded-full transition-all"
+                  className="h-full bg-[var(--cat-purple)] rounded-full transition-all"
                   style={{ width: getBarWidth(healthData.storage.used, healthData.storage.total) }}
                 />
               </div>

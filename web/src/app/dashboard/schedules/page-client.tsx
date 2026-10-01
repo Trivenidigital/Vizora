@@ -687,7 +687,7 @@ export default function SchedulesClient() {
  {/* Header */}
  <div className="flex justify-between items-center">
  <div>
- <h2 className="eh-dash-title font-sora text-2xl text-[var(--foreground)]">Schedules</h2>
+ <h2 className="eh-dash-title font-sora text-2xl">Schedules</h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Automate content playback with schedules ({schedules.length} total)
  </p>
@@ -722,7 +722,7 @@ export default function SchedulesClient() {
  onClick={openCreateModal}
  className="eh-btn-neon rounded-xl px-6 py-3 transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2 active:scale-95"
  >
- <Icon name="add" size="lg" className="text-white" />
+ <Icon name="add" size="lg" className="text-[var(--primary-contrast)]" />
  <span>Create Schedule</span>
  </button>
  )}
@@ -730,13 +730,13 @@ export default function SchedulesClient() {
  </div>
 
  {loadError && (
- <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
- <Icon name="error" size="lg" className="text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+ <div className="bg-[var(--status-offline-bg)] border border-error-ink/30 rounded-lg p-4 flex items-start gap-3">
+ <Icon name="error" size="lg" className="text-[var(--error-ink)] flex-shrink-0 mt-0.5" />
  <div>
- <h3 className="text-sm font-semibold text-red-900 dark:text-red-100">
+ <h3 className="text-sm font-semibold text-[var(--error-ink)]">
  Some schedule data could not load
  </h3>
- <p className="text-sm text-red-700 dark:text-red-300 mt-1">{loadError}</p>
+ <p className="text-sm text-[var(--error-ink)] mt-1">{loadError}</p>
  </div>
  </div>
  )}
@@ -781,14 +781,14 @@ export default function SchedulesClient() {
  return (
  <div
  key={schedule.id}
- className={`eh-dash-card border-l-4 p-6 ${scheduleActive ? 'border-l-[#00E5A0]' : 'border-l-[var(--border)]'}`}
+ className={`eh-dash-card !border-l-4 p-6 ${scheduleActive ? '!border-l-[var(--success-ink)]' : '!border-l-[var(--border)]'}`}
  >
  <div className="flex items-start justify-between">
  <div className="flex items-start gap-4 flex-1">
  <Icon
  name="schedules"
  size="2xl"
- className={scheduleActive ? 'text-[#00E5A0] dark:text-[#00E5A0]' : 'text-[var(--foreground-tertiary)]'}
+ className={scheduleActive ? 'text-[var(--success-ink)]' : 'text-[var(--foreground-tertiary)]'}
  />
  <div className="flex-1 min-w-0">
  <div className="flex items-center gap-3 mb-3">
@@ -797,7 +797,7 @@ export default function SchedulesClient() {
  </h3>
  <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
  scheduleActive
- ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200'
+ ? 'bg-[var(--status-online-bg)] text-[var(--success-ink)]'
  : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)]'
  }`}>
  {scheduleActive ? 'Active' : 'Inactive'}
@@ -831,7 +831,7 @@ export default function SchedulesClient() {
  <div className="flex gap-2 mt-4 pt-4 border-t border-[var(--border)]">
  <button
  onClick={() => openEditModal(schedule)}
- className="px-4 py-2 text-sm bg-[#00E5A0]/5 dark:bg-[#00E5A0]/10 text-[#00E5A0] dark:text-[#00E5A0] rounded-lg hover:bg-[#00E5A0]/10 dark:hover:bg-[#00E5A0]/10 transition font-medium active:scale-95"
+ className="px-4 py-2 text-sm bg-brand/5 text-[var(--primary-ink)] rounded-lg hover:bg-brand/10 transition font-medium active:scale-95"
  >
  Edit
  </button>
@@ -844,7 +844,7 @@ export default function SchedulesClient() {
  {permissions.canDeleteSchedules && (
  <button
  onClick={() => openDeleteModal(schedule)}
- className="px-4 py-2 text-sm bg-red-50 dark:bg-red-900 text-red-600 dark:text-red-200 rounded-lg hover:bg-red-100 dark:hover:bg-red-800 transition font-medium active:scale-95"
+ className="px-4 py-2 text-sm bg-[var(--status-offline-bg)] text-[var(--error-ink)] rounded-lg hover:bg-error/20 transition font-medium active:scale-95"
  >
  Delete
  </button>
@@ -859,12 +859,12 @@ export default function SchedulesClient() {
 
  {/* Tips Section */}
  {schedules.length > 0 && (
- <div className="bg-[#00E5A0]/5 dark:bg-[#00E5A0]/10 border border-[#00E5A0]/30 dark:border-[#00E5A0] rounded-lg p-6">
- <h4 className="eh-dash-subtitle text-[#00E5A0] dark:text-[#00E5A0] mb-3 flex items-center gap-2">
- <Icon name="info" size="md" className="text-[#00E5A0] dark:text-[#00E5A0]" />
+ <div className="bg-brand/5 border border-brand/30 rounded-lg p-6">
+ <h4 className="eh-dash-subtitle !text-[var(--primary-ink)] mb-3 flex items-center gap-2">
+ <Icon name="info" size="md" className="text-[var(--primary-ink)]" />
  Tips for Using Schedules
  </h4>
- <ul className="text-sm text-[#00E5A0] dark:text-[#00E5A0] space-y-2">
+ <ul className="text-sm text-[var(--primary-ink)] space-y-2">
  <li>• Schedules automatically control which playlist plays at specific times</li>
  <li>• You can overlap schedules - the most recently created one takes precedence</li>
  <li>• Devices will sync schedule changes automatically</li>
@@ -889,7 +889,7 @@ export default function SchedulesClient() {
  {/* Name */}
  <div>
  <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
- Schedule Name <span className="text-red-500">*</span>
+ Schedule Name <span className="text-[var(--error-ink)]">*</span>
  </label>
  <input
  type="text"
@@ -899,18 +899,18 @@ export default function SchedulesClient() {
  if (formErrors.name) setFormErrors({ ...formErrors, name: '' });
  }}
  placeholder="e.g., Morning Content, Holiday Special"
- className={`eh-input w-full px-4 py-2 border rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] transition ${
- formErrors.name ? 'border-red-500' : 'border-[var(--border)]'
+ className={`eh-input w-full px-4 py-2 border rounded-lg transition ${
+ formErrors.name ? '!border-[var(--error-ink)]' : ''
  }`}
  />
- {formErrors.name && <p className="text-red-600 dark:text-red-400 text-sm mt-1">{formErrors.name}</p>}
+ {formErrors.name && <p className="text-[var(--error-ink)] text-sm mt-1">{formErrors.name}</p>}
  </div>
 
  {/* Time & Duration */}
  <div className="grid grid-cols-2 gap-4">
  <div>
  <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
- Start Time <span className="text-red-500">*</span>
+ Start Time <span className="text-[var(--error-ink)]">*</span>
  </label>
  <TimePicker
  value={formData.startTime}
@@ -922,7 +922,7 @@ export default function SchedulesClient() {
 
  <div>
  <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
- Duration (minutes) <span className="text-red-500">*</span>
+ Duration (minutes) <span className="text-[var(--error-ink)]">*</span>
  </label>
  <input
  type="number"
@@ -933,11 +933,11 @@ export default function SchedulesClient() {
  }}
  min="1"
  max="1440"
- className={`eh-input w-full px-4 py-2 border rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] transition ${
- formErrors.duration ? 'border-red-500' : 'border-[var(--border)]'
+ className={`eh-input w-full px-4 py-2 border rounded-lg transition ${
+ formErrors.duration ? '!border-[var(--error-ink)]' : ''
  }`}
  />
- {formErrors.duration && <p className="text-red-600 dark:text-red-400 text-sm mt-1">{formErrors.duration}</p>}
+ {formErrors.duration && <p className="text-[var(--error-ink)] text-sm mt-1">{formErrors.duration}</p>}
  </div>
  </div>
 
@@ -957,7 +957,7 @@ export default function SchedulesClient() {
  {/* Days */}
  <div>
  <label className="block text-sm font-medium text-[var(--foreground)] mb-3">
- Schedule Days <span className="text-red-500">*</span>
+ Schedule Days <span className="text-[var(--error-ink)]">*</span>
  </label>
  <DaySelector
  selected={formData.days}
@@ -966,14 +966,14 @@ export default function SchedulesClient() {
  if (formErrors.days) setFormErrors({ ...formErrors, days: '' });
  }}
  />
- {formErrors.days && <p className="text-red-600 dark:text-red-400 text-sm mt-2">{formErrors.days}</p>}
+ {formErrors.days && <p className="text-[var(--error-ink)] text-sm mt-2">{formErrors.days}</p>}
  </div>
 
  {/* Next Occurrences Preview */}
  {formData.days.length > 0 && (
- <div className="bg-purple-50 dark:bg-purple-900 border border-purple-200 dark:border-purple-800 rounded-lg p-3">
- <p className="text-sm font-medium text-purple-900 dark:text-purple-200 mb-2">Next 10 Occurrences:</p>
- <div className="text-xs text-purple-800 dark:text-purple-300">
+ <div className="bg-[var(--cat-purple-bg)] border border-[var(--cat-purple-edge)] rounded-lg p-3">
+ <p className="text-sm font-medium text-[var(--cat-purple)] mb-2">Next 10 Occurrences:</p>
+ <div className="text-xs text-[var(--cat-purple)]">
  {getNextOccurrences().join(' • ')}
  </div>
  </div>
@@ -982,7 +982,7 @@ export default function SchedulesClient() {
  {/* Playlist Selection */}
  <div>
  <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
- Playlist <span className="text-red-500">*</span>
+ Playlist <span className="text-[var(--error-ink)]">*</span>
  </label>
  <select
  value={formData.playlistId}
@@ -990,8 +990,8 @@ export default function SchedulesClient() {
  setFormData({ ...formData, playlistId: e.target.value });
  if (formErrors.playlistId) setFormErrors({ ...formErrors, playlistId: '' });
  }}
- className={`eh-select w-full px-4 py-2 border rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] transition ${
- formErrors.playlistId ? 'border-red-500' : 'border-[var(--border)]'
+ className={`eh-select w-full px-4 py-2 border rounded-lg transition ${
+ formErrors.playlistId ? '!border-[var(--error-ink)]' : ''
  }`}
  >
  <option value="">Select a playlist...</option>
@@ -1001,7 +1001,7 @@ export default function SchedulesClient() {
  </option>
  ))}
  </select>
- {formErrors.playlistId && <p className="text-red-600 dark:text-red-400 text-sm mt-1">{formErrors.playlistId}</p>}
+ {formErrors.playlistId && <p className="text-[var(--error-ink)] text-sm mt-1">{formErrors.playlistId}</p>}
  </div>
 
  {/* Target Type Toggle */}
@@ -1015,7 +1015,7 @@ export default function SchedulesClient() {
  onClick={() => handleTargetTypeChange('device')}
  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition ${
  targetType === 'device'
- ? 'bg-[#00E5A0] text-[#061A21]'
+ ? 'bg-[var(--primary)] text-[var(--primary-contrast)]'
  : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
  }`}
  >
@@ -1026,7 +1026,7 @@ export default function SchedulesClient() {
  onClick={() => handleTargetTypeChange('group')}
  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition ${
  targetType === 'group'
- ? 'bg-[#00E5A0] text-[#061A21]'
+ ? 'bg-[var(--primary)] text-[var(--primary-contrast)]'
  : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
  }`}
  >
@@ -1039,7 +1039,7 @@ export default function SchedulesClient() {
  {targetType === 'group' ? (
  <div>
  <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
- Device Group <span className="text-red-500">*</span>
+ Device Group <span className="text-[var(--error-ink)]">*</span>
  </label>
  <select
  value={formData.deviceIds[0] || ''}
@@ -1047,7 +1047,7 @@ export default function SchedulesClient() {
  setFormData({ ...formData, deviceIds: e.target.value ? [e.target.value] : [] });
  if (formErrors.deviceIds) setFormErrors({ ...formErrors, deviceIds: '' });
  }}
- className="eh-select w-full px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] transition"
+ className="eh-select w-full px-4 py-2 border rounded-lg transition"
  >
  <option value="">Select a group...</option>
  {displayGroups.map((g: any) => (
@@ -1056,12 +1056,12 @@ export default function SchedulesClient() {
  </option>
  ))}
  </select>
- {formErrors.deviceIds && <p className="text-red-600 dark:text-red-400 text-sm mt-1">{formErrors.deviceIds}</p>}
+ {formErrors.deviceIds && <p className="text-[var(--error-ink)] text-sm mt-1">{formErrors.deviceIds}</p>}
  </div>
  ) : (
  <div>
  <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
- Devices <span className="text-red-500">*</span>
+ Devices <span className="text-[var(--error-ink)]">*</span>
  </label>
  <div className="space-y-2 max-h-48 overflow-y-auto border border-[var(--border)] rounded-lg p-3 bg-[var(--surface)]">
  {devices.length === 0 ? (
@@ -1081,14 +1081,14 @@ export default function SchedulesClient() {
  setFormData({ ...formData, deviceIds: newDeviceIds });
  if (formErrors.deviceIds) setFormErrors({ ...formErrors, deviceIds: '' });
  }}
- className="rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]"
+ className="rounded border-[var(--border)] text-[var(--primary-ink)] focus:ring-[var(--primary-ink)]"
  />
  <span className="text-sm text-[var(--foreground-secondary)]">{device.nickname}</span>
  </label>
  ))
  )}
  </div>
- {formErrors.deviceIds && <p className="text-red-600 dark:text-red-400 text-sm mt-1">{formErrors.deviceIds}</p>}
+ {formErrors.deviceIds && <p className="text-[var(--error-ink)] text-sm mt-1">{formErrors.deviceIds}</p>}
  {formData.deviceIds.length > 0 && (
  <p className="text-sm text-[var(--foreground-secondary)] mt-2">
  {formData.deviceIds.length} device{formData.deviceIds.length !== 1 ? 's' : ''} selected
@@ -1099,23 +1099,23 @@ export default function SchedulesClient() {
 
  {/* Conflict Warnings */}
  {conflictCheckFailed && (
- <div role="alert" className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
- <p className="text-sm font-semibold text-red-800 dark:text-red-200 mb-1 flex items-center gap-2">
- <Icon name="error" size="sm" className="text-red-600 dark:text-red-400" />
+ <div role="alert" className="bg-[var(--status-offline-bg)] border border-error-ink/30 rounded-lg p-3">
+ <p className="text-sm font-semibold text-[var(--error-ink)] mb-1 flex items-center gap-2">
+ <Icon name="error" size="sm" className="text-[var(--error-ink)]" />
  Unable to verify schedule conflicts
  </p>
- <p className="text-xs text-red-700 dark:text-red-300">
+ <p className="text-xs text-[var(--error-ink)]">
  Check the schedule after saving or retry when the network is available.
  </p>
  </div>
  )}
  {conflictWarnings.length > 0 && (
- <div role="status" aria-live="polite" className="bg-amber-50 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded-lg p-3">
- <p className="text-sm font-semibold text-amber-800 dark:text-amber-200 mb-1 flex items-center gap-2">
- <span className="text-amber-500">&#9888;</span> Schedule Conflicts Detected
+ <div role="status" aria-live="polite" className="bg-[var(--status-error-bg)] border border-warning-ink/30 rounded-lg p-3">
+ <p className="text-sm font-semibold text-[var(--warning-ink)] mb-1 flex items-center gap-2">
+ <span className="text-[var(--warning-ink)]">&#9888;</span> Schedule Conflicts Detected
  </p>
  {conflictWarnings.map((c: any, i: number) => (
- <p key={i} className="text-xs text-amber-700 dark:text-amber-300">
+ <p key={i} className="text-xs text-[var(--warning-ink)]">
  Overlaps with &quot;{c.name}&quot; ({formatConflictTimeRange(c)})
  </p>
  ))}

@@ -95,12 +95,12 @@ export default function AdminSecurityPage() {
 
   const getActionColor = (action: string) => {
     if (action.includes('delete') || action.includes('suspend') || action.includes('block')) {
-      return 'text-red-600 dark:text-red-400';
+      return 'text-[var(--error-ink)]';
     }
     if (action.includes('create') || action.includes('enable') || action.includes('unblock')) {
-      return 'text-green-600 dark:text-green-400';
+      return 'text-[var(--success-ink)]';
     }
-    return 'text-[#00E5A0]';
+    return 'text-[var(--primary-ink)]';
   };
 
   if (loading) {
@@ -130,7 +130,7 @@ export default function AdminSecurityPage() {
             onClick={() => setActiveTab('audit')}
             className={`py-3 px-1 border-b-2 font-medium text-sm transition ${
               activeTab === 'audit'
-                ? 'border-[#00E5A0] text-[#00E5A0]'
+                ? 'border-[var(--primary-ink)] text-[var(--primary-ink)]'
                 : 'border-transparent text-[var(--foreground-tertiary)] hover:text-[var(--foreground-secondary)]'
             }`}
           >
@@ -146,7 +146,7 @@ export default function AdminSecurityPage() {
             onClick={() => setActiveTab('blocklist')}
             className={`py-3 px-1 border-b-2 font-medium text-sm transition ${
               activeTab === 'blocklist'
-                ? 'border-[#00E5A0] text-[#00E5A0]'
+                ? 'border-[var(--primary-ink)] text-[var(--primary-ink)]'
                 : 'border-transparent text-[var(--foreground-tertiary)] hover:text-[var(--foreground-secondary)]'
             }`}
           >
@@ -252,9 +252,17 @@ export default function AdminSecurityPage() {
       {activeTab === 'blocklist' && (
         <div className="space-y-4">
           <div className="flex justify-end">
+            {/*
+              * The app's primary action pair, replacing an identity hue whose
+              * hover was a NO-OP - `hover:bg-[var(--cat-purple)]` restated the
+              * base value, so this button has never had hover feedback. The
+              * destructive step is the modal's confirm below, not this trigger,
+              * so an ordinary primary button is the right weight. Label 9.70:1
+              * on the fill, 6.99:1 on the hover.
+              */}
             <button
               onClick={() => setShowBlockModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-[#8B5CF6] text-white rounded-lg hover:bg-[#7C3AED] transition"
+              className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition"
             >
               <Plus className="w-5 h-5" />
               Block IP
@@ -325,7 +333,7 @@ export default function AdminSecurityPage() {
                         <div className="flex justify-end">
                           <button
                             onClick={() => setUnblockingId(entry.id)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--success-ink)] hover:bg-[var(--status-online-bg)] rounded-lg transition"
                           >
                             <Trash2 className="w-4 h-4" />
                             Unblock
@@ -377,7 +385,7 @@ export default function AdminSecurityPage() {
                   value={blockIp}
                   onChange={(e) => setBlockIp(e.target.value)}
                   placeholder="192.168.1.1"
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent font-mono"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent font-mono"
                 />
               </div>
 
@@ -390,7 +398,7 @@ export default function AdminSecurityPage() {
                   onChange={(e) => setBlockReason(e.target.value)}
                   placeholder="Why is this IP being blocked?"
                   rows={3}
-                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
                 />
               </div>
             </div>
@@ -405,7 +413,7 @@ export default function AdminSecurityPage() {
               <button
                 onClick={handleBlockIp}
                 disabled={blockLoading}
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition"
+                className="flex items-center gap-2 px-4 py-2 bg-[var(--danger-solid)] text-white rounded-lg hover:bg-[var(--danger-solid-hover)] disabled:opacity-50 transition"
               >
                 {blockLoading ? (
                   <>

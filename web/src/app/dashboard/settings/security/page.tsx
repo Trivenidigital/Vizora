@@ -110,7 +110,7 @@ export default function SecuritySettingsPage() {
             <span
               className={`px-2.5 py-1 rounded-full text-xs font-medium ${
                 status.enabled
-                  ? 'bg-[#00E5A0]/10 text-[#00E5A0]'
+                  ? 'bg-brand/10 text-[var(--primary-ink)]'
                   : 'bg-[var(--background)] text-[var(--foreground-tertiary)] border border-[var(--border)]'
               }`}
             >
@@ -175,7 +175,7 @@ export default function SecuritySettingsPage() {
                   value={regenCode}
                   onChange={(e) => setRegenCode(e.target.value)}
                   placeholder="123456"
-                  className="eh-input px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                  className="eh-input px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
                 />
                 <button
                   onClick={handleRegenerate}
@@ -199,12 +199,12 @@ export default function SecuritySettingsPage() {
                   value={disableCode}
                   onChange={(e) => setDisableCode(e.target.value)}
                   placeholder="123456"
-                  className="eh-input px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  className="eh-input px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--error-ink)] focus:border-transparent"
                 />
                 <button
                   onClick={handleDisable}
                   disabled={busy || disableCode.trim().length < 4}
-                  className="px-4 py-2 text-sm font-medium bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium bg-[var(--danger-solid)] text-white rounded-lg hover:bg-[var(--danger-solid-hover)] transition disabled:opacity-50"
                 >
                   Disable
                 </button>
@@ -233,7 +233,7 @@ export default function SecuritySettingsPage() {
               checked={orgMfaRequired}
               disabled={busy}
               onChange={(e) => handleToggleOrgRequired(e.target.checked)}
-              className="w-5 h-5 accent-[#00E5A0] cursor-pointer"
+              className="w-5 h-5 accent-[var(--primary)] cursor-pointer"
             />
           </label>
         </div>

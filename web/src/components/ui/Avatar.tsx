@@ -47,7 +47,7 @@ export const Avatar: React.FC<AvatarProps> = ({
   return (
     <div className={`relative inline-block ${className || ''}`}>
       <div
-        className={`${sizeMap[size]} rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-semibold overflow-hidden`}
+        className={`${sizeMap[size]} rounded-full bg-gradient-to-br from-[var(--primary-light)] to-[var(--primary)] flex items-center justify-center text-white font-semibold overflow-hidden`}
       >
         {src ? (
           <img src={src} alt={alt} className="w-full h-full object-cover" />

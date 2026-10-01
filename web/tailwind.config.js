@@ -1,5 +1,14 @@
 /** @type {import('tailwindcss').Config} */
-const { semanticColors, tokens } = require('./tailwind.theme.cjs');
+const {
+  cssVarColors,
+  cssVarEhColors,
+  cssVarSemanticColors,
+  tokens,
+  varName,
+} = require('./tailwind.theme.cjs');
+
+/** The neon accent, for the glow shadows and keyframes below. */
+const NEON = varName('primary', 500);
 
 module.exports = {
   content: [
@@ -7,7 +16,14 @@ module.exports = {
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
-  darkMode: 'class',
+  /*
+   * `darkMode` is deliberately absent. Dark mode was removed (plan §3 D1): the
+   * `.dark` token block is gone and nothing applies the class, so leaving
+   * `darkMode: 'class'` configured would keep Tailwind emitting `dark:` variants
+   * that can never match — dead CSS in every bundle. The ~467 inert `dark:`
+   * utilities already in the JSX are left in place and retire under the ratchet
+   * per-wave; this line is what stops them costing anything at runtime.
+   */
   theme: {
     extend: {
       /**
@@ -29,32 +45,52 @@ module.exports = {
         dm: ['var(--font-dm)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
       },
+      /**
+       * Every colour here points at a CSS variable declared in globals.css
+       * rather than at a literal, so the palette can be re-pointed from `:root`
+       * instead of from a rebuild — which is what Phase 1 of the redesign does.
+       * The values themselves live in `src/theme/palette.js`; the variable
+       * references are derived in `tailwind.theme.cjs`, which also explains why
+       * the variables hold bare CHANNELS (so `bg-error-500/10` keeps working).
+       */
       colors: {
-        // Semantic colors
-        primary: semanticColors.primary,
-        success: semanticColors.success,
-        warning: semanticColors.warning,
-        error: semanticColors.error,
-        info: semanticColors.info,
-        neutral: semanticColors.neutral,
+        /*
+         * The SEMANTIC tokens, as named channel-backed colours.
+         *
+         * Spread FIRST, and the four that share a name with a ramp are merged
+         * into it below as a `DEFAULT` rather than sitting beside it.
+         *
+         * ── Why the order and the merge both matter ──────────────────────
+         * These were originally spread LAST, with a comment claiming a name
+         * collision would "break the build rather than quietly winning". That
+         * was wrong, and wrong in the worst direction. `success`, `warning`,
+         * `error` and `info` exist in BOTH sets: ramp objects here, flat
+         * strings there. Spreading the strings last replaced each ramp object
+         * outright, so every `bg-error-500`, `text-success-700`,
+         * `bg-warning-500/10` — 141 classes across the app — silently stopped
+         * emitting. Tailwind does not error on that; it just drops the scale.
+         * It took a screenshot diff to find: "5 online" on the dashboard went
+         * from green to grey, 391 px, and `Toast`'s four AA-computed fills
+         * (`bg-success-700` and friends) left white text on no background at
+         * all.
+         *
+         * `DEFAULT` is Tailwind's own idiom for "this name is both a scale and
+         * a single colour": `bg-error` resolves to the flat token, and
+         * `bg-error-500` still resolves to the ramp. Nothing has to choose.
+         */
+        ...cssVarSemanticColors,
+
+        // Ramps. Merged with the flat token of the same name where one exists,
+        // so `bg-error` and `bg-error-500` both work.
+        primary: cssVarColors.primary,
+        neutral: cssVarColors.neutral,
+        success: { ...cssVarColors.success, DEFAULT: cssVarSemanticColors.success },
+        warning: { ...cssVarColors.warning, DEFAULT: cssVarSemanticColors.warning },
+        error: { ...cssVarColors.error, DEFAULT: cssVarSemanticColors.error },
+        info: { ...cssVarColors.info, DEFAULT: cssVarSemanticColors.info },
+
         // Electric Horizon namespace
-        eh: {
-          bg: '#061A21',
-          'bg-secondary': '#081E28',
-          'bg-tertiary': '#0A222E',
-          surface: '#0C2229',
-          'surface-secondary': '#122D35',
-          accent: '#00E5A0',
-          'accent-hover': '#00CC8E',
-          cyan: '#00B4D8',
-          violet: '#8B5CF6',
-          text: '#F0ECE8',
-          'text-secondary': '#8A8278',
-          'text-muted': '#5A5248',
-          border: '#1B3D47',
-          'border-light': '#264A55',
-          card: 'rgba(12, 34, 41, 0.6)',
-        },
+        eh: cssVarEhColors,
       },
       spacing: {
         xs: tokens.spacing.xs,
@@ -84,10 +120,12 @@ module.exports = {
         xl: tokens.shadow.xl,
         '2xl': tokens.shadow['2xl'],
         inner: tokens.shadow.inner,
-        // Neon glow shadows
-        neon: '0 0 12px rgba(0, 229, 160, 0.25), 0 0 4px rgba(0, 229, 160, 0.1)',
-        'neon-sm': '0 0 6px rgba(0, 229, 160, 0.2)',
-        'neon-lg': '0 0 28px rgba(0, 229, 160, 0.3), 0 0 8px rgba(0, 229, 160, 0.15)',
+        // Neon glow shadows. Same colour as `primary-500`, so they reference it
+        // rather than restating rgba(0, 229, 160) five more times — box-shadow
+        // takes no <alpha-value>, so the alphas are written out per stop.
+        neon: `0 0 12px rgb(var(${NEON}) / 0.25), 0 0 4px rgb(var(${NEON}) / 0.1)`,
+        'neon-sm': `0 0 6px rgb(var(${NEON}) / 0.2)`,
+        'neon-lg': `0 0 28px rgb(var(${NEON}) / 0.3), 0 0 8px rgb(var(${NEON}) / 0.15)`,
       },
       transitionDuration: {
         fast: tokens.transition.fast,
@@ -149,8 +187,8 @@ module.exports = {
           '100%': { transform: 'translateX(0)', opacity: '1' },
         },
         neonPulse: {
-          '0%, 100%': { opacity: '1', boxShadow: '0 0 8px rgba(0,229,160,0.25)' },
-          '50%': { opacity: '0.4', boxShadow: '0 0 4px rgba(0,229,160,0.15)' },
+          '0%, 100%': { opacity: '1', boxShadow: `0 0 8px rgb(var(${NEON}) / 0.25)` },
+          '50%': { opacity: '0.4', boxShadow: `0 0 4px rgb(var(${NEON}) / 0.15)` },
         },
         glowBreathe: {
           '0%, 100%': { opacity: '0.4' },

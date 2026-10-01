@@ -4,6 +4,13 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { apiClient } from '@/lib/api';
 import type { SubscriptionStatus } from '@/lib/types';
+import {
+  BANNER_ACTION,
+  BANNER_MESSAGE,
+  BANNER_QUIET_ACTION,
+  BANNER_ROW,
+  BANNER_TONE,
+} from './banner-tones';
 
 /**
  * Trial + free-tier-expired banner. Renders one line below EntitlementBanner in
@@ -107,18 +114,18 @@ export default function TrialBanner() {
 
   if (showExpired) {
     return (
-      <div className="bg-gradient-to-r from-red-900/80 to-red-800/60 border-b border-red-700/50">
-        <div className="px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-4">
+      <div className={BANNER_TONE.critical.bar}>
+        <div className={BANNER_ROW}>
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse shrink-0" />
-            <p className="text-sm text-red-100 truncate sm:whitespace-normal sm:overflow-visible">
+            <div className={`w-2 h-2 ${BANNER_TONE.critical.dot} rounded-full animate-pulse shrink-0`} />
+            <p className={`${BANNER_MESSAGE} ${BANNER_TONE.critical.text}`}>
               <span className="font-semibold">Your free trial has ended.</span>
               <span className="hidden sm:inline">{' '}Your data is safe. Upgrade to pick up where you left off.</span>
             </p>
           </div>
           <Link
             href="/dashboard/settings/billing/plans"
-            className="shrink-0 px-4 py-1.5 bg-[#00E5A0] text-[#061A21] text-sm font-semibold rounded-md hover:bg-[#00CC8E] transition-colors"
+            className={`${BANNER_ACTION} ${BANNER_TONE.critical.action}`}
           >
             Upgrade Now
           </Link>
@@ -129,11 +136,11 @@ export default function TrialBanner() {
 
   if (isUrgent) {
     return (
-      <div className="bg-gradient-to-r from-amber-900/60 to-amber-800/40 border-b border-amber-700/40">
-        <div className="px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-4">
+      <div className={BANNER_TONE.warning.bar}>
+        <div className={BANNER_ROW}>
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse shrink-0" />
-            <p className="text-sm text-amber-100 truncate sm:whitespace-normal sm:overflow-visible">
+            <div className={`w-2 h-2 ${BANNER_TONE.warning.dot} rounded-full animate-pulse shrink-0`} />
+            <p className={`${BANNER_MESSAGE} ${BANNER_TONE.warning.text}`}>
               <span className="font-semibold">Free Trial</span>
               {' '}&mdash; {daysRemaining} {daysRemaining === 1 ? 'day' : 'days'} remaining.<span className="hidden sm:inline"> Upgrade to keep your screens running.</span>
             </p>
@@ -141,13 +148,13 @@ export default function TrialBanner() {
           <div className="flex items-center gap-2 shrink-0">
             <Link
               href="/dashboard/settings/billing/plans"
-              className="px-4 py-1.5 bg-[#00E5A0] text-[#061A21] text-sm font-semibold rounded-md hover:bg-[#00CC8E] transition-colors"
+              className={`${BANNER_ACTION} ${BANNER_TONE.warning.action}`}
             >
               Upgrade
             </Link>
             <button
               onClick={() => setDismissed(true)}
-              className="p-1.5 text-amber-300/60 hover:text-amber-200 transition-colors"
+              className={`p-1.5 ${BANNER_TONE.warning.text} opacity-60 hover:opacity-100 transition-colors`}
               aria-label="Dismiss"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -162,11 +169,11 @@ export default function TrialBanner() {
 
   // Normal trial state (> 5 days left)
   return (
-    <div className="bg-gradient-to-r from-[#061A21] to-[#0a2a35] border-b border-[#00E5A0]/20">
-      <div className="px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-between gap-4">
+    <div className={BANNER_TONE.info.bar}>
+      <div className={BANNER_ROW}>
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-2 h-2 bg-[#00E5A0] rounded-full shrink-0" />
-          <p className="text-sm text-[#00E5A0]/90 truncate sm:whitespace-normal sm:overflow-visible">
+          <div className={`w-2 h-2 ${BANNER_TONE.info.dot} rounded-full shrink-0`} />
+          <p className={`${BANNER_MESSAGE} ${BANNER_TONE.info.text}`}>
             <span className="font-semibold">Free Trial</span>
             {' '}&mdash; {daysRemaining} days remaining
           </p>
@@ -174,13 +181,13 @@ export default function TrialBanner() {
         <div className="flex items-center gap-2 shrink-0">
           <Link
             href="/dashboard/settings/billing/plans"
-            className="px-3 py-1 text-sm text-[#00E5A0] border border-[#00E5A0]/30 rounded-md hover:bg-[#00E5A0]/10 transition-colors font-medium"
+            className={`${BANNER_QUIET_ACTION} ${BANNER_TONE.info.quiet}`}
           >
             View Plans
           </Link>
           <button
             onClick={() => setDismissed(true)}
-            className="p-1.5 text-[#00E5A0]/30 hover:text-[#00E5A0]/60 transition-colors"
+            className={`p-1.5 ${BANNER_TONE.info.text} opacity-50 hover:opacity-100 transition-colors`}
             aria-label="Dismiss"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -196,10 +203,12 @@ export default function TrialBanner() {
 /**
  * The degraded/unknown rendering for a failed subscription read.
  *
- * Reuses the `slate` degraded tone established by #355 (EntitlementBanner's
- * `TONE_*` maps) rather than introducing a new one — degraded must not read as
- * one of the escalating warning tones, and the two banners stack in the same
- * container, so they have to agree on what "unknown" looks like.
+ * Uses the `unknown` tone from the shared vocabulary (`banner-tones.ts`, which
+ * was the `slate` tone in EntitlementBanner's `TONE_*` maps established by #355)
+ * rather than introducing a new one — degraded must not read as one of the
+ * escalating warning tones, and the two banners stack in the same container, so
+ * they have to agree on what "unknown" looks like. They now agree by IMPORT:
+ * the two copies of the tone maps were the drift risk that rule was guarding.
  */
 function DegradedNotice({
   detail,
@@ -211,14 +220,11 @@ function DegradedNotice({
   loading: boolean;
 }) {
   return (
-    <div
-      className="bg-gradient-to-r from-slate-800/70 to-slate-700/50 border-b border-slate-600/40"
-      role="alert"
-    >
-      <div className="px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-4">
+    <div className={BANNER_TONE.unknown.bar} role="alert">
+      <div className={BANNER_ROW}>
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-2 h-2 bg-slate-400 rounded-full animate-pulse shrink-0" />
-          <p className="text-sm text-slate-200 truncate sm:whitespace-normal sm:overflow-visible">
+          <div className={`w-2 h-2 ${BANNER_TONE.unknown.dot} rounded-full animate-pulse shrink-0`} />
+          <p className={`${BANNER_MESSAGE} ${BANNER_TONE.unknown.text}`}>
             <span className="font-semibold">Couldn&rsquo;t check your trial status.</span>
             <span className="hidden sm:inline">{' '}{detail}</span>
           </p>
@@ -227,7 +233,7 @@ function DegradedNotice({
           <button
             onClick={onRetry}
             disabled={loading}
-            className="shrink-0 px-3 py-1.5 text-sm font-medium text-slate-100 bg-slate-700/60 border border-slate-500/50 rounded-md hover:bg-slate-600/60 disabled:opacity-60 transition-colors"
+            className={`${BANNER_QUIET_ACTION} ${BANNER_TONE.unknown.quiet}`}
           >
             {loading ? 'Retrying…' : 'Retry'}
           </button>

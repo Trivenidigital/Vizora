@@ -101,37 +101,37 @@ const getHealthSummary = (health: DashboardSystemHealth | null) => {
  return {
  label: 'Healthy',
  detail: 'All systems operational',
- dotClassName: 'bg-success-300 animate-pulse',
- cardClassName: 'bg-gradient-to-br from-[#00E5A0] to-[#00B4D8]',
- textClassName: 'text-primary-100',
- iconClassName: 'text-primary-200',
+ dotClassName: 'bg-[var(--primary-contrast)] animate-pulse',
+ cardClassName: 'bg-gradient-to-br from-[var(--primary)] to-[var(--primary-light)]',
+ textClassName: 'text-[var(--primary-contrast)]',
+ iconClassName: 'text-[var(--primary-contrast)]',
  };
  case 'degraded':
  return {
  label: 'Degraded',
  detail: health.message || 'Some dependencies degraded',
- dotClassName: 'bg-amber-200 animate-pulse',
- cardClassName: 'bg-gradient-to-br from-amber-500 to-orange-500',
- textClassName: 'text-amber-50',
- iconClassName: 'text-amber-100',
+ dotClassName: 'bg-[var(--lw-on-forest)] animate-pulse',
+ cardClassName: 'bg-gradient-to-br from-[var(--warning-ink)] to-[var(--accent-brass-ink)]',
+ textClassName: 'text-[var(--lw-on-forest)]',
+ iconClassName: 'text-[var(--lw-on-forest)]',
  };
  case 'unhealthy':
  return {
  label: 'Critical',
  detail: health.message || 'Core service needs attention',
- dotClassName: 'bg-red-200 animate-pulse',
- cardClassName: 'bg-gradient-to-br from-red-600 to-rose-500',
- textClassName: 'text-red-50',
- iconClassName: 'text-red-100',
+ dotClassName: 'bg-[var(--lw-on-forest)] animate-pulse',
+ cardClassName: 'bg-gradient-to-br from-[var(--error-ink)] to-[var(--accent-coral-ink)]',
+ textClassName: 'text-[var(--lw-on-forest)]',
+ iconClassName: 'text-[var(--lw-on-forest)]',
  };
  default:
  return {
  label: 'Unknown',
  detail: 'Status unavailable',
- dotClassName: 'bg-slate-300',
- cardClassName: 'bg-gradient-to-br from-slate-600 to-slate-500',
- textClassName: 'text-slate-100',
- iconClassName: 'text-slate-200',
+ dotClassName: 'bg-[var(--lw-on-forest)]',
+ cardClassName: 'bg-gradient-to-br from-[var(--foreground-secondary)] to-[var(--foreground-tertiary)]',
+ textClassName: 'text-[var(--lw-on-forest)]',
+ iconClassName: 'text-[var(--lw-on-forest)]',
  };
  }
 };
@@ -456,7 +456,7 @@ export default function DashboardClient({
  return (
  <div className="space-y-8">
  <div>
- <h2 className="eh-dash-title text-2xl text-[var(--foreground)]">Dashboard Overview</h2>
+ <h2 className="eh-dash-title text-2xl">Dashboard Overview</h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Welcome to your Vizora dashboard. Here's what's happening.
  </p>
@@ -467,16 +467,16 @@ export default function DashboardClient({
 
  {/* Error Banner */}
  {error && (
- <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
- <Icon name="error" size="lg" className="text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+ <div className="bg-[var(--status-offline-bg)] border border-error-ink/30 rounded-lg p-4 flex items-start gap-3">
+ <Icon name="error" size="lg" className="text-[var(--error-ink)] flex-shrink-0 mt-0.5" />
  <div className="flex-1">
- <h3 className="text-sm font-semibold text-red-900 dark:text-red-100">
+ <h3 className="text-sm font-semibold text-[var(--error-ink)]">
  Error loading dashboard data
  </h3>
- <p className="text-sm text-red-700 dark:text-red-300 mt-1">{error}</p>
+ <p className="text-sm text-[var(--error-ink)] mt-1">{error}</p>
  <button
  onClick={() => loadStats()}
- className="mt-3 text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 underline"
+ className="mt-3 text-sm font-medium text-[var(--error-ink)] hover:text-[var(--error-ink)] underline"
  >
  Try again
  </button>
@@ -488,7 +488,7 @@ export default function DashboardClient({
  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
  <Link
  href="/dashboard/devices"
- className="eh-dash-card w-full p-6 text-left hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#00E5A0]/40 transition-all duration-300 cursor-pointer animate-[fadeIn_0.3s_ease-out]"
+ className="eh-dash-card w-full p-6 text-left hover:-translate-y-[2px] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-ink)] transition-all duration-300 cursor-pointer animate-[fadeIn_0.3s_ease-out]"
  >
  <div className="flex items-center justify-between mb-4">
  <p className="text-sm font-medium text-[var(--foreground-secondary)]">Total Devices</p>
@@ -497,7 +497,7 @@ export default function DashboardClient({
  <p className="text-4xl font-bold text-[var(--foreground)] font-sora mb-2">{stats.devices.total}</p>
  <div className="flex items-center gap-2">
  <span className="w-2 h-2 bg-success-500 rounded-full"></span>
- <p className="text-sm text-success-600 dark:text-success-400 font-medium">
+ <p className="text-sm text-[var(--success-ink)] font-medium">
  {stats.devices.online} online
  </p>
  </div>
@@ -505,7 +505,7 @@ export default function DashboardClient({
 
  <Link
  href="/dashboard/content"
- className="eh-dash-card w-full p-6 text-left hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#00E5A0]/40 transition-all duration-300 cursor-pointer animate-[fadeIn_0.4s_ease-out]"
+ className="eh-dash-card w-full p-6 text-left hover:-translate-y-[2px] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-ink)] transition-all duration-300 cursor-pointer animate-[fadeIn_0.4s_ease-out]"
  >
  <div className="flex items-center justify-between mb-4">
  <p className="text-sm font-medium text-[var(--foreground-secondary)]">Content Items</p>
@@ -521,7 +521,7 @@ export default function DashboardClient({
 
  <Link
  href="/dashboard/playlists"
- className="eh-dash-card w-full p-6 text-left hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#00E5A0]/40 transition-all duration-300 cursor-pointer animate-[fadeIn_0.5s_ease-out]"
+ className="eh-dash-card w-full p-6 text-left hover:-translate-y-[2px] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[var(--primary-ink)] transition-all duration-300 cursor-pointer animate-[fadeIn_0.5s_ease-out]"
  >
  <div className="flex items-center justify-between mb-4">
  <p className="text-sm font-medium text-[var(--foreground-secondary)]">Playlists</p>
@@ -533,12 +533,24 @@ export default function DashboardClient({
  </p>
  </Link>
 
- <div className={`${healthSummary.cardClassName} p-6 rounded-lg border border-[var(--border)] hover:-translate-y-[2px] hover:shadow-md transition-all duration-300 text-white animate-[fadeIn_0.6s_ease-out]`}>
+ {/* `data-live-telemetry`: visual-baseline mask hook. This tile renders the
+     LIVE readiness of the stack, which genuinely flaps between ok and
+     degraded and repaints the whole gradient — it is not comparable between
+     two runs, so it is masked rather than compared. An attribute, not a
+     class, so a restyle cannot silently detach it. See GLOBAL_MASKS in
+     scripts/design/baseline.mjs. */}
+ <div
+ data-live-telemetry
+ /* No base ink here. One declaration cannot serve four states once the `ok`
+    fill is tenant-overridable and the other three are static, so the ink is
+    decided per state in the config above and the 4xl label names it too. */
+ className={`${healthSummary.cardClassName} p-6 rounded-lg border border-[var(--border)] hover:-translate-y-[2px] hover:shadow-md transition-all duration-300 animate-[fadeIn_0.6s_ease-out]`}
+ >
  <div className="flex items-center justify-between mb-4">
  <p className={`text-sm font-medium ${healthSummary.textClassName}`}>System Status</p>
  <Icon name="power" size="2xl" className={healthSummary.iconClassName} />
  </div>
- <p className="text-4xl font-bold mb-2">{healthSummary.label}</p>
+ <p className={`text-4xl font-bold mb-2 ${healthSummary.textClassName}`}>{healthSummary.label}</p>
  <div className="flex items-center gap-2">
  <span className={`w-2 h-2 rounded-full ${healthSummary.dotClassName}`}></span>
  <p className={`text-sm ${healthSummary.textClassName}`}>{healthSummary.detail}</p>
@@ -549,7 +561,7 @@ export default function DashboardClient({
  {/* Quick Actions */}
  <div className="bg-[var(--surface)] rounded-lg border border-[var(--border)] p-6">
  <div className="flex items-center gap-2 mb-4">
- <h3 className="eh-dash-subtitle text-lg text-[var(--foreground)]">Quick Actions</h3>
+ <h3 className="eh-dash-subtitle text-lg">Quick Actions</h3>
  <HelpIcon content="Common tasks to get started quickly" position="right" />
  </div>
  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -557,7 +569,7 @@ export default function DashboardClient({
  onClick={() => router.push('/dashboard/devices/pair')}
  className="eh-dash-card eh-dash-card-interactive p-5 flex items-center gap-3 transition-all transform hover:scale-105"
  >
- <Icon name="add" size="2xl" className="text-[#00E5A0]" />
+ <Icon name="add" size="2xl" className="text-[var(--primary-ink)]" />
  <div className="text-left">
  <div className="font-semibold text-[var(--foreground)]">Pair Device</div>
  <div className="text-xs text-[var(--foreground-secondary)]">Add new display</div>
@@ -568,7 +580,7 @@ export default function DashboardClient({
  onClick={() => router.push('/dashboard/content')}
  className="eh-dash-card eh-dash-card-interactive p-5 flex items-center gap-3 transition-all transform hover:scale-105"
  >
- <Icon name="upload" size="2xl" className="text-[#00E5A0]" />
+ <Icon name="upload" size="2xl" className="text-[var(--primary-ink)]" />
  <div className="text-left">
  <div className="font-semibold text-[var(--foreground)]">Upload Content</div>
  <div className="text-xs text-[var(--foreground-secondary)]">Add new media</div>
@@ -579,7 +591,7 @@ export default function DashboardClient({
  onClick={() => router.push('/dashboard/playlists')}
  className="eh-dash-card eh-dash-card-interactive p-5 flex items-center gap-3 transition-all transform hover:scale-105"
  >
- <Icon name="playlists" size="2xl" className="text-[#00E5A0]" />
+ <Icon name="playlists" size="2xl" className="text-[var(--primary-ink)]" />
  <div className="text-left">
  <div className="font-semibold text-[var(--foreground)]">Create Playlist</div>
  <div className="text-xs text-[var(--foreground-secondary)]">Organize content</div>
@@ -592,7 +604,7 @@ export default function DashboardClient({
  onClick={() => router.push('/dashboard/schedules')}
  className="eh-dash-card eh-dash-card-interactive p-5 flex items-center gap-3 transition-all transform hover:scale-105"
  >
- <Icon name="schedules" size="2xl" className="text-[#00E5A0]" />
+ <Icon name="schedules" size="2xl" className="text-[var(--primary-ink)]" />
  <div className="text-left">
  <div className="font-semibold text-[var(--foreground)]">Schedule</div>
  <div className="text-xs text-[var(--foreground-secondary)]">Set up timing</div>
@@ -604,7 +616,7 @@ export default function DashboardClient({
 
  {/* Recent Activity */}
  <div className="bg-[var(--surface)] rounded-lg border border-[var(--border)] p-6">
- <h3 className="eh-dash-subtitle text-lg text-[var(--foreground)] mb-4">Recent Activity</h3>
+ <h3 className="eh-dash-subtitle text-lg mb-4">Recent Activity</h3>
  {recentActivity.length > 0 ? (
  <div className="space-y-3">
  {recentActivity.map((item, idx) => (
@@ -647,7 +659,7 @@ export default function DashboardClient({
  {/* Storage Usage */}
  <div className="bg-[var(--surface)] rounded-lg border border-[var(--border)] p-6">
  <div className="flex items-center justify-between mb-4">
- <h3 className="eh-dash-subtitle text-lg text-[var(--foreground)]">Storage Usage</h3>
+ <h3 className="eh-dash-subtitle text-lg">Storage Usage</h3>
  <Icon name="storage" size="xl" className="text-[var(--foreground-secondary)]" />
  </div>
  <div className="space-y-3">
@@ -674,52 +686,52 @@ export default function DashboardClient({
 
  {/* Getting Started Guide */}
  {stats.devices.total === 0 && (
- <div className="bg-gradient-to-r from-[#00E5A0] to-[#00B4D8] rounded-lg shadow-lg p-8 text-white">
- <h3 className="eh-dash-subtitle text-2xl font-bold mb-4 flex items-center gap-2"><Icon name="power" size="xl" className="text-white" /> Getting Started</h3>
- <p className="mb-6 text-primary-100">
+ <div className="bg-gradient-to-r from-[var(--primary)] to-[var(--primary-light)] rounded-lg shadow-lg p-8 text-[var(--primary-contrast)]">
+ <h3 className="eh-dash-subtitle !text-[var(--primary-contrast)] text-2xl font-bold mb-4 flex items-center gap-2"><Icon name="power" size="xl" className="text-[var(--primary-contrast)]" /> Getting Started</h3>
+ <p className="mb-6 text-[var(--primary-contrast)]">
  Welcome to Vizora! Follow these steps to get your digital signage system up and running:
  </p>
  <div className="space-y-4">
  <div className="flex items-start gap-4">
- <div className="w-8 h-8 bg-[var(--surface)] text-primary-600 rounded-full flex items-center justify-center font-bold flex-shrink-0">
+ <div className="w-8 h-8 bg-[var(--surface)] text-[var(--primary-ink)] rounded-full flex items-center justify-center font-bold flex-shrink-0">
  1
  </div>
  <div>
  <div className="font-semibold mb-1">Pair Your First Device</div>
- <div className="text-sm text-primary-100">
+ <div className="text-sm text-[var(--primary-contrast)]">
  Connect a display device to start showing content
  </div>
  </div>
  </div>
  <div className="flex items-start gap-4">
- <div className="w-8 h-8 bg-[var(--surface)] text-primary-600 rounded-full flex items-center justify-center font-bold flex-shrink-0">
+ <div className="w-8 h-8 bg-[var(--surface)] text-[var(--primary-ink)] rounded-full flex items-center justify-center font-bold flex-shrink-0">
  2
  </div>
  <div>
  <div className="font-semibold mb-1">Upload Your Content</div>
- <div className="text-sm text-primary-100">
+ <div className="text-sm text-[var(--primary-contrast)]">
  Add images, videos, or other media to your library
  </div>
  </div>
  </div>
  <div className="flex items-start gap-4">
- <div className="w-8 h-8 bg-[var(--surface)] text-primary-600 rounded-full flex items-center justify-center font-bold flex-shrink-0">
+ <div className="w-8 h-8 bg-[var(--surface)] text-[var(--primary-ink)] rounded-full flex items-center justify-center font-bold flex-shrink-0">
  3
  </div>
  <div>
  <div className="font-semibold mb-1">Create a Playlist</div>
- <div className="text-sm text-primary-100">
+ <div className="text-sm text-[var(--primary-contrast)]">
  Organize your content into playlists
  </div>
  </div>
  </div>
  <div className="flex items-start gap-4">
- <div className="w-8 h-8 bg-[var(--surface)] text-primary-600 rounded-full flex items-center justify-center font-bold flex-shrink-0">
+ <div className="w-8 h-8 bg-[var(--surface)] text-[var(--primary-ink)] rounded-full flex items-center justify-center font-bold flex-shrink-0">
  4
  </div>
  <div>
  <div className="font-semibold mb-1">Assign & Schedule</div>
- <div className="text-sm text-primary-100">
+ <div className="text-sm text-[var(--primary-contrast)]">
  Assign playlists to devices and set schedules
  </div>
  </div>

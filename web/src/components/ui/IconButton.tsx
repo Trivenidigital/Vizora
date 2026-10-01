@@ -17,11 +17,11 @@ const sizeStyles = {
 } as const;
 
 const variantStyles = {
-  primary: 'text-[#00E5A0] hover:text-[#00CC8E] hover:bg-[#00E5A0]/10',
+  primary: 'text-[var(--primary-ink)] hover:text-[var(--foreground)] hover:bg-[var(--surface-hover)]',
   secondary: 'text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--surface-hover)]',
-  danger: 'text-red-600 hover:text-red-800 hover:bg-red-50',
-  success: 'text-green-600 hover:text-green-800 hover:bg-green-50',
-  warning: 'text-yellow-600 hover:text-yellow-800 hover:bg-yellow-50',
+  danger: 'text-[var(--error-ink)] hover:text-[var(--error-ink)] hover:bg-[var(--status-offline-bg)]',
+  success: 'text-[var(--success-ink)] hover:text-[var(--success-ink)] hover:bg-[var(--status-online-bg)]',
+  warning: 'text-[var(--warning-ink)] hover:text-[var(--warning-ink)] hover:bg-[var(--status-error-bg)]',
 } as const;
 
 export function IconButton({
@@ -44,7 +44,7 @@ export function IconButton({
         inline-flex items-center justify-center
         rounded-lg transition-colors duration-200
         disabled:opacity-50 disabled:cursor-not-allowed
-        focus:outline-2 focus:outline-offset-2 focus:outline-[#00E5A0]
+        focus:outline-2 focus:outline-offset-2 focus:outline-[var(--primary-ink)]
         ${sizeStyles[size]}
         ${variantStyles[variant]}
         ${className}

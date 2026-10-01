@@ -33,6 +33,6 @@ describe('FieldError', () => {
     const element = screen.getByRole('alert');
     expect(element.tagName).toBe('P');
     expect(element.className).toContain('text-sm');
-    expect(element.className).toContain('text-red-600');
+    expect(element.className).toContain('text-[var(--error-ink)]');
   });
 });

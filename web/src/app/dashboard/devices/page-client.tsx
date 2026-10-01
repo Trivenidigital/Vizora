@@ -1129,11 +1129,15 @@ export default function DevicesClient({
  const isCurrent = currentPage === pageNum;
  return (
  <li key={pageNum}>
+ {/* The current-page ink and border need !important: .eh-row-action sets
+     color AND the border SHORTHAND and lands after the base utilities, so this
+     marker used to render as a brand-tinted pill with ordinary secondary text
+     and a transparent edge. --primary-ink on --badge-brand-bg is 8.40:1. */}
  <button
  onClick={() => setCurrentPage(pageNum)}
  aria-current={isCurrent ? 'page' : undefined}
  aria-label={`Page ${pageNum}`}
- className={`eh-row-action min-w-[40px] tabular-nums ${isCurrent ? 'border-[var(--primary-ink)] bg-[var(--badge-brand-bg)] text-[var(--primary-ink)]' : ''}`}
+ className={`eh-row-action min-w-[40px] tabular-nums ${isCurrent ? '!border-[var(--primary-ink)] bg-[var(--badge-brand-bg)] !text-[var(--primary-ink)]' : ''}`}
  >
  {pageNum}
  </button>

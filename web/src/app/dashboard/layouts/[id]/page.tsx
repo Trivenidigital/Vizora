@@ -118,18 +118,23 @@ function getGridStyle(layoutType: string): React.CSSProperties {
   }
 }
 
+/*
+ * Zone identity, not status — a zone is 1/2/3/4, it is not healthy or failing.
+ * Four hues from the categorical set, which is checked for separability as a
+ * group (green/teal are the closest pair here at 44.0 sRGB).
+ */
 const zoneColors = [
-  'border-[#00E5A0] bg-[#00E5A0]/5',
-  'border-[#00B4D8] bg-[#00B4D8]/5',
-  'border-purple-400 bg-purple-400/5',
-  'border-orange-400 bg-orange-400/5',
+  'border-[var(--cat-green-edge)] bg-[var(--cat-green-bg)]',
+  'border-[var(--cat-teal-edge)] bg-[var(--cat-teal-bg)]',
+  'border-[var(--cat-purple-edge)] bg-[var(--cat-purple-bg)]',
+  'border-[var(--cat-orange-edge)] bg-[var(--cat-orange-bg)]',
 ];
 
 const zoneHeaderColors = [
-  'bg-[#00E5A0]/20 text-[#00E5A0]',
-  'bg-[#00B4D8]/20 text-[#00B4D8]',
-  'bg-purple-400/20 text-purple-400',
-  'bg-orange-400/20 text-orange-400',
+  'bg-[var(--cat-green-bg)] text-[var(--cat-green)]',
+  'bg-[var(--cat-teal-bg)] text-[var(--cat-teal)]',
+  'bg-[var(--cat-purple-bg)] text-[var(--cat-purple)]',
+  'bg-[var(--cat-orange-bg)] text-[var(--cat-orange)]',
 ];
 
 export default function LayoutEditorPage({ params }: { params: Promise<{ id: string }> }) {
@@ -251,7 +256,7 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
         <p className="text-[var(--foreground-secondary)]">Layout not found.</p>
         <button
           onClick={() => router.push('/dashboard/layouts')}
-          className="mt-4 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition"
+          className="mt-4 px-4 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition"
         >
           Back to Layouts
         </button>
@@ -285,7 +290,7 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
             onClick={() => setIsPreviewMode(!isPreviewMode)}
             className={`px-4 py-2 text-sm font-medium rounded-lg border transition flex items-center gap-2 ${
               isPreviewMode
-                ? 'bg-[#00E5A0]/10 border-[#00E5A0] text-[#00E5A0]'
+                ? 'bg-brand/10 border-[var(--primary-ink)] text-[var(--primary-ink)]'
                 : 'border-[var(--border)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
@@ -295,7 +300,7 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-6 py-2 text-sm font-semibold bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+            className="px-6 py-2 text-sm font-semibold bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
           >
             {saving && <LoadingSpinner size="sm" />}
             Save Layout
@@ -324,10 +329,10 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
                     key={zone.id}
                     className={`rounded-lg border-2 transition-all cursor-pointer ${
                       isSelected
-                        ? 'border-[#00E5A0] bg-[#00E5A0]/10 ring-2 ring-[#00E5A0]/30'
+                        ? 'border-[var(--primary-ink)] bg-brand/10 ring-2 ring-brand/30'
                         : hasContent
                         ? zoneColors[idx % zoneColors.length]
-                        : 'border-dashed border-[var(--border)] bg-[var(--surface)] hover:border-[#00E5A0]/50'
+                        : 'border-dashed border-[var(--border)] bg-[var(--surface)] hover:border-brand/50'
                     }`}
                     style={{ gridArea: zone.gridArea }}
                     onClick={() => setSelectedZone(isSelected ? null : zone.id)}
@@ -427,7 +432,7 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
                         onChange={(e) =>
                           handleZoneAssignment(zone.id, 'contentId', e.target.value || null)
                         }
-                        className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-sm text-[var(--foreground)] bg-[var(--surface)]"
+                        className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-sm text-[var(--foreground)] bg-[var(--surface)]"
                       >
                         <option value="">-- No content --</option>
                         {contentItems.map((item) => (
@@ -454,7 +459,7 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
                         onChange={(e) =>
                           handleZoneAssignment(zone.id, 'playlistId', e.target.value || null)
                         }
-                        className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-sm text-[var(--foreground)] bg-[var(--surface)]"
+                        className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-sm text-[var(--foreground)] bg-[var(--surface)]"
                       >
                         <option value="">-- No playlist --</option>
                         {playlists.map((pl) => (
@@ -472,7 +477,7 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
                           handleZoneAssignment(zone.id, 'contentId', null);
                           handleZoneAssignment(zone.id, 'playlistId', null);
                         }}
-                        className="w-full py-2 text-sm text-red-500 border border-red-500/30 rounded-lg hover:bg-red-500/10 transition flex items-center justify-center gap-2"
+                        className="w-full py-2 text-sm text-[var(--error-ink)] border border-error-ink/30 rounded-lg hover:bg-error/10 transition flex items-center justify-center gap-2"
                       >
                         <Icon name="close" size="sm" />
                         Clear Assignment
@@ -505,13 +510,13 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
                     onClick={() => setSelectedZone(zone.id)}
                     className={`w-full flex items-center gap-3 p-2 rounded-lg text-left transition text-sm ${
                       selectedZone === zone.id
-                        ? 'bg-[#00E5A0]/10 border border-[#00E5A0]/30'
+                        ? 'bg-brand/10 border border-brand/30'
                         : 'hover:bg-[var(--surface-hover)] border border-transparent'
                     }`}
                   >
                     <div
                       className={`w-3 h-3 rounded-full ${
-                        zone.contentId || zone.playlistId ? 'bg-[#00E5A0]' : 'bg-[var(--border)]'
+                        zone.contentId || zone.playlistId ? 'bg-[var(--primary-ink)]' : 'bg-[var(--border)]'
                       }`}
                     />
                     <div className="flex-1 min-w-0">

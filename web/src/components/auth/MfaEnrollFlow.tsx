@@ -126,7 +126,7 @@ export default function MfaEnrollFlow({
       </div>
 
       {error && (
-        <div className="px-4 py-3 rounded-lg bg-[var(--error)]/10 border border-[var(--error)]/30 text-[var(--error-ink)] text-sm">
+        <div className="px-4 py-3 rounded-lg bg-error/10 border border-error/30 text-[var(--error-ink)] text-sm">
           {error}
         </div>
       )}
@@ -139,6 +139,10 @@ export default function MfaEnrollFlow({
               alt="MFA QR code"
               width={192}
               height={192}
+              /* `bg-white` is FUNCTIONAL, not a missed token. A QR code needs a
+                 white quiet zone to scan reliably; tinting it ivory reduces the
+                 contrast a camera has to work with. Do not "convert" this to
+                 --surface. */
               className="rounded-lg border border-[var(--border)] bg-white p-2"
             />
             {secretParam && (
@@ -163,7 +167,7 @@ export default function MfaEnrollFlow({
                 if (error) setError('');
               }}
               placeholder="123456"
-              className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent tracking-widest"
+              className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent tracking-widest"
             />
             <div className="flex gap-2">
               <button

@@ -48,7 +48,7 @@ export default function Breadcrumbs() {
         <li className="inline-flex items-center">
           <Link
             href="/dashboard"
-            className="inline-flex items-center text-[var(--foreground-secondary)] hover:text-[#00E5A0] transition"
+            className="inline-flex items-center text-[var(--foreground-secondary)] hover:text-[var(--primary-ink)] transition"
           >
             <svg
               className="w-4 h-4 mr-2"
@@ -81,7 +81,7 @@ export default function Breadcrumbs() {
               ) : (
                 <Link
                   href={crumb.path}
-                  className="ml-1 text-[var(--foreground-secondary)] hover:text-[#00E5A0] transition md:ml-2"
+                  className="ml-1 text-[var(--foreground-secondary)] hover:text-[var(--primary-ink)] transition md:ml-2"
                 >
                   {crumb.label}
                 </Link>

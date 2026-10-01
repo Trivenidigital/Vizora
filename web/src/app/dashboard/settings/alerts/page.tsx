@@ -18,6 +18,7 @@ import ConfirmDialog from '@/components/ConfirmDialog';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import EmptyState from '@/components/EmptyState';
 import { Icon } from '@/theme/icons';
+import { Switch } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -340,7 +341,7 @@ export default function AlertsPage() {
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="flex-1 px-3 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+          className="flex-1 px-3 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
         >
           <option value="">Select a team member…</option>
           {members.map((m) => (
@@ -361,7 +362,7 @@ export default function AlertsPage() {
             ? 'alerts@example.com'
             : 'https://hooks.slack.com/services/…'
         }
-        className="flex-1 px-3 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+        className="flex-1 px-3 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
       />
     );
   };
@@ -380,7 +381,7 @@ export default function AlertsPage() {
         {isAdmin && (
           <button
             onClick={openCreate}
-            className="bg-[#00E5A0] text-[#061A21] px-6 py-3 rounded-lg hover:bg-[#00CC8E] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+            className="bg-[var(--primary)] text-[var(--primary-contrast)] px-6 py-3 rounded-lg hover:bg-[var(--primary-light)] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
           >
             <Icon name="add" size="lg" />
             <span>New Alert Rule</span>
@@ -389,8 +390,8 @@ export default function AlertsPage() {
       </div>
 
       {!isAdmin && (
-        <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-          <p className="text-sm text-yellow-700 dark:text-yellow-300">
+        <div className="p-4 bg-warning/10 border border-warning-ink/30 rounded-lg">
+          <p className="text-sm text-[var(--warning-ink)]">
             Only administrators can create or modify alert rules. Contact your admin to change these settings.
           </p>
         </div>
@@ -439,29 +440,18 @@ export default function AlertsPage() {
                   </td>
                   <td className="px-4 py-3 whitespace-nowrap">
                     {isAdmin ? (
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={rule.isActive}
+                      <Switch
+                        checked={rule.isActive}
                         aria-label={`Toggle ${rule.name}`}
                         disabled={actionLoading}
-                        onClick={() => handleToggleActive(rule)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#00E5A0] focus:ring-offset-2 disabled:opacity-50 ${
-                          rule.isActive ? 'bg-[#00E5A0]' : 'bg-gray-300 dark:bg-gray-600'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            rule.isActive ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
+                        onChange={() => handleToggleActive(rule)}
+                      />
                     ) : (
                       <span
                         className={`px-2 py-0.5 text-xs font-medium rounded ${
                           rule.isActive
-                            ? 'bg-[#00E5A0]/10 text-[#00E5A0]'
-                            : 'bg-gray-200 dark:bg-gray-700 text-[var(--foreground-tertiary)]'
+                            ? 'bg-brand/10 text-[var(--primary-ink)]'
+                            : 'bg-[var(--surface-secondary)] text-[var(--foreground-tertiary)]'
                         }`}
                       >
                         {rule.isActive ? 'Active' : 'Paused'}
@@ -478,7 +468,7 @@ export default function AlertsPage() {
                       </button>
                       <button
                         onClick={() => setRuleToDelete(rule)}
-                        className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-500/10 px-3 py-1 rounded transition"
+                        className="text-[var(--error-ink)] hover:text-[var(--foreground)] hover:bg-error/10 px-3 py-1 rounded transition"
                       >
                         Delete
                       </button>
@@ -501,7 +491,7 @@ export default function AlertsPage() {
         <div className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
-              Rule Name <span className="text-red-500">*</span>
+              Rule Name <span className="text-[var(--error-ink)]">*</span>
             </label>
             <input
               type="text"
@@ -509,7 +499,7 @@ export default function AlertsPage() {
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               maxLength={120}
               placeholder="e.g. Lobby screens offline"
-              className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+              className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
               autoComplete="off"
             />
           </div>
@@ -520,7 +510,7 @@ export default function AlertsPage() {
               <select
                 value={form.triggerEvent}
                 onChange={(e) => setForm({ ...form, triggerEvent: e.target.value })}
-                className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
               >
                 {TRIGGER_OPTIONS.map((t) => (
                   <option key={t.value} value={t.value}>{t.label}</option>
@@ -538,7 +528,7 @@ export default function AlertsPage() {
                 onChange={(e) =>
                   setForm({ ...form, minOfflineSec: parseInt(e.target.value, 10) || MIN_OFFLINE_SEC_FLOOR })
                 }
-                className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
               />
             </div>
           </div>
@@ -551,7 +541,7 @@ export default function AlertsPage() {
                 onChange={(e) =>
                   setForm({ ...form, scope: e.target.value as AlertScope, scopeDisplayId: '', scopeGroupId: '' })
                 }
-                className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
               >
                 {SCOPE_OPTIONS.map((s) => (
                   <option key={s.value} value={s.value}>{s.label}</option>
@@ -561,12 +551,12 @@ export default function AlertsPage() {
             {form.scope === 'display' && (
               <div>
                 <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
-                  Device <span className="text-red-500">*</span>
+                  Device <span className="text-[var(--error-ink)]">*</span>
                 </label>
                 <select
                   value={form.scopeDisplayId}
                   onChange={(e) => setForm({ ...form, scopeDisplayId: e.target.value })}
-                  className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                  className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
                 >
                   <option value="">Select a device…</option>
                   {displays.map((d) => (
@@ -578,12 +568,12 @@ export default function AlertsPage() {
             {form.scope === 'group' && (
               <div>
                 <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
-                  Device Group <span className="text-red-500">*</span>
+                  Device Group <span className="text-[var(--error-ink)]">*</span>
                 </label>
                 <select
                   value={form.scopeGroupId}
                   onChange={(e) => setForm({ ...form, scopeGroupId: e.target.value })}
-                  className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+                  className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
                 >
                   <option value="">Select a group…</option>
                   {groups.map((g) => (
@@ -599,7 +589,7 @@ export default function AlertsPage() {
               type="checkbox"
               checked={form.isActive}
               onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
-              className="h-4 w-4 text-[#00E5A0] border-[var(--border)] rounded focus:ring-[#00E5A0]"
+              className="h-4 w-4 text-[var(--primary-ink)] border-[var(--border)] rounded focus:ring-[var(--primary-ink)]"
             />
             <span className="text-sm font-medium text-[var(--foreground)]">Rule is active</span>
           </label>
@@ -607,7 +597,7 @@ export default function AlertsPage() {
           {/* Recipients */}
           <div className="border-t border-[var(--border)] pt-4">
             <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-3">
-              Recipients {!editingRule && <span className="text-red-500">*</span>}
+              Recipients {!editingRule && <span className="text-[var(--error-ink)]">*</span>}
             </label>
 
             {editingRule ? (
@@ -644,7 +634,7 @@ export default function AlertsPage() {
             <button
               onClick={handleSave}
               disabled={actionLoading || !form.name.trim()}
-              className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+              className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
             >
               {actionLoading && <LoadingSpinner size="sm" />}
               {editingRule ? 'Save Changes' : 'Create Rule'}
@@ -693,7 +683,7 @@ function DraftRecipientsEditor({
           <select
             value={r.channel}
             onChange={(e) => update(i, { channel: e.target.value as AlertChannel, target: '' })}
-            className="w-40 px-3 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+            className="w-40 px-3 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
           >
             {CHANNEL_OPTIONS.map((c) => (
               <option key={c.value} value={c.value}>{c.label}</option>
@@ -705,7 +695,7 @@ function DraftRecipientsEditor({
             onClick={() => removeRow(i)}
             disabled={recipients.length === 1}
             aria-label="Remove recipient"
-            className="p-2 text-red-500 hover:bg-red-500/10 rounded transition disabled:opacity-30"
+            className="p-2 text-[var(--error-ink)] hover:bg-error/10 rounded transition disabled:opacity-30"
           >
             <Icon name="delete" size="md" />
           </button>
@@ -714,7 +704,7 @@ function DraftRecipientsEditor({
       <button
         type="button"
         onClick={() => setRecipients([...recipients, { channel: 'in_app', target: '' }])}
-        className="text-sm font-medium text-[#00E5A0] hover:text-[#00CC8E] flex items-center gap-1"
+        className="text-sm font-medium text-[var(--primary-ink)] hover:text-[var(--primary-light)] flex items-center gap-1"
       >
         <Icon name="add" size="sm" /> Add recipient
       </button>
@@ -758,7 +748,7 @@ function RecipientsEditor({
           className="flex items-center justify-between gap-2 px-3 py-2 bg-[var(--background)] rounded-lg"
         >
           <div className="flex items-center gap-2 text-sm">
-            <span className="px-2 py-0.5 text-xs font-medium bg-[#00E5A0]/10 text-[#00E5A0] rounded">
+            <span className="px-2 py-0.5 text-xs font-medium bg-brand/10 text-[var(--primary-ink)] rounded">
               {CHANNEL_OPTIONS.find((c) => c.value === r.channel)?.label ?? r.channel}
             </span>
             <span className="text-[var(--foreground)] break-all">{labelForTarget(r.channel, r.target)}</span>
@@ -768,7 +758,7 @@ function RecipientsEditor({
             onClick={() => onRemove(r.id)}
             disabled={actionLoading}
             aria-label="Remove recipient"
-            className="p-1.5 text-red-500 hover:bg-red-500/10 rounded transition disabled:opacity-40"
+            className="p-1.5 text-[var(--error-ink)] hover:bg-error/10 rounded transition disabled:opacity-40"
           >
             <Icon name="delete" size="sm" />
           </button>
@@ -782,7 +772,7 @@ function RecipientsEditor({
             setNewChannel(e.target.value as AlertChannel);
             setNewTarget('');
           }}
-          className="w-40 px-3 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+          className="w-40 px-3 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
         >
           {CHANNEL_OPTIONS.map((c) => (
             <option key={c.value} value={c.value}>{c.label}</option>
@@ -796,7 +786,7 @@ function RecipientsEditor({
             setNewTarget('');
           }}
           disabled={actionLoading || !newTarget.trim()}
-          className="px-3 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 whitespace-nowrap"
+          className="px-3 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 whitespace-nowrap"
         >
           Add
         </button>

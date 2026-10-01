@@ -38,8 +38,8 @@ function SeverityIcon({ severity }: { severity: 'info' | 'warning' | 'critical' 
   switch (severity) {
     case 'critical':
       return (
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-red-500/10 flex items-center justify-center">
-          <svg className="w-4 h-4 text-red-500 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--status-offline-bg)] flex items-center justify-center">
+          <svg className="w-4 h-4 text-[var(--error-ink)]" fill="currentColor" viewBox="0 0 20 20">
             <path
               fillRule="evenodd"
               d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
@@ -50,8 +50,8 @@ function SeverityIcon({ severity }: { severity: 'info' | 'warning' | 'critical' 
       );
     case 'warning':
       return (
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-yellow-500/10 flex items-center justify-center">
-          <svg className="w-4 h-4 text-yellow-500 dark:text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--status-error-bg)] flex items-center justify-center">
+          <svg className="w-4 h-4 text-[var(--warning-ink)]" fill="currentColor" viewBox="0 0 20 20">
             <path
               fillRule="evenodd"
               d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
@@ -63,8 +63,8 @@ function SeverityIcon({ severity }: { severity: 'info' | 'warning' | 'critical' 
     case 'info':
     default:
       return (
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#00E5A0]/10 flex items-center justify-center">
-          <svg className="w-4 h-4 text-[#00E5A0]" fill="currentColor" viewBox="0 0 20 20">
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--status-pairing-bg)] flex items-center justify-center">
+          <svg className="w-4 h-4 text-[var(--info-ink)]" fill="currentColor" viewBox="0 0 20 20">
             <path
               fillRule="evenodd"
               d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
@@ -132,7 +132,7 @@ export default function NotificationDropdown({
         {hasUnread && (
           <button
             onClick={handleMarkAllAsRead}
-            className="text-xs text-[#00E5A0] hover:text-[#00CC8E] font-medium transition-colors"
+            className="text-xs text-[var(--primary-ink)] hover:text-[var(--foreground)] font-medium transition-colors"
           >
             Mark all as read
           </button>
@@ -167,7 +167,7 @@ export default function NotificationDropdown({
                   className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors ${
                     notification.read
                       ? 'bg-[var(--surface)] hover:bg-[var(--surface-hover)]'
-                      : 'bg-[#00E5A0]/10 hover:bg-[#00E5A0]/20'
+                      : 'bg-[var(--badge-brand-bg)] hover:bg-[var(--surface-hover)]'
                   }`}
                   onClick={() => handleNotificationClick(notification)}
                   role="menuitem"
@@ -183,7 +183,7 @@ export default function NotificationDropdown({
                         {notification.title}
                       </p>
                       {!notification.read && (
-                        <span className="flex-shrink-0 w-2 h-2 mt-1.5 bg-[#00E5A0] rounded-full" />
+                        <span className="flex-shrink-0 w-2 h-2 mt-1.5 bg-[var(--primary-ink)] rounded-full" />
                       )}
                     </div>
                     <p className="text-sm text-[var(--foreground-secondary)] line-clamp-2 mt-0.5">

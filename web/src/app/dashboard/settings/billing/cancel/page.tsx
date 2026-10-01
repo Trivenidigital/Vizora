@@ -7,8 +7,8 @@ export default function CheckoutCancelPage() {
     <div className="flex items-center justify-center min-h-[60vh]">
       <div className="max-w-md w-full text-center space-y-6">
         {/* Info Icon */}
-        <div className="mx-auto w-20 h-20 bg-amber-500/10 rounded-full flex items-center justify-center">
-          <svg className="w-10 h-10 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="mx-auto w-20 h-20 bg-warning/10 rounded-full flex items-center justify-center">
+          <svg className="w-10 h-10 text-[var(--warning-ink)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
@@ -25,7 +25,7 @@ export default function CheckoutCancelPage() {
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
             href="/dashboard/settings/billing/plans"
-            className="px-6 py-2.5 bg-[#00E5A0] text-[#061A21] font-semibold rounded-lg hover:bg-[#00CC8E] transition-colors"
+            className="px-6 py-2.5 bg-brand text-[var(--lw-on-forest)] font-semibold rounded-lg hover:bg-[var(--primary-light)] transition-colors"
           >
             Try Again
           </Link>

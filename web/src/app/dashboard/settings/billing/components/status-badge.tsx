@@ -1,40 +1,58 @@
 'use client';
 
+import { Badge, type BadgeTone } from '@/components/ui/Badge';
+
 interface StatusBadgeProps {
   status: string;
 }
 
-const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
-  active: { bg: 'bg-green-500/10', text: 'text-green-500', label: 'Active' },
-  trial: { bg: 'bg-[#00B4D8]/10', text: 'text-[#00B4D8]', label: 'Trial' },
-  trialing: { bg: 'bg-[#00B4D8]/10', text: 'text-[#00B4D8]', label: 'Trial' },
-  past_due: { bg: 'bg-yellow-500/10', text: 'text-yellow-500', label: 'Past Due' },
-  canceled: { bg: 'bg-[var(--surface-hover)]', text: 'text-[var(--foreground-tertiary)]', label: 'Canceled' },
-  unpaid: { bg: 'bg-red-500/10', text: 'text-red-500', label: 'Unpaid' },
-  incomplete: { bg: 'bg-orange-500/10', text: 'text-orange-500', label: 'Incomplete' },
-  incomplete_expired: { bg: 'bg-red-500/10', text: 'text-red-500', label: 'Expired' },
-  paused: { bg: 'bg-[var(--surface-hover)]', text: 'text-[var(--foreground-tertiary)]', label: 'Paused' },
-  free: { bg: 'bg-[var(--surface-hover)]', text: 'text-[var(--foreground-tertiary)]', label: 'Free' },
+/**
+ * Billing status pill — subscription statuses AND invoice statuses.
+ *
+ * Renders through the shared `ui/Badge`; what stays here is what is genuinely
+ * billing's: which tone each provider status means, and the human label, which
+ * is NOT derivable from the key (`incomplete_expired` -> "Expired",
+ * `trialing` -> "Trial").
+ *
+ * ── Every distinction the old table drew is still drawn ───────────────────
+ * The old table used six colours: green, cyan, yellow, grey, red and orange.
+ * `incomplete` was the only orange, and it has to stay apart from the yellows
+ * (`past_due`, `open`), so it takes the OUTLINED form of the warning family —
+ * the same second axis `admin/StatusBadge` uses, for the same reason (see the
+ * note in `ui/Badge`).
+ *
+ * The cyan `trial` becomes the BRAND tone, which is where it always pointed:
+ * it was #00B4D8, the retired Electric Horizon cyan, and it is the one status
+ * here that means "Vizora is carrying you" rather than a health verdict.
+ */
+const statusConfig: Record<string, { tone: BadgeTone; outline?: boolean; label: string }> = {
+  active: { tone: 'success', label: 'Active' },
+  trial: { tone: 'brand', label: 'Trial' },
+  trialing: { tone: 'brand', label: 'Trial' },
+  past_due: { tone: 'warning', label: 'Past Due' },
+  canceled: { tone: 'neutral', label: 'Canceled' },
+  unpaid: { tone: 'error', label: 'Unpaid' },
+  incomplete: { tone: 'warning', outline: true, label: 'Incomplete' },
+  incomplete_expired: { tone: 'error', label: 'Expired' },
+  paused: { tone: 'neutral', label: 'Paused' },
+  free: { tone: 'neutral', label: 'Free' },
   // Invoice statuses
-  paid: { bg: 'bg-green-500/10', text: 'text-green-500', label: 'Paid' },
-  open: { bg: 'bg-yellow-500/10', text: 'text-yellow-500', label: 'Open' },
-  draft: { bg: 'bg-[var(--surface-hover)]', text: 'text-[var(--foreground-tertiary)]', label: 'Draft' },
-  void: { bg: 'bg-[var(--surface-hover)]', text: 'text-[var(--foreground-tertiary)]', label: 'Void' },
-  uncollectible: { bg: 'bg-red-500/10', text: 'text-red-500', label: 'Uncollectible' },
+  paid: { tone: 'success', label: 'Paid' },
+  open: { tone: 'warning', label: 'Open' },
+  draft: { tone: 'neutral', label: 'Draft' },
+  void: { tone: 'neutral', label: 'Void' },
+  uncollectible: { tone: 'error', label: 'Uncollectible' },
 };
 
 export function StatusBadge({ status }: StatusBadgeProps) {
   const config = statusConfig[status.toLowerCase()] || {
-    bg: 'bg-[var(--surface-hover)]',
-    text: 'text-[var(--foreground-tertiary)]',
+    tone: 'neutral' as BadgeTone,
     label: status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' '),
   };
 
   return (
-    <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}
-    >
+    <Badge variant={config.tone} outline={config.outline} size="sm">
       {config.label}
-    </span>
+    </Badge>
   );
 }

@@ -133,7 +133,7 @@ function SortablePlaylistItem({
           }}
           disabled={!canUpdateDuration}
           onClick={(e) => e.stopPropagation()}
-          className="w-16 px-2 py-1 text-sm border border-[var(--border)] rounded focus:ring-1 focus:ring-[#00E5A0] focus:border-[#00E5A0] disabled:opacity-70 disabled:cursor-not-allowed"
+          className="w-16 px-2 py-1 text-sm border border-[var(--border)] rounded focus:ring-1 focus:ring-[var(--primary-ink)] focus:border-[var(--primary-ink)] disabled:opacity-70 disabled:cursor-not-allowed"
         />
         <span className="text-sm text-[var(--foreground-tertiary)]">s</span>
       </div>
@@ -142,10 +142,10 @@ function SortablePlaylistItem({
       {canRemove && (
         <button
           onClick={onRemove}
-          className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded transition"
+          className="text-[var(--error-ink)] p-1 hover:bg-[var(--status-offline-bg)] rounded transition"
           aria-label="Remove playlist item"
         >
-          <Icon name="delete" size="sm" className="text-red-600" />
+          <Icon name="delete" size="sm" className="text-[var(--error-ink)]" />
         </button>
       )}
     </div>
@@ -190,7 +190,7 @@ export default function PlaylistEditorPanel({
         ref={setNodeRef}
         className={`
           flex-1 overflow-y-auto p-4 space-y-2
-          ${canReorder && isOver ? 'bg-[#00E5A0]/5 border-2 border-[#00E5A0] border-dashed' : ''}
+          ${canReorder && isOver ? 'bg-brand/5 border-2 border-[var(--primary-ink)] border-dashed' : ''}
         `}
       >
         {items.length === 0 ? (

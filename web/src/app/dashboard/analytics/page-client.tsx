@@ -89,13 +89,26 @@ const KPICard: React.FC<KPICardProps> = ({
  {value}
  </p>
  {change && (
+ /*
+  * All three branches are INKS now. The neutral one was `--accent-warm`, the
+  * brass FILL, which measured 3.10:1 as 14px text on the card — brass is
+  * declared for fills and hairlines and has never been a text token.
+  *
+  * It becomes `--foreground-tertiary` (5.89:1) rather than a warning ink or a
+  * darker brass, for two reasons. `changeType` is hardcoded per call site and
+  * knows nothing about the ratio, so this one branch renders "5/9 devices
+  * online", "9/9 devices online" AND the literal "Unavailable" — a warning ink
+  * would assert an alarm on all three. And `--accent-brass-ink` (6.28:1) does
+  * clear AA, but it would leave a gold beside the green and the red, reading as
+  * a third signal where the prop's own name says there is none.
+  */
  <p
  className={`text-sm mt-2 ${
  changeType === 'positive'
  ? 'text-[var(--success-ink)]'
  : changeType === 'negative'
  ? 'text-[var(--error-ink)]'
- : 'text-[var(--accent-warm)]'
+ : 'text-[var(--foreground-tertiary)]'
  }`}
  >
  {changeType === 'positive' && '↑ '}
@@ -273,14 +286,14 @@ export default function AnalyticsClient() {
  {/* Header */}
  <div className="flex items-center justify-between">
  <div>
- <h2 className="eh-dash-title font-sora text-2xl text-[var(--foreground)]">
+ <h2 className="eh-dash-title font-sora text-2xl">
  Analytics
  </h2>
  <p className="mt-2 text-[var(--foreground-secondary)]">
  Current device status and proof-of-play reporting
  {realtimeStatus === 'connected' && (
- <span className="ml-2 inline-flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
- <span className="w-2 h-2 bg-green-600 dark:bg-green-400 rounded-full animate-pulse"></span>
+ <span className="ml-2 inline-flex items-center gap-1 text-xs text-[var(--success-ink)]">
+ <span className="w-2 h-2 bg-[var(--success-ink)] rounded-full animate-pulse"></span>
  Realtime connection active
  </span>
  )}
@@ -301,7 +314,7 @@ export default function AnalyticsClient() {
  onClick={() => setDateRange(range)}
  className={`px-4 py-2 rounded-lg font-medium transition-colors capitalize ${
  dateRange === range
- ? 'bg-primary-600 dark:bg-primary-400 text-white'
+ ? 'bg-brand text-[var(--lw-on-forest)]'
  : 'bg-[var(--background-tertiary)] text-[var(--foreground)] hover:bg-[var(--surface-hover)]'
  }`}
  >
@@ -354,7 +367,7 @@ export default function AnalyticsClient() {
  <div
  role="alert"
  aria-label="Analytics data unavailable"
- className="bg-[var(--error)]/10 border border-[var(--error)]/30 rounded-lg px-4 py-3 flex flex-col gap-2"
+ className="bg-error/10 border border-error/30 rounded-lg px-4 py-3 flex flex-col gap-2"
  >
  <div className="flex items-center gap-2">
  <Icon name="error" size="sm" className="text-[var(--error-ink)]" />
@@ -373,8 +386,8 @@ export default function AnalyticsClient() {
 
  {/* Empty data notice */}
  {allMockData && (
-   <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg px-4 py-3 flex items-center gap-3">
-     <span className="text-blue-400 text-sm font-medium">No Data Yet</span>
+   <div className="bg-[var(--status-pairing-bg)] border border-info-ink/20 rounded-lg px-4 py-3 flex items-center gap-3">
+     <span className="text-[var(--info-ink)] text-sm font-medium">No Data Yet</span>
      <span className="text-sm text-[var(--foreground-secondary)]">
        Analytics will appear as devices report content playback. Connect devices and upload content to get started.
      </span>
@@ -387,7 +400,7 @@ export default function AnalyticsClient() {
  <Card className="eh-dash-card lg:col-span-2">
  <Card.Header>
  <div className="flex items-center justify-between">
- <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)]">
+ <h3 className="eh-dash-subtitle text-lg font-semibold">
  Estimated Availability Trend
  </h3>
  <Badge variant="info" size="sm" className="eh-badge">
@@ -402,7 +415,7 @@ export default function AnalyticsClient() {
  {deviceMetrics.loading ? (
  <div className="h-80 flex items-center justify-center">
  <div className="animate-spin">
- <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
+ <div className="w-8 h-8 border-4 border-[var(--border)] border-t-[var(--primary-ink)] rounded-full" />
  </div>
  </div>
  ) : deviceMetrics.error ? (
@@ -426,7 +439,7 @@ export default function AnalyticsClient() {
  {/* Content Proof-of-Play */}
  <Card className="eh-dash-card">
  <Card.Header>
- <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)]">
+ <h3 className="eh-dash-subtitle text-lg font-semibold">
  Content Proof-of-Play
  </h3>
  <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
@@ -437,7 +450,7 @@ export default function AnalyticsClient() {
  {contentPerformance.loading ? (
  <div className="h-80 flex items-center justify-center">
  <div className="animate-spin">
- <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
+ <div className="w-8 h-8 border-4 border-[var(--border)] border-t-[var(--primary-ink)] rounded-full" />
  </div>
  </div>
  ) : contentPerformance.error ? (
@@ -459,7 +472,7 @@ export default function AnalyticsClient() {
  {/* Device Distribution */}
  <Card className="eh-dash-card">
  <Card.Header>
- <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)]">
+ <h3 className="eh-dash-subtitle text-lg font-semibold">
  Device Distribution
  </h3>
  </Card.Header>
@@ -467,7 +480,7 @@ export default function AnalyticsClient() {
  {deviceDistribution.loading ? (
  <div className="h-80 flex items-center justify-center">
  <div className="animate-spin">
- <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
+ <div className="w-8 h-8 border-4 border-[var(--border)] border-t-[var(--primary-ink)] rounded-full" />
  </div>
  </div>
  ) : deviceDistribution.error ? (
@@ -489,7 +502,7 @@ export default function AnalyticsClient() {
  {/* Usage Trends */}
  <Card className="eh-dash-card lg:col-span-2">
  <Card.Header>
- <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)]">
+ <h3 className="eh-dash-subtitle text-lg font-semibold">
  Usage Trends by Reported Content Type
  </h3>
  <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
@@ -500,7 +513,7 @@ export default function AnalyticsClient() {
  {usageTrends.loading ? (
  <div className="h-80 flex items-center justify-center">
  <div className="animate-spin">
- <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
+ <div className="w-8 h-8 border-4 border-[var(--border)] border-t-[var(--primary-ink)] rounded-full" />
  </div>
  </div>
  ) : usageTrends.error ? (
@@ -529,7 +542,7 @@ export default function AnalyticsClient() {
  {/* Estimated Storage Footprint */}
  <Card className="eh-dash-card lg:col-span-2">
  <Card.Header>
- <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)]">
+ <h3 className="eh-dash-subtitle text-lg font-semibold">
  Estimated Storage Footprint
  </h3>
  <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
@@ -540,7 +553,7 @@ export default function AnalyticsClient() {
  {bandwidthUsage.loading ? (
  <div className="h-80 flex items-center justify-center">
  <div className="animate-spin">
- <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
+ <div className="w-8 h-8 border-4 border-[var(--border)] border-t-[var(--primary-ink)] rounded-full" />
  </div>
  </div>
  ) : bandwidthUsage.error ? (
@@ -564,7 +577,7 @@ export default function AnalyticsClient() {
  {/* Playlist Playback Summary */}
  <Card className="eh-dash-card lg:col-span-2">
  <Card.Header>
- <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)]">
+ <h3 className="eh-dash-subtitle text-lg font-semibold">
  Playlist Playback Summary
  </h3>
  <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
@@ -575,7 +588,7 @@ export default function AnalyticsClient() {
  {playlistPerformance.loading ? (
  <div className="h-80 flex items-center justify-center">
  <div className="animate-spin">
- <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
+ <div className="w-8 h-8 border-4 border-[var(--border)] border-t-[var(--primary-ink)] rounded-full" />
  </div>
  </div>
  ) : playlistPerformance.error ? (

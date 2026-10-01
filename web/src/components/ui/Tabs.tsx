@@ -35,11 +35,14 @@ export const Tabs: React.FC<TabsProps> = ({
   };
 
   const baseTabClass =
-    'relative px-4 py-2 font-medium text-sm transition-colors whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00E5A0]';
+    'relative px-4 py-2 font-medium text-sm transition-colors whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-ink)]';
   const inactiveClass =
     'text-[var(--foreground-secondary)] hover:text-[var(--foreground)]';
-  const activeClass =
-    'text-primary-600 dark:text-primary-400';
+  /* `--primary-ink`, not `text-primary-600`. That utility resolves to the
+     Electric Horizon neon (`--c-primary-600` is `0 204 142`), which measures
+     2.2:1 on the ivory substrate — the selected tab was the least readable
+     label in the control. The ink token is 10.79:1 and follows white-label. */
+  const activeClass = 'text-[var(--primary-ink)]';
 
   const tabListClass = {
     underline: 'border-b border-[var(--border)] flex gap-0',
@@ -48,7 +51,7 @@ export const Tabs: React.FC<TabsProps> = ({
   };
 
   const underlineIndicator = activeTab && (
-    <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary-600 dark:bg-primary-400 transition-all" />
+    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--primary-ink)] transition-all" />
   );
 
   return (

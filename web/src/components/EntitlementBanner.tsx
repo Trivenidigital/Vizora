@@ -4,6 +4,14 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { apiClient } from '@/lib/api';
 import type { EntitlementBanner as EntitlementBannerData } from '@/lib/types';
+import {
+  BANNER_ACTION,
+  BANNER_MESSAGE,
+  BANNER_QUIET_ACTION,
+  BANNER_ROW,
+  BANNER_TONE,
+  type BannerTone,
+} from './banner-tones';
 
 /**
  * B3 — the dashboard-first escalation channel for the entitlement degrade ladder.
@@ -106,9 +114,9 @@ export default function EntitlementBanner() {
   if (status === 'past_due' && !dismissed) {
     return (
       <BannerShell
-        tone="amber"
+        tone="warning"
         message={<><strong>Payment past due.</strong><span className="hidden sm:inline">{' '}Your screens are still playing — publishing pauses in {days} {dayLabel} if unpaid.</span></>}
-        actions={<><PayLink /><DismissButton tone="amber" onClick={() => setDismissed(true)} /></>}
+        actions={<><PayLink tone="warning" /><DismissButton tone="warning" onClick={() => setDismissed(true)} /></>}
       />
     );
   }
@@ -118,9 +126,9 @@ export default function EntitlementBanner() {
   if (status === 'publish_locked') {
     return (
       <BannerShell
-        tone="orange"
+        tone="urgent"
         message={<><strong>Publishing paused — billing past due.</strong><span className="hidden sm:inline">{' '}Your screens keep playing their current content; you can&rsquo;t push new content until you update billing. Screens pause in {days} {dayLabel}.</span></>}
-        actions={<PayLink />}
+        actions={<PayLink tone="urgent" />}
       />
     );
   }
@@ -129,9 +137,9 @@ export default function EntitlementBanner() {
   if (status === 'suspended') {
     return (
       <BannerShell
-        tone="red"
+        tone="critical"
         message={<><strong>Your screens are paused.</strong><span className="hidden sm:inline">{' '}Update your billing to bring them back online.</span></>}
-        actions={<PayLink label="Update Billing" />}
+        actions={<PayLink tone="critical" label="Update Billing" />}
       />
     );
   }
@@ -139,26 +147,21 @@ export default function EntitlementBanner() {
   return null;
 }
 
-// 'slate' is the degraded/unknown tone — not a ladder rung, so it must not read
-// as one of the escalating warnings.
-type Tone = 'slate' | 'amber' | 'orange' | 'red';
-
-const TONE_BG: Record<Tone, string> = {
-  slate: 'bg-gradient-to-r from-slate-800/70 to-slate-700/50 border-b border-slate-600/40',
-  amber: 'bg-gradient-to-r from-amber-900/60 to-amber-800/40 border-b border-amber-700/40',
-  orange: 'bg-gradient-to-r from-orange-900/70 to-orange-800/50 border-b border-orange-700/50',
-  red: 'bg-gradient-to-r from-red-900/80 to-red-800/60 border-b border-red-700/50',
-};
-const TONE_DOT: Record<Tone, string> = { slate: 'bg-slate-400', amber: 'bg-amber-400', orange: 'bg-orange-400', red: 'bg-red-400' };
-const TONE_TEXT: Record<Tone, string> = { slate: 'text-slate-200', amber: 'text-amber-100', orange: 'text-orange-100', red: 'text-red-100' };
-
-function BannerShell({ tone, message, actions }: { tone: Tone; message: React.ReactNode; actions: React.ReactNode }) {
+/**
+ * The escalation ladder, in the shared tone vocabulary (`banner-tones.ts`).
+ *
+ * `unknown` is the degraded tone — NOT a ladder rung, so it must not read as
+ * one of the escalating warnings. That constraint predates this file and is
+ * restated at the definition site.
+ */
+function BannerShell({ tone, message, actions }: { tone: BannerTone; message: React.ReactNode; actions: React.ReactNode }) {
+  const t = BANNER_TONE[tone];
   return (
-    <div className={TONE_BG[tone]} role="alert">
-      <div className="px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-4">
+    <div className={t.bar} role="alert">
+      <div className={BANNER_ROW}>
         <div className="flex items-center gap-3 min-w-0">
-          <div className={`w-2 h-2 ${TONE_DOT[tone]} rounded-full animate-pulse shrink-0`} />
-          <p className={`text-sm ${TONE_TEXT[tone]} truncate sm:whitespace-normal sm:overflow-visible`}>{message}</p>
+          <div className={`w-2 h-2 ${t.dot} rounded-full animate-pulse shrink-0`} />
+          <p className={`${BANNER_MESSAGE} ${t.text}`}>{message}</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">{actions}</div>
       </div>
@@ -166,11 +169,11 @@ function BannerShell({ tone, message, actions }: { tone: Tone; message: React.Re
   );
 }
 
-function PayLink({ label = 'Update Payment' }: { label?: string }) {
+function PayLink({ tone, label = 'Update Payment' }: { tone: BannerTone; label?: string }) {
   return (
     <Link
       href="/dashboard/settings/billing/plans"
-      className="shrink-0 px-4 py-1.5 bg-[#00E5A0] text-[#061A21] text-sm font-semibold rounded-md hover:bg-[#00CC8E] transition-colors"
+      className={`${BANNER_ACTION} ${BANNER_TONE[tone].action}`}
     >
       {label}
     </Link>
@@ -193,7 +196,7 @@ function DegradedNotice({
 }) {
   return (
     <BannerShell
-      tone="slate"
+      tone="unknown"
       message={
         <>
           <strong>Couldn&rsquo;t check your subscription status.</strong>
@@ -210,16 +213,16 @@ function RetryButton({ onClick, loading }: { onClick: () => void; loading: boole
     <button
       onClick={onClick}
       disabled={loading}
-      className="shrink-0 px-3 py-1.5 text-sm font-medium text-slate-100 bg-slate-700/60 border border-slate-500/50 rounded-md hover:bg-slate-600/60 disabled:opacity-60 transition-colors"
+      className={`${BANNER_QUIET_ACTION} ${BANNER_TONE.unknown.quiet}`}
     >
       {loading ? 'Retrying…' : 'Retry'}
     </button>
   );
 }
 
-function DismissButton({ tone, onClick }: { tone: Tone; onClick: () => void }) {
+function DismissButton({ tone, onClick }: { tone: BannerTone; onClick: () => void }) {
   return (
-    <button onClick={onClick} className={`p-1.5 ${TONE_TEXT[tone]} opacity-60 hover:opacity-100 transition`} aria-label="Dismiss">
+    <button onClick={onClick} className={`p-1.5 ${BANNER_TONE[tone].text} opacity-60 hover:opacity-100 transition`} aria-label="Dismiss">
       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
       </svg>

@@ -21,17 +21,30 @@ interface DeviceHealthMonitorProps {
   className?: string;
 }
 
+/*
+ * The inks here were already tokens; the TINTS under them were raw `-100`
+ * Tailwind steps, which are cool pastels on a warm page. They now take the
+ * documented badge pairs, each measured ink-on-its-own-fill in globals.css:
+ * online 5.47:1, error 5.41:1, offline 4.89:1. 'Good' already carried
+ * `bg-brand/10` with `--primary-ink` (8.40:1) and is unchanged.
+ */
 const getHealthStatus = (score: number): { label: string; color: string; bgColor: string } => {
-  if (score >= 90) return { label: 'Excellent', color: 'text-green-600 dark:text-green-400', bgColor: 'bg-green-100 dark:bg-green-900' };
-  if (score >= 70) return { label: 'Good', color: 'text-[#00E5A0]', bgColor: 'bg-[#00E5A0]/10' };
-  if (score >= 50) return { label: 'Fair', color: 'text-yellow-600 dark:text-yellow-400', bgColor: 'bg-yellow-100 dark:bg-yellow-900' };
-  return { label: 'Poor', color: 'text-red-600 dark:text-red-400', bgColor: 'bg-red-100 dark:bg-red-900' };
+  if (score >= 90) return { label: 'Excellent', color: 'text-[var(--success-ink)]', bgColor: 'bg-[var(--status-online-bg)]' };
+  if (score >= 70) return { label: 'Good', color: 'text-[var(--primary-ink)]', bgColor: 'bg-brand/10' };
+  if (score >= 50) return { label: 'Fair', color: 'text-[var(--warning-ink)]', bgColor: 'bg-[var(--status-error-bg)]' };
+  return { label: 'Poor', color: 'text-[var(--error-ink)]', bgColor: 'bg-[var(--status-offline-bg)]' };
 };
 
+/*
+ * `MetricBar`'s track is `--background-tertiary`, where the `-500` fills measure
+ * 3.74:1 (red), 2.47:1 (amber) and 2.55:1 (green) - two of the three under the
+ * 3:1 a meaningful graphic needs. The inks are 5.01:1, 5.49:1 and 5.53:1 on the
+ * same track. Same finding as `ui/Progress`, same fix.
+ */
 const getMetricStatus = (value: number, thresholds: { warning: number; critical: number }): string => {
-  if (value >= thresholds.critical) return 'bg-red-500';
-  if (value >= thresholds.warning) return 'bg-yellow-500';
-  return 'bg-green-500';
+  if (value >= thresholds.critical) return 'bg-[var(--error-ink)]';
+  if (value >= thresholds.warning) return 'bg-[var(--warning-ink)]';
+  return 'bg-[var(--success-ink)]';
 };
 
 const MetricBar = ({ label, value, unit, thresholds }: any) => (
@@ -44,7 +57,7 @@ const MetricBar = ({ label, value, unit, thresholds }: any) => (
     </div>
     <div className="w-full h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
       <div
-        className={`h-full ${typeof value === 'number' ? getMetricStatus(value, thresholds) : 'bg-[var(--foreground-tertiary)]/30'} transition-all`}
+        className={`h-full ${typeof value === 'number' ? getMetricStatus(value, thresholds) : 'bg-foreground-tertiary/30'} transition-all`}
         style={{ width: `${typeof value === 'number' ? Math.min(value, 100) : 0}%` }}
       />
     </div>

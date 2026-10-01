@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useToast } from '@/lib/hooks/useToast';
+import { Switch } from '@/components/ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,8 +91,8 @@ export default function FeatureFlagsPage() {
       </div>
 
       {!isAdmin && (
-        <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-          <p className="text-sm text-yellow-700 dark:text-yellow-300">
+        <div className="p-4 bg-warning/10 border border-warning-ink/30 rounded-lg">
+          <p className="text-sm text-[var(--warning-ink)]">
             Only administrators can modify feature flags. Contact your admin to change these settings.
           </p>
         </div>
@@ -113,24 +114,11 @@ export default function FeatureFlagsPage() {
                 <div className="font-medium text-[var(--foreground)]">{name}</div>
                 <div className="text-sm text-[var(--foreground-secondary)]">{description}</div>
               </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={flags[key] !== false}
+              <Switch
+                checked={flags[key] !== false}
                 disabled={!isAdmin}
-                onClick={() => handleToggle(key)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#00E5A0] focus:ring-offset-2 disabled:opacity-50 ${
-                  flags[key] !== false
-                    ? 'bg-[#00E5A0]'
-                    : 'bg-gray-300 dark:bg-gray-600'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    flags[key] !== false ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
+                onChange={() => handleToggle(key)}
+              />
             </label>
           ))}
         </div>

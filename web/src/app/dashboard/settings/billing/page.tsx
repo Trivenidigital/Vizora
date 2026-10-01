@@ -159,7 +159,7 @@ export default function BillingPage() {
  </div>
  <Link
  href="/dashboard/settings/billing/history"
- className="text-[#00E5A0] hover:text-[#00E5A0] dark:text-[#00E5A0] dark:hover:text-[#00CC8E] text-sm font-medium flex items-center gap-1"
+ className="text-[var(--primary-ink)] hover:text-[var(--primary-light)] text-sm font-medium flex items-center gap-1"
  >
  View Invoice History
  <Icon name="chevronRight" size="sm" />
@@ -170,7 +170,7 @@ export default function BillingPage() {
      read. A missing subscription used to render as "Free" plus a live
      "Cancel Subscription" button, which really cancels on the provider. */}
  {loadError ? (
- <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-300">
+ <div className="rounded-lg border border-error-ink/30 bg-error/10 p-4 text-sm text-[var(--error-ink)]">
  <p>Unable to load your billing information. Your plan is unchanged — please try again.</p>
  <p className="mt-1 text-xs opacity-80">{loadError}</p>
  <button
@@ -203,12 +203,12 @@ export default function BillingPage() {
  {subscription?.subscriptionTier || '—'}
  </div>
  {isTrialing && subscription?.trialEndsAt && (
- <p className="text-sm text-[#00E5A0] dark:text-[#00E5A0] mt-1">
+ <p className="text-sm text-[var(--primary-ink)] mt-1">
  Trial ends {formatDate(subscription.trialEndsAt)}
  </p>
  )}
  {isCanceled && subscription?.currentPeriodEnd && (
- <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-1">
+ <p className="text-sm text-[var(--warning-ink)] mt-1">
  Access until {formatDate(subscription.currentPeriodEnd)}
  </p>
  )}
@@ -220,7 +220,7 @@ export default function BillingPage() {
  </div>
  <Link
  href="/dashboard/settings/billing/plans"
- className="px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition font-medium text-sm"
+ className="px-4 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition font-medium text-sm"
  >
  {isPaidPlan ? 'Change Plan' : 'Upgrade'}
  </Link>
@@ -236,7 +236,7 @@ export default function BillingPage() {
 
  {/* Actions Footer */}
  {isPaidPlan && (
- <div className="px-6 py-4 bg-[var(--background)]/50 border-t border-[var(--border)]">
+ <div className="px-6 py-4 bg-background/50 border-t border-[var(--border)]">
  <div className="flex flex-wrap gap-4">
  {subscription?.paymentProvider && (
  <button
@@ -257,7 +257,7 @@ export default function BillingPage() {
  <button
  onClick={handleReactivateSubscription}
  disabled={actionLoading}
- className="px-4 py-2 text-sm font-medium text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/50 border border-green-300 dark:border-green-700 rounded-lg hover:bg-green-100 dark:hover:bg-green-900 transition flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium text-[var(--success-ink)] bg-success/10 border border-success-ink/30 rounded-lg hover:bg-success/20 transition flex items-center gap-2"
  >
  {actionLoading ? <LoadingSpinner size="sm" /> : <Icon name="refresh" size="sm" />}
  Reactivate Subscription
@@ -266,7 +266,7 @@ export default function BillingPage() {
  <button
  onClick={() => setIsCancelDialogOpen(true)}
  disabled={actionLoading}
- className="px-4 py-2 text-sm font-medium text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/50 border border-red-300 dark:border-red-700 rounded-lg hover:bg-red-100 dark:hover:bg-red-900 transition"
+ className="px-4 py-2 text-sm font-medium text-[var(--error-ink)] bg-error/10 border border-error-ink/30 rounded-lg hover:bg-error/20 transition"
  >
  Cancel Subscription
  </button>
@@ -310,7 +310,7 @@ export default function BillingPage() {
     onChange={(e) => setGstin(e.target.value.toUpperCase())}
     placeholder="e.g., 22AAAAA0000A1Z5"
     maxLength={15}
-    className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent font-mono"
+    className="w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent font-mono"
    />
    <p className="mt-2 text-xs text-[var(--foreground-tertiary)]">
     Required for GST-compliant invoices in India
@@ -318,7 +318,7 @@ export default function BillingPage() {
    <button
     onClick={handleSaveGstin}
     disabled={gstinSaving}
-    className="mt-3 px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition flex items-center gap-2"
+    className="mt-3 px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition flex items-center gap-2"
    >
     {gstinSaving && <LoadingSpinner size="sm" />}
     Save GSTIN
@@ -336,11 +336,11 @@ export default function BillingPage() {
  className="bg-[var(--surface)] rounded-lg shadow-md p-6 hover:shadow-lg transition group"
  >
  <div className="flex items-center gap-4">
- <div className="w-12 h-12 bg-[#00E5A0]/10 dark:bg-[#00E5A0]/10 rounded-lg flex items-center justify-center">
- <Icon name="list" size="lg" className="text-[#00E5A0] dark:text-[#00E5A0]" />
+ <div className="w-12 h-12 bg-brand/10 rounded-lg flex items-center justify-center">
+ <Icon name="list" size="lg" className="text-[var(--primary-ink)]" />
  </div>
  <div className="flex-1">
- <h4 className="font-semibold text-[var(--foreground)] group-hover:text-[#00E5A0] dark:group-hover:text-[#00E5A0] transition">
+ <h4 className="font-semibold text-[var(--foreground)] group-hover:text-[var(--primary-ink)] transition">
  Compare Plans
  </h4>
  <p className="text-sm text-[var(--foreground-tertiary)]">
@@ -350,7 +350,7 @@ export default function BillingPage() {
  <Icon
  name="chevronRight"
  size="md"
- className="text-[var(--foreground-tertiary)] group-hover:text-[#00E5A0] dark:group-hover:text-[#00E5A0] transition"
+ className="text-[var(--foreground-tertiary)] group-hover:text-[var(--primary-ink)] transition"
  />
  </div>
  </Link>
@@ -364,7 +364,7 @@ export default function BillingPage() {
  <Icon name="document" size="lg" className="text-[var(--foreground-secondary)]" />
  </div>
  <div className="flex-1">
- <h4 className="font-semibold text-[var(--foreground)] group-hover:text-[#00E5A0] dark:group-hover:text-[#00E5A0] transition">
+ <h4 className="font-semibold text-[var(--foreground)] group-hover:text-[var(--primary-ink)] transition">
  Invoice History
  </h4>
  <p className="text-sm text-[var(--foreground-tertiary)]">
@@ -374,7 +374,7 @@ export default function BillingPage() {
  <Icon
  name="chevronRight"
  size="md"
- className="text-[var(--foreground-tertiary)] group-hover:text-[#00E5A0] dark:group-hover:text-[#00E5A0] transition"
+ className="text-[var(--foreground-tertiary)] group-hover:text-[var(--primary-ink)] transition"
  />
  </div>
  </Link>

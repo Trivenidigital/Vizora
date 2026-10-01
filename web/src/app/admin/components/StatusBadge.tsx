@@ -1,5 +1,7 @@
 'use client';
 
+import { Badge, type BadgeTone } from '@/components/ui/Badge';
+
 type BadgeStatus =
   | 'active'
   | 'inactive'
@@ -21,83 +23,50 @@ interface StatusBadgeProps {
   className?: string;
 }
 
-const statusStyles: Record<string, { bg: string; text: string; dot: string }> = {
-  active: {
-    bg: 'bg-green-100 dark:bg-green-900/30',
-    text: 'text-green-700 dark:text-green-400',
-    dot: 'bg-green-500',
-  },
-  inactive: {
-    bg: 'bg-[var(--background-secondary)]',
-    text: 'text-[var(--foreground-secondary)]',
-    dot: 'bg-[var(--foreground-tertiary)]',
-  },
-  suspended: {
-    bg: 'bg-red-100 dark:bg-red-900/30',
-    text: 'text-red-700 dark:text-red-400',
-    dot: 'bg-red-500',
-  },
-  trialing: {
-    bg: 'bg-[#00E5A0]/10',
-    text: 'text-[#00E5A0]',
-    dot: 'bg-[#00E5A0]',
-  },
-  canceled: {
-    bg: 'bg-yellow-100 dark:bg-yellow-900/30',
-    text: 'text-yellow-700 dark:text-yellow-400',
-    dot: 'bg-yellow-500',
-  },
-  past_due: {
-    bg: 'bg-orange-100 dark:bg-orange-900/30',
-    text: 'text-orange-700 dark:text-orange-400',
-    dot: 'bg-orange-500',
-  },
-  pending: {
-    bg: 'bg-yellow-100 dark:bg-yellow-900/30',
-    text: 'text-yellow-700 dark:text-yellow-400',
-    dot: 'bg-yellow-500',
-  },
-  success: {
-    bg: 'bg-green-100 dark:bg-green-900/30',
-    text: 'text-green-700 dark:text-green-400',
-    dot: 'bg-green-500',
-  },
-  warning: {
-    bg: 'bg-yellow-100 dark:bg-yellow-900/30',
-    text: 'text-yellow-700 dark:text-yellow-400',
-    dot: 'bg-yellow-500',
-  },
-  error: {
-    bg: 'bg-red-100 dark:bg-red-900/30',
-    text: 'text-red-700 dark:text-red-400',
-    dot: 'bg-red-500',
-  },
-  info: {
-    bg: 'bg-[#00E5A0]/10',
-    text: 'text-[#00E5A0]',
-    dot: 'bg-[#00E5A0]',
-  },
-  maintenance: {
-    bg: 'bg-purple-100 dark:bg-purple-900/30',
-    text: 'text-purple-700 dark:text-purple-400',
-    dot: 'bg-purple-500',
-  },
-  critical: {
-    bg: 'bg-red-100 dark:bg-red-900/30',
-    text: 'text-red-700 dark:text-red-400',
-    dot: 'bg-red-500',
-  },
-};
-
-const sizeStyles = {
-  sm: 'px-2 py-0.5 text-xs',
-  md: 'px-2.5 py-1 text-sm',
-  lg: 'px-3 py-1.5 text-base',
+/**
+ * Admin status pill. Renders through the shared `ui/Badge` — the colour table
+ * this file used to carry (13 entries of `bg-[var(--status-online-bg)]`
+ * and friends) is gone; what remains is the part that is genuinely admin's:
+ * which tone each status means, and how the label is worded.
+ *
+ * ── Every distinction the old table drew is still drawn ───────────────────
+ * The old table used seven visually distinct colours: green, grey, red, neon,
+ * yellow, orange and purple. The Little Worlds tints cannot carry seven — see
+ * the note in `ui/Badge` — so the two that would have collided take the
+ * OUTLINED form of their family instead:
+ *
+ *   old            new                                       distinct from
+ *   green          success, filled                           —
+ *   grey           neutral, filled                           —
+ *   red            error, filled                             —
+ *   neon           brand, outlined (brand is always outlined) —
+ *   yellow         warning, filled                           —
+ *   orange         warning, OUTLINED                         yellow (filled)
+ *   purple         info, OUTLINED                            neon (brand)
+ *
+ * So `past_due` still reads apart from `canceled`/`pending`, and `maintenance`
+ * still reads apart from `trialing`/`info`. Nothing was collapsed onto
+ * something it did not already share a meaning with.
+ */
+const statusTone: Record<string, { tone: BadgeTone; outline?: boolean }> = {
+  active: { tone: 'success' },
+  inactive: { tone: 'neutral' },
+  suspended: { tone: 'error' },
+  trialing: { tone: 'brand' },
+  canceled: { tone: 'warning' },
+  past_due: { tone: 'warning', outline: true },
+  pending: { tone: 'warning' },
+  success: { tone: 'success' },
+  warning: { tone: 'warning' },
+  error: { tone: 'error' },
+  info: { tone: 'brand' },
+  maintenance: { tone: 'info', outline: true },
+  critical: { tone: 'error' },
 };
 
 export function StatusBadge({ status, size = 'md', className = '' }: StatusBadgeProps) {
   const normalizedStatus = status.toLowerCase().replace(' ', '_');
-  const styles = statusStyles[normalizedStatus] || statusStyles.inactive;
+  const { tone, outline } = statusTone[normalizedStatus] || statusTone.inactive;
 
   const formatLabel = (s: string) => {
     return s
@@ -106,11 +75,8 @@ export function StatusBadge({ status, size = 'md', className = '' }: StatusBadge
   };
 
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 rounded-full font-medium ${styles.bg} ${styles.text} ${sizeStyles[size]} ${className}`}
-    >
-      <span className={`w-1.5 h-1.5 rounded-full ${styles.dot}`} />
+    <Badge variant={tone} outline={outline} dot size={size} className={className}>
       {formatLabel(status)}
-    </span>
+    </Badge>
   );
 }

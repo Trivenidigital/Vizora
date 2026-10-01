@@ -1,34 +1,19 @@
 /**
  * Design Tokens for Vizora — Electric Horizon
  * Centralized design system values for consistent UI/UX
+ *
+ * The groups Tailwind also consumes (spacing, radius, shadow, transition,
+ * zIndex, breakpoints, animation, border, opacity) live in `./palette.js` and
+ * are spread in below — see that file's header. The groups declared here are
+ * the ones ONLY TypeScript uses, so they have no second home to drift from.
  */
 
+import { tokens as palette } from './palette.js';
+
 export const tokens = {
-  // Spacing scale (base unit: 4px)
-  spacing: {
-    xs: '4px',
-    sm: '8px',
-    md: '12px',
-    lg: '16px',
-    xl: '24px',
-    '2xl': '32px',
-    '3xl': '48px',
-    '4xl': '64px',
-    '5xl': '80px',
-  } as const,
+  ...palette,
 
-  // Border radius scale
-  radius: {
-    xs: '2px',
-    sm: '4px',
-    md: '8px',
-    lg: '12px',
-    xl: '16px',
-    '2xl': '24px',
-    full: '9999px',
-  } as const,
-
-  // Typography scales
+  // Typography scales — TypeScript-only; Tailwind's type scale is its own.
   typography: {
     // Display heading - largest
     display: {
@@ -126,94 +111,22 @@ export const tokens = {
     },
   } as const,
 
-  // Shadow/elevation system
-  shadow: {
-    none: 'none',
-    xs: '0 1px 2px rgba(0, 0, 0, 0.05)',
-    sm: '0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06)',
-    md: '0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06)',
-    lg: '0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05)',
-    xl: '0 20px 25px rgba(0, 0, 0, 0.1), 0 10px 10px rgba(0, 0, 0, 0.04)',
-    '2xl': '0 25px 50px rgba(0, 0, 0, 0.1)',
-    inner: 'inset 0 2px 4px rgba(0, 0, 0, 0.06)',
-  } as const,
-
-  // Transitions/animations
-  transition: {
-    fast: '150ms ease-in-out',
-    normal: '300ms ease-in-out',
-    slow: '500ms ease-in-out',
-  } as const,
-
-  // Z-index scale
-  zIndex: {
-    hide: '-1',
-    auto: 'auto',
-    base: '0',
-    docked: '10',
-    dropdown: '1000',
-    sticky: '1020',
-    fixed: '1030',
-    backdrop: '1040',
-    offcanvas: '1050',
-    modal: '1060',
-    popover: '1070',
-    tooltip: '1080',
-  } as const,
-
-  // Breakpoints for responsive design
-  breakpoints: {
-    xs: '0px',
-    sm: '640px',
-    md: '768px',
-    lg: '1024px',
-    xl: '1280px',
-    '2xl': '1536px',
-  } as const,
-
-  // Animation/keyframes
-  animation: {
-    spin: 'spin 1s linear infinite',
-    pulse: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-    bounce: 'bounce 1s infinite',
-    fadeIn: 'fadeIn 300ms ease-in-out',
-    slideIn: 'slideIn 300ms ease-in-out',
-    slideOut: 'slideOut 300ms ease-in-out',
-  } as const,
-
-  // Border widths
-  border: {
-    none: '0px',
-    xs: '0.5px',
-    sm: '1px',
-    md: '2px',
-    lg: '4px',
-  } as const,
-
-  // Opacity scale
-  opacity: {
-    0: '0',
-    5: '0.05',
-    10: '0.1',
-    20: '0.2',
-    25: '0.25',
-    30: '0.3',
-    40: '0.4',
-    50: '0.5',
-    60: '0.6',
-    70: '0.7',
-    75: '0.75',
-    80: '0.8',
-    90: '0.9',
-    95: '0.95',
-    100: '1',
-  } as const,
-
-  // Focus ring styles — EH neon green
+  /*
+   * Focus ring. The value was still the Electric Horizon neon, which is 1.65:1
+   * on ivory and so could never have been a visible ring on this substrate.
+   *
+   * It is a LITERAL and not `var(--primary-ink)` because this object is consumed
+   * as plain data, not as CSS. It is also currently consumed by NOTHING - a
+   * repo-wide search for `tokens.focus` and `.focus.ring` finds no reader - so
+   * correcting the value is a data fix, not a behaviour change. The live focus
+   * ring is `--accent-ring`, applied by the `.eh-*` component rules in
+   * globals.css. Deleting this is a separate call; leaving it holding a retired
+   * palette value is not.
+   */
   focus: {
     ring: '2px',
     ringOffset: '2px',
-    ringColor: '#00E5A0',
+    ringColor: '#1f4230' /* = --primary / --lw-forest */,
   } as const,
 
   // Container widths

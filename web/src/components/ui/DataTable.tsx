@@ -78,7 +78,7 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps<any>>(
       return (
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin">
-            <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 dark:border-t-primary-400 rounded-full" />
+            <div className="w-8 h-8 border-4 border-[var(--border)] border-t-primary-600 rounded-full" />
           </div>
         </div>
       );
@@ -106,7 +106,7 @@ export const DataTable = React.forwardRef<HTMLDivElement, DataTableProps<any>>(
                     {col.sortable ? (
                       <button
                         onClick={() => handleSort(col.key)}
-                        className="inline-flex items-center gap-1 hover:text-primary-600 dark:hover:text-primary-400 transition-colors"
+                        className="inline-flex items-center gap-1 hover:text-[var(--primary-ink)] transition-colors"
                       >
                         {col.header}
                         {sortKey === col.key && (

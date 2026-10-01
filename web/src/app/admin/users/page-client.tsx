@@ -76,9 +76,9 @@ export default function AdminUsersClient({ initialUsers, initialTotal }: AdminUs
   const getRoleBadgeColor = (role: string) => {
     switch (role.toLowerCase()) {
       case 'admin':
-        return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400';
+        return 'bg-[var(--cat-purple-bg)] text-[var(--cat-purple)]';
       case 'owner':
-        return 'bg-[#00E5A0]/10 text-[#00E5A0] dark:bg-[#00E5A0]/10 dark:text-[#00E5A0]';
+        return 'bg-brand/10 text-[var(--primary-ink)]';
       default:
         return 'bg-[var(--background-tertiary)] text-[var(--foreground-secondary)]';
     }
@@ -104,7 +104,7 @@ export default function AdminUsersClient({ initialUsers, initialTotal }: AdminUs
           value={search}
           onChange={(e) => handleSearchChange(e.target.value)}
           placeholder="Search by name or email..."
-          className="w-full pl-10 pr-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+          className="w-full pl-10 pr-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
         />
       </div>
 
@@ -147,8 +147,8 @@ export default function AdminUsersClient({ initialUsers, initialTotal }: AdminUs
                   >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] flex items-center justify-center">
-                          <span className="text-[#061A21] text-sm font-semibold">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--accent-brass)] flex items-center justify-center">
+                          <span className="text-[var(--primary-contrast)] text-sm font-semibold">
                             {user.firstName[0]}
                             {user.lastName[0]}
                           </span>
@@ -160,7 +160,7 @@ export default function AdminUsersClient({ initialUsers, initialTotal }: AdminUs
                             </p>
                             {user.isSuperAdmin && (
                               <span title="Super Admin">
-                                <Shield className="w-4 h-4 text-yellow-500" />
+                                <Shield className="w-4 h-4 text-[var(--warning-ink)]" />
                               </span>
                             )}
                           </div>
@@ -204,7 +204,7 @@ export default function AdminUsersClient({ initialUsers, initialTotal }: AdminUs
                               setActionType('disable');
                             }}
                             disabled={user.isSuperAdmin}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--error-ink)] hover:bg-[var(--status-offline-bg)] rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
                             title={user.isSuperAdmin ? 'Cannot disable super admin' : 'Disable user'}
                           >
                             <UserX className="w-4 h-4" />
@@ -216,7 +216,7 @@ export default function AdminUsersClient({ initialUsers, initialTotal }: AdminUs
                               setActionUser(user);
                               setActionType('enable');
                             }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition"
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-[var(--success-ink)] hover:bg-[var(--status-online-bg)] rounded-lg transition"
                           >
                             <UserCheck className="w-4 h-4" />
                             Enable

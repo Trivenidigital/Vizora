@@ -7,3 +7,4 @@ export { Stepper } from './Stepper';
 export { DataTable } from './DataTable';
 export { Card } from './Card';
 export { IconButton } from './IconButton';
+export { Switch } from './Switch';

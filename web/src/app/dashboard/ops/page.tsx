@@ -106,22 +106,22 @@ function formatTimestamp(isoString: string): string {
 function StatusBadge({ status }: { status: SystemStatus }) {
   const config: Record<SystemStatus, { bg: string; text: string; ring: string; dot: string }> = {
     HEALTHY: {
-      bg: 'bg-green-100 dark:bg-green-900/30',
-      text: 'text-green-800 dark:text-green-300',
-      ring: 'ring-green-500/30',
-      dot: 'bg-green-500',
+      bg: 'bg-[var(--status-online-bg)]',
+      text: 'text-[var(--success-ink)]',
+      ring: 'ring-success-ink/30',
+      dot: 'bg-[var(--success-ink)]',
     },
     DEGRADED: {
-      bg: 'bg-amber-100 dark:bg-amber-900/30',
-      text: 'text-amber-800 dark:text-amber-300',
-      ring: 'ring-amber-500/30',
-      dot: 'bg-amber-500',
+      bg: 'bg-[var(--status-error-bg)]',
+      text: 'text-[var(--warning-ink)]',
+      ring: 'ring-warning-ink/30',
+      dot: 'bg-[var(--warning-ink)]',
     },
     CRITICAL: {
-      bg: 'bg-red-100 dark:bg-red-900/30',
-      text: 'text-red-800 dark:text-red-300',
-      ring: 'ring-red-500/30',
-      dot: 'bg-red-500 animate-pulse',
+      bg: 'bg-[var(--status-offline-bg)]',
+      text: 'text-[var(--error-ink)]',
+      ring: 'ring-error-ink/30',
+      dot: 'bg-[var(--error-ink)] animate-pulse',
     },
   };
 
@@ -141,9 +141,11 @@ function StatusBadge({ status }: { status: SystemStatus }) {
 
 function SeverityBadge({ severity }: { severity: Severity }) {
   const config: Record<Severity, { bg: string; text: string; icon: 'error' | 'warning' | 'info' }> = {
-    critical: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300', icon: 'error' },
-    warning: { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-300', icon: 'warning' },
-    info: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300', icon: 'info' },
+    // Ordinal, and all three rungs have a semantic token of their own, so this
+    // one needs no compromise. The icon carries the rung in greyscale too.
+    critical: { bg: 'bg-[var(--status-offline-bg)]', text: 'text-[var(--error-ink)]', icon: 'error' },
+    warning: { bg: 'bg-[var(--status-error-bg)]', text: 'text-[var(--warning-ink)]', icon: 'warning' },
+    info: { bg: 'bg-[var(--status-pairing-bg)]', text: 'text-[var(--info-ink)]', icon: 'info' },
   };
   const c = config[severity] ?? config.info;
 
@@ -158,10 +160,21 @@ function SeverityBadge({ severity }: { severity: Severity }) {
 // ─── Incident Status Badge ──────────────────────────────────────────────────
 
 function IncidentStatusBadge({ status }: { status: IncidentStatus }) {
+  /*
+   * This is a LIFECYCLE, not a severity ladder, and the existing hue assignment
+   * is preserved exactly: open -> error, escalated -> warning, resolved ->
+   * success.
+   *
+   * Worth recording that `escalated` is arguably the more severe of the first
+   * two — it means automated remediation failed and a human was paged — yet it
+   * is painted calmer than `open`. That inversion is pre-existing and is NOT
+   * changed here: a recolour must not silently re-rank an operator's incident
+   * states. If the ranking is wrong it is a product decision, not a palette one.
+   */
   const styles: Record<IncidentStatus, string> = {
-    open: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300',
-    escalated: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300',
-    resolved: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
+    open: 'bg-[var(--status-offline-bg)] text-[var(--error-ink)]',
+    escalated: 'bg-[var(--status-error-bg)] text-[var(--warning-ink)]',
+    resolved: 'bg-[var(--status-online-bg)] text-[var(--success-ink)]',
   };
 
   return (
@@ -253,12 +266,12 @@ export default function OpsStatusPage() {
           <h2 className="text-3xl font-bold text-[var(--foreground)]">Ops Status</h2>
           <p className="mt-2 text-[var(--foreground-secondary)]">Autonomous operations monitoring</p>
         </div>
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6 text-center">
-          <Icon name="error" size="3xl" className="mx-auto text-red-500 mb-3" />
-          <p className="text-red-700 dark:text-red-300 font-medium">{error}</p>
+        <div className="bg-[var(--status-offline-bg)] border border-error-ink/30 rounded-lg p-6 text-center">
+          <Icon name="error" size="3xl" className="mx-auto text-[var(--error-ink)] mb-3" />
+          <p className="text-[var(--error-ink)] font-medium">{error}</p>
           <button
             onClick={fetchOpsStatus}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm font-medium"
+            className="mt-4 px-4 py-2 bg-[var(--danger-solid)] text-white rounded-lg hover:bg-[var(--danger-solid-hover)] transition text-sm font-medium"
           >
             Retry
           </button>
@@ -299,7 +312,7 @@ export default function OpsStatusPage() {
           <StatusBadge status={opsData.systemStatus} />
           <button
             onClick={fetchOpsStatus}
-            className="bg-[#00E5A0] text-[#061A21] px-5 py-2.5 rounded-lg hover:bg-[#00CC8E] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+            className="bg-[var(--primary)] text-[var(--primary-contrast)] px-5 py-2.5 rounded-lg hover:bg-[var(--primary-light)] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
           >
             <Icon name="refresh" size="md" />
             <span>Refresh</span>
@@ -333,14 +346,14 @@ export default function OpsStatusPage() {
               const hasEscalated = result.issuesEscalated > 0;
 
               // Determine card accent color
-              let borderColor = 'border-green-500';
-              let dotColor = 'bg-green-500';
+              let borderColor = 'border-[var(--success-ink)]';
+              let dotColor = 'bg-[var(--success-ink)]';
               if (hasEscalated) {
-                borderColor = 'border-red-500';
-                dotColor = 'bg-red-500';
+                borderColor = 'border-[var(--error-ink)]';
+                dotColor = 'bg-[var(--error-ink)]';
               } else if (hasIssues && !allFixed) {
-                borderColor = 'border-amber-500';
-                dotColor = 'bg-amber-500';
+                borderColor = 'border-[var(--warning-ink)]';
+                dotColor = 'bg-[var(--warning-ink)]';
               }
 
               return (
@@ -364,11 +377,11 @@ export default function OpsStatusPage() {
                       <p className="text-xs text-[var(--foreground-tertiary)]">Found</p>
                     </div>
                     <div className="bg-[var(--surface-hover)] rounded-md p-2">
-                      <p className="text-lg font-bold text-green-600 dark:text-green-400">{result.issuesFixed}</p>
+                      <p className="text-lg font-bold text-[var(--success-ink)]">{result.issuesFixed}</p>
                       <p className="text-xs text-[var(--foreground-tertiary)]">Fixed</p>
                     </div>
                     <div className="bg-[var(--surface-hover)] rounded-md p-2">
-                      <p className={`text-lg font-bold ${result.issuesEscalated > 0 ? 'text-red-600 dark:text-red-400' : 'text-[var(--foreground)]'}`}>
+                      <p className={`text-lg font-bold ${result.issuesEscalated > 0 ? 'text-[var(--error-ink)]' : 'text-[var(--foreground)]'}`}>
                         {result.issuesEscalated}
                       </p>
                       <p className="text-xs text-[var(--foreground-tertiary)]">Escalated</p>
@@ -398,10 +411,10 @@ export default function OpsStatusPage() {
         </h3>
 
         {activeIncidents.length === 0 ? (
-          <div className="bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg p-6 text-center">
-            <Icon name="success" size="3xl" className="mx-auto text-green-500 mb-2" />
-            <p className="text-green-700 dark:text-green-300 font-medium">No active incidents</p>
-            <p className="text-sm text-green-600 dark:text-green-400 mt-1">All systems operating normally</p>
+          <div className="bg-[var(--status-online-bg)] border border-success-ink/30 rounded-lg p-6 text-center">
+            <Icon name="success" size="3xl" className="mx-auto text-[var(--success-ink)] mb-2" />
+            <p className="text-[var(--success-ink)] font-medium">No active incidents</p>
+            <p className="text-sm text-[var(--success-ink)] mt-1">All systems operating normally</p>
           </div>
         ) : (
           <div className="bg-[var(--surface)] rounded-lg shadow border border-[var(--border)] overflow-hidden">
@@ -503,12 +516,12 @@ export default function OpsStatusPage() {
                     <tr key={`${rem.agent}-${rem.timestamp}-${idx}`} className="hover:bg-[var(--surface-hover)] transition">
                       <td className="px-4 py-3 whitespace-nowrap">
                         {rem.success ? (
-                          <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400 text-sm font-medium">
+                          <span className="inline-flex items-center gap-1 text-[var(--success-ink)] text-sm font-medium">
                             <Icon name="success" size="sm" />
                             Success
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-red-600 dark:text-red-400 text-sm font-medium">
+                          <span className="inline-flex items-center gap-1 text-[var(--error-ink)] text-sm font-medium">
                             <Icon name="error" size="sm" />
                             Failed
                           </span>

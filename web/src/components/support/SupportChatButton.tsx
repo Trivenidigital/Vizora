@@ -9,7 +9,7 @@ export default function SupportChatButton() {
   return (
     <button
       onClick={toggleChat}
-      className={`fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-[#00E5A0] text-[#0A0F1C] shadow-lg hover:brightness-110 flex items-center justify-center transition-all duration-200 active:scale-95 ${
+      className={`fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-[var(--lw-forest)] text-[var(--lw-on-forest)] shadow-lg hover:bg-[var(--lw-forest-deep)] flex items-center justify-center transition-all duration-200 active:scale-95 ${
         unreadCount > 0 && !isOpen ? 'animate-pulse' : ''
       }`}
       aria-label={isOpen ? 'Close support chat' : 'Open support chat'}
@@ -22,7 +22,7 @@ export default function SupportChatButton() {
 
       {/* Unread badge */}
       {unreadCount > 0 && !isOpen && (
-        <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-md">
+        <span className="absolute -top-1 -right-1 w-5 h-5 bg-[var(--danger-solid)] text-white text-xs font-bold rounded-full flex items-center justify-center shadow-md">
           {unreadCount > 9 ? '9+' : unreadCount}
         </span>
       )}

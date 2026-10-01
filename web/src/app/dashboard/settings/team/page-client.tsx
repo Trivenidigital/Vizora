@@ -136,9 +136,9 @@ export default function TeamClient() {
  const getRoleBadgeColor = (role: string) => {
  switch (role) {
  case 'admin':
- return 'bg-purple-500/10 text-purple-700 dark:text-purple-300';
+ return 'bg-[var(--cat-purple-bg)] text-[var(--cat-purple)]';
  case 'manager':
- return 'bg-[#00E5A0]/10 text-[#00E5A0]';
+ return 'bg-brand/10 text-[var(--primary-ink)]';
  case 'viewer':
  return 'bg-[var(--background-secondary)] text-[var(--foreground)]';
  default:
@@ -148,8 +148,8 @@ export default function TeamClient() {
 
  const getStatusBadgeColor = (isActive: boolean) => {
  return isActive
- ? 'bg-green-500/10 text-green-700 dark:text-green-300'
- : 'bg-red-500/10 text-red-700 dark:text-red-300';
+ ? 'bg-success/10 text-[var(--success-ink)]'
+ : 'bg-error/10 text-[var(--error-ink)]';
  };
 
  const formatDate = (dateStr: string | null) => {
@@ -176,7 +176,7 @@ export default function TeamClient() {
  </div>
  <button
  onClick={() => setIsInviteModalOpen(true)}
- className="bg-[#00E5A0] text-[#061A21] px-6 py-3 rounded-lg hover:bg-[#00CC8E] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
+ className="bg-[var(--primary)] text-[var(--primary-contrast)] px-6 py-3 rounded-lg hover:bg-[var(--primary-light)] transition font-semibold shadow-md hover:shadow-lg flex items-center gap-2"
  >
  <Icon name="add" size="lg" className="text-white" />
  <span>Invite User</span>
@@ -185,17 +185,17 @@ export default function TeamClient() {
 
  {/* Temp Password Alert */}
  {tempPasswordInfo && (
- <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+ <div className="bg-warning/10 border border-warning/20 rounded-lg p-4">
  <div className="flex items-start gap-3">
- <Icon name="warning" size="lg" className="text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+ <Icon name="warning" size="lg" className="text-[var(--warning-ink)] flex-shrink-0 mt-0.5" />
  <div className="flex-1">
- <h4 className="font-semibold text-yellow-800 dark:text-yellow-200">Temporary Password Created</h4>
- <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+ <h4 className="font-semibold text-[var(--warning-ink)]">Temporary Password Created</h4>
+ <p className="text-sm text-[var(--warning-ink)] mt-1">
  A temporary password has been generated for <strong>{tempPasswordInfo.email}</strong>.
  Share this password securely - it will not be shown again.
  </p>
  <div className="mt-2 flex items-center gap-2">
- <code className="bg-yellow-500/15 px-3 py-1 rounded text-sm font-mono text-yellow-900 dark:text-yellow-100">
+ <code className="bg-warning/15 px-3 py-1 rounded text-sm font-mono text-[var(--warning-ink)]">
  {tempPasswordInfo.password}
  </code>
  <button
@@ -203,14 +203,14 @@ export default function TeamClient() {
  navigator.clipboard.writeText(tempPasswordInfo.password);
  toast.success('Password copied to clipboard');
  }}
- className="text-sm text-yellow-700 dark:text-yellow-300 hover:text-yellow-900 dark:hover:text-yellow-100 underline"
+ className="text-sm text-[var(--warning-ink)] hover:text-[var(--foreground)] underline"
  >
  Copy
  </button>
  </div>
  <button
  onClick={() => setTempPasswordInfo(null)}
- className="mt-2 text-sm text-yellow-600 dark:text-yellow-400 hover:text-yellow-800 dark:hover:text-yellow-200"
+ className="mt-2 text-sm text-[var(--warning-ink)] hover:text-[var(--foreground)]"
  >
  Dismiss
  </button>
@@ -265,7 +265,7 @@ export default function TeamClient() {
  <tr key={user.id} className="hover:bg-[var(--surface-hover)] transition">
  <td className="px-4 py-3 whitespace-nowrap">
  <div className="flex items-center gap-3">
- <div className="w-8 h-8 bg-[#00E5A0]/10 rounded-full flex items-center justify-center text-[#00E5A0] font-semibold text-sm">
+ <div className="w-8 h-8 bg-brand/10 rounded-full flex items-center justify-center text-[var(--primary-ink)] font-semibold text-sm">
  {user.firstName.charAt(0)}{user.lastName.charAt(0)}
  </div>
  <span className="text-sm font-medium text-[var(--foreground)]">
@@ -293,7 +293,7 @@ export default function TeamClient() {
  <div className="flex justify-end gap-2">
  <button
  onClick={() => handleEditRole(user)}
- className="text-[#00E5A0] hover:text-[#00E5A0] hover:bg-[#00E5A0]/5 px-2 py-1 rounded transition"
+ className="text-[var(--primary-ink)] hover:bg-brand/5 px-2 py-1 rounded transition"
  title="Edit role"
  >
  <Icon name="edit" size="md" />
@@ -301,7 +301,7 @@ export default function TeamClient() {
  {user.isActive && (
  <button
  onClick={() => handleDeactivateClick(user)}
- className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-500/10 px-2 py-1 rounded transition"
+ className="text-[var(--error-ink)] hover:text-[var(--foreground)] hover:bg-error/10 px-2 py-1 rounded transition"
  title="Deactivate"
  >
  <Icon name="delete" size="md" />
@@ -355,7 +355,7 @@ export default function TeamClient() {
  type="email"
  value={inviteForm.email}
  onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-[var(--foreground)]"
  placeholder="user@company.com"
  autoComplete="off"
  />
@@ -369,7 +369,7 @@ export default function TeamClient() {
  type="text"
  value={inviteForm.firstName}
  onChange={(e) => setInviteForm({ ...inviteForm, firstName: e.target.value })}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-[var(--foreground)]"
  placeholder="John"
  autoComplete="off"
  />
@@ -382,7 +382,7 @@ export default function TeamClient() {
  type="text"
  value={inviteForm.lastName}
  onChange={(e) => setInviteForm({ ...inviteForm, lastName: e.target.value })}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-[var(--foreground)]"
  placeholder="Doe"
  autoComplete="off"
  />
@@ -395,7 +395,7 @@ export default function TeamClient() {
  <select
  value={inviteForm.role}
  onChange={(e) => setInviteForm({ ...inviteForm, role: e.target.value })}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-[var(--foreground)]"
  >
  <option value="viewer">Viewer - Can view content and displays</option>
  <option value="manager">Manager - Can manage content and displays</option>
@@ -412,7 +412,7 @@ export default function TeamClient() {
  <button
  onClick={handleInvite}
  disabled={actionLoading || !inviteForm.email || !inviteForm.firstName || !inviteForm.lastName}
- className="px-4 py-2 text-sm font-medium text-white bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
  Send Invite
@@ -445,7 +445,7 @@ export default function TeamClient() {
  <select
  value={editRole}
  onChange={(e) => setEditRole(e.target.value)}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-[var(--foreground)]"
  >
  <option value="viewer">Viewer - Can view content and displays</option>
  <option value="manager">Manager - Can manage content and displays</option>
@@ -465,7 +465,7 @@ export default function TeamClient() {
  <button
  onClick={handleSaveRole}
  disabled={actionLoading || editRole === selectedUser.role}
- className="px-4 py-2 text-sm font-medium text-white bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
  Save Changes

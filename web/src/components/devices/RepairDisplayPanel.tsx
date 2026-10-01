@@ -286,7 +286,7 @@ export function RepairDisplayPanel({
               <p className="text-sm">
                 <Link
                   href={`/dashboard/devices/${failure.conflictingDisplayId}`}
-                  className="text-[#00E5A0] hover:text-[#00CC8E] transition font-medium"
+                  className="text-[var(--primary-ink)] hover:text-[var(--foreground)] transition font-medium"
                 >
                   Open display {failure.conflictingDisplayId}
                 </Link>

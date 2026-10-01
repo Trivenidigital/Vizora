@@ -96,8 +96,8 @@ export default function PairDevicePage() {
  <div className="max-w-2xl mx-auto space-y-6">
  <toast.ToastContainer />
  <div className="bg-[var(--surface)] rounded-lg shadow-md p-8 text-center space-y-4">
- <div className="mx-auto h-12 w-12 rounded-full bg-yellow-500/10 flex items-center justify-center">
- <Icon name="warning" size="xl" className="text-yellow-600 dark:text-yellow-400" />
+ <div className="mx-auto h-12 w-12 rounded-full bg-[var(--status-error-bg)] flex items-center justify-center">
+ <Icon name="warning" size="xl" className="text-[var(--warning-ink)]" />
  </div>
  <div>
  <h2 className="text-2xl font-bold text-[var(--foreground)]">
@@ -134,26 +134,26 @@ export default function PairDevicePage() {
  <div className="bg-[var(--surface)] rounded-lg shadow-md p-8">
  <div className="space-y-6">
  {/* Step Instructions */}
- <div className="bg-gradient-to-r from-[#00E5A0]/5 to-[#00B4D8]/5 rounded-lg p-6 border border-[#00E5A0]/30">
+ <div className="bg-brand/5 rounded-lg p-6 border border-brand/30">
  <h3 className="font-semibold text-[var(--foreground)] mb-3 flex items-center gap-2">
- <Icon name="devices" size="lg" className="text-[#00E5A0]" />
+ <Icon name="devices" size="lg" className="text-[var(--primary-ink)]" />
  How to Pair Your Device
  </h3>
  <ol className="space-y-2 text-sm text-[var(--foreground-secondary)]">
  <li className="flex items-start gap-2">
- <span className="font-bold text-[#00E5A0] min-w-[24px]">1.</span>
+ <span className="font-bold text-[var(--primary-ink)] min-w-[24px]">1.</span>
  <span>Open the Vizora Display App on your device</span>
  </li>
  <li className="flex items-start gap-2">
- <span className="font-bold text-[#00E5A0] min-w-[24px]">2.</span>
+ <span className="font-bold text-[var(--primary-ink)] min-w-[24px]">2.</span>
  <span>A 6-character pairing code will be displayed on the screen</span>
  </li>
  <li className="flex items-start gap-2">
- <span className="font-bold text-[#00E5A0] min-w-[24px]">3.</span>
+ <span className="font-bold text-[var(--primary-ink)] min-w-[24px]">3.</span>
  <span>Enter that code below along with a name for your device</span>
  </li>
  <li className="flex items-start gap-2">
- <span className="font-bold text-[#00E5A0] min-w-[24px]">4.</span>
+ <span className="font-bold text-[var(--primary-ink)] min-w-[24px]">4.</span>
  <span>Click "Pair Device" to complete the pairing</span>
  </li>
  </ol>
@@ -170,7 +170,7 @@ export default function PairDevicePage() {
  type="text"
  value={form.pairingCode}
  onChange={handleCodeChange}
- className="w-full px-4 py-4 text-center text-3xl font-bold tracking-widest border-2 border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent uppercase"
+ className="w-full px-4 py-4 text-center text-3xl font-bold tracking-widest border-2 border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent uppercase"
  placeholder="ABC123"
  maxLength={6}
  autoFocus
@@ -211,7 +211,7 @@ export default function PairDevicePage() {
  type="text"
  value={form.deviceName}
  onChange={(e) => setForm({ ...form, deviceName: e.target.value })}
- className="w-full px-4 py-3 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="w-full px-4 py-3 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
  placeholder="e.g., Lobby Display, Store Front Screen"
  />
  <p className="mt-2 text-xs text-[var(--foreground-tertiary)]">
@@ -229,7 +229,7 @@ export default function PairDevicePage() {
  type="text"
  value={form.location}
  onChange={(e) => setForm({ ...form, location: e.target.value })}
- className="w-full px-4 py-3 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="w-full px-4 py-3 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
  placeholder="e.g., Main Entrance, Floor 2"
  />
  <p className="mt-2 text-xs text-[var(--foreground-tertiary)]">
@@ -248,7 +248,7 @@ export default function PairDevicePage() {
  </button>
  <button
  onClick={handlePairing}
- className="flex-1 px-6 py-3 text-sm font-medium text-white bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center justify-center gap-2"
+ className="flex-1 px-6 py-3 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center justify-center gap-2"
  disabled={loading || !form.pairingCode || form.pairingCode.length !== 6 || !form.deviceName.trim()}
  >
  {loading ? (
@@ -258,7 +258,7 @@ export default function PairDevicePage() {
  </>
  ) : (
  <>
- <Icon name="success" size="md" className="text-white" />
+ <Icon name="success" size="md" className="text-[var(--primary-contrast)]" />
  <span>Pair Device</span>
  </>
  )}
@@ -268,12 +268,12 @@ export default function PairDevicePage() {
  </div>
 
  {/* Help Section */}
- <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-6">
- <h4 className="font-semibold text-yellow-700 dark:text-yellow-300 mb-3 flex items-center gap-2">
- <Icon name="info" size="md" className="text-yellow-600 dark:text-yellow-400" />
+ <div className="bg-[var(--status-error-bg)] border border-warning-ink/20 rounded-lg p-6">
+ <h4 className="font-semibold text-[var(--warning-ink)] mb-3 flex items-center gap-2">
+ <Icon name="info" size="md" className="text-[var(--warning-ink)]" />
  Troubleshooting Tips
  </h4>
- <ul className="text-sm text-yellow-700 dark:text-yellow-300 space-y-2">
+ <ul className="text-sm text-[var(--warning-ink)] space-y-2">
  <li>• Make sure the Vizora Display App is installed and running on your device</li>
  <li>• Ensure your device is connected to the internet</li>
  <li>• Pairing codes expire after 5 minutes - generate a new one if needed</li>
@@ -301,7 +301,7 @@ export default function PairDevicePage() {
  </div>
  </div>
  <div className="p-4 bg-[var(--background)] rounded-lg">
- <Icon name="success" size="2xl" className="mx-auto mb-2 text-green-600" />
+ <Icon name="success" size="2xl" className="mx-auto mb-2 text-[var(--success-ink)]" />
  <div className="font-semibold text-sm text-[var(--foreground)] mb-1">Pairing Complete</div>
  <div className="text-xs text-[var(--foreground-secondary)]">
  Your device will connect automatically

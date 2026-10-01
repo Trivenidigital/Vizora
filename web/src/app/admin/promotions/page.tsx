@@ -134,7 +134,7 @@ export default function AdminPromotionsPage() {
         </div>
         <button
           onClick={handleCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition"
+          className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition"
         >
           <Plus className="w-5 h-5" />
           Create Promotion
@@ -187,7 +187,7 @@ export default function AdminPromotionsPage() {
                         title="Copy code"
                       >
                         {copiedCode === promo.code ? (
-                          <Check className="w-4 h-4 text-green-500" />
+                          <Check className="w-4 h-4 text-[var(--success-ink)]" />
                         ) : (
                           <Copy className="w-4 h-4" />
                         )}
@@ -205,7 +205,7 @@ export default function AdminPromotionsPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="inline-flex items-center px-2.5 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm font-medium">
+                    <span className="inline-flex items-center px-2.5 py-1 bg-[var(--status-online-bg)] text-[var(--success-ink)] rounded-full text-sm font-medium">
                       {formatDiscount(promo)}
                     </span>
                   </td>
@@ -249,7 +249,7 @@ export default function AdminPromotionsPage() {
                       </button>
                       <button
                         onClick={() => setDeletingPromotion(promo)}
-                        className="p-2 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
+                        className="p-2 text-[var(--error-ink)] hover:bg-[var(--status-offline-bg)] rounded-lg transition"
                         title="Delete"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -273,7 +273,7 @@ export default function AdminPromotionsPage() {
             </p>
             <button
               onClick={handleCreate}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition"
             >
               <Plus className="w-5 h-5" />
               Create Promotion

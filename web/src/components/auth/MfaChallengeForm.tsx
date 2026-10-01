@@ -50,7 +50,7 @@ export default function MfaChallengeForm({
       </p>
 
       {error && (
-        <div className="flex items-start gap-3 px-4 py-3 rounded-lg mb-6 bg-[var(--error)]/10 border border-[var(--error)]/30 text-[var(--error-ink)]">
+        <div className="flex items-start gap-3 px-4 py-3 rounded-lg mb-6 bg-error/10 border border-error/30 text-[var(--error-ink)]">
           <p className="text-sm">{error}</p>
         </div>
       )}
@@ -72,7 +72,7 @@ export default function MfaChallengeForm({
               if (error) setError('');
             }}
             placeholder="123456"
-            className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent tracking-widest"
+            className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent tracking-widest"
           />
         </div>
 

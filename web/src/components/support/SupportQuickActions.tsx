@@ -13,14 +13,14 @@ export default function SupportQuickActions() {
   const { startComposing } = useSupportChat();
 
   return (
-    <div className="px-4 py-3 border-t border-white/5">
-      <p className="text-xs text-gray-500 mb-2">Quick actions</p>
+    <div className="px-4 py-3 border-t border-[var(--border)]">
+      <p className="text-xs text-[var(--foreground-tertiary)] mb-2">Quick actions</p>
       <div className="flex flex-wrap gap-2">
         {quickActions.map((action) => (
           <button
             key={action.label}
             onClick={() => startComposing(action.prefill)}
-            className="px-3 py-1.5 text-sm text-gray-300 border border-white/10 rounded-full hover:bg-white/10 transition-all duration-200"
+            className="px-3 py-1.5 text-sm text-[var(--foreground-secondary)] border border-[var(--border)] rounded-full hover:bg-[var(--surface-hover)] transition-all duration-200"
           >
             {action.label}
           </button>

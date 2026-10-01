@@ -5,40 +5,72 @@ import { PlanCard } from '../components/plan-card';
 import type { Plan } from '@/lib/types';
 
 describe('StatusBadge', () => {
+  /*
+   * These assert the TONE CLASS, not a colour.
+   *
+   * They used to pin raw palette classes (`bg-green-500/10`, `bg-[#00B4D8]/10`)
+   * straight out of this component's own table. That made them re-state the
+   * implementation rather than check it, and it made them fail on a palette
+   * change that broke nothing. The tone class is the durable statement: it says
+   * "paid reads as success", and what success LOOKS like is globals.css's
+   * business — which is where its contrast is computed.
+   *
+   * The distinctions worth protecting are that no two statuses which used to be
+   * told apart now render identically; `renders the six tones distinctly` below
+   * is that check, and it is the reason `incomplete` carries `eh-badge-outline`.
+   */
   it('renders active status correctly', () => {
     render(<StatusBadge status="active" />);
     expect(screen.getByText('Active')).toBeInTheDocument();
-    expect(screen.getByText('Active')).toHaveClass('bg-green-500/10');
+    expect(screen.getByText('Active')).toHaveClass('eh-badge-success');
   });
 
   it('renders trial status correctly', () => {
     render(<StatusBadge status="trial" />);
     expect(screen.getByText('Trial')).toBeInTheDocument();
-    expect(screen.getByText('Trial')).toHaveClass('bg-[#00B4D8]/10');
+    expect(screen.getByText('Trial')).toHaveClass('eh-badge-brand');
   });
 
   it('renders past_due status correctly', () => {
     render(<StatusBadge status="past_due" />);
     expect(screen.getByText('Past Due')).toBeInTheDocument();
-    expect(screen.getByText('Past Due')).toHaveClass('bg-yellow-500/10');
+    expect(screen.getByText('Past Due')).toHaveClass('eh-badge-warning');
   });
 
   it('renders canceled status correctly', () => {
     render(<StatusBadge status="canceled" />);
     expect(screen.getByText('Canceled')).toBeInTheDocument();
-    expect(screen.getByText('Canceled')).toHaveClass('bg-[var(--surface-hover)]');
+    expect(screen.getByText('Canceled')).toHaveClass('eh-badge-neutral');
   });
 
   it('renders paid invoice status correctly', () => {
     render(<StatusBadge status="paid" />);
     expect(screen.getByText('Paid')).toBeInTheDocument();
-    expect(screen.getByText('Paid')).toHaveClass('bg-green-500/10');
+    expect(screen.getByText('Paid')).toHaveClass('eh-badge-success');
   });
 
   it('renders open invoice status correctly', () => {
     render(<StatusBadge status="open" />);
     expect(screen.getByText('Open')).toBeInTheDocument();
-    expect(screen.getByText('Open')).toHaveClass('bg-yellow-500/10');
+    expect(screen.getByText('Open')).toHaveClass('eh-badge-warning');
+  });
+
+  /*
+   * The old table drew six visual distinctions (green, cyan, yellow, grey, red,
+   * orange). The Little Worlds tints cannot carry a seventh by hue, so
+   * `incomplete` — the only orange — moved to the OUTLINED form of its family.
+   * This pins that it did not simply collapse into the yellows: if someone
+   * "tidies" the outline away, `incomplete` and `open` become the same pill and
+   * this fails.
+   */
+  it('keeps incomplete distinct from the other warning-family statuses', () => {
+    const { rerender } = render(<StatusBadge status="incomplete" />);
+    const incomplete = screen.getByText('Incomplete').className;
+    rerender(<StatusBadge status="open" />);
+    const open = screen.getByText('Open').className;
+    expect(incomplete).toContain('eh-badge-outline');
+    expect(open).not.toContain('eh-badge-outline');
+    expect(incomplete).not.toEqual(open);
   });
 
   it('handles unknown status gracefully', () => {
@@ -73,21 +105,21 @@ describe('QuotaBar', () => {
     expect(screen.getByText('15 remaining')).toBeInTheDocument();
   });
 
-  it('shows green color for normal usage', () => {
+  it('shows the brand tone for normal usage', () => {
     const { container } = render(<QuotaBar used={10} total={25} />);
-    const progressBar = container.querySelector('.bg-\\[\\#00E5A0\\]');
+    const progressBar = container.querySelector('.bg-brand');
     expect(progressBar).toBeInTheDocument();
   });
 
-  it('shows yellow color for 75%+ usage', () => {
+  it('shows the warning tone at 75%+ usage', () => {
     const { container } = render(<QuotaBar used={80} total={100} />);
-    const progressBar = container.querySelector('.bg-yellow-500');
+    const progressBar = container.querySelector('.bg-warning');
     expect(progressBar).toBeInTheDocument();
   });
 
-  it('shows red color for 90%+ usage', () => {
+  it('shows the error tone at 90%+ usage', () => {
     const { container } = render(<QuotaBar used={95} total={100} />);
-    const progressBar = container.querySelector('.bg-red-500');
+    const progressBar = container.querySelector('.bg-error');
     expect(progressBar).toBeInTheDocument();
   });
 
