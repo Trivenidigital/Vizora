@@ -446,3 +446,33 @@ Three corrections were needed this session, all the same shape — a conclusion 
   exists, extend or fix it there. If your independent measurement disagrees with its docblock,
   that is a finding worth reporting either way — agreeing numbers cross-check the existing fix,
   disagreeing numbers mean one of you is measuring the wrong thing.
+
+## 2026-10-01 — A test that asserts the defect is worse than no test at all
+
+- The register form let a 1-character surname show a green tick and then fail on the server with a
+  bare `Bad Request`. Three validation layers disagreed (per-field tick: non-empty; `registerSchema`:
+  min 1 / max 50; server DTO: min 2 / max 100), and the password rule was wrong in BOTH directions
+  at once — it demanded a digit the server does not require while the checklist rendered directly
+  beneath it correctly said "number or special".
+- **Five existing cases in `validation.test.ts` were pinning the drift.** Three asserted the false
+  rejection outright. So the suite was not merely blind to the defect, it was defending it: any
+  correct fix would have presented as a regression and been "fixed" back. `register-page.test.tsx`
+  could never have caught it either, because it stubs `registerSchema.parse` and so never exercises
+  validation at all.
+- **A second trap in the same investigation.** The brief asserted the API returns class-validator
+  detail and the page discards it. False: `main.ts:141` sets
+  `disableErrorMessages: process.env.NODE_ENV === 'production'`, so production genuinely sends
+  `{statusCode: 400, message: 'Bad Request'}` and nothing more. The production log line reading
+  "error detail: undefined" supports BOTH diagnoses — a logger fault, or a server with nothing to
+  log — and only reading the pipe config separates them. No client change could surface a message
+  the server never sent.
+- **Rules:**
+  1. When a bug survives a green suite, read the tests for whether they ASSERT the broken behaviour
+     before concluding the path is untested. A defect-encoding test is the more dangerous of the two.
+  2. A spec that stubs the thing under test (`registerSchema.parse`) proves nothing about it. Check
+     what a suite actually exercises before citing it as coverage.
+  3. One observation consistent with two diagnoses is not evidence for either. Go and read the
+     configuration that distinguishes them.
+  4. Client-side validation must MIRROR the server contract from a single definition, never restate
+     it. Three independent restatements is how these drifted apart, and the drift was invisible
+     because each layer was internally consistent.
