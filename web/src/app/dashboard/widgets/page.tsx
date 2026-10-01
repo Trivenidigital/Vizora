@@ -7,6 +7,7 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import EmptyState from '@/components/EmptyState';
 import { useToast } from '@/lib/hooks/useToast';
 import { Icon } from '@/theme/icons';
+import type { IconName } from '@/theme/icons';
 import WeatherWidget from '@/components/widgets/WeatherWidget';
 import SheetsWidget from '@/components/widgets/SheetsWidget';
 import SocialFeedWidget, { parsePostUrls } from '@/components/widgets/SocialFeedWidget';
@@ -111,6 +112,73 @@ interface Widget {
 }
 
 const WIDGET_TYPES_UNAVAILABLE_MESSAGE = 'Widget types could not be loaded. Try again before creating widgets.';
+
+/*
+ * WIDGET TYPE TILES — one map for the hue, the glyph ink and the icon.
+ *
+ * These were TWO maps, `getColorForType` and `getIconForType`, keyed on the same
+ * strings — and they fell through for the same four types, so the Widget Gallery
+ * rendered six cards of which four shared one colour AND one icon and were
+ * indistinguishable. Fusing them is the point: a type can no longer have a hue
+ * but no icon, and a fall-through cannot happen to one map and not the other.
+ *
+ * THE KEYS ARE THE REGISTRY'S SPELLINGS, NOT THE GALLERY'S LABELS. The six types
+ * the middleware actually serves are the `readonly type` values of the six
+ * providers registered in `ContentModule`, returned by
+ * `ContentService.getWidgetTypes()` and fetched here by `apiClient.getWidgetTypes()`:
+ *
+ *   weather · rss · social_instagram · social_twitter · social_facebook · generic-api
+ *
+ * The social ones carry UNDERSCORES. `type.replace(/_/g, ' ')` in the merge step
+ * below turns `social_instagram` into the label "Social Instagram", so the visible
+ * name is not the key — a grep for `social-instagram` finds nothing and proves
+ * nothing. `clock` and `countdown` are `CreateWidgetDto` enum members, so a SAVED
+ * widget can carry them and the My Widgets list keys on `widget.widgetType`;
+ * `social-feed` and `sheets` reach this map only through `DEFAULT_WIDGET_TYPES`,
+ * i.e. only when the types request throws. All ten are therefore reachable.
+ *
+ * The hue is IDENTITY, not status — non-ordinal, so `--cat-*` and never the status
+ * tokens, which would assert a condition the type does not have.
+ *
+ * Each tile is a FLAT hue, not a gradient. The gradients ran from the hue's `-bg`
+ * tint to the hue, and a white glyph on that measured 1.33-1.37:1 at the tint end
+ * and 2.63-3.14:1 across the midpoint — the gallery's `white/80` was 2.23-2.59:1.
+ * Every hue failed the 3:1 floor for a graphical object. On the flat hue the worst
+ * of the ten is `--cat-pink` at 6.12:1, so the glyph is legible wherever it lands.
+ */
+type WidgetTypeTile = { tile: string; ink: string; icon: IconName };
+
+const WIDGET_TYPE_TILES: Record<string, WidgetTypeTile> = {
+  weather: { tile: 'bg-[var(--cat-blue)]', ink: 'text-white', icon: 'sun' },
+  rss: { tile: 'bg-[var(--cat-orange)]', ink: 'text-white', icon: 'list' },
+  social_instagram: { tile: 'bg-[var(--cat-pink)]', ink: 'text-white', icon: 'grid' },
+  social_twitter: { tile: 'bg-[var(--cat-teal)]', ink: 'text-white', icon: 'bell' },
+  social_facebook: { tile: 'bg-[var(--cat-indigo)]', ink: 'text-white', icon: 'document' },
+  'generic-api': { tile: 'bg-[var(--cat-yellow)]', ink: 'text-white', icon: 'power' },
+  'social-feed': { tile: 'bg-[var(--cat-rose)]', ink: 'text-white', icon: 'link' },
+  clock: { tile: 'bg-[var(--cat-purple)]', ink: 'text-white', icon: 'clock' },
+  countdown: { tile: 'bg-[var(--cat-red)]', ink: 'text-white', icon: 'clock' },
+  sheets: { tile: 'bg-[var(--cat-green)]', ink: 'text-white', icon: 'content' },
+};
+
+/*
+ * UNKNOWN TYPE — neutral, on purpose.
+ *
+ * The fallback used to be the brand gradient and the `content` icon, which made an
+ * unrecognised type read as a first-class category rather than as an absence. A
+ * quiet `--background-tertiary` band says "no identity assigned" instead. The ink
+ * has to come from the map for the same reason: the hue tiles are dark and take
+ * white, this one is light and takes `--foreground-tertiary` (4.73:1).
+ *
+ * `help` rather than `content`, because `content` and `image` are the same glyph
+ * and `sheets` already uses it — a fallback that looks like a real type is the bug
+ * this map exists to prevent.
+ */
+const WIDGET_TYPE_TILE_FALLBACK: WidgetTypeTile = {
+  tile: 'bg-[var(--background-tertiary)]',
+  ink: 'text-[var(--foreground-tertiary)]',
+  icon: 'help',
+};
 
 const humanizeFieldName = (key: string) =>
   key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
@@ -265,37 +333,11 @@ export default function WidgetsPage() {
     setLoading(false);
   };
 
-  const getIconForType = (type: string) => {
-    const mapping: Record<string, string> = {
-      weather: 'sun',
-      rss: 'list',
-      'social-media': 'link',
-      'social-feed': 'link',
-      clock: 'clock',
-      countdown: 'clock',
-      sheets: 'content',
-    };
-    return (mapping[type] || 'content') as any;
-  };
-
-  const getColorForType = (type: string) => {
-    /*
-     * Widget TYPE identity, not status. Each gradient runs from the hue's tint
-     * to its ink so the tile reads as one colour with depth rather than as two
-     * unrelated stops — the old `-400 -> -600` pairs were dark-theme values and
-     * the light halves measured under 2.5:1 against anything.
-     */
-    const mapping: Record<string, string> = {
-      weather: 'from-[var(--cat-blue-bg)] to-[var(--cat-blue)]',
-      rss: 'from-[var(--cat-orange-bg)] to-[var(--cat-orange)]',
-      'social-media': 'from-[var(--cat-pink-bg)] to-[var(--cat-pink)]',
-      'social-feed': 'from-[var(--cat-pink-bg)] via-[var(--cat-purple)] to-[var(--cat-orange)]',
-      clock: 'from-[var(--cat-purple-bg)] to-[var(--cat-purple)]',
-      countdown: 'from-[var(--cat-red-bg)] to-[var(--cat-red)]',
-      sheets: 'from-[var(--cat-green-bg)] to-[var(--cat-green)]',
-    };
-    return mapping[type] || 'from-[var(--primary-light)] to-[var(--primary)]';
-  };
+  const tileForType = (type: string): WidgetTypeTile =>
+    WIDGET_TYPE_TILES[type] ?? WIDGET_TYPE_TILE_FALLBACK;
+  const getIconForType = (type: string) => tileForType(type).icon;
+  const getColorForType = (type: string) => tileForType(type).tile;
+  const getGlyphInkForType = (type: string) => tileForType(type).ink;
 
   const openWizard = (type: WidgetType) => {
     if (type.available === false) {
@@ -433,7 +475,7 @@ export default function WidgetsPage() {
         <div key={key} className="space-y-1">
           <label className="block text-sm font-medium text-[var(--foreground-secondary)]">
             {label}
-            {schema.required && <span className="text-red-500 ml-1">*</span>}
+            {schema.required && <span className="text-[var(--error-ink)] ml-1">*</span>}
           </label>
           <textarea
             aria-label={label}
@@ -447,7 +489,7 @@ export default function WidgetsPage() {
                 onChange(key, e.target.value);
               }
             }}
-            className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)] resize-y font-mono text-sm"
+            className="eh-input w-full px-3 py-2 rounded-lg resize-y font-mono text-sm"
           />
         </div>
       );
@@ -458,7 +500,7 @@ export default function WidgetsPage() {
         <div key={key} className="space-y-1">
           <label className="block text-sm font-medium text-[var(--foreground-secondary)]">
             {label}
-            {schema.required && <span className="text-red-500 ml-1">*</span>}
+            {schema.required && <span className="text-[var(--error-ink)] ml-1">*</span>}
           </label>
           <textarea
             aria-label={label}
@@ -466,7 +508,7 @@ export default function WidgetsPage() {
             placeholder={schema.placeholder || ''}
             rows={4}
             onChange={(e) => onChange(key, e.target.value)}
-            className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)] resize-y"
+            className="eh-input w-full px-3 py-2 rounded-lg resize-y"
           />
         </div>
       );
@@ -479,7 +521,7 @@ export default function WidgetsPage() {
             type="checkbox"
             checked={!!value}
             onChange={(e) => onChange(key, e.target.checked)}
-            className="w-4 h-4 rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]"
+            className="w-4 h-4 rounded border-[var(--border)] text-[var(--primary-ink)] focus:ring-[var(--primary-ink)]"
           />
           <span className="text-sm font-medium text-[var(--foreground)]">{label}</span>
         </label>
@@ -491,13 +533,13 @@ export default function WidgetsPage() {
         <div key={key} className="space-y-1">
           <label className="block text-sm font-medium text-[var(--foreground-secondary)]">
             {label}
-            {schema.required && <span className="text-red-500 ml-1">*</span>}
+            {schema.required && <span className="text-[var(--error-ink)] ml-1">*</span>}
           </label>
           <select
             aria-label={label}
             value={value || ''}
             onChange={(e) => onChange(key, e.target.value)}
-            className="eh-select w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+            className="eh-select w-full px-3 py-2 rounded-lg"
           >
             <option value="">Select...</option>
             {(schema.options || []).map((opt: string) => (
@@ -523,7 +565,7 @@ export default function WidgetsPage() {
             min={schema.min}
             max={schema.max}
             onChange={(e) => onChange(key, parseInt(e.target.value) || 0)}
-            className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+            className="eh-input w-full px-3 py-2 rounded-lg"
           />
         </div>
       );
@@ -534,7 +576,7 @@ export default function WidgetsPage() {
       <div key={key} className="space-y-1">
         <label className="block text-sm font-medium text-[var(--foreground-secondary)]">
           {label}
-          {schema.required && <span className="text-red-500 ml-1">*</span>}
+          {schema.required && <span className="text-[var(--error-ink)] ml-1">*</span>}
         </label>
         <input
           aria-label={label}
@@ -542,7 +584,7 @@ export default function WidgetsPage() {
           value={value || ''}
           placeholder={schema.placeholder || ''}
           onChange={(e) => onChange(key, e.target.value)}
-          className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+          className="eh-input w-full px-3 py-2 rounded-lg"
         />
       </div>
     );
@@ -585,7 +627,7 @@ export default function WidgetsPage() {
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="eh-dash-title font-sora text-2xl text-[var(--foreground)]">Widgets</h2>
+          <h2 className="eh-dash-title font-sora text-2xl">Widgets</h2>
           <p className="mt-2 text-[var(--foreground-secondary)]">
             Add dynamic data widgets like weather, RSS feeds, clocks, and more to your displays.
           </p>
@@ -613,19 +655,19 @@ export default function WidgetsPage() {
           {/* My Widgets Section */}
           {myWidgets.length > 0 && (
             <div>
-              <h3 className="eh-dash-subtitle text-xl font-semibold text-[var(--foreground)] mb-4">My Widgets</h3>
+              <h3 className="eh-dash-subtitle text-xl font-semibold mb-4">My Widgets</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
                 {myWidgets.map((widget) => (
                   <div
                     key={widget.id}
-                    className="eh-dash-card rounded-lg shadow border border-[var(--border)] overflow-hidden hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300"
+                    className="eh-dash-card rounded-lg shadow overflow-hidden hover:-translate-y-[2px] hover:border-brand/20 hover:shadow-md transition-all duration-300"
                   >
-                    <div className={`h-2 bg-gradient-to-r ${getColorForType(widget.widgetType)}`} />
+                    <div className={`h-2 ${getColorForType(widget.widgetType)}`} />
                     <div className="p-5">
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${getColorForType(widget.widgetType)} flex items-center justify-center`}>
-                            <Icon name={getIconForType(widget.widgetType)} size="md" className="text-white" />
+                          <div className={`w-10 h-10 rounded-lg ${getColorForType(widget.widgetType)} flex items-center justify-center`}>
+                            <Icon name={getIconForType(widget.widgetType)} size="md" className={getGlyphInkForType(widget.widgetType)} />
                           </div>
                           <div>
                             <h4 className="font-semibold text-[var(--foreground)]">{widget.name}</h4>
@@ -644,7 +686,7 @@ export default function WidgetsPage() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => openEditModal(widget)}
-                          className="flex-1 text-sm py-2 rounded-lg bg-[#00E5A0]/10 text-[#00E5A0] hover:bg-[#00E5A0]/20 transition font-medium flex items-center justify-center gap-1"
+                          className="flex-1 text-sm py-2 rounded-lg bg-brand/10 text-[var(--primary-ink)] hover:bg-brand/20 transition font-medium flex items-center justify-center gap-1"
                         >
                           <Icon name="edit" size="sm" />
                           Edit
@@ -652,7 +694,7 @@ export default function WidgetsPage() {
                         <button
                           onClick={() => handleRefreshWidget(widget.id)}
                           disabled={refreshingWidgetIds.has(widget.id)}
-                          className="flex-1 text-sm py-2 rounded-lg bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition font-medium flex items-center justify-center gap-1 disabled:opacity-60 disabled:cursor-wait"
+                          className="flex-1 text-sm py-2 rounded-lg bg-[var(--surface-hover)] text-[var(--foreground-secondary)] hover:bg-[var(--border)] transition font-medium flex items-center justify-center gap-1 disabled:opacity-60 disabled:cursor-wait"
                         >
                           {refreshingWidgetIds.has(widget.id) ? (
                             <LoadingSpinner size="sm" />
@@ -671,11 +713,11 @@ export default function WidgetsPage() {
 
           {/* Widget Type Gallery */}
           <div>
-            <h3 className="eh-dash-subtitle text-xl font-semibold text-[var(--foreground)] mb-4">
+            <h3 className="eh-dash-subtitle text-xl font-semibold mb-4">
               {myWidgets.length > 0 ? 'Available Widget Types' : 'Widget Gallery'}
             </h3>
             {widgetTypesLoadError && (
-              <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+              <div className="mb-4 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-[var(--warning-ink)]">
                 {widgetTypesLoadError}
               </div>
             )}
@@ -683,18 +725,18 @@ export default function WidgetsPage() {
               {widgetTypes.map((wType) => (
                 <div
                   key={wType.type}
-                  className={`eh-dash-card rounded-lg shadow overflow-hidden transition-all duration-300 border border-[var(--border)] group ${wType.available === false ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md'}`}
+                  className={`eh-dash-card rounded-lg shadow overflow-hidden transition-all duration-300 group ${wType.available === false ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:-translate-y-[2px] hover:border-brand/20 hover:shadow-md'}`}
                   onClick={() => openWizard(wType)}
                 >
-                  <div className={`h-32 bg-gradient-to-br ${getColorForType(wType.type)} flex items-center justify-center relative`}>
-                    <Icon name={getIconForType(wType.type)} size="4xl" className="text-white/80 group-hover:text-white transition" />
+                  <div className={`h-32 ${getColorForType(wType.type)} flex items-center justify-center relative`}>
+                    <Icon name={getIconForType(wType.type)} size="4xl" className={`${getGlyphInkForType(wType.type)} transition`} />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition" />
                   </div>
                   <div className="p-5">
                     <h4 className="text-lg font-semibold text-[var(--foreground)] mb-1">{wType.name}</h4>
                     <p className="text-sm text-[var(--foreground-secondary)] mb-4">{wType.description}</p>
                     {wType.available === false && (
-                      <p className="text-xs text-amber-600 dark:text-amber-300 mb-3">
+                      <p className="text-xs text-[var(--warning-ink)] mb-3">
                         Reload widget types before creating.
                       </p>
                     )}
@@ -704,7 +746,7 @@ export default function WidgetsPage() {
                         openWizard(wType);
                       }}
                       disabled={wType.available === false}
-                      className="w-full py-2 text-sm font-medium rounded-lg border border-[#00E5A0] text-[#00E5A0] hover:bg-[#00E5A0] hover:text-[#061A21] transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#00E5A0]"
+                      className="w-full py-2 text-sm font-medium rounded-lg border border-[var(--primary-ink)] text-[var(--primary-ink)] hover:bg-[var(--primary)] hover:text-[var(--lw-on-forest)] transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[var(--primary-ink)]"
                     >
                       <Icon name="add" size="sm" />
                       Create {wType.name} Widget
@@ -746,7 +788,7 @@ export default function WidgetsPage() {
           <div className="space-y-4">
             <p className="text-[var(--foreground-secondary)]">Choose a widget type to get started:</p>
             {widgetTypesLoadError && (
-              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+              <div className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-[var(--warning-ink)]">
                 {widgetTypesLoadError}
               </div>
             )}
@@ -756,10 +798,10 @@ export default function WidgetsPage() {
                   key={wType.type}
                   onClick={() => openWizard(wType)}
                   disabled={wType.available === false}
-                  className="flex items-center gap-3 p-4 rounded-lg border border-[var(--border)] hover:border-[#00E5A0] hover:bg-[#00E5A0]/5 transition text-left disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-[var(--border)] disabled:hover:bg-transparent"
+                  className="flex items-center gap-3 p-4 rounded-lg border border-[var(--border)] hover:border-[var(--primary-ink)] hover:bg-brand/5 transition text-left disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:border-[var(--border)] disabled:hover:bg-transparent"
                 >
-                  <div className={`w-12 h-12 rounded-lg bg-gradient-to-br ${getColorForType(wType.type)} flex items-center justify-center flex-shrink-0`}>
-                    <Icon name={getIconForType(wType.type)} size="lg" className="text-white" />
+                  <div className={`w-12 h-12 rounded-lg ${getColorForType(wType.type)} flex items-center justify-center flex-shrink-0`}>
+                    <Icon name={getIconForType(wType.type)} size="lg" className={getGlyphInkForType(wType.type)} />
                   </div>
                   <div>
                     <div className="font-medium text-[var(--foreground)]">{wType.name}</div>
@@ -783,7 +825,7 @@ export default function WidgetsPage() {
             {/* Widget Name */}
             <div>
               <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-1">
-                Widget Name <span className="text-red-500">*</span>
+                Widget Name <span className="text-[var(--error-ink)]">*</span>
               </label>
               <input
                 aria-label="Widget Name"
@@ -791,7 +833,7 @@ export default function WidgetsPage() {
                 value={widgetName}
                 onChange={(e) => setWidgetName(e.target.value)}
                 placeholder={`My ${selectedType.name} Widget`}
-                className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+                className="eh-input w-full px-3 py-2 rounded-lg"
               />
             </div>
 
@@ -806,7 +848,7 @@ export default function WidgetsPage() {
                 value={widgetDescription}
                 onChange={(e) => setWidgetDescription(e.target.value)}
                 placeholder="A brief description..."
-                className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+                className="eh-input w-full px-3 py-2 rounded-lg"
               />
             </div>
 
@@ -945,8 +987,8 @@ export default function WidgetsPage() {
             ) : (
             /* Generic Preview Card */
             <div className="bg-[var(--background)] rounded-lg border border-[var(--border)] overflow-hidden">
-              <div className={`h-20 bg-gradient-to-br ${getColorForType(selectedType.type)} flex items-center justify-center`}>
-                <Icon name={getIconForType(selectedType.type)} size="3xl" className="text-white" />
+              <div className={`h-20 ${getColorForType(selectedType.type)} flex items-center justify-center`}>
+                <Icon name={getIconForType(selectedType.type)} size="3xl" className={getGlyphInkForType(selectedType.type)} />
               </div>
               <div className="p-4">
                 <h4 className="font-semibold text-[var(--foreground)] mb-1">{widgetName || 'Untitled Widget'}</h4>
@@ -1003,8 +1045,8 @@ export default function WidgetsPage() {
         {editingWidget && (
           <div className="space-y-4">
             <div className="flex items-center gap-3 p-3 bg-[var(--background)] rounded-lg">
-              <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${getColorForType(editingWidget.widgetType)} flex items-center justify-center`}>
-                <Icon name={getIconForType(editingWidget.widgetType)} size="md" className="text-white" />
+              <div className={`w-10 h-10 rounded-lg ${getColorForType(editingWidget.widgetType)} flex items-center justify-center`}>
+                <Icon name={getIconForType(editingWidget.widgetType)} size="md" className={getGlyphInkForType(editingWidget.widgetType)} />
               </div>
               <div>
                 <div className="font-medium text-[var(--foreground)]">{editingWidget.name}</div>
