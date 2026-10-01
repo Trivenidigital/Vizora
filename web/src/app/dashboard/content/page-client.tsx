@@ -1105,29 +1105,48 @@ export default function ContentClient() {
  }
  };
 
+ /*
+  * STATUS BADGES — the five recorded tones, on two forms.
+  *
+  * Nine statuses, and `globals.css` deliberately offers only five low-chroma
+  * status tints: "callers that need more distinctions than six get them from
+  * FORM instead". So the second axis does the work, and it carries a meaning
+  * rather than just breaking a tie: a FILLED pill is a state the system put the
+  * item in, an OUTLINED pill is a state that records or awaits a HUMAN
+  * decision (flagged, rejected, pending approval, draft).
+  *
+  * Two of these names never existed. `eh-badge-danger` and `eh-badge-muted`
+  * are defined nowhere in the repo, so `error`, `archived` and the default
+  * branch have been shipping an unstyled box — no fill and no ink — while
+  * looking like they had a tone. They are `eh-badge-error` / `-neutral`.
+  *
+  * `processing` moves from the warning tone to info. It is not a warning, and
+  * holding warning for `expired` is what makes nine statuses fit in ten slots
+  * without a collision.
+  */
  const getStatusColor = (status: string) => {
  switch (status) {
  case 'ready':
  case 'active':
  return 'eh-badge-success';
  case 'processing':
- return 'eh-badge-warning';
+ return 'eh-badge-info';
  case 'error':
- return 'eh-badge-danger';
+ return 'eh-badge-error';
  case 'flagged':
- return 'bg-amber-500/20 text-[var(--warning-ink)] border border-amber-500/30';
+ return 'eh-badge-warning eh-badge-outline';
  case 'rejected':
- return 'bg-red-500/20 text-[var(--error-ink)] border border-red-500/30';
+ return 'eh-badge-error eh-badge-outline';
  case 'expired':
- return 'bg-orange-500/20 text-[var(--warning-ink)] border border-orange-500/30';
+ return 'eh-badge-warning';
  case 'pending_approval':
- return 'bg-blue-500/20 text-[var(--info-ink)] border border-blue-500/30';
+ return 'eh-badge-info eh-badge-outline';
  case 'draft':
- return 'bg-slate-500/20 text-[var(--foreground-tertiary)] border border-slate-500/30';
+ return 'eh-badge-neutral eh-badge-outline';
  case 'archived':
- return 'eh-badge-muted';
+ return 'eh-badge-neutral';
  default:
- return 'eh-badge-muted';
+ return 'eh-badge-neutral';
  }
  };
 
@@ -1269,17 +1288,17 @@ export default function ContentClient() {
  {totalContentItems} items
  {realtimeStatus === 'connected' && (
  <span className="inline-flex items-center gap-1" title="Real-time sync enabled">
- <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+ <span className="w-2 h-2 bg-[var(--success-ink)] rounded-full animate-pulse"></span>
  </span>
  )}
  {realtimeStatus === 'reconnecting' && (
  <span className="inline-flex items-center gap-1" title="Reconnecting...">
- <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></span>
+ <span className="w-2 h-2 bg-[var(--warning-ink)] rounded-full animate-pulse"></span>
  </span>
  )}
  {realtimeStatus === 'offline' && (
  <span className="inline-flex items-center gap-1" title="Live updates unavailable">
- <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+ <span className="w-2 h-2 bg-[var(--error-ink)] rounded-full"></span>
  </span>
  )}
  {getPendingCount() > 0 && (
@@ -1294,7 +1313,7 @@ export default function ContentClient() {
  onClick={() => setIsUploadModalOpen(true)}
  className="eh-btn-neon px-6 py-3 rounded-xl flex items-center gap-2"
  >
- <Icon name="add" size="lg" className="text-[#061A21]" />
+ <Icon name="add" size="lg" />
  <span>Upload Content</span>
  </button>
  )}
@@ -1370,7 +1389,7 @@ export default function ContentClient() {
  <div className="text-sm text-[var(--foreground-secondary)]">Loading tags...</div>
  ) : tagsLoadError ? (
  <div className="flex items-center justify-between gap-3">
- <p className="text-sm text-red-600">{tagsLoadError}</p>
+ <p className="text-sm text-[var(--error-ink)]">{tagsLoadError}</p>
  <button
  type="button"
  onClick={loadContentTags}
@@ -1654,11 +1673,11 @@ export default function ContentClient() {
  }
  }}
  >
- <div className="w-12 h-12 bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] rounded flex items-center justify-center flex-shrink-0 overflow-hidden">
+ <div className="w-12 h-12 bg-gradient-to-br from-[var(--viewport-surface)] to-[var(--viewport-bg)] rounded flex items-center justify-center flex-shrink-0 overflow-hidden">
  {item.thumbnailUrl ? (
  <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
  ) : (
- <Icon name={getTypeIcon(item.type)} size="xl" className="text-white" />
+ <Icon name={getTypeIcon(item.type)} size="xl" className="text-[var(--viewport-ink)]" />
  )}
  </div>
  <div className="min-w-0">
@@ -1690,7 +1709,7 @@ export default function ContentClient() {
  <button
  onClick={() => handleReview(item)}
  disabled={isContentDetailLoading(item.id)}
- className="eh-icon-btn text-[var(--warning-ink)]"
+ className="eh-icon-btn"
  title="Review flagged content"
  >
  <Icon name="shield" size="md" />
@@ -1753,10 +1772,10 @@ export default function ContentClient() {
  {filteredContent.map((item) => (
  <div
  key={item.id}
- className="eh-dash-card overflow-hidden hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300"
+ className="eh-dash-card overflow-hidden hover:-translate-y-[2px] hover:border-brand/20 hover:shadow-md transition-all duration-300"
  >
  <div
- className="aspect-video bg-gradient-to-br from-[#00E5A0] to-[#00B4D8] flex items-center justify-center relative overflow-hidden cursor-pointer"
+ className="aspect-video bg-gradient-to-br from-[var(--viewport-surface)] to-[var(--viewport-bg)] flex items-center justify-center relative overflow-hidden cursor-pointer"
  aria-busy={isContentDetailLoading(item.id)}
  aria-disabled={isContentDetailLoading(item.id)}
  onClick={() => handlePreview(item)}
@@ -1774,7 +1793,7 @@ export default function ContentClient() {
  }}
  />
  ) : null}
- <Icon name={getTypeIcon(item.type)} size="6xl" className={`text-white ${item.thumbnailUrl ? 'hidden' : ''}`} />
+ <Icon name={getTypeIcon(item.type)} size="6xl" className={`text-[var(--viewport-ink)] ${item.thumbnailUrl ? 'hidden' : ''}`} />
  {canSelectContent && (
  <div className="absolute top-3 left-3">
  <input
@@ -1812,7 +1831,7 @@ export default function ContentClient() {
  <button
  onClick={() => handleReview(item)}
  disabled={isContentDetailLoading(item.id)}
- className="eh-icon-btn text-sm py-2 rounded-lg font-medium flex items-center justify-center gap-1 text-[var(--warning-ink)] col-span-2"
+ className="eh-icon-btn text-sm py-2 rounded-lg font-medium flex items-center justify-center gap-1 col-span-2"
  >
  <Icon name="shield" size="sm" />
  Review
@@ -1909,14 +1928,14 @@ export default function ContentClient() {
  setFormErrors({ ...formErrors, title: errors.title });
  }
  }}
- className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] ${
- formErrors.title ? 'border-red-500' : 'border-[var(--border)]'
+ className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-[var(--foreground)] ${
+ formErrors.title ? 'border-[var(--error)]' : 'border-[var(--border)]'
  }`}
  placeholder="e.g., Summer Sale Banner"
  autoComplete="off"
  />
  {formErrors.title && (
- <p className="mt-1 text-sm text-red-600">{formErrors.title}</p>
+ <p className="mt-1 text-sm text-[var(--error-ink)]">{formErrors.title}</p>
  )}
  </div>
  <div>
@@ -1931,7 +1950,7 @@ export default function ContentClient() {
  setUploadForm({ ...uploadForm, type: nextType });
  }}
  disabled={actionLoading}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-[var(--foreground)]"
  >
  <option value="image">Image</option>
  <option value="video">Video</option>
@@ -1952,8 +1971,8 @@ export default function ContentClient() {
  actionLoading ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'
  } ${
  isDragActive
- ? 'border-[#00E5A0] bg-[#00E5A0]/5'
- : 'border-[var(--border)] hover:border-[#00E5A0] hover:bg-[var(--surface-hover)]'
+ ? 'border-[var(--primary-ink)] bg-brand/5'
+ : 'border-[var(--border)] hover:border-[var(--primary-ink)] hover:bg-[var(--surface-hover)]'
  }`}
  >
  <input {...getInputProps()} />
@@ -1971,12 +1990,12 @@ export default function ContentClient() {
  />
  </svg>
  {isDragActive ? (
- <p className="text-sm font-medium text-[#00E5A0]">
+ <p className="text-sm font-medium text-[var(--primary-ink)]">
  Drop the file here...
  </p>
  ) : (
  <>
- <p className="text-sm font-medium text-[#00E5A0] hover:text-[#00E5A0] mb-1">
+ <p className="text-sm font-medium text-[var(--primary-ink)] mb-1">
  Drag & drop file here, or click to browse
  </p>
  <p className="text-xs text-[var(--foreground-tertiary)]">
@@ -1994,7 +2013,7 @@ export default function ContentClient() {
  <div
  key={`${rejection.fileName}-${rejection.reason}`}
  role="alert"
- className="rounded border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-600"
+ className="rounded border border-error/30 bg-error/10 p-3 text-sm text-[var(--error-ink)]"
  >
  <p className="font-medium">{rejection.fileName}</p>
  <p className="text-xs">{rejection.reason}</p>
@@ -2013,7 +2032,7 @@ export default function ContentClient() {
  <button
  onClick={clearUploadQueue}
  disabled={actionLoading}
- className="text-xs text-red-600 hover:text-red-700 dark:hover:text-[var(--error-ink)] disabled:opacity-50 disabled:cursor-not-allowed"
+ className="text-xs text-[var(--error)] hover:text-[var(--error-ink)] disabled:opacity-50 disabled:cursor-not-allowed"
  >
  Clear All
  </button>
@@ -2034,13 +2053,13 @@ export default function ContentClient() {
  {item.status === 'uploading' && (
  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--border)]">
  <div
- className="h-full rounded-full bg-[#00E5A0] transition-all duration-300"
+ className="h-full rounded-full bg-[var(--primary)] transition-all duration-300"
  style={{ width: `${item.progress}%` }}
  />
  </div>
  )}
  {item.status === 'error' && item.error && (
- <p className="mt-1 text-xs text-red-600">{item.error}</p>
+ <p className="mt-1 text-xs text-[var(--error-ink)]">{item.error}</p>
  )}
  </div>
  <div className="ml-4 flex items-center gap-2">
@@ -2048,22 +2067,22 @@ export default function ContentClient() {
  <span className="text-xs text-[var(--foreground-tertiary)]">Pending</span>
  )}
  {item.status === 'uploading' && (
- <span className="flex items-center gap-2 text-xs text-[#00E5A0]">
+ <span className="flex items-center gap-2 text-xs text-[var(--primary-ink)]">
  <LoadingSpinner size="sm" />
  {item.progress}%
  </span>
  )}
  {item.status === 'success' && (
- <span className="text-green-600">✓</span>
+ <span className="text-[var(--success-ink)]">✓</span>
  )}
  {item.status === 'error' && (
- <span className="text-red-600" title={item.error}>✗</span>
+ <span className="text-[var(--error-ink)]" title={item.error}>✗</span>
  )}
  <button
  onClick={() => removeUploadQueueItem(idx)}
  disabled={actionLoading}
  aria-label={`Remove ${item.file.name} from upload queue`}
- className="text-[var(--foreground-tertiary)] hover:text-red-600 dark:hover:text-[var(--error-ink)] disabled:opacity-50 disabled:cursor-not-allowed"
+ className="text-[var(--foreground-tertiary)] hover:text-[var(--error-ink)] disabled:opacity-50 disabled:cursor-not-allowed"
  >
  ×
  </button>
@@ -2097,14 +2116,14 @@ export default function ContentClient() {
  setFormErrors({ ...formErrors, url: errors.url });
  }
  }}
- className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] ${
- formErrors.url ? 'border-red-500' : 'border-[var(--border)]'
+ className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-[var(--foreground)] ${
+ formErrors.url ? 'border-[var(--error)]' : 'border-[var(--border)]'
  }`}
  placeholder="https://example.com/page"
  autoComplete="off"
  />
  {formErrors.url && (
- <p className="mt-1 text-sm text-red-600">{formErrors.url}</p>
+ <p className="mt-1 text-sm text-[var(--error-ink)]">{formErrors.url}</p>
  )}
  </div>
  )}
@@ -2114,11 +2133,11 @@ export default function ContentClient() {
  <div className="space-y-2">
  <div className="flex justify-between text-sm">
  <span className="text-[var(--foreground-secondary)]">Uploading...</span>
- <span className="font-medium text-[#00E5A0]">{uploadProgress}%</span>
+ <span className="font-medium text-[var(--primary-ink)]">{uploadProgress}%</span>
  </div>
  <div className="w-full bg-[var(--border)] rounded-full h-2.5 overflow-hidden">
  <div
- className="bg-[#00E5A0] h-2.5 rounded-full transition-all duration-300 ease-out"
+ className="bg-[var(--primary)] h-2.5 rounded-full transition-all duration-300 ease-out"
  style={{ width: `${uploadProgress}%` }}
  />
  </div>
@@ -2143,7 +2162,7 @@ export default function ContentClient() {
  </button>
  <button
  onClick={handleUpload}
- className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  disabled={actionLoading || (uploadQueue.length > 0 ? retryableUploadCount === 0 : (!uploadForm.title || !uploadForm.url))}
  >
  {actionLoading && <LoadingSpinner size="sm" />}
@@ -2185,14 +2204,14 @@ export default function ContentClient() {
  setFormErrors({ ...formErrors, title: errors.title });
  }
  }}
- className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] ${
- formErrors.title ? 'border-red-500' : 'border-[var(--border)]'
+ className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-[var(--foreground)] ${
+ formErrors.title ? 'border-[var(--error)]' : 'border-[var(--border)]'
  }`}
  placeholder="e.g., Summer Sale Banner"
  autoComplete="off"
  />
  {formErrors.title && (
- <p className="mt-1 text-sm text-red-600">{formErrors.title}</p>
+ <p className="mt-1 text-sm text-[var(--error-ink)]">{formErrors.title}</p>
  )}
  </div>
  
@@ -2215,7 +2234,7 @@ export default function ContentClient() {
  min={1}
  value={editDuration}
  onChange={(e) => setEditDuration(Math.max(1, parseInt(e.target.value, 10) || 1))}
- className="w-32 px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="w-32 px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
  />
  <p className="mt-1 text-xs text-[var(--foreground-tertiary)]">
  How long this item shows in a playlist before advancing.
@@ -2257,7 +2276,7 @@ export default function ContentClient() {
  </button>
  <button
  onClick={handleSaveEdit}
- className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  disabled={actionLoading || !uploadForm.title}
  >
  {actionLoading && <LoadingSpinner size="sm" />}
@@ -2290,7 +2309,7 @@ export default function ContentClient() {
  max={60}
  value={pushDuration}
  onChange={(e) => setPushDuration(Math.max(1, Math.min(60, parseInt(e.target.value) || 5)))}
- className="w-24 px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="w-24 px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
  />
  <div className="flex gap-1">
  {[1, 5, 15, 30].map((min) => (
@@ -2299,7 +2318,7 @@ export default function ContentClient() {
  onClick={() => setPushDuration(min)}
  className={`px-2 py-1 text-xs rounded ${
  pushDuration === min
- ? 'bg-[#00E5A0] text-[#061A21]'
+ ? 'bg-[var(--primary)] text-[var(--lw-on-forest)]'
  : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
  }`}
  >
@@ -2323,7 +2342,7 @@ export default function ContentClient() {
  <div className="py-4 flex justify-center"><LoadingSpinner size="sm" /></div>
  ) : devicesLoadError ? (
  <div className="py-4 text-center space-y-3">
- <p className="text-sm text-error-600 dark:text-error-400">{devicesLoadError}</p>
+ <p className="text-sm text-[var(--error-ink)]">{devicesLoadError}</p>
  <button
  type="button"
  onClick={() => void ensureDevicesLoaded(true)}
@@ -2354,7 +2373,7 @@ export default function ContentClient() {
  setSelectedDevices(selectedDevices.filter((id) => id !== device.id));
  }
  }}
- className="mr-3 h-4 w-4 rounded border-[var(--border)] text-[#00E5A0] focus:ring-[#00E5A0]"
+ className="mr-3 h-4 w-4 rounded border-[var(--border)] text-[var(--primary-ink)] focus:ring-[var(--primary-ink)]"
  />
  <div className="flex-1">
  <div className="font-medium text-[var(--foreground)]">{device.nickname}</div>
@@ -2363,7 +2382,7 @@ export default function ContentClient() {
  <span
  className={`px-2 py-1 text-xs rounded-full ${
  device.status === 'online'
- ? 'bg-success-500/10 text-success-700 dark:text-success-400'
+ ? 'bg-success/10 text-[var(--success-ink)]'
  : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)]'
  }`}
  >
@@ -2384,11 +2403,11 @@ export default function ContentClient() {
  </button>
  <button
  onClick={confirmPush}
- className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  disabled={actionLoading || selectedDevices.length === 0}
  >
  {actionLoading && <LoadingSpinner size="sm" />}
- <Icon name="push" size="md" className="text-[#061A21]" />
+ <Icon name="push" size="md" />
  Push to {selectedDevices.length} Device{selectedDevices.length !== 1 ? 's' : ''}
  </button>
  </div>
@@ -2409,7 +2428,7 @@ export default function ContentClient() {
  value={selectedPlaylist}
  onChange={(e) => setSelectedPlaylist(e.target.value)}
  disabled={playlistsLoading || !!playlistsLoadError}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
  >
  <option value="">
  {playlistsLoading
@@ -2426,7 +2445,7 @@ export default function ContentClient() {
  </select>
  {playlistsLoadError && (
  <div className="mt-3 text-center space-y-3">
- <p className="text-sm text-error-600 dark:text-error-400">{playlistsLoadError}</p>
+ <p className="text-sm text-[var(--error-ink)]">{playlistsLoadError}</p>
  <button
  type="button"
  onClick={() => void ensurePlaylistsLoaded(true)}
@@ -2445,7 +2464,7 @@ export default function ContentClient() {
  </button>
  <button
  onClick={confirmAddToPlaylist}
- className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium text-[var(--lw-on-forest)] bg-[var(--primary)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  disabled={actionLoading || !selectedPlaylist}
  >
  {actionLoading && <LoadingSpinner size="sm" />}
@@ -2505,7 +2524,7 @@ export default function ContentClient() {
  min={1}
  value={bulkDurationValue}
  onChange={(e) => setBulkDurationValue(Math.max(1, parseInt(e.target.value, 10) || 1))}
- className="w-32 px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent"
+ className="w-32 px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
  />
  </div>
  <div className="flex justify-end gap-3 pt-2">
@@ -2519,7 +2538,7 @@ export default function ContentClient() {
  <button
  onClick={confirmBulkSetDuration}
  disabled={actionLoading}
- className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
  Apply
@@ -2547,7 +2566,7 @@ export default function ContentClient() {
  type="text"
  value={newFolderName}
  onChange={(e) => setNewFolderName(e.target.value)}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-[var(--foreground)]"
  placeholder="e.g., Marketing Materials"
  autoComplete="off"
  />
@@ -2559,7 +2578,7 @@ export default function ContentClient() {
  <select
  value={newFolderParentId || ''}
  onChange={(e) => setNewFolderParentId(e.target.value || null)}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-[var(--foreground)]"
  >
  <option value="">Root (No Parent)</option>
  {folders.map((folder) => (
@@ -2583,7 +2602,7 @@ export default function ContentClient() {
  <button
  onClick={handleCreateFolder}
  disabled={actionLoading || !newFolderName.trim()}
- className="px-4 py-2 text-sm font-medium bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
  Create Folder
@@ -2612,7 +2631,7 @@ export default function ContentClient() {
  <textarea
  value={flagReason}
  onChange={(e) => setFlagReason(e.target.value)}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
  placeholder="Why are you flagging this content?"
  rows={3}
  maxLength={500}
@@ -2631,7 +2650,7 @@ export default function ContentClient() {
  <button
  onClick={confirmFlag}
  disabled={actionLoading}
- className="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium text-white bg-warning-800 rounded-lg hover:bg-warning-900 transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
  <Icon name="warning" size="md" className="text-white" />
@@ -2651,7 +2670,7 @@ export default function ContentClient() {
  title="Review Flagged Content"
  >
  <div className="space-y-4">
- <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+ <div className="p-3 bg-warning/10 border border-warning/20 rounded-lg">
  <p className="text-[var(--warning-ink)] text-sm font-medium flex items-center gap-2">
  <Icon name="warning" size="md" />
  This content has been flagged for review
@@ -2675,7 +2694,7 @@ export default function ContentClient() {
  <textarea
  value={reviewReason}
  onChange={(e) => setReviewReason(e.target.value)}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
  placeholder="Add a note for the review decision..."
  rows={3}
  maxLength={500}
@@ -2694,7 +2713,7 @@ export default function ContentClient() {
  <button
  onClick={() => confirmReview('reject')}
  disabled={actionLoading}
- className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium text-white bg-[var(--danger-solid)] rounded-lg hover:bg-[var(--danger-solid-hover)] transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
  <Icon name="close" size="md" className="text-white" />
@@ -2703,10 +2722,10 @@ export default function ContentClient() {
  <button
  onClick={() => confirmReview('approve')}
  disabled={actionLoading}
- className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium text-[var(--lw-on-forest)] bg-[var(--primary)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
- <Icon name="check" size="md" className="text-white" />
+ <Icon name="check" size="md" />
  Approve
  </button>
  </div>
@@ -2733,7 +2752,7 @@ export default function ContentClient() {
  <select
  value={targetFolderId || ''}
  onChange={(e) => setTargetFolderId(e.target.value || null)}
- className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)]"
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-[var(--foreground)]"
  >
  <option value="">Select a folder...</option>
  {folders.map((folder) => (
@@ -2756,10 +2775,10 @@ export default function ContentClient() {
  <button
  onClick={handleMoveToFolder}
  disabled={actionLoading || !targetFolderId}
- className="px-4 py-2 text-sm font-medium text-white bg-yellow-600 rounded-lg hover:bg-yellow-700 transition disabled:opacity-50 flex items-center gap-2"
+ className="px-4 py-2 text-sm font-medium text-[var(--lw-on-forest)] bg-[var(--primary)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
- <Icon name="folder" size="md" className="text-white" />
+ <Icon name="folder" size="md" />
  Move to Folder
  </button>
  </div>
