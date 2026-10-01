@@ -43,6 +43,23 @@ const IN_PRICING = {
   locale: 'en-IN',
 };
 
+/**
+ * The price figure inside ONE plan card.
+ *
+ * These assertions used to query the whole document — `getByText('$8')` — which
+ * made them silently wrong rather than failing when a price moved. $8 was Pro's
+ * monthly price until the October rise and is Basic's now, so the assertion kept
+ * passing while testing a different tier than it was written for. A figure is
+ * only meaningful attached to the tier charging it.
+ *
+ * Scoped through markup the component already has: a unique `<h3>` per card and
+ * the `.lwr-card` container. Nothing was added for the test's benefit, and if
+ * either hook is renamed this fails loudly instead of matching the wrong element,
+ * which is the whole point.
+ */
+const planCard = (tier: string) =>
+  screen.getByRole('heading', { name: tier }).closest('.lwr-card') as HTMLElement;
+
 const mockGeoPricing = () => {
   global.fetch = jest.fn().mockResolvedValue({
     ok: true,
@@ -303,7 +320,10 @@ describe('geo-aware pricing', () => {
     const user = userEvent.setup();
     render(<Index />);
 
+    // Pro monthly. Scoped, so it cannot drift onto Basic the next time a price moves.
     expect(await screen.findByText('₹749', undefined, WAIT)).toBeInTheDocument();
+    expect(within(planCard('Pro')).getByText('₹749')).toBeInTheDocument();
+    expect(within(planCard('Basic')).getByText('₹499')).toBeInTheDocument();
 
     const monthly = screen.getByRole('button', { name: /^Monthly$/ });
     const annual = screen.getByRole('button', { name: /Annual/ });
@@ -311,15 +331,18 @@ describe('geo-aware pricing', () => {
     expect(annual).toHaveAttribute('aria-pressed', 'false');
 
     await user.click(annual);
-    expect(screen.getByText('₹525')).toBeInTheDocument();
+    expect(within(planCard('Pro')).getByText('₹525')).toBeInTheDocument();
+    expect(within(planCard('Basic')).getByText('₹375')).toBeInTheDocument();
     expect(monthly).toHaveAttribute('aria-pressed', 'false');
     expect(annual).toHaveAttribute('aria-pressed', 'true');
 
     await user.click(screen.getByRole('button', { name: 'USD' }));
-    expect(screen.getByText('$7')).toBeInTheDocument();
+    expect(within(planCard('Basic')).getByText('$6')).toBeInTheDocument();
+    expect(within(planCard('Pro')).getByText('$7')).toBeInTheDocument();
 
     await user.click(monthly);
-    expect(screen.getByText('$8')).toBeInTheDocument();
+    expect(within(planCard('Basic')).getByText('$8')).toBeInTheDocument();
+    expect(within(planCard('Pro')).getByText('$10')).toBeInTheDocument();
   });
 
   it('falls back to US pricing when the geo lookup fails', async () => {
