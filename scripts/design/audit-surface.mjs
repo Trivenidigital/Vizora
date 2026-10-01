@@ -29,6 +29,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import nodePath from 'node:path';
 
+/*
+ * The scanner lives in its own module so it can be pointed at a fixture as well as
+ * at the app — see its header, and `audit-scan-svg-control.mjs`, which is what
+ * proves it reports SVG text correctly in both directions.
+ */
+import { SCAN } from './audit-scan.mjs';
+
 const BASE = process.env.CAPTURE_BASE_URL || 'http://localhost:3001';
 const EMAIL = process.env.DEMO_TENANT_EMAIL || 'demo@vizora.local';
 const PASSWORD = process.env.DEMO_TENANT_PASSWORD;
@@ -76,244 +83,6 @@ const OUT_DIR = arg('out', nodePath.join(os.tmpdir(), 'vizora-design-audit', TAG
 const VIEWPORT_HEIGHT = { 1440: 900, 1280: 800, 1024: 768, 768: 1024, 430: 932, 390: 844, 375: 812, 320: 640 };
 
 fs.mkdirSync(OUT_DIR, { recursive: true });
-
-/* ---------- in-page scanners (serialised into the browser) ---------- */
-
-/**
- * Contrast + clipping + touch-target scan.
- *
- * Runs entirely in the page so it reads *computed* values off live nodes,
- * which is the only thing that proves an element actually receives a rule.
- */
-const SCAN = ({ vw, isMobile }) => {
-  /* --- colour helpers --- */
-  const parse = (c) => {
-    const m = String(c).match(/rgba?\(([^)]+)\)/);
-    if (!m) return null;
-    const p = m[1].split(/[,/]/).map((x) => parseFloat(x.trim()));
-    return { r: p[0], g: p[1], b: p[2], a: p[3] === undefined ? 1 : p[3] };
-  };
-  const lum = ({ r, g, b }) => {
-    const f = (v) => {
-      const s = v / 255;
-      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-    };
-    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
-  };
-  const ratio = (a, b) => {
-    const l1 = lum(a), l2 = lum(b);
-    return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
-  };
-  /**
-   * Porter-Duff "source over", carrying a real result alpha.
-   *
-   * Returning a hardcoded `a: 1` would be correct only when the backdrop is
-   * already opaque. `effectiveBg` walks outward through possibly-translucent
-   * layers and stops once the accumulated alpha is opaque — with a fixed 1 it
-   * would stop after the FIRST translucent layer and report a colour composited
-   * against nothing, silently mis-measuring contrast on any tinted overlay
-   * (`bg-[var(--primary)]/10`, the sidebar active wash, modal scrims).
-   */
-  const over = (fg, bg) => {
-    const a = fg.a + bg.a * (1 - fg.a);
-    if (a === 0) return { r: 0, g: 0, b: 0, a: 0 };
-    return {
-      r: (fg.r * fg.a + bg.r * bg.a * (1 - fg.a)) / a,
-      g: (fg.g * fg.a + bg.g * bg.a * (1 - fg.a)) / a,
-      b: (fg.b * fg.a + bg.b * bg.a * (1 - fg.a)) / a,
-      a,
-    };
-  };
-
-  const label = (el) => {
-    const cls = typeof el.className === 'string' ? el.className : (el.className?.baseVal ?? '');
-    return `${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}${cls ? '.' + cls.trim().split(/\s+/).slice(0, 4).join('.') : ''}`.slice(0, 140);
-  };
-
-  const visible = (el, cs, rect) => {
-    if (cs.visibility === 'hidden' || cs.display === 'none' || cs.opacity === '0') return false;
-    if (rect.width === 0 || rect.height === 0) return false;
-    return true;
-  };
-
-  /** Nearest ancestor painting an opaque-ish background; also reports image backdrops. */
-  const effectiveBg = (el) => {
-    let node = el;
-    let acc = null;
-    while (node && node !== document.documentElement.parentElement) {
-      const cs = getComputedStyle(node);
-      if (cs.backgroundImage && cs.backgroundImage !== 'none') return { color: null, indeterminate: true };
-      const c = parse(cs.backgroundColor);
-      if (c && c.a > 0) {
-        acc = acc ? over(acc, c) : c;
-        if (acc.a >= 0.999) return { color: acc, indeterminate: false };
-      }
-      node = node.parentElement;
-    }
-    // Ran out of ancestors while still translucent: whatever we accumulated is
-    // really sitting on the canvas, so composite it over white rather than
-    // discarding it and assuming plain white.
-    const canvas = { r: 255, g: 255, b: 255, a: 1 };
-    return { color: acc ? over(acc, canvas) : canvas, indeterminate: false };
-  };
-
-  const clipped = [];
-  const contrast = [];
-  const touch = [];
-  const seenText = new Set();
-
-  const all = document.querySelectorAll('body *');
-  for (const el of all) {
-    const cs = getComputedStyle(el);
-    const rect = el.getBoundingClientRect();
-    if (!visible(el, cs, rect)) continue;
-
-    /* --- clipping: real geometry, immune to overflow-x:hidden (trap 7) ---
-     *
-     * Extending past the viewport is NOT by itself a defect: a wide table
-     * inside an `overflow-x: auto` scroller is perfectly reachable, and its
-     * getBoundingClientRect() still reports the full width. Reporting on
-     * geometry alone flags every legitimate scroller as broken.
-     *
-     * So walk up and find the first ancestor that governs horizontal overflow:
-     *   auto/scroll that can actually scroll -> reachable, not a finding
-     *   hidden/clip                          -> genuinely unreachable content
-     *   nothing all the way up               -> depends on the document
-     */
-    if (rect.right > vw + 1 && rect.left < vw) {
-      let node = el.parentElement;
-      let verdict = null;
-      while (node) {
-        const pcs = getComputedStyle(node);
-        const ox = pcs.overflowX;
-        if (ox === 'auto' || ox === 'scroll') {
-          verdict = node.scrollWidth > node.clientWidth + 1 ? null : `unscrollable:${label(node)}`;
-          break;
-        }
-        if (ox === 'hidden' || ox === 'clip') {
-          verdict = `hidden-by:${label(node)}`;
-          break;
-        }
-        node = node.parentElement;
-      }
-      if (node === null) {
-        const de = document.documentElement;
-        verdict = de.scrollWidth > de.clientWidth + 1 ? null : 'hidden-by:document';
-      }
-      if (verdict) {
-        clipped.push({ el: label(el), right: Math.round(rect.right), overBy: Math.round(rect.right - vw), cause: verdict });
-      }
-    }
-
-    /* --- touch targets on mobile --- */
-    if (isMobile) {
-      const interactive =
-        ['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName) ||
-        el.getAttribute('role') === 'button' ||
-        el.getAttribute('role') === 'link';
-      /*
-       * Skip-links and other sr-only affordances are deliberately collapsed
-       * (1x1, clipped) until focused. Counting them as undersized targets
-       * reports a defect for doing accessibility correctly.
-       */
-      const srOnly =
-        rect.width <= 1 &&
-        rect.height <= 1 &&
-        (cs.position === 'absolute' || cs.clip !== 'auto' || cs.overflow === 'hidden');
-      if (interactive && !srOnly && (rect.width < 44 || rect.height < 44)) {
-        touch.push({ el: label(el), w: Math.round(rect.width), h: Math.round(rect.height) });
-      }
-    }
-
-    /* --- contrast: only elements with their own rendered text --- */
-    const own = Array.from(el.childNodes)
-      .filter((n) => n.nodeType === 3)
-      .map((n) => n.textContent.trim())
-      .join(' ')
-      .trim();
-    if (!own || own.length < 2) continue;
-
-    const fg = parse(cs.color);
-    if (!fg || fg.a === 0) continue;
-    const bg = effectiveBg(el);
-    if (bg.indeterminate || !bg.color) continue;
-
-    const composited = fg.a < 1 ? over(fg, bg.color) : fg;
-    const r = ratio(composited, bg.color);
-    const size = parseFloat(cs.fontSize);
-    const weight = parseInt(cs.fontWeight, 10) || 400;
-    const large = size >= 24 || (size >= 18.66 && weight >= 700);
-    const required = large ? 3 : 4.5;
-
-    if (r < required) {
-      const key = `${cs.color}|${cs.fontSize}|${own.slice(0, 24)}`;
-      if (seenText.has(key)) continue;
-      seenText.add(key);
-      contrast.push({
-        el: label(el),
-        text: own.slice(0, 60),
-        color: cs.color,
-        bg: `rgb(${Math.round(bg.color.r)}, ${Math.round(bg.color.g)}, ${Math.round(bg.color.b)})`,
-        fontSize: cs.fontSize,
-        weight,
-        ratio: Math.round(r * 100) / 100,
-        required,
-      });
-    }
-  }
-
-  /* --- focus indicator ---
-   *
-   * Focus rings are not text, so the contrast pass above never sees them, and a
-   * ring bound to a FILL token can silently fall to 1.4:1 while every text run
-   * on the page still passes. WCAG 2.1 SC 1.4.11 wants >= 3:1 for non-text UI.
-   *
-   * `getPropertyValue` returns the *declared* value (`var(--primary-ink)`), so
-   * resolve it by letting the engine compute it on a throwaway element.
-   */
-  const focusRing = (() => {
-    const probe = document.createElement('span');
-    probe.style.color = 'var(--focus-ring-color)';
-    probe.style.position = 'absolute';
-    probe.style.opacity = '0';
-    /*
-     * Mount the probe INSIDE the scope the content lives in, not on <body>.
-     * Custom properties cascade, so a probe on <body> resolves the root-scope
-     * value while the real controls inside a scoped wrapper (`.mkt`) resolve a
-     * different one. Measuring from the wrong place reported a 1.65:1 focus
-     * ring on the auth pages that no focusable element there actually has.
-     */
-    const scope = document.querySelector('.mkt') || document.body;
-    scope.appendChild(probe);
-    const resolved = parse(getComputedStyle(probe).color);
-    probe.remove();
-    if (!resolved) return null;
-
-    const surfaces = [
-      ['scope', parse(getComputedStyle(scope).backgroundColor)],
-      ['body', parse(getComputedStyle(document.body).backgroundColor)],
-      ['card', (() => {
-        const card = document.querySelector('.eh-dash-card, [class*="surface"]');
-        return card ? parse(getComputedStyle(card).backgroundColor) : null;
-      })()],
-    ];
-    const worst = surfaces
-      .filter(([, c]) => c && c.a > 0)
-      .map(([where, c]) => ({ where, ratio: Math.round(ratio(resolved, c) * 100) / 100 }))
-      .sort((a, b) => a.ratio - b.ratio)[0];
-    if (!worst) return null;
-    return { color: getComputedStyle(document.documentElement).getPropertyValue('--focus-ring-color').trim(), ...worst, passes: worst.ratio >= 3 };
-  })();
-
-  return {
-    focusRing,
-    docScrollWidth: document.documentElement.scrollWidth,
-    docClientWidth: document.documentElement.clientWidth,
-    clipped: clipped.slice(0, 30),
-    contrast: contrast.sort((a, b) => a.ratio - b.ratio).slice(0, 40),
-    touch: touch.slice(0, 30),
-  };
-};
 
 /* ---------- driver ---------- */
 
@@ -430,6 +199,7 @@ for (const theme of THEMES) {
           scan.focusRing && !scan.focusRing.passes ? `focus-ring ${scan.focusRing.ratio}:1` : '',
           scan.clipped.length ? `${scan.clipped.length} clipped` : '',
           scan.contrast.length ? `${scan.contrast.length} contrast` : '',
+          scan.skipped?.length ? `${scan.skipped.length} unmeasurable` : '',
           scan.touch.length ? `${scan.touch.length} touch` : '',
           consoleErrors.length ? `${consoleErrors.length} console` : '',
         ].filter(Boolean).join(', ');
@@ -450,17 +220,23 @@ fs.writeFileSync(nodePath.join(OUT_DIR, 'report.json'), JSON.stringify(report, n
 
 /* ---------- human-readable summary ---------- */
 const lines = [`# Vizora surface audit — ${TAG}`, ''];
-let totalClip = 0, totalContrast = 0, totalTouch = 0, totalErr = 0;
+let totalClip = 0, totalContrast = 0, totalTouch = 0, totalErr = 0, totalSkipped = 0;
 for (const r of report) {
   totalClip += r.clipped?.length || 0;
   totalContrast += r.contrast?.length || 0;
   totalTouch += r.touch?.length || 0;
   totalErr += r.consoleErrors?.length || 0;
+  totalSkipped += r.skipped?.length || 0;
 }
-lines.push(`Captures: ${report.length} | clipped: ${totalClip} | contrast failures: ${totalContrast} | small touch targets: ${totalTouch} | console errors: ${totalErr}`, '');
+/*
+ * `unmeasurable` is reported alongside the failures on purpose. A text run whose
+ * paint is a gradient or `none` is neither passing nor failing, and letting it drop
+ * out silently makes "0 contrast findings" mean two different things.
+ */
+lines.push(`Captures: ${report.length} | clipped: ${totalClip} | contrast failures: ${totalContrast} | unmeasurable text runs: ${totalSkipped} | small touch targets: ${totalTouch} | console errors: ${totalErr}`, '');
 for (const r of report) {
   if (r.error) { lines.push(`## ${r.route} [${r.theme} ${r.viewport}px] — ERROR: ${r.error}`, ''); continue; }
-  const issues = (r.clipped.length + r.contrast.length + r.touch.length + r.consoleErrors.length);
+  const issues = (r.clipped.length + r.contrast.length + r.touch.length + r.consoleErrors.length + (r.skipped?.length || 0));
   if (!issues) continue;
   lines.push(`## ${r.route} [${r.theme} ${r.viewport}px]`);
   if (r.clipped.length) {
@@ -469,7 +245,11 @@ for (const r of report) {
   }
   if (r.contrast.length) {
     lines.push(`**Contrast below AA (${r.contrast.length})**`);
-    r.contrast.slice(0, 10).forEach((c) => lines.push(`- ${c.ratio}:1 (needs ${c.required}) \`${c.color}\` on \`${c.bg}\` — "${c.text}" — \`${c.el}\``));
+    r.contrast.slice(0, 10).forEach((c) => lines.push(`- ${c.ratio}:1 (needs ${c.required}) \`${c.color}\` (${c.paintedBy || 'color'}) on \`${c.bg}\` — "${c.text}" — \`${c.el}\``));
+  }
+  if (r.skipped?.length) {
+    lines.push(`**Text runs that could not be measured (${r.skipped.length})**`);
+    r.skipped.slice(0, 8).forEach((x) => lines.push(`- ${x.reason} — "${x.text}" — \`${x.el}\``));
   }
   if (r.touch.length) {
     lines.push(`**Touch targets < 44px (${r.touch.length})**`);
@@ -484,4 +264,4 @@ for (const r of report) {
 fs.writeFileSync(nodePath.join(OUT_DIR, 'SUMMARY.md'), lines.join('\n'));
 
 console.log(`\nwrote ${report.length} captures to ${OUT_DIR}`);
-console.log(`clipped=${totalClip} contrast=${totalContrast} touch=${totalTouch} console=${totalErr}`);
+console.log(`clipped=${totalClip} contrast=${totalContrast} unmeasurable=${totalSkipped} touch=${totalTouch} console=${totalErr}`);
