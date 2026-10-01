@@ -6372,7 +6372,9 @@
     ],
     "colourUtils": [
      "text-[var(--foreground-tertiary)]"
-    ]
+    ],
+    "status": "FALSE POSITIVE - resolved in B7, row kept",
+    "whyNotANoOp": ".eh-td sets padding/white-space/font-size/font-variant-numeric and no colour (globals.css ~1379); the utility is load-bearing"
    },
    {
     "file": "app/dashboard/content/page-client.tsx",
