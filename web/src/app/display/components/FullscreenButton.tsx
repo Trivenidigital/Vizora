@@ -44,13 +44,20 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(0,0,0,0.6)',
-    color: '#fff',
+    /*
+     * Same call as `StatusBar`: opaque `--viewport-surface` rather than a black
+     * scrim, because this control floats over customer media and a translucent
+     * fill leaves its glyph with no computable ground. The icon is
+     * `currentColor`, so the two SVGs inherit the 13.33:1 ink below.
+     * `backdropFilter` is gone for the same reason it went there — inert behind
+     * an opaque fill.
+     */
+    background: 'var(--viewport-surface)',
+    color: 'var(--viewport-ink)',
     border: 'none',
     borderRadius: '10px',
     cursor: 'pointer',
     zIndex: 1000,
-    backdropFilter: 'blur(4px)',
     transition: 'background 0.2s',
   },
 };

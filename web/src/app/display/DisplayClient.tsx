@@ -208,7 +208,17 @@ export function DisplayClient() {
     return (
       <div style={styles.errorScreen}>
         <div style={styles.errorContent}>
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ff6b6b" strokeWidth="2">
+          {/* `currentColor` + a `style` colour: `var()` resolves in CSS, never in a
+              presentation attribute. Matches the error text below. */}
+          <svg
+            width="48"
+            height="48"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            style={{ color: 'var(--error-light)' }}
+          >
             <circle cx="12" cy="12" r="10" />
             <line x1="12" y1="8" x2="12" y2="12" />
             <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -237,6 +247,21 @@ export function DisplayClient() {
   );
 }
 
+/*
+ * VIEWPORT, like `PairingScreen` — the loading and reconnecting states are the
+ * TV's own chrome between pieces of customer media, so they stay dark on the
+ * `--viewport-*` tokens. See the note in `PairingScreen` for why.
+ *
+ * Computed on `--viewport-bg`, which is the ground for both screens:
+ *   error text      --error-light         4.81:1
+ *   error subtext   --viewport-ink-muted  7.75:1
+ *   spinner head    --viewport-ink       15.71:1
+ *
+ * `--error-light` rather than `--error-ink` (2.79:1 here, invisible) and rather
+ * than the `--error-lighter` the pairing card uses: this ground is the deeper of
+ * the two, so the brighter step is not needed — 4.81:1 clears the 4.5:1 this
+ * text size asks for, on the real ground, and keeps the red reading as red.
+ */
 const styles: Record<string, React.CSSProperties> = {
   loadingScreen: {
     display: 'flex',
@@ -244,13 +269,13 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     width: '100vw',
     height: '100vh',
-    background: '#061A21',
+    background: 'var(--viewport-bg)',
   },
   spinner: {
     width: '48px',
     height: '48px',
-    border: '3px solid rgba(0,229,160,0.2)',
-    borderTopColor: '#00E5A0',
+    border: '3px solid var(--viewport-border)',
+    borderTopColor: 'var(--viewport-ink)',
     borderRadius: '50%',
     animation: 'spin 1s linear infinite',
   },
@@ -260,7 +285,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     width: '100vw',
     height: '100vh',
-    background: '#061A21',
+    background: 'var(--viewport-bg)',
   },
   errorContent: {
     textAlign: 'center' as const,
@@ -270,13 +295,13 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '1rem',
   },
   errorText: {
-    color: '#ff6b6b',
+    color: 'var(--error-light)',
     fontSize: '1.2rem',
     fontWeight: 500,
     margin: 0,
   },
   errorSubtext: {
-    color: 'rgba(255,255,255,0.4)',
+    color: 'var(--viewport-ink-muted)',
     fontSize: '0.9rem',
   },
 };
