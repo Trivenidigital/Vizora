@@ -40,8 +40,8 @@ export default function Index() {
           region: 'US',
           currency: 'USD',
           symbol: '$',
-          basic: { monthly: 6, annual: 5 },
-          pro: { monthly: 8, annual: 7 },
+          basic: { monthly: 8, annual: 6 },
+          pro: { monthly: 10, annual: 7 },
           locale: 'en-US',
         });
       });
