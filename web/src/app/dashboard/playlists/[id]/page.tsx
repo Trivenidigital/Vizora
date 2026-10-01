@@ -331,7 +331,7 @@ export default function PlaylistBuilderPage() {
      }
    }}
    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-     playlist.loop !== false ? 'bg-[#00E5A0]' : 'bg-[var(--border)]'
+     playlist.loop !== false ? 'bg-[var(--primary)]' : 'bg-[var(--border)]'
    }`}
  >
    <span
@@ -372,10 +372,10 @@ export default function PlaylistBuilderPage() {
  <button
  onClick={handleSave}
  disabled={saving}
- className="px-6 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition font-medium flex items-center gap-2 disabled:opacity-50"
+ className="px-6 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition font-medium flex items-center gap-2 disabled:opacity-50"
  >
  {saving && <LoadingSpinner size="sm" />}
- <Icon name="check" size="sm" className="text-white" />
+ <Icon name="check" size="sm" className="text-[var(--lw-on-forest)]" />
  Save
  </button>
  )}

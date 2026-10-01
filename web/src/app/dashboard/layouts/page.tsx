@@ -43,10 +43,10 @@ function LayoutPreviewGrid({ type }: { type: string }) {
   };
 
   const zoneColors = [
-    'bg-[#00E5A0]/40',
-    'bg-[#00B4D8]/40',
-    'bg-purple-400/40',
-    'bg-orange-400/40',
+    'bg-[var(--cat-green-bg)]',
+    'bg-[var(--cat-teal-bg)]',
+    'bg-[var(--cat-purple-bg)]',
+    'bg-[var(--cat-orange-bg)]',
   ];
 
   const getZones = (layoutType: string) => {
@@ -310,7 +310,7 @@ export default function LayoutsPage() {
       {/* Page Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="eh-dash-title font-sora text-2xl text-[var(--foreground)]">Layouts</h2>
+          <h2 className="eh-dash-title font-sora text-2xl">Layouts</h2>
           <p className="mt-2 text-[var(--foreground-secondary)]">
             Create multi-zone display layouts to show multiple content items simultaneously.
           </p>
@@ -338,12 +338,12 @@ export default function LayoutsPage() {
           {/* Existing Layouts */}
           {layouts.length > 0 && (
             <div>
-              <h3 className="eh-dash-subtitle text-xl font-semibold text-[var(--foreground)] mb-4">My Layouts</h3>
+              <h3 className="eh-dash-subtitle text-xl font-semibold mb-4">My Layouts</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                 {layouts.map((layout) => (
                   <div
                     key={layout.id}
-                    className="eh-dash-card rounded-lg shadow border border-[var(--border)] overflow-hidden hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300"
+                    className="eh-dash-card rounded-lg shadow border border-[var(--border)] overflow-hidden hover:-translate-y-[2px] hover:shadow-md transition-all duration-300"
                   >
                     <div className="p-5">
                       <LayoutPreviewGrid type={layout.layoutType} />
@@ -364,7 +364,7 @@ export default function LayoutsPage() {
                       <div className="flex gap-2">
                         <button
                           onClick={() => router.push(`/dashboard/layouts/${layout.id}`)}
-                          className="flex-1 text-sm py-2 rounded-lg bg-[#00E5A0]/10 text-[#00E5A0] hover:bg-[#00E5A0]/20 transition font-medium flex items-center justify-center gap-1"
+                          className="flex-1 text-sm py-2 rounded-lg bg-brand/10 text-[var(--primary-ink)] hover:bg-brand/20 transition font-medium flex items-center justify-center gap-1"
                         >
                           <Icon name="edit" size="sm" />
                           Edit Zones
@@ -374,7 +374,7 @@ export default function LayoutsPage() {
                             setDeletingLayout(layout);
                             setIsDeleteDialogOpen(true);
                           }}
-                          className="text-sm py-2 px-3 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition font-medium flex items-center justify-center"
+                          className="text-sm py-2 px-3 rounded-lg bg-error/10 text-[var(--error-ink)] hover:bg-error/20 transition font-medium flex items-center justify-center"
                         >
                           <Icon name="delete" size="sm" />
                         </button>
@@ -388,7 +388,7 @@ export default function LayoutsPage() {
 
           {/* Preset Picker */}
           <div>
-            <h3 className="eh-dash-subtitle text-xl font-semibold text-[var(--foreground)] mb-4">Layout Presets</h3>
+            <h3 className="eh-dash-subtitle text-xl font-semibold mb-4">Layout Presets</h3>
             <p className="text-[var(--foreground-secondary)] mb-4">
               Choose a preset to create a new layout. Each preset defines the zone structure for your display.
             </p>
@@ -396,7 +396,7 @@ export default function LayoutsPage() {
               {presets.map((preset) => (
                 <div
                   key={getPresetType(preset)}
-                  className="eh-dash-card rounded-lg border border-[var(--border)] p-5 hover:-translate-y-[2px] hover:border-[rgba(0,229,160,0.2)] hover:shadow-md transition-all duration-300 cursor-pointer group"
+                  className="eh-dash-card rounded-lg border border-[var(--border)] p-5 hover:-translate-y-[2px] hover:shadow-md transition-all duration-300 cursor-pointer group"
                   onClick={() => {
                     setSelectedPreset(preset);
                     setLayoutName('');
@@ -455,7 +455,7 @@ export default function LayoutsPage() {
                 <button
                   key={getPresetType(preset)}
                   onClick={() => setSelectedPreset(preset)}
-                  className="w-full flex items-center gap-4 p-3 rounded-lg border border-[var(--border)] hover:border-[#00E5A0] hover:bg-[#00E5A0]/5 transition text-left"
+                  className="w-full flex items-center gap-4 p-3 rounded-lg border border-[var(--border)] hover:border-[var(--primary-ink)] hover:bg-brand/5 transition text-left"
                 >
                   <div className="w-24 flex-shrink-0">
                     <LayoutPreviewGrid type={getPresetType(preset)} />
@@ -482,7 +482,7 @@ export default function LayoutsPage() {
                 </div>
                 <button
                   onClick={() => setSelectedPreset(null)}
-                  className="ml-auto text-xs text-[#00E5A0] hover:underline"
+                  className="ml-auto text-xs text-[var(--primary-ink)] hover:underline"
                 >
                   Change
                 </button>
@@ -491,14 +491,14 @@ export default function LayoutsPage() {
               {/* Layout Name */}
               <div>
                 <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-1">
-                  Layout Name <span className="text-red-500">*</span>
+                  Layout Name <span className="text-[var(--error-ink)]">*</span>
                 </label>
                 <input
                   type="text"
                   value={layoutName}
                   onChange={(e) => setLayoutName(e.target.value)}
                   placeholder="e.g., Lobby Main Display"
-                  className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+                  className="eh-input w-full px-3 py-2 border rounded-lg"
                   autoFocus
                 />
               </div>
@@ -513,7 +513,7 @@ export default function LayoutsPage() {
                   value={layoutDescription}
                   onChange={(e) => setLayoutDescription(e.target.value)}
                   placeholder="A brief description of this layout..."
-                  className="eh-input w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-[var(--foreground)] bg-[var(--surface)]"
+                  className="eh-input w-full px-3 py-2 border rounded-lg"
                 />
               </div>
 

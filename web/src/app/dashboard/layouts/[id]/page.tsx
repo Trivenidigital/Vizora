@@ -256,7 +256,7 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
         <p className="text-[var(--foreground-secondary)]">Layout not found.</p>
         <button
           onClick={() => router.push('/dashboard/layouts')}
-          className="mt-4 px-4 py-2 bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition"
+          className="mt-4 px-4 py-2 bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition"
         >
           Back to Layouts
         </button>
@@ -290,7 +290,7 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
             onClick={() => setIsPreviewMode(!isPreviewMode)}
             className={`px-4 py-2 text-sm font-medium rounded-lg border transition flex items-center gap-2 ${
               isPreviewMode
-                ? 'bg-[#00E5A0]/10 border-[#00E5A0] text-[#00E5A0]'
+                ? 'bg-brand/10 border-[var(--primary-ink)] text-[var(--primary-ink)]'
                 : 'border-[var(--border)] text-[var(--foreground-secondary)] hover:bg-[var(--surface-hover)]'
             }`}
           >
@@ -300,7 +300,7 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
           <button
             onClick={handleSave}
             disabled={saving}
-            className="px-6 py-2 text-sm font-semibold bg-[#00E5A0] text-[#061A21] rounded-lg hover:bg-[#00CC8E] transition disabled:opacity-50 flex items-center gap-2"
+            className="px-6 py-2 text-sm font-semibold bg-[var(--primary)] text-[var(--lw-on-forest)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
           >
             {saving && <LoadingSpinner size="sm" />}
             Save Layout
@@ -329,10 +329,10 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
                     key={zone.id}
                     className={`rounded-lg border-2 transition-all cursor-pointer ${
                       isSelected
-                        ? 'border-[#00E5A0] bg-[#00E5A0]/10 ring-2 ring-[#00E5A0]/30'
+                        ? 'border-[var(--primary-ink)] bg-brand/10 ring-2 ring-brand/30'
                         : hasContent
                         ? zoneColors[idx % zoneColors.length]
-                        : 'border-dashed border-[var(--border)] bg-[var(--surface)] hover:border-[#00E5A0]/50'
+                        : 'border-dashed border-[var(--border)] bg-[var(--surface)] hover:border-brand/50'
                     }`}
                     style={{ gridArea: zone.gridArea }}
                     onClick={() => setSelectedZone(isSelected ? null : zone.id)}
@@ -432,7 +432,7 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
                         onChange={(e) =>
                           handleZoneAssignment(zone.id, 'contentId', e.target.value || null)
                         }
-                        className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-sm text-[var(--foreground)] bg-[var(--surface)]"
+                        className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-sm text-[var(--foreground)] bg-[var(--surface)]"
                       >
                         <option value="">-- No content --</option>
                         {contentItems.map((item) => (
@@ -459,7 +459,7 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
                         onChange={(e) =>
                           handleZoneAssignment(zone.id, 'playlistId', e.target.value || null)
                         }
-                        className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[#00E5A0] focus:border-transparent text-sm text-[var(--foreground)] bg-[var(--surface)]"
+                        className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-sm text-[var(--foreground)] bg-[var(--surface)]"
                       >
                         <option value="">-- No playlist --</option>
                         {playlists.map((pl) => (
@@ -477,7 +477,7 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
                           handleZoneAssignment(zone.id, 'contentId', null);
                           handleZoneAssignment(zone.id, 'playlistId', null);
                         }}
-                        className="w-full py-2 text-sm text-red-500 border border-red-500/30 rounded-lg hover:bg-red-500/10 transition flex items-center justify-center gap-2"
+                        className="w-full py-2 text-sm text-[var(--error-ink)] border border-error-ink/30 rounded-lg hover:bg-error/10 transition flex items-center justify-center gap-2"
                       >
                         <Icon name="close" size="sm" />
                         Clear Assignment
@@ -510,13 +510,13 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
                     onClick={() => setSelectedZone(zone.id)}
                     className={`w-full flex items-center gap-3 p-2 rounded-lg text-left transition text-sm ${
                       selectedZone === zone.id
-                        ? 'bg-[#00E5A0]/10 border border-[#00E5A0]/30'
+                        ? 'bg-brand/10 border border-brand/30'
                         : 'hover:bg-[var(--surface-hover)] border border-transparent'
                     }`}
                   >
                     <div
                       className={`w-3 h-3 rounded-full ${
-                        zone.contentId || zone.playlistId ? 'bg-[#00E5A0]' : 'bg-[var(--border)]'
+                        zone.contentId || zone.playlistId ? 'bg-[var(--primary-ink)]' : 'bg-[var(--border)]'
                       }`}
                     />
                     <div className="flex-1 min-w-0">
