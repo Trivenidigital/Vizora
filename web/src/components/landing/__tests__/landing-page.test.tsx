@@ -78,7 +78,7 @@ describe('homepage composition', () => {
   it('mounts every narrated section under the page landmarks', async () => {
     const { container } = await renderPage();
 
-    for (const id of ['places', 'how-it-works', 'product', 'pricing', 'faq', 'start']) {
+    for (const id of ['places', 'how-it-works', 'pricing', 'faq', 'start']) {
       expect(container.querySelector(`#${id}`)).toBeInTheDocument();
     }
 
@@ -387,32 +387,6 @@ describe('FAQ accordion', () => {
 
     const answer = container.querySelector(`#${CSS.escape(question.getAttribute('aria-controls')!)}`)!;
     expect(answer.textContent).toContain('keeps playing');
-  });
-});
-
-describe('product tour dialog', () => {
-  it('requests the video only once asked, and returns focus to the chip', async () => {
-    const user = userEvent.setup();
-    const { container } = await renderPage();
-
-    // The asset is 48 MB — it must not be in the tree before the chip is pressed.
-    expect(container.querySelector('video')).not.toBeInTheDocument();
-
-    const product = container.querySelector('#product')!;
-    const chip = within(product as HTMLElement).getByRole('button', { name: /Watch the tour/ });
-    await user.click(chip);
-
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(container.querySelector('source[src="/videos/vizora-demo.mp4"]')).toBeInTheDocument();
-
-    // The player itself must be a tab stop inside the trap, or its native
-    // controls can never be reached by keyboard.
-    await user.tab();
-    expect(document.activeElement).toBe(container.querySelector('video'));
-
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(document.activeElement).toBe(chip);
   });
 });
 

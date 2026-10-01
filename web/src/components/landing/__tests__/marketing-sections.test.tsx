@@ -1,8 +1,5 @@
-import { render, screen } from '@testing-library/react';
 import fs from 'node:fs';
 import path from 'node:path';
-
-import WorkspaceSection from '../WorkspaceSection';
 
 /**
  * Invariants for the marketing surface that are NOT page behaviour.
@@ -10,23 +7,13 @@ import WorkspaceSection from '../WorkspaceSection';
  * These are deliberately not snapshot tests. Each one pins a rule that was
  * broken at some point and would break silently again:
  *   - fabricated customer claims must not exist anywhere in the web source,
- *   - the product shot must be the real capture at its real dimensions, not a
- *     CSS reconstruction or a guessed `sizes`,
  *   - the "Little Worlds" rebrand must stay inside its own `.lw` token block:
  *     `.mkt` is shared with the legal pages and the auth layout, so recolouring
  *     it would restyle surfaces this work never looked at.
  */
 
-jest.mock('next/image', () => ({
-  __esModule: true,
-  default: ({ src, alt, sizes, width, height }: Record<string, unknown>) => (
-    <img src={String(src)} alt={String(alt)} data-sizes={String(sizes)} width={Number(width)} height={Number(height)} />
-  ),
-}));
-
 const SRC_ROOT = path.join(__dirname, '..', '..', '..');
 const GLOBALS_CSS = path.join(SRC_ROOT, 'app', 'globals.css');
-const PRODUCT_PNG = path.join(SRC_ROOT, '..', 'public', 'product', 'dashboard-fleet.png');
 
 /** The body of a top-level `<selector> { ... }` rule in globals.css. */
 const cssBlock = (css: string, selector: string) => {
@@ -69,37 +56,6 @@ describe('fabricated customer claims are gone from the source', () => {
     walk(SRC_ROOT);
 
     expect(offenders).toEqual([]);
-  });
-});
-
-describe('the workspace section ships the real product shot', () => {
-  it('renders the captured image, not a CSS reconstruction', () => {
-    render(<WorkspaceSection />);
-    const img = screen.getByRole('img', { name: /devices view/i });
-    expect(img).toHaveAttribute('src', '/product/dashboard-fleet.png');
-  });
-
-  it('declares the real intrinsic dimensions of the asset on disk', () => {
-    const png = fs.readFileSync(PRODUCT_PNG);
-    // PNG IHDR: width/height are big-endian uint32 at byte offsets 16 and 20.
-    const width = png.readUInt32BE(16);
-    const height = png.readUInt32BE(20);
-
-    render(<WorkspaceSection />);
-    const img = screen.getByRole('img', { name: /devices view/i });
-    expect(Number(img.getAttribute('width'))).toBe(width);
-    expect(Number(img.getAttribute('height'))).toBe(height);
-  });
-
-  it('caption states the data is synthetic, so it cannot read as a production claim', () => {
-    render(<WorkspaceSection />);
-    expect(screen.getByText(/demo workspace, synthetic data/i)).toBeInTheDocument();
-  });
-
-  it('sizes reflects the real column cap, not a naive vw guess', () => {
-    render(<WorkspaceSection />);
-    const img = screen.getByRole('img', { name: /devices view/i });
-    expect(img.getAttribute('data-sizes')).toContain('560px');
   });
 });
 

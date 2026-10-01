@@ -6,7 +6,6 @@ import { anchorProps } from './shared';
 const PRODUCT_LINKS = [
   { id: 'places', label: 'Places' },
   { id: 'how-it-works', label: 'How it works' },
-  { id: 'product', label: 'The workspace' },
   { id: 'pricing', label: 'Pricing' },
   { id: 'faq', label: 'FAQ' },
 ];

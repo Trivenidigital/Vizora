@@ -7,7 +7,6 @@ import {
   LocationsSection,
   PlacesSection,
   PipelineSection,
-  WorkspaceSection,
   PricingSection,
   FAQSection,
   FinalCTASection,
@@ -63,7 +62,6 @@ export default function Index() {
         <LocationsSection onView={explore} />
         <PlacesSection place={place} onPlaceChange={setPlace} />
         <PipelineSection />
-        <WorkspaceSection />
         <PricingSection
           billingCycle={billingCycle}
           setBillingCycle={setBillingCycle}
