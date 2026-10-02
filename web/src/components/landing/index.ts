@@ -4,8 +4,6 @@ export { default as WorldsScene, MiniWorld } from './WorldsScene';
 export { default as LocationsSection } from './LocationsSection';
 export { default as PlacesSection } from './PlacesSection';
 export { default as PipelineSection } from './PipelineSection';
-export { default as WorkspaceSection } from './WorkspaceSection';
-export { default as ProductTourDialog } from './ProductTourDialog';
 export { default as PricingSection } from './PricingSection';
 export { default as FAQSection } from './FAQSection';
 export { default as FinalCTASection } from './FinalCTASection';

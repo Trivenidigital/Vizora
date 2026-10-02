@@ -61,7 +61,38 @@ const CSS = `
 @media (max-width:560px){.lwr-grid{grid-template-columns:1fr}}
 `;
 
+/**
+ * The best annual saving on offer, as a whole percentage, or null if there is
+ * none to claim.
+ *
+ * DERIVED, because the badge used to hardcode "Save 20%" and a hardcoded claim
+ * about price drifts the moment a price moves. It was already wrong before this
+ * change — the real USD saving was 12.5-16.7%, so it OVERSTATED — and after the
+ * rise it would have understated instead. Neither failure would have broken a
+ * test, which is the problem with a number nothing computes.
+ *
+ * "Best of the tiers" rather than an average, paired with "up to" in the copy:
+ * the tiers differ (USD is 25% on Basic and 30% on Pro), so a single figure is
+ * only honest as a ceiling that at least one tier actually reaches. An average
+ * would assert a number no tier achieves.
+ *
+ * Returns null rather than 0 when there is nothing to show, so the caller
+ * renders no badge instead of "Save 0%" or NaN. A monthly of 0 is excluded
+ * before dividing.
+ */
+export function annualSavingPercent(pricing: PricingData | null): number | null {
+  if (!pricing) return null;
+  const savings = [pricing.basic, pricing.pro]
+    .filter((tier) => tier.monthly > 0)
+    .map((tier) => 1 - tier.annual / tier.monthly)
+    .filter((saving) => saving > 0);
+  if (savings.length === 0) return null;
+  const best = Math.round(Math.max(...savings) * 100);
+  return best > 0 ? best : null;
+}
+
 export default function PricingSection({ billingCycle, setBillingCycle, pricing, setPricing }: PricingSectionProps) {
+  const saving = annualSavingPercent(pricing);
   return (
     <section id="pricing" className="lw-pricing scroll-mt-20" aria-labelledby="pricingTitle">
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
@@ -90,7 +121,7 @@ export default function PricingSection({ billingCycle, setBillingCycle, pricing,
                 onClick={() => setBillingCycle('annual')}
               >
                 Annual
-                <span className="lwr-save">Save 20%</span>
+                {saving !== null && <span className="lwr-save">Save up to {saving}%</span>}
               </button>
             </div>
             {pricing && (
@@ -106,8 +137,8 @@ export default function PricingSection({ billingCycle, setBillingCycle, pricing,
                             region: 'US',
                             currency: 'USD',
                             symbol: '$',
-                            basic: { monthly: 6, annual: 5 },
-                            pro: { monthly: 8, annual: 7 },
+                            basic: { monthly: 8, annual: 6 },
+                            pro: { monthly: 10, annual: 7 },
                           }
                         : prev,
                     )
@@ -127,8 +158,8 @@ export default function PricingSection({ billingCycle, setBillingCycle, pricing,
                             region: 'IN',
                             currency: 'INR',
                             symbol: '₹',
-                            basic: { monthly: 399, annual: 317 },
-                            pro: { monthly: 599, annual: 483 },
+                            basic: { monthly: 499, annual: 375 },
+                            pro: { monthly: 749, annual: 525 },
                           }
                         : prev,
                     )
@@ -172,7 +203,7 @@ export default function PricingSection({ billingCycle, setBillingCycle, pricing,
                 <b>
                   {pricing
                     ? `${pricing.symbol}${billingCycle === 'monthly' ? pricing.basic.monthly : pricing.basic.annual}`
-                    : `$${billingCycle === 'monthly' ? '6' : '5'}`}
+                    : `$${billingCycle === 'monthly' ? '8' : '6'}`}
                 </b>
                 <span>/screen/mo</span>
               </div>
@@ -199,7 +230,7 @@ export default function PricingSection({ billingCycle, setBillingCycle, pricing,
                 <b style={{ color: 'var(--lw-forest)' }}>
                   {pricing
                     ? `${pricing.symbol}${billingCycle === 'monthly' ? pricing.pro.monthly : pricing.pro.annual}`
-                    : `$${billingCycle === 'monthly' ? '8' : '7'}`}
+                    : `$${billingCycle === 'monthly' ? '10' : '7'}`}
                 </b>
                 <span>/screen/mo</span>
               </div>

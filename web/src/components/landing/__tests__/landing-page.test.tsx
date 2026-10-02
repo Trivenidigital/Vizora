@@ -38,10 +38,27 @@ const IN_PRICING = {
   region: 'IN',
   currency: 'INR',
   symbol: '₹',
-  basic: { monthly: 399, annual: 317 },
-  pro: { monthly: 599, annual: 483 },
+  basic: { monthly: 499, annual: 375 },
+  pro: { monthly: 749, annual: 525 },
   locale: 'en-IN',
 };
+
+/**
+ * The price figure inside ONE plan card.
+ *
+ * These assertions used to query the whole document — `getByText('$8')` — which
+ * made them silently wrong rather than failing when a price moved. $8 was Pro's
+ * monthly price until the October rise and is Basic's now, so the assertion kept
+ * passing while testing a different tier than it was written for. A figure is
+ * only meaningful attached to the tier charging it.
+ *
+ * Scoped through markup the component already has: a unique `<h3>` per card and
+ * the `.lwr-card` container. Nothing was added for the test's benefit, and if
+ * either hook is renamed this fails loudly instead of matching the wrong element,
+ * which is the whole point.
+ */
+const planCard = (tier: string) =>
+  screen.getByRole('heading', { name: tier }).closest('.lwr-card') as HTMLElement;
 
 const mockGeoPricing = () => {
   global.fetch = jest.fn().mockResolvedValue({
@@ -78,7 +95,7 @@ describe('homepage composition', () => {
   it('mounts every narrated section under the page landmarks', async () => {
     const { container } = await renderPage();
 
-    for (const id of ['places', 'how-it-works', 'product', 'pricing', 'faq', 'start']) {
+    for (const id of ['places', 'how-it-works', 'pricing', 'faq', 'start']) {
       expect(container.querySelector(`#${id}`)).toBeInTheDocument();
     }
 
@@ -303,7 +320,10 @@ describe('geo-aware pricing', () => {
     const user = userEvent.setup();
     render(<Index />);
 
-    expect(await screen.findByText('₹599', undefined, WAIT)).toBeInTheDocument();
+    // Pro monthly. Scoped, so it cannot drift onto Basic the next time a price moves.
+    expect(await screen.findByText('₹749', undefined, WAIT)).toBeInTheDocument();
+    expect(within(planCard('Pro')).getByText('₹749')).toBeInTheDocument();
+    expect(within(planCard('Basic')).getByText('₹499')).toBeInTheDocument();
 
     const monthly = screen.getByRole('button', { name: /^Monthly$/ });
     const annual = screen.getByRole('button', { name: /Annual/ });
@@ -311,15 +331,18 @@ describe('geo-aware pricing', () => {
     expect(annual).toHaveAttribute('aria-pressed', 'false');
 
     await user.click(annual);
-    expect(screen.getByText('₹483')).toBeInTheDocument();
+    expect(within(planCard('Pro')).getByText('₹525')).toBeInTheDocument();
+    expect(within(planCard('Basic')).getByText('₹375')).toBeInTheDocument();
     expect(monthly).toHaveAttribute('aria-pressed', 'false');
     expect(annual).toHaveAttribute('aria-pressed', 'true');
 
     await user.click(screen.getByRole('button', { name: 'USD' }));
-    expect(screen.getByText('$7')).toBeInTheDocument();
+    expect(within(planCard('Basic')).getByText('$6')).toBeInTheDocument();
+    expect(within(planCard('Pro')).getByText('$7')).toBeInTheDocument();
 
     await user.click(monthly);
-    expect(screen.getByText('$8')).toBeInTheDocument();
+    expect(within(planCard('Basic')).getByText('$8')).toBeInTheDocument();
+    expect(within(planCard('Pro')).getByText('$10')).toBeInTheDocument();
   });
 
   it('falls back to US pricing when the geo lookup fails', async () => {
@@ -387,32 +410,6 @@ describe('FAQ accordion', () => {
 
     const answer = container.querySelector(`#${CSS.escape(question.getAttribute('aria-controls')!)}`)!;
     expect(answer.textContent).toContain('keeps playing');
-  });
-});
-
-describe('product tour dialog', () => {
-  it('requests the video only once asked, and returns focus to the chip', async () => {
-    const user = userEvent.setup();
-    const { container } = await renderPage();
-
-    // The asset is 48 MB — it must not be in the tree before the chip is pressed.
-    expect(container.querySelector('video')).not.toBeInTheDocument();
-
-    const product = container.querySelector('#product')!;
-    const chip = within(product as HTMLElement).getByRole('button', { name: /Watch the tour/ });
-    await user.click(chip);
-
-    expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(container.querySelector('source[src="/videos/vizora-demo.mp4"]')).toBeInTheDocument();
-
-    // The player itself must be a tab stop inside the trap, or its native
-    // controls can never be reached by keyboard.
-    await user.tab();
-    expect(document.activeElement).toBe(container.querySelector('video'));
-
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(document.activeElement).toBe(chip);
   });
 });
 
