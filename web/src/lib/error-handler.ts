@@ -75,6 +75,83 @@ export function getUserFriendlyMessage(error: unknown): string {
   return 'An unexpected error occurred. Please try again.';
 }
 
+/*
+ * A status PHRASE is not an error message.
+ *
+ * `middleware/src/main.ts` sets `disableErrorMessages: true` on the global
+ * ValidationPipe when NODE_ENV is production, so a DTO rejection there returns
+ * `{ statusCode: 400, message: 'Bad Request' }` with no field detail at all.
+ * `buildApiError` faithfully lifts that `message`, and the register page
+ * faithfully rendered it — which is how a real sign-up attempt ended at a red
+ * banner reading only "Bad Request".
+ *
+ * So the client cannot invent detail the server withheld. What it CAN stop doing
+ * is presenting an HTTP status phrase as if it were an explanation.
+ */
+const BARE_STATUS_PHRASE =
+  /^(bad request|unauthorized|forbidden|not found|conflict|gone|unprocessable entity|too many requests|internal server error|bad gateway|service unavailable|http \d{3})\.?$/i;
+
+export function isBareStatusPhrase(message: unknown): boolean {
+  return typeof message === 'string' && BARE_STATUS_PHRASE.test(message.trim());
+}
+
+/**
+ * The message to show a user for a failed request, never a bare status phrase.
+ *
+ * Prefers the server's own text, falls back to the status-derived copy that
+ * `buildApiError` already computed, and only then to the caller's fallback.
+ */
+export function userFacingMessage(error: unknown, fallback: string): string {
+  if (isApiError(error)) {
+    if (error.message && !isBareStatusPhrase(error.message)) return error.message;
+    if (error.userMessage && !isBareStatusPhrase(error.userMessage)) return error.userMessage;
+    return fallback;
+  }
+  if (error instanceof Error && error.message && !isBareStatusPhrase(error.message)) {
+    return error.message;
+  }
+  return fallback;
+}
+
+/**
+ * Split class-validator's message array onto the fields it names.
+ *
+ * Nest returns `message` as an ARRAY of strings for a DTO rejection, each of
+ * which begins with the offending property — "lastName must be longer than or
+ * equal to 2 characters". Attaching them to their field puts the correction where
+ * the user is looking instead of in a banner above the form.
+ *
+ * Only fields the caller names are matched, so arbitrary server text can never
+ * invent a key. Anything unmatched is returned under `_` for the banner, because
+ * dropping a message the server bothered to send is how an opaque failure
+ * survives a fix.
+ */
+export function fieldErrorsFromApiError(
+  error: unknown,
+  fields: readonly string[],
+): { fieldErrors: Record<string, string>; rest: string[] } {
+  const fieldErrors: Record<string, string> = {};
+  const rest: string[] = [];
+  if (!isApiError(error)) return { fieldErrors, rest };
+
+  const raw = error.details?.message;
+  const messages = Array.isArray(raw) ? raw.filter((m): m is string => typeof m === 'string') : [];
+
+  for (const message of messages) {
+    // class-validator prefixes the property name; match the longest field first
+    // so `organizationName` is not claimed by a hypothetical `organization`.
+    const field = [...fields]
+      .sort((a, b) => b.length - a.length)
+      .find((f) => message.startsWith(`${f} `));
+    if (field && !fieldErrors[field]) {
+      fieldErrors[field] = message;
+    } else if (!field) {
+      rest.push(message);
+    }
+  }
+  return { fieldErrors, rest };
+}
+
 /**
  * Handle fetch response and throw appropriate errors
  */
