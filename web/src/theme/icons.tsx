@@ -44,6 +44,7 @@ import {
   LayoutGrid,
   Component,
   HelpCircle,
+  Users,
 } from 'lucide-react';
 
 export const ICON_SIZES = {
@@ -125,6 +126,7 @@ export const iconMap = {
   key: Key,
   copy: Copy,
   shield: Shield,
+  users: Users,
   help: HelpCircle,
 } as const;
 
