@@ -104,17 +104,24 @@ test.describe('Authentication Flow', () => {
     await page.click('button[type="submit"]');
 
     /*
-     * 45s, not 15s. This was the only flaky test in the CI suite: it timed out
-     * on the first attempt and passed on retry. The wait is for a NAVIGATION,
-     * not a latency assertion — the budget exists so a redirect that never
-     * happens fails the test, and nothing here is measuring how fast the
-     * dashboard renders. The stack runs `next dev` in CI, where reaching
-     * /dashboard can pay a route-compilation cost on a loaded single-worker
-     * runner, and 15s was inside that noise.
+     * This is the one test that flaked in CI: it timed out on the first attempt
+     * and passed on retry. The wait is for a NAVIGATION, not a latency
+     * assertion — the budget exists so a redirect that never happens fails the
+     * test, and nothing here measures how fast the dashboard renders. The stack
+     * runs `next dev` in CI, where this navigation can pay a route-compilation
+     * cost on a loaded single-worker runner.
      *
-     * If this starts timing out at 45s, that is a real redirect failure. Do
-     * not raise it again — diagnose it.
+     * A first attempt to fix this raised ONLY this timeout to 45s, which did
+     * nothing: Playwright's per-test timeout is 30s, so the test died at 30s
+     * and the 45s was unreachable. A sub-timeout above the enclosing test
+     * timeout can never fire. The test budget is raised here too, and is kept
+     * above the navigation budget so that a genuine failure to redirect is
+     * reported as such rather than as a generic test timeout.
+     *
+     * If this times out at 45s, the redirect really is broken. Diagnose it
+     * rather than raising the number again.
      */
+    test.setTimeout(90_000);
     await page.waitForURL(/dashboard/, { timeout: 45000 });
   });
 

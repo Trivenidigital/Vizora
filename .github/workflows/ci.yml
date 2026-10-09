@@ -400,8 +400,13 @@ jobs:
           echo '--- realtime ---';   tail -200 /tmp/realtime.log   || true
           echo '--- web ---';        tail -200 /tmp/web.log        || true
 
+      # `always()`, not `failure()`. Playwright retries twice in CI, so a test
+      # that fails once and passes on retry is reported as FLAKY and the job
+      # SUCCEEDS — and with `if: failure()` that run left no artifact at all, so
+      # a flake could not be diagnosed after the fact. That happened: the login
+      # redirect flaked twice with no screenshot or trace retained either time.
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: playwright-report
           path: test-results/
