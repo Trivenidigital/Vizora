@@ -205,3 +205,53 @@ accessible-name match is a case-insensitive *substring* by default, and both the
 stack and the CI job run `next dev`, which renders that button on every page. A test
 asserting "this page has no pager" counted one. Any loose role-name query in this suite
 can collide with the dev-tools button; use `exact: true`.
+
+---
+
+# Part 4 — final state
+
+## The suite in CI
+
+| | |
+|---|---|
+| Tests | 327 |
+| Passed | 326 |
+| Failed | 0 |
+| Skipped | 0 |
+| Flaky | 1 (login redirect, timeout raised to 45s with rationale) |
+| Wall time | ~16 min, 1 worker |
+
+All seven CI jobs green: lint, test, migrations, e2e, **playwright**, build, security.
+
+## The 7 "skipped" were not skipped by intent
+
+The first green CI run read 320 passed / 7 skipped. The 7 were the entire
+`3-Panel Playlist Builder` block, and they skipped themselves because their setup
+could never succeed:
+
+1. The POST sent only the auth cookie. `CsrfMiddleware` enforces a double-submit pair,
+   so it returned 403 and `response.ok()` was false.
+2. Even on success, the global `ResponseEnvelopeInterceptor` wraps responses as
+   `{ success, data, meta }`, so `data.id` read `undefined` off the envelope.
+
+The fixture already exports `apiPost` (sends both credentials) and `readData` (unwraps
+the envelope) for exactly this. **Setup failure now fails rather than skipping** — a test
+that quietly skips when its fixture breaks reports green forever while covering nothing.
+
+With the block actually running, two of its assertions turned out to be wrong: the
+"3-panel layout" test counted elements by class names the builder does not use (it is
+flex, not grid), and the undo/redo test missed controls that do exist because they are
+icon-only with a `title` and no `aria-label`.
+
+## Three independent ways this suite reported green while testing nothing
+
+Worth stating together, because they are the real finding of this work:
+
+1. **31 assertions that cannot fail** — `expect(x || true)`, `expect(true)`.
+2. **A whole spec file whose locators matched nothing** — all 23 command-palette tests.
+3. **A block that skipped itself on a broken fixture** — 7 playlist-builder tests.
+
+None of these show up as a failure. All three are invisible in a pass count. The
+convention adopted throughout the repaired suite is the **reach control**: any assertion
+that something is absent must be paired with a second assertion proving the locator was
+searching somewhere that really does contain comparable elements.

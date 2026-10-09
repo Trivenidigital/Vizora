@@ -103,8 +103,19 @@ test.describe('Authentication Flow', () => {
     await page.fill('input[type="password"]', password);
     await page.click('button[type="submit"]');
 
-    // Should redirect to dashboard - wait longer and allow for redirects
-    await page.waitForURL(/dashboard/, { timeout: 15000 });
+    /*
+     * 45s, not 15s. This was the only flaky test in the CI suite: it timed out
+     * on the first attempt and passed on retry. The wait is for a NAVIGATION,
+     * not a latency assertion — the budget exists so a redirect that never
+     * happens fails the test, and nothing here is measuring how fast the
+     * dashboard renders. The stack runs `next dev` in CI, where reaching
+     * /dashboard can pay a route-compilation cost on a loaded single-worker
+     * runner, and 15s was inside that noise.
+     *
+     * If this starts timing out at 45s, that is a real redirect failure. Do
+     * not raise it again — diagnose it.
+     */
+    await page.waitForURL(/dashboard/, { timeout: 45000 });
   });
 
   test('should show validation errors for invalid input', async ({ page }) => {

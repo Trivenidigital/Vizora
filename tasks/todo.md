@@ -7446,5 +7446,14 @@ Plan: `docs/plans/2026-06-01-content-library-search-performance-pass-18.md`
 - [x] D CI runs no Playwright at all — the `e2e` job is a middleware Jest subset plus realtime with `continue-on-error: true`
 
 ### Verification
-- [ ] Full Playwright suite re-run, per-spec loop, expect 0 unexplained failures
-- [ ] Web/middleware unit suites still green after the product changes
+- [x] Full Playwright suite green in CI: 327 tests, 326 passed, 0 failed, 0 skipped, 1 flaky
+- [x] Web/middleware/realtime unit suites green after the product changes
+
+### Outcome 2026-10-09
+All seven CI jobs green on `f0b92ece`+. PR #390. Nine product defects fixed, 32 stale
+specs repaired, 31 inert assertions replaced, and three separate mechanisms by which the
+suite reported green while testing nothing. Deliberately NOT fixed (unbuilt scope, each
+recorded in `docs/plans/2026-10-09-e2e-full-stack-results.md`): content-tag creation has
+no UI, nested device groups are dead code, folder rename/delete have no UI, no
+`button[type="submit"]` under /dashboard, `require('@vizora/database')` returns only the
+Prisma exports in dev, and ~85 tests still sit wholly inside `if (isVisible())` guards.
