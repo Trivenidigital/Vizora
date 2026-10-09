@@ -7419,3 +7419,12 @@ Plan: `docs/plans/2026-06-01-content-library-search-performance-pass-18.md`
   - `$env:ESLINT_USE_FLAT_CONFIG='false'; npx eslint web/src/components/playlist/ContentLibraryPanel.tsx web/src/components/__tests__/PlaylistBuilder.test.tsx` - 0 errors, 0 warnings in touched files.
   - `NODE_OPTIONS=--max-old-space-size=4096 NEXT_PUBLIC_SOCKET_URL=http://localhost:3002 NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1 BACKEND_URL=http://localhost:3000 pnpm --filter @vizora/web build` - passed with existing Next middleware/proxy and TS project-reference warnings.
   - `git diff --check` - passed with CRLF warnings only.
+
+## 2026-10-09 — full-stack e2e run (requested 2026-10-02)
+- [x] Unit suites (middleware/realtime/web/ops) green
+- [x] API smoke 22/27 — remaining 5 are harness/dev-only
+- [x] Device pairing + content streaming direct test passes
+- [x] Playwright 332 tests spec-by-spec: 293 pass / 32 fail / 7 skip — all 32 attributed, see `docs/plans/2026-10-09-e2e-full-stack-results.md`
+- [ ] Fix 01-auth `locator('h2')` selectors (NewLookNotice h2 — my regression)
+- [ ] Decide fate of 18 stale specs (analytics mock copy, $29/$99, "Dashboard" nav label, view toggle)
+- [ ] Add Playwright to CI `e2e` job (currently never runs)
