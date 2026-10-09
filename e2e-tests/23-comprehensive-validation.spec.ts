@@ -24,19 +24,35 @@ test.describe('Comprehensive UI Validation', () => {
       await authenticatedPage.goto('/dashboard');
       await authenticatedPage.waitForLoadState('networkidle');
 
+      /*
+       * The real sidebar (web/src/app/dashboard/layout.tsx `allNavigation`).
+       * 'Dashboard' has not been a nav label since the first item was renamed
+       * 'Overview' in January 2026, and the list was missing Templates, Widgets,
+       * Layouts and Help.
+       *
+       * 'Schedules' is deliberately absent: it is filtered out of the nav unless
+       * SCHEDULES_ENABLED, which is a BUILD input (NEXT_PUBLIC_SCHEDULES_ENABLED)
+       * and off by default, so asserting it here would pin a flag state the spec
+       * cannot see.
+       */
       const navLinks = [
-        'Dashboard',
+        'Overview',
         'Devices',
         'Content',
+        'Templates',
+        'Widgets',
+        'Layouts',
         'Playlists',
-        'Schedules',
         'Analytics',
         'Settings',
+        'Help',
       ];
 
+      const sidebar = authenticatedPage.locator('aside nav');
       for (const linkText of navLinks) {
-        const link = authenticatedPage.locator(`nav a, aside a`).filter({ hasText: new RegExp(linkText, 'i') }).first();
-        await expect(link).toBeVisible({ timeout: 5000 });
+        await expect(sidebar.getByRole('link', { name: linkText, exact: true })).toBeVisible({
+          timeout: 5000,
+        });
       }
     });
 
@@ -64,22 +80,38 @@ test.describe('Comprehensive UI Validation', () => {
 
   test.describe('Form Validation', () => {
     test('should validate email fields', async ({ authenticatedPage }) => {
-      await authenticatedPage.goto('/dashboard/settings');
+      /*
+       * This used to fill the first input[type="email"] on /dashboard/settings,
+       * which is the Account Email field — deliberately readOnly (it shows the
+       * signed-in account), so fill() waited forever. The only editable email
+       * input in settings is the team invite field, so that is what is exercised
+       * here; the locator excludes [readonly] so it can never drift back onto a
+       * read-only field.
+       */
+      await authenticatedPage.goto('/dashboard/settings/team');
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Find any email input
-      const emailInput = authenticatedPage.locator('input[type="email"]').first();
-      const hasEmail = await emailInput.isVisible({ timeout: 5000 }).catch(() => false);
+      await authenticatedPage.getByRole('button', { name: 'Invite User' }).first().click();
 
-      if (hasEmail) {
-        // Clear and enter invalid email
-        await emailInput.fill('invalid-email');
-        await emailInput.blur();
+      const dialog = authenticatedPage.getByRole('dialog', { name: 'Invite Team Member' });
+      await expect(dialog).toBeVisible({ timeout: 10000 });
 
-        // Should show validation error or HTML5 validation
-        const validity = await emailInput.evaluate(el => (el as HTMLInputElement).validity.valid);
-        expect(validity).toBeFalsy();
-      }
+      const emailInput = dialog.locator('input[type="email"]:not([readonly])');
+      await expect(emailInput).toBeVisible();
+
+      await emailInput.fill('invalid-email');
+      await emailInput.blur();
+      expect(
+        await emailInput.evaluate((el) => (el as HTMLInputElement).validity.valid),
+      ).toBeFalsy();
+
+      // Control: the same check must pass for a well-formed address, otherwise
+      // the assertion above proves nothing about the input's type.
+      await emailInput.fill('someone@example.com');
+      await emailInput.blur();
+      expect(
+        await emailInput.evaluate((el) => (el as HTMLInputElement).validity.valid),
+      ).toBeTruthy();
     });
 
     test('should validate required fields', async ({ authenticatedPage }) => {
@@ -276,11 +308,21 @@ test.describe('Comprehensive UI Validation', () => {
       await authenticatedPage.goto('/dashboard/nonexistent-page');
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Should show 404 or redirect to valid page
-      const is404 = await authenticatedPage.locator('text=/404|not found|page not found/i').isVisible({ timeout: 5000 }).catch(() => false);
-      const redirected = !authenticatedPage.url().includes('nonexistent-page');
-
-      expect(is404 || redirected).toBeTruthy();
+      /*
+       * `locator('text=/404|not found|page not found/i')` matched several nodes
+       * on the (correct) 404 page, so isVisible() threw a strict-mode violation
+       * that the `.catch(() => false)` turned into "no 404 found" — the test
+       * failed against a working page. Role queries resolve to one element each.
+       */
+      await expect(
+        authenticatedPage.getByRole('heading', { name: '404', exact: true }),
+      ).toBeVisible({ timeout: 5000 });
+      await expect(
+        authenticatedPage.getByRole('heading', { name: 'Page Not Found', exact: true }),
+      ).toBeVisible();
+      await expect(
+        authenticatedPage.getByText(/does not exist or has been moved/i),
+      ).toBeVisible();
     });
   });
 

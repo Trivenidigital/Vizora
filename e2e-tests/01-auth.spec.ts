@@ -69,7 +69,9 @@ test.describe('Authentication Flow', () => {
     }
 
     // Verify dashboard loaded
-    await expect(page.locator('h2')).toContainText(/dashboard/i, { timeout: 5000 });
+    await expect(
+      page.getByRole('heading', { name: /dashboard overview/i }),
+    ).toBeVisible({ timeout: 5000 });
   });
 
   test('should login existing user', async ({ page }) => {
@@ -186,7 +188,9 @@ test.describe('Authentication Flow', () => {
 
     // Wait for dashboard to load (not login page)
     await expect(page).toHaveURL('/dashboard', { timeout: 10000 });
-    await expect(page.locator('h2')).toContainText(/dashboard/i, { timeout: 5000 });
+    await expect(
+      page.getByRole('heading', { name: /dashboard overview/i }),
+    ).toBeVisible({ timeout: 5000 });
 
     // Open user menu - look for button containing email or avatar
     const userMenuButton = page.locator('button').filter({ hasText: email.split('@')[0] }).or(

@@ -756,9 +756,11 @@ export default function SettingsPage() {
  </div>
  </div>
 
- {/* Organization */}
+ {/* Team & Activity. Deliberately NOT titled "Organization": the organization
+ settings card above already carries that h3, and two cards sharing a heading
+ is ambiguous for anyone navigating by heading. */}
  <div className="eh-dash-card bg-[var(--surface)] rounded-lg shadow-md p-6">
- <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)] mb-4">Organization</h3>
+ <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)] mb-4">Team &amp; Activity</h3>
  <div className="space-y-3">
  <Link
  href="/dashboard/settings/team"

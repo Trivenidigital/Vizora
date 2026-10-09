@@ -35,25 +35,34 @@ test.describe('Playlist Builder (Wave 5)', () => {
       await authenticatedPage.goto('/dashboard/playlists');
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Click create button
-      await authenticatedPage.click('button:has-text("Create"), button:has-text("New"), button:has-text("Add"), a:has-text("Create")');
+      const playlistName = `Test Playlist ${Date.now()}`;
 
-      // Fill in playlist name in modal or new page
-      const nameInput = authenticatedPage.locator('input[name="name"], input[placeholder*="name" i], input[type="text"]').first();
-      await nameInput.waitFor({ state: 'visible', timeout: 5000 });
-      await nameInput.fill(`Test Playlist ${Date.now()}`);
+      // Open the create dialog.
+      await authenticatedPage.getByRole('button', { name: 'Create Playlist' }).first().click();
 
-      // Submit
-      await authenticatedPage.click('button[type="submit"], button:has-text("Create"), button:has-text("Save")');
+      /*
+       * Everything below is scoped to the dialog. The old selector
+       * (`input[name="name"], input[placeholder*="name" i], input[type="text"]`)
+       * matched the page's own search box ("Search playlists by name...") first,
+       * so the modal field stayed empty, "Create Playlist" stayed correctly
+       * disabled, and the submit click timed out against a disabled button.
+       */
+      const dialog = authenticatedPage.getByRole('dialog', { name: 'Create New Playlist' });
+      await expect(dialog).toBeVisible({ timeout: 5000 });
 
-      // Wait for navigation or success
-      await authenticatedPage.waitForTimeout(1000);
+      await dialog.getByLabel('Playlist Name').fill(playlistName);
+      await dialog.getByLabel('Description (Optional)').fill('Created by 18-playlist-builder e2e');
 
-      // Should see the new playlist or be on builder page
-      const onBuilderPage = authenticatedPage.url().includes('/playlists/');
-      const hasNewPlaylist = await authenticatedPage.locator('text=/Test Playlist/').isVisible({ timeout: 5000 }).catch(() => false);
+      const submit = dialog.getByRole('button', { name: 'Create Playlist' });
+      await expect(submit).toBeEnabled();
+      await submit.click();
 
-      expect(onBuilderPage || hasNewPlaylist).toBeTruthy();
+      // The product closes the dialog and reloads the list in place; it does not
+      // navigate to the builder.
+      await expect(dialog).toBeHidden({ timeout: 10000 });
+      await expect(authenticatedPage.getByText(playlistName).first()).toBeVisible({
+        timeout: 10000,
+      });
     });
   });
 

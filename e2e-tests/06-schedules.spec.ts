@@ -62,21 +62,25 @@ test.describe('Phase 6.0: Complete Schedules Implementation', () => {
     await expect(countLocator).toBeVisible({ timeout: 5000 });
   });
 
-  test('should have search functionality', async ({ authenticatedPage }) => {
+  test('schedules list offers no search input (pinned gap)', async ({ authenticatedPage }) => {
     await authenticatedPage.goto('/dashboard/schedules');
     await authenticatedPage.waitForLoadState('networkidle');
 
-    // Look for search input or filter functionality
-    const searchInput = authenticatedPage.locator('input[placeholder*="Search"], input[type="search"]').first();
-    const hasSearch = await searchInput.isVisible({ timeout: 3000 }).catch(() => false);
+    /*
+     * This asserted search by checking only that the page heading was visible,
+     * so it passed whether or not a search box existed. The schedules page
+     * ships no search input at all (there is no searchQuery state in
+     * page-client.tsx). The absence is pinned here so the test goes red the day
+     * search is added, instead of certifying nothing.
+     */
+    const main = authenticatedPage.locator('main');
+    await expect(main.locator('input[placeholder*="Search" i], input[type="search"]')).toHaveCount(
+      0,
+    );
 
-    if (!hasSearch) {
-      test.info().annotations.push({
-        type: 'skipped-branch',
-        description: 'no search input on the schedules page — search not exercised',
-      });
-    }
-    await expect(authenticatedPage.locator('h2').filter({ hasText: 'Schedules' })).toBeVisible();
+    // Reach control: the scoped region really does render the list, so the zero
+    // above is a finding and not a dead selector.
+    await expect(main.locator('h2').filter({ hasText: 'Schedules' })).toBeVisible();
   });
 
   // ============= CREATE SCHEDULE TESTS =============
@@ -90,10 +94,15 @@ test.describe('Phase 6.0: Complete Schedules Implementation', () => {
     await expect(createButton).toBeVisible({ timeout: 5000 });
     await createButton.click();
 
-    // Modal should appear - look for dialog and modal heading
-    await expect(authenticatedPage.locator('[role="dialog"]')).toBeVisible({ timeout: 5000 });
-    // The heading should be visible inside the modal
-    await expect(authenticatedPage.locator('[role="dialog"] h3, [role="dialog"] h2').first()).toBeVisible();
+    // A page-wide `[role="dialog"]` resolves to several elements here (Modal,
+    // ConfirmDialog and the cookie-consent bar all take the role), which is a
+    // strict-mode violation. Name the dialog instead: Modal wires
+    // `aria-labelledby` to its own title, so the create modal's accessible name
+    // is "Create Schedule".
+    const dialog = authenticatedPage.getByRole('dialog', { name: /create schedule/i });
+    await expect(dialog).toBeVisible({ timeout: 5000 });
+    // The heading must be visible inside THAT modal, not just anywhere on the page.
+    await expect(dialog.getByRole('heading', { name: /create schedule/i })).toBeVisible();
   });
 
   test('should validate schedule form - required fields (BOUNDARY)', async ({ authenticatedPage }) => {
@@ -104,11 +113,34 @@ test.describe('Phase 6.0: Complete Schedules Implementation', () => {
     const createButton = authenticatedPage.locator('button').filter({ hasText: /create|new|add schedule/i }).first();
     await createButton.click({ timeout: 5000 });
 
-    // Try to submit empty form
-    const submitButton = authenticatedPage.locator('button').filter({ hasText: /create|save|submit/i }).locator('..').locator('button').last();
-    await expect(submitButton).toBeVisible({ timeout: 5000 });
-    // An empty schedule form must not be submittable.
-    await expect(submitButton).toBeDisabled();
+    const dialog = authenticatedPage.getByRole('dialog', { name: /create schedule/i });
+    await expect(dialog).toBeVisible({ timeout: 5000 });
+
+    /*
+     * The product does NOT disable submit on an incomplete form - that button
+     * carries `disabled={actionLoading}` only. It validates ON SUBMIT:
+     * handleCreate calls validateForm(), which fills `formErrors` and returns
+     * before any request is made. So the contract to assert is "submitting an
+     * empty form names every missing field and creates nothing", not "the button
+     * is disabled".
+     */
+    const submitButton = dialog.getByRole('button', { name: /^create$/i });
+    await expect(submitButton).toBeEnabled();
+    await submitButton.click();
+
+    // Exact copy from validateForm() in dashboard/schedules/page-client.tsx.
+    // Name, playlist and target are the three fields a freshly opened form leaves
+    // empty (days and duration are pre-filled), so all three errors must appear.
+    await expect(dialog.getByText('Schedule name is required')).toBeVisible({ timeout: 5000 });
+    // `exact` matters: the playlist <select> carries a "Select a playlist..."
+    // placeholder option, so a substring match resolves to two elements.
+    await expect(dialog.getByText('Select a playlist', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Select at least one device')).toBeVisible();
+
+    // The dialog stays open on a failed validation, and nothing was created: the
+    // header counter is rendered straight from the schedules list.
+    await expect(dialog).toBeVisible();
+    await expect(authenticatedPage.getByText(/\(0 total\)/)).toBeVisible();
   });
 
   test('should validate schedule name (MUTATION)', async ({ authenticatedPage }) => {
@@ -286,24 +318,14 @@ test.describe('Phase 6.0: Complete Schedules Implementation', () => {
 
   // ============= TIMEZONE TESTS =============
 
-  test('should support timezone selection (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create|new|add schedule/i }).first();
-    await createButton.click({ timeout: 5000 });
-
-    const timezoneSelect = authenticatedPage.locator('select, [role="combobox"]').filter({ hasText: /timezone/i }, { timeout: 2000 }).first();
-
-    if (await timezoneSelect.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await expect(timezoneSelect).toBeVisible();
-
-      // Check for common US timezones
-      const timezoneOptions = authenticatedPage.locator('option, [role="option"]');
-      const count = await timezoneOptions.count();
-      expect(count).toBeGreaterThanOrEqual(3);
-    }
-  });
+  /*
+   * Removed 2026-10-09: 'should support timezone selection (DOMAIN)'. Its whole
+   * body sat inside `if (await timezoneSelect.isVisible(...))`, which can never
+   * be true: the create-schedule dialog has no timezone picker, it shows an
+   * informational panel because each target display applies its own configured
+   * timezone at playback. The real contract is asserted by 'should handle
+   * timezone edge cases (BOUNDARY)' below.
+   */
 
   test('should handle timezone edge cases (BOUNDARY)', async ({ authenticatedPage }) => {
     await authenticatedPage.goto('/dashboard/schedules');
@@ -312,22 +334,31 @@ test.describe('Phase 6.0: Complete Schedules Implementation', () => {
     const createButton = authenticatedPage.locator('button').filter({ hasText: /create|new|add schedule/i }).first();
     await createButton.click({ timeout: 5000 });
 
-    const timezoneSelect = authenticatedPage.locator('select').first();
+    const dialog = authenticatedPage.getByRole('dialog', { name: /create schedule/i });
+    await expect(dialog).toBeVisible({ timeout: 5000 });
 
-    if (await timezoneSelect.isVisible({ timeout: 1000 }).catch(() => false)) {
-      // Set to UTC (extreme timezone)
-      await timezoneSelect.selectOption('UTC', { force: true }).catch(() => {});
-      await authenticatedPage.waitForTimeout(200);
+    /*
+     * There is no timezone picker in this dialog any more, and the page-wide
+     * `select` this test used to grab resolved to a hidden element elsewhere, so
+     * it timed out. The edge case the product now has to get right is the
+     * opposite one: a schedule carries no zone of its own, every target display
+     * applies its own configured timezone at playback time, and the dialog has
+     * to SAY so rather than offer a choice it cannot honour.
+     */
+    await expect(dialog.getByText('Target display timezone')).toBeVisible();
+    await expect(
+      dialog.getByText(/each target display applies its own configured timezone/i),
+    ).toBeVisible();
 
-      // Set to extreme Pacific time
-      const options = await timezoneSelect.locator('option').count();
-      if (options > 0) {
-        const optionValues = await timezoneSelect.locator('option').evaluateAll(opts =>
-          opts.map(o => (o as HTMLOptionElement).value)
-        );
-        expect(optionValues.length).toBeGreaterThanOrEqual(1);
-      }
-    }
+    // So no select inside the dialog may offer a timezone. The count assertion is
+    // the control: the dialog really does render selects (playlist, target), so
+    // "no zone-shaped option value" is a finding and not an empty match.
+    const selects = dialog.locator('select');
+    expect(await selects.count()).toBeGreaterThanOrEqual(1);
+    const optionValues = await selects.locator('option').evaluateAll(opts =>
+      opts.map(o => (o as HTMLOptionElement).value),
+    );
+    expect(optionValues.filter(v => /^(UTC|[A-Za-z]+\/[A-Za-z_]+)$/.test(v))).toEqual([]);
   });
 
   // ============= PLAYLIST & DEVICE SELECTION TESTS =============
@@ -501,23 +532,28 @@ test.describe('Phase 6.0: Complete Schedules Implementation', () => {
     }
   });
 
-  test('should filter schedules by status (DOMAIN)', async ({ authenticatedPage }) => {
+  test('schedules list offers no status filter (pinned gap)', async ({ authenticatedPage }) => {
     await authenticatedPage.goto('/dashboard/schedules');
     await authenticatedPage.waitForLoadState('networkidle');
 
-    // Look for status filter buttons
-    const statusButtons = authenticatedPage.locator('button').filter({ hasText: /active|inactive|all/i });
-    const count = await statusButtons.count();
+    const main = authenticatedPage.locator('main');
 
-    if (count > 0) {
-      // Click on status filter
-      const firstStatusButton = statusButtons.first();
-      await firstStatusButton.click();
-      await authenticatedPage.waitForTimeout(500);
+    /*
+     * Unscoped, `button` + /active|inactive|all/i matched the cookie-consent
+     * bar's "Accept All" - permanently mounted, translated off-screen - so the
+     * click waited forever. Scoped to the page's own content region the real
+     * answer is that the schedules page ships NO status filter: status is
+     * rendered per card as an Active/Inactive badge, and the only list control is
+     * the List/Calendar view toggle. That contract is pinned here explicitly so
+     * this test goes red the day a status filter is added (or an existing one
+     * removed) instead of passing either way.
+     */
+    const statusFilters = main.getByRole('button', { name: /^(all|active|inactive)$/i });
+    await expect(statusFilters).toHaveCount(0);
 
-      // Verify filtered results
-      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Schedules' })).toBeVisible();
-    }
+    // Reach control: the scoped locator above is searching a region that really
+    // does contain buttons, so the zero above is a finding and not a dead selector.
+    await expect(main.getByRole('button', { name: /^(list|calendar)$/i })).toHaveCount(2);
   });
 
   // ============= DISPLAY & FORMATTING TESTS =============
