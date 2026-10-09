@@ -7428,3 +7428,23 @@ Plan: `docs/plans/2026-06-01-content-library-search-performance-pass-18.md`
 - [ ] Fix 01-auth `locator('h2')` selectors (NewLookNotice h2 — my regression)
 - [ ] Decide fate of 18 stale specs (analytics mock copy, $29/$99, "Dashboard" nav label, view toggle)
 - [ ] Add Playwright to CI `e2e` job (currently never runs)
+
+## 2026-10-09 — production-readiness pass on the e2e findings (branch `fix/e2e-production-readiness`)
+
+### Product defects (fix the product, not the test)
+- [ ] A1 Settings index links nothing to `/dashboard/settings/team` or `/dashboard/settings/audit-log` — both pages ship but are reachable only by typing the URL
+- [ ] A2 `NewLookNotice` renders an `<h2>` from the dashboard **layout**, so every dashboard page has two competing `h2`s; it is a transient `role="status"` card and needs no heading
+- [ ] A3 API-key create input has no `id`/`name`; label not associated
+- [ ] A4 Settings Region/Timezone selects have no `id`
+- [ ] A5 `CookieConsent` claims `role="dialog"` while `aria-hidden` and off-screen
+
+### Stale specs (fix the test, product is correct)
+- [ ] B 01-auth ×2, 06-schedules ×4, 08-settings ×3, 09-device-status ×3
+- [ ] C 07-analytics ×5, 16-billing, 18-playlist-builder, 19-api-keys ×4, 20-content-folders ×3, 22-device-preview, 23-comprehensive ×3
+
+### Infrastructure
+- [ ] D CI runs no Playwright at all — the `e2e` job is a middleware Jest subset plus realtime with `continue-on-error: true`
+
+### Verification
+- [ ] Full Playwright suite re-run, per-spec loop, expect 0 unexplained failures
+- [ ] Web/middleware unit suites still green after the product changes
