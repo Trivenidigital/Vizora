@@ -52,24 +52,39 @@ test.describe('Authentication Flow', () => {
     // Submit and wait for navigation (or error)
     await page.click('button[type="submit"]');
 
-    // Wait longer for URL change since registration involves API calls
+    /*
+     * 30s under a 60s test budget. 15s was tight enough that the navigation
+     * landed just after the deadline: the catch block then reported
+     * "Registration timeout. Still at: http://localhost:3001/dashboard" —
+     * naming the destination it had just reached, which reads as a product
+     * failure and is not one. A sub-timeout must also stay below the enclosing
+     * test timeout or it can never fire; both are set here deliberately.
+     */
+    test.setTimeout(60_000);
     try {
-      await page.waitForURL(/dashboard/, { timeout: 15000 });
-    } catch (e) {
-      // If we didn't navigate to dashboard, check for errors
-      const errorElement = page.locator('.bg-red-50, [role="alert"]');
+      await page.waitForURL(/dashboard/, { timeout: 30000 });
+    } catch {
+      /*
+       * `.first()` matters: this selector is a multi-match, so isVisible()
+       * threw a strict-mode error that `.catch(() => false)` turned into "no
+       * error shown" — the branch that exists to surface the product's own
+       * message could never run.
+       */
+      const errorElement = page.locator('.bg-red-50, [role="alert"]').first();
       const hasError = await errorElement.isVisible({ timeout: 2000 }).catch(() => false);
       if (hasError) {
         const error = await errorElement.textContent().catch(() => 'Unknown error');
         throw new Error(`Registration failed with error: ${error}`);
       }
-      // If no error and still on register page, may be loading
-      const currentUrl = page.url();
-      throw new Error(`Registration timeout. Still at: ${currentUrl}`);
+      throw new Error(
+        `Registration did not reach the dashboard within 30s. URL at failure: ${page.url()}`,
+      );
     }
 
     // Verify dashboard loaded
-    await expect(page.locator('h2')).toContainText(/dashboard/i, { timeout: 5000 });
+    await expect(
+      page.getByRole('heading', { name: /dashboard overview/i }),
+    ).toBeVisible({ timeout: 5000 });
   });
 
   test('should login existing user', async ({ page }) => {
@@ -97,12 +112,47 @@ test.describe('Authentication Flow', () => {
     // Wait for login form to be visible - accept either "login" or "sign in"
     await expect(page.locator('h1')).toContainText(/log in|login|sign in/i);
 
-    await page.fill('input[type="email"]', email);
-    await page.fill('input[type="password"]', password);
+    const emailInput = page.locator('input[type="email"]');
+    const passwordInput = page.locator('input[type="password"]');
+
+    /*
+     * Re-fill until the value sticks. This is the only test that flaked in CI,
+     * and it took three attempts to get right — each wrong one is recorded
+     * because the wrong readings are the instructive part.
+     *
+     * 1. The symptom was `waitForURL(/dashboard/)` timing out, so the first fix
+     *    raised that timeout to 45s. It could never fire: Playwright's per-test
+     *    timeout is 30s, so the test died at 30s pointing at a line asking for
+     *    45000ms. A sub-timeout above the enclosing test timeout is not a
+     *    timeout.
+     * 2. No screenshot existed to check, because the artifact upload ran
+     *    `if: failure()` and a flake that passes on retry makes the job
+     *    SUCCEED. Switching that to `always()` is what produced the evidence:
+     *    the page was still on /login with BOTH fields empty and "Please enter
+     *    a valid email address" under the email. The login never submitted.
+     * 3. So the fill was being discarded — this is a controlled React form, and
+     *    a `fill` that lands before hydration is thrown away when the client
+     *    re-renders. The second fix asserted `toHaveValue` after filling, on
+     *    the theory that it only needed waiting out. It did not: the assertion
+     *    held an empty string for its full 5s. React owns the input by then and
+     *    the lost keystrokes never come back.
+     *
+     * So the fill has to be REPEATED, not awaited. `toPass` retries the whole
+     * block, re-filling until the value survives a re-render.
+     */
+    const fillUntilSet = async (locator: typeof emailInput, value: string) => {
+      await expect(async () => {
+        await locator.fill(value);
+        await expect(locator).toHaveValue(value, { timeout: 1000 });
+      }).toPass({ timeout: 20000 });
+    };
+
+    await fillUntilSet(emailInput, email);
+    await fillUntilSet(passwordInput, password);
+
     await page.click('button[type="submit"]');
 
-    // Should redirect to dashboard - wait longer and allow for redirects
-    await page.waitForURL(/dashboard/, { timeout: 15000 });
+    await page.waitForURL(/dashboard/, { timeout: 30000 });
   });
 
   test('should show validation errors for invalid input', async ({ page }) => {
@@ -186,7 +236,9 @@ test.describe('Authentication Flow', () => {
 
     // Wait for dashboard to load (not login page)
     await expect(page).toHaveURL('/dashboard', { timeout: 10000 });
-    await expect(page.locator('h2')).toContainText(/dashboard/i, { timeout: 5000 });
+    await expect(
+      page.getByRole('heading', { name: /dashboard overview/i }),
+    ).toBeVisible({ timeout: 5000 });
 
     // Open user menu - look for button containing email or avatar
     const userMenuButton = page.locator('button').filter({ hasText: email.split('@')[0] }).or(

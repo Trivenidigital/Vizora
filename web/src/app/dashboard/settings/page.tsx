@@ -449,10 +449,11 @@ export default function SettingsPage() {
  </p>
  </div>
  <div>
-   <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-2">
+   <label htmlFor="settings-region" className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-2">
      Region
    </label>
    <select
+     id="settings-region"
      value={settings.country || 'US'}
      onChange={(e) => setSettings({ ...settings, country: e.target.value })}
      className="eh-select w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
@@ -713,10 +714,11 @@ export default function SettingsPage() {
  </p>
  </div>
  <div>
- <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-2">
+ <label htmlFor="settings-timezone" className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-2">
  Timezone
  </label>
  <select
+ id="settings-timezone"
  value={settings.timezone}
  onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
  className="eh-select w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
@@ -751,6 +753,35 @@ export default function SettingsPage() {
  className="w-5 h-5"
  />
  </label>
+ </div>
+ </div>
+
+ {/* Team & Activity. Deliberately NOT titled "Organization": the organization
+ settings card above already carries that h3, and two cards sharing a heading
+ is ambiguous for anyone navigating by heading. */}
+ <div className="eh-dash-card bg-[var(--surface)] rounded-lg shadow-md p-6">
+ <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)] mb-4">Team &amp; Activity</h3>
+ <div className="space-y-3">
+ <Link
+ href="/dashboard/settings/team"
+ className="w-full px-4 py-3 text-sm bg-[var(--background)] text-[var(--foreground-secondary)] rounded-lg hover:bg-[var(--surface-hover)] transition font-medium text-left flex items-center gap-2"
+ >
+ <Icon name="users" size="md" className="text-[var(--foreground-secondary)]" />
+ Team Members
+ <span className="ml-auto text-[var(--foreground-tertiary)]">
+ <Icon name="chevronRight" size="md" />
+ </span>
+ </Link>
+ <Link
+ href="/dashboard/settings/audit-log"
+ className="w-full px-4 py-3 text-sm bg-[var(--background)] text-[var(--foreground-secondary)] rounded-lg hover:bg-[var(--surface-hover)] transition font-medium text-left flex items-center gap-2"
+ >
+ <Icon name="document" size="md" className="text-[var(--foreground-secondary)]" />
+ Audit Log
+ <span className="ml-auto text-[var(--foreground-tertiary)]">
+ <Icon name="chevronRight" size="md" />
+ </span>
+ </Link>
  </div>
  </div>
 

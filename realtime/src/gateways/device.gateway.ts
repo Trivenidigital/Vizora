@@ -1892,7 +1892,14 @@ export class DeviceGateway
         return {
           deviceId: device.id,
           status,
-          lastSeen: device.lastHeartbeat?.toISOString() || now,
+          // `null`, never `now`, when the device has never reported. Falling
+          // back to the current time told every dashboard that joins the org
+          // room that a screen which has NEVER checked in was "last seen just
+          // now", and re-stamped it on every page load. That is fabricated
+          // freshness: lastSeen is an observation, not the time we looked.
+          // The client's `update.lastSeen ?? d.lastSeen` leaves its own value
+          // alone for a null, so the row keeps rendering "Never".
+          lastSeen: device.lastHeartbeat?.toISOString() ?? null,
           timestamp: now,
         };
       });

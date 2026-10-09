@@ -87,8 +87,14 @@ export function CookieConsent() {
         transition-[transform,visibility] duration-500 ease-in-out
         ${visible ? 'translate-y-0 visible' : 'translate-y-full invisible'}
       `}
-      role="dialog"
-      aria-label="Cookie consent"
+      /*
+       * The bar is permanently mounted (it only slides out of view), so the dialog
+       * semantics are conditional: an `aria-hidden` element must not also advertise a
+       * role, and an unconditional one made `[role="dialog"]` match on every page even
+       * while the bar was translated off-screen and `invisible`.
+       */
+      role={visible ? 'dialog' : undefined}
+      aria-label={visible ? 'Cookie consent' : undefined}
       aria-hidden={!visible}
     >
       <div className="mx-auto max-w-4xl px-4 pb-4 sm:px-6">

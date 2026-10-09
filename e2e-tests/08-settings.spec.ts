@@ -21,7 +21,9 @@ test.describe('Settings Management', () => {
     
     // Check for form fields
     await expect(authenticatedPage.locator('label').filter({ hasText: 'Organization Name' })).toBeVisible();
-    await expect(authenticatedPage.locator('label').filter({ hasText: 'Admin Email' })).toBeVisible();
+    // The field is labelled "Account Email" (the signed-in account's address,
+    // rendered read-only) — there is no "Admin Email" label on this page.
+    await expect(authenticatedPage.locator('label').filter({ hasText: 'Account Email' })).toBeVisible();
   });
 
   test('should have editable organization name field', async ({ authenticatedPage }) => {
@@ -74,8 +76,10 @@ test.describe('Settings Management', () => {
     await authenticatedPage.goto('/dashboard/settings');
     await authenticatedPage.waitForLoadState('networkidle');
     
-    // Find timezone select
-    const timezoneSelect = authenticatedPage.locator('select').first();
+    // Target the timezone select by id. `select` is page-wide and its FIRST match
+    // is the Region select (US/IN), which has no America/Chicago option, so the
+    // selectOption below used to fail against a perfectly good product.
+    const timezoneSelect = authenticatedPage.locator('#settings-timezone');
     await expect(timezoneSelect).toBeVisible({ timeout: 10000 });
     
     // Should have options
@@ -124,7 +128,9 @@ test.describe('Settings Management', () => {
     
     // Check for account action buttons
     await expect(authenticatedPage.locator('button').filter({ hasText: /change password/i })).toBeVisible();
-    await expect(authenticatedPage.locator('button').filter({ hasText: /export data/i })).toBeVisible();
+    // The button reads "Export My Data" (or "Exporting..." while in flight), which
+    // /export data/i does not match.
+    await expect(authenticatedPage.locator('button').filter({ hasText: /export my data/i })).toBeVisible();
     await expect(authenticatedPage.locator('button').filter({ hasText: /delete account/i })).toBeVisible();
   });
 

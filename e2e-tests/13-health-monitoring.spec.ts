@@ -1,4 +1,35 @@
-import { test, expect } from './fixtures/auth.fixture';
+import type { Page } from '@playwright/test';
+import { test, expect, apiPost, readData } from './fixtures/auth.fixture';
+
+/**
+ * Seed one display through the API and return its nickname.
+ *
+ * The auth fixture registers a BRAND-NEW organization per test, so
+ * /dashboard/health renders the "No devices found" empty state unless the test
+ * puts a device there. Payload shape is CreateDisplayDto, as used by 03 and 09.
+ */
+async function seedDisplay(page: Page, token: string, status: 'online' | 'offline' = 'online'): Promise<string> {
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const res = await apiPost(page, token, 'http://localhost:3000/api/v1/displays', {
+    name: `E2E Health ${status} ${stamp}`,
+    deviceId: `e2e-health-${stamp}`,
+    location: 'Test Location',
+    status,
+  });
+
+  expect(res.ok(), `display create failed: ${res.status()} ${await res.text()}`).toBeTruthy();
+
+  const display = await readData(res);
+  expect(display.nickname, 'created display must carry a nickname').toBeTruthy();
+  return display.nickname;
+}
+
+/** A device's health card, keyed by the <h3> that carries its name. */
+const healthCardHeading = (page: Page, nickname: string) =>
+  page.getByRole('heading', { level: 3, name: nickname });
+
+/** A stat tile's label - the four tiles are the page's responsive grid. */
+const statLabel = (page: Page, label: string) => page.getByText(label, { exact: true });
 
 /**
  * PHASE 7.1: DEVICE HEALTH MONITORING DASHBOARD TEST SUITE
@@ -328,20 +359,47 @@ test.describe('Phase 7.1: Device Health Monitoring Dashboard', () => {
     }
   });
 
-  test('should auto-refresh health data (BOUNDARY)', async ({ authenticatedPage }) => {
+  /**
+   * The page really does auto-refresh: `HEALTH_REFRESH_INTERVAL_MS` is 30s and
+   * the interval calls `loadDevicesAndHealth(false)`, which refetches the whole
+   * display list without showing the spinner. So this is assertable for real -
+   * seed a SECOND device after the page has settled and it must arrive on its
+   * own. The old test only looked for the word "ago" and then passed
+   * regardless, which is how it stayed green on a page showing an empty state.
+   *
+   * Slow by construction: one interval period has to elapse. It is the only
+   * test here that waits.
+   */
+  test('should auto-refresh health data (BOUNDARY)', async ({ authenticatedPage, token }) => {
+    test.setTimeout(150_000);
+
+    const firstName = await seedDisplay(authenticatedPage, token);
+
     await authenticatedPage.goto('/dashboard/health');
     await authenticatedPage.waitForLoadState('networkidle');
 
-    // Verify page header is visible
-    const pageHeader = authenticatedPage.locator('h2').filter({ hasText: /Health|Monitor/i });
-    await expect(pageHeader).toBeVisible({ timeout: 5000 });
+    // Baseline: the first device's card is on screen, and the second one is
+    // not. Together these are the control - they prove the card locator
+    // resolves at all, and that the assertion below is observing an arrival
+    // rather than something that was already there.
+    await expect(healthCardHeading(authenticatedPage, firstName)).toBeVisible({ timeout: 15000 });
 
-    // Look for timestamp elements
-    const timestampLocator = authenticatedPage.locator('text=/ago/i').first();
-    const hasTimestamp = await timestampLocator.isVisible({ timeout: 2000 }).catch(() => false);
+    const secondName = await seedDisplay(authenticatedPage, token);
+    await expect(healthCardHeading(authenticatedPage, secondName)).toHaveCount(0);
 
-    // Test passes if page is functional
-    expect(hasTimestamp || true).toBeTruthy();
+    // A marker that a navigation would destroy: the new card has to appear in
+    // THIS document, not via a reload.
+    await authenticatedPage.evaluate(() => {
+      (window as unknown as { __vizoraNoReload?: boolean }).__vizoraNoReload = true;
+    });
+
+    await expect(healthCardHeading(authenticatedPage, secondName)).toBeVisible({ timeout: 75_000 });
+    await expect(statLabel(authenticatedPage, 'Total Devices')).toBeVisible();
+    expect(
+      await authenticatedPage.evaluate(
+        () => (window as unknown as { __vizoraNoReload?: boolean }).__vizoraNoReload === true,
+      ),
+    ).toBe(true);
   });
 
   test('should handle empty health data gracefully (ADVERSARIAL)', async ({ authenticatedPage }) => {
@@ -359,23 +417,51 @@ test.describe('Phase 7.1: Device Health Monitoring Dashboard', () => {
     }
   });
 
+  /**
+   * "Reflow" is the claim, so measure it. The stat grid is `grid-cols-1
+   * md:grid-cols-4`: below the `md` breakpoint the four tiles stack one per
+   * row, at desktop width they sit side by side. The old test looked for any
+   * element with a class containing "bg-" and then passed whether or not it
+   * found one - it could not have gone red had the page rendered nothing at all.
+   *
+   * Measured through bounding boxes rather than class names, so it tracks what
+   * actually lays out and does not churn when the utility classes do.
+   */
   test('should display responsive health layout (DOMAIN)', async ({ authenticatedPage }) => {
-    // Test mobile view
     await authenticatedPage.setViewportSize({ width: 375, height: 667 });
     await authenticatedPage.goto('/dashboard/health');
     await authenticatedPage.waitForLoadState('networkidle');
 
-    // Should be accessible on mobile
-    await expect(authenticatedPage.locator('h2').filter({ hasText: /Health|Monitor/i })).toBeVisible({ timeout: 5000 });
+    await expect(authenticatedPage.locator('h2').filter({ hasText: /Health|Monitor/i })).toBeVisible({ timeout: 10000 });
 
-    // Cards should reflow - look for any visible card
-    const cards = authenticatedPage.locator('[class*="card"], [class*="health"], div[class*="bg-"]').first();
-    const hasCards = await cards.isVisible({ timeout: 3000 }).catch(() => false);
+    const total = statLabel(authenticatedPage, 'Total Devices');
+    const healthy = statLabel(authenticatedPage, 'Healthy');
+    await expect(total).toBeVisible();
+    await expect(healthy).toBeVisible();
 
-    // Test passes if page renders properly on mobile
-    expect(hasCards || true).toBeTruthy();
+    const mobileTotal = (await total.boundingBox())!;
+    const mobileHealthy = (await healthy.boundingBox())!;
 
-    // Reset viewport
+    // Stacked: same left edge, the second tile strictly below the first.
+    expect(Math.abs(mobileTotal.x - mobileHealthy.x)).toBeLessThanOrEqual(1);
+    expect(mobileHealthy.y).toBeGreaterThan(mobileTotal.y + mobileTotal.height);
+
     await authenticatedPage.setViewportSize({ width: 1280, height: 720 });
+
+    // Side by side: same baseline, the second tile strictly to the right. This
+    // is the control for the measurement above - the same two boxes have to
+    // change relationship, so a pair that never moves cannot pass both halves.
+    await expect
+      .poll(async () => {
+        const a = await total.boundingBox();
+        const b = await healthy.boundingBox();
+        return a && b ? Math.round(b.x - a.x) : 0;
+      }, { timeout: 10000 })
+      .toBeGreaterThan(0);
+
+    const wideTotal = (await total.boundingBox())!;
+    const wideHealthy = (await healthy.boundingBox())!;
+    expect(Math.abs(wideTotal.y - wideHealthy.y)).toBeLessThanOrEqual(1);
+    expect(wideHealthy.x).toBeGreaterThan(wideTotal.x + wideTotal.width);
   });
 });

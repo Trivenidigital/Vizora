@@ -10,7 +10,16 @@ import type { DisplayStatus, Playlist } from '../types';
 export type DeviceStatusUpdate = {
   deviceId: string;
   status: DisplayStatus;
-  lastSeen: string;
+  /**
+   * `null` when the device has never reported. The gateway used to substitute
+   * the current time here, which made every dashboard that joined the org room
+   * render "Last seen: Just now" for a screen that had never checked in — the
+   * same fabricated-timestamp bug documented in DeviceStatusContext's
+   * mergeStatus, arriving from the server instead of the client. Consumers
+   * must treat null as "unknown" and keep whatever they already had; the
+   * devices page does this with `update.lastSeen ?? d.lastSeen`.
+   */
+  lastSeen: string | null;
   currentPlaylistId?: string;
 };
 

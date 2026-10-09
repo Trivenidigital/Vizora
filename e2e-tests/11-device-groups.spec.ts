@@ -132,22 +132,23 @@ test.describe('Phase 6.3: Device Groups & Zones System', () => {
     }
   });
 
-  test('should expand/collapse nested groups (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/devices');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for expand button
-    const expandButton = authenticatedPage.locator('button').filter({ hasText: /show|hide|expand|collapse/i }).first();
-
-    if (await expandButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      const initialClass = await expandButton.getAttribute('class');
-      await expandButton.click();
-      const afterClickClass = await expandButton.getAttribute('class');
-
-      // Class should change
-      expect(initialClass || afterClickClass).toBeTruthy();
-    }
-  });
+  /*
+   * REMOVED 2026-10-09: 'should expand/collapse nested groups (MUTATION)'.
+   *
+   * It looked for a button matching /show|hide|expand|collapse/i, and behind
+   * that guard asserted `expect(initialClass || afterClickClass).toBeTruthy()`
+   * - which passes as long as EITHER read returned a class, so it could not
+   * detect the change it claimed to check. Both halves were moot anyway:
+   * nested groups do not exist. `DisplayGroup` in schema.prisma has no parent
+   * column, `createDisplayGroup` takes only { name, description }, and
+   * `DeviceGroupSelector.renderGroups` recurses on a `parentGroupId` that is
+   * therefore always undefined - so every group renders flat at level 0 and
+   * there is no expand/collapse control to click.
+   *
+   * Nothing was substituted: the flat list is covered by the group-filter
+   * tests above. See also 'support nested/hierarchical groups' and 'show group
+   * hierarchy visually' in this file, which probe the same non-feature.
+   */
 
   test('should allow bulk operations on group (DOMAIN)', async ({ authenticatedPage }) => {
     await authenticatedPage.goto('/dashboard/devices');
@@ -200,28 +201,49 @@ test.describe('Phase 6.3: Device Groups & Zones System', () => {
     }
   });
 
+  /**
+   * The group-creation form lives inside the COLLAPSED "Device Groups" card on
+   * the devices page, not in a page-level modal. The old locator took the first
+   * button on the page matching /create|new|add.*group/i - which is "Pair New
+   * Device" in the header - so the form under test was never opened, the
+   * `nameInput` guard was never satisfied, and the body never ran. The
+   * `expect(isDisabled || true)` left behind could not have failed in any case.
+   *
+   * The real rule is `!newGroupName.trim()` in DeviceGroupSelector: empty is
+   * refused and so is whitespace-only, which is the half a `required` attribute
+   * would have missed.
+   */
   test('should validate group name (BOUNDARY)', async ({ authenticatedPage }) => {
     await authenticatedPage.goto('/dashboard/devices');
     await authenticatedPage.waitForLoadState('networkidle');
 
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create|new|add.*group/i }).first();
+    const groupsToggle = authenticatedPage.getByRole('button', { name: /Device Groups \(\d+\)/ });
+    await expect(groupsToggle).toBeVisible({ timeout: 10000 });
+    await groupsToggle.click();
 
-    if (await createButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await createButton.click();
-      await authenticatedPage.waitForTimeout(500);
+    const panel = authenticatedPage.locator('#device-group-filter');
+    await expect(panel).toBeVisible();
 
-      // Find name input
-      const nameInput = authenticatedPage.locator('input[placeholder*="name"], input[placeholder*="Name"]').first();
+    await panel.getByRole('button', { name: /Create New Group/ }).click();
 
-      if (await nameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-        // Test required field
-        const submitButton = authenticatedPage.locator('button').filter({ hasText: /save|create|submit/i }).last();
-        const isDisabled = await submitButton.isDisabled().catch(() => false);
+    const nameInput = panel.getByPlaceholder(/^Group name/);
+    const createButton = panel.getByRole('button', { name: 'Create', exact: true });
+    await expect(nameInput).toBeVisible();
 
-        // Should be disabled without name
-        expect(isDisabled || true).toBeTruthy();
-      }
-    }
+    // Cancel stays live throughout. That is the control: it proves enablement
+    // is being decided per button by the name, and that the whole form has not
+    // simply been rendered disabled.
+    await expect(createButton).toBeDisabled();
+    await expect(panel.getByRole('button', { name: 'Cancel', exact: true })).toBeEnabled();
+
+    await nameInput.fill('   ');
+    await expect(createButton).toBeDisabled();
+
+    await nameInput.fill(`E2E Group ${Date.now()}`);
+    await expect(createButton).toBeEnabled();
+
+    await nameInput.fill('');
+    await expect(createButton).toBeDisabled();
   });
 
   test('should assign devices to group (MUTATION)', async ({ authenticatedPage }) => {
