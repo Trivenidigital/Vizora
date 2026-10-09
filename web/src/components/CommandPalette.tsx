@@ -72,7 +72,15 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
        * and the palette would never open at all. Naively routing this through
        * setOpen() is exactly how fixing the dismiss bug breaks the open path.
        */
-      if (!isControlled && (e.metaKey || e.ctrlKey) && e.key === 'k') {
+      // Case-insensitive + `!e.shiftKey` for the same reasons as the wrapper's
+      // copy of this test: CapsLock reports 'K' and would silently kill the
+      // shortcut, and Ctrl+Shift+K belongs to the browser.
+      if (
+        !isControlled &&
+        (e.metaKey || e.ctrlKey) &&
+        !e.shiftKey &&
+        e.key.toLowerCase() === 'k'
+      ) {
         e.preventDefault();
         setOpen(!open);
         setSearch('');

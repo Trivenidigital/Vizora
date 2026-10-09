@@ -80,7 +80,7 @@ const command = (page: Page, title: string): Locator =>
   commands(page).filter({ hasText: title });
 
 async function openPalette(page: Page): Promise<void> {
-  await page.keyboard.press('Control+K');
+  await page.keyboard.press('Control+k');
   await expect(searchField(page)).toBeVisible({ timeout: 5000 });
 }
 
@@ -100,13 +100,13 @@ test.describe('Phase 7.2: Command Palette (Power User Navigation)', () => {
     // The wrapper's handler accepts either modifier (`e.metaKey || e.ctrlKey`),
     // so both are a real contract and both are asserted rather than one being
     // tried as a fallback for the other.
-    await authenticatedPage.keyboard.press('Meta+K');
+    await authenticatedPage.keyboard.press('Meta+k');
     await expect(searchField(authenticatedPage)).toBeVisible({ timeout: 5000 });
 
     await authenticatedPage.keyboard.press('Escape');
     await expect(searchField(authenticatedPage)).toBeHidden();
 
-    await authenticatedPage.keyboard.press('Control+K');
+    await authenticatedPage.keyboard.press('Control+k');
     await expect(searchField(authenticatedPage)).toBeVisible({ timeout: 5000 });
 
     // And it announces itself as a modal dialog rather than a search box that
@@ -379,7 +379,7 @@ test.describe('Phase 7.2: Command Palette (Power User Navigation)', () => {
     await authenticatedPage.waitForLoadState('networkidle');
 
     for (let i = 0; i < 10; i++) {
-      await authenticatedPage.keyboard.press('Control+K');
+      await authenticatedPage.keyboard.press('Control+k');
       await authenticatedPage.waitForTimeout(100);
     }
 
@@ -394,7 +394,7 @@ test.describe('Phase 7.2: Command Palette (Power User Navigation)', () => {
     await expect(searchField(authenticatedPage)).toBeHidden();
     await expect(hint(authenticatedPage)).toBeVisible();
 
-    await authenticatedPage.keyboard.press('Control+K');
+    await authenticatedPage.keyboard.press('Control+k');
     await expect(searchField(authenticatedPage)).toBeVisible({ timeout: 5000 });
   });
 
@@ -407,7 +407,7 @@ test.describe('Phase 7.2: Command Palette (Power User Navigation)', () => {
 
       // CommandPaletteWrapper is mounted on the dashboard shell, so this is a
       // contract on every /dashboard/* route, not a best effort.
-      await authenticatedPage.keyboard.press('Control+K');
+      await authenticatedPage.keyboard.press('Control+k');
       await expect(searchField(authenticatedPage)).toBeVisible({ timeout: 5000 });
       await expect(command(authenticatedPage, 'Go to Settings')).toBeVisible();
 
@@ -479,7 +479,7 @@ test.describe('Phase 7.2: Command Palette (Power User Navigation)', () => {
      * reported as a product inconsistency rather than fixed here; it is pinned
      * so that making the three paths consistent is a deliberate, visible change.
      */
-    await authenticatedPage.keyboard.press('Control+K');
+    await authenticatedPage.keyboard.press('Control+k');
     await expect(searchField(authenticatedPage)).toHaveValue('devices');
 
     /*
