@@ -116,3 +116,92 @@ Note the browser suite does **not** cover these two endpoints — they are devic
 ## Known remaining weakness in the suite
 
 Beyond the 31 literal tautologies, roughly **85 tests still have bodies wholly wrapped in `if (await element.isVisible())`**, plus about ten `toBeGreaterThanOrEqual(0)` assertions that also cannot fail. `12-content-tagging` is the worst case: nearly every remaining test is of that shape and most probe the tag-creation surface that does not exist. That file wants consolidation into a few real tests plus one pinned gap, not site-by-site repair. This was left out of scope and is recorded here rather than left implicit.
+
+---
+
+# Part 3 — what CI found that local could not
+
+The `playwright` job's first real run against the rewritten suite surfaced three
+defects that the local stack structurally could not show. Worth recording, because the
+reason is reusable: **the local environment was broken in a way that hid product bugs.**
+
+## 1. Every audit-log and schedules filter returned 400
+
+The global `ValidationPipe` runs with `whitelist: true` AND `forbidNonWhitelisted: true`
+(`main.ts`). `@Query() pagination: PaginationDto` validates the **whole** query object,
+not just the fields that DTO declares, so any additional bare `@Query('x')` on the same
+handler is an unknown property and the request is rejected before the handler runs.
+Verified live against the running stack:
+
+```
+GET /api/v1/audit-logs?page=1&limit=20&startDate=2026-10-10
+  -> 400 {"message":["property startDate should not exist"]}
+GET /api/v1/schedules?page=1&limit=10&isActive=true
+  -> 400 {"message":["property isActive should not exist"]}
+```
+
+All five audit-log filters (action, entityType, userId, startDate, endDate) and all three
+schedule filters (displayId, displayGroupId, isActive) were dead. **The failure is silent
+from the operator's seat**: the audit-log page catches the 400, toasts "Failed to load
+audit logs" and leaves the previous rows on screen — so the filter appears to do nothing
+while the data displayed is unfiltered. An operator narrowing an audit trail to a date
+range would read the full log and believe it was filtered.
+
+Fixed with `AuditLogQueryDto` and `ScheduleQueryDto`, both extending `PaginationDto`.
+Verified after the fix: `startDate=<tomorrow>` returns 0 of 2 entries, `action=user_login`
+returns 1, `entityType=user` returns 2, and a malformed value now 400s with a useful
+message instead of a blanket rejection.
+
+**`middleware/src/modules/common/dto/query-dto-policy.spec.ts` scans every controller for
+the pattern.** This guard is not optional garnish: the unit tests **cannot** catch a
+reintroduction, because they call handler methods directly and never run the
+ValidationPipe. A reintroduced bare `@Query('x')` passes every unit test and fails only
+over HTTP. The scan carries two reach controls (it asserts it found >10 controllers, and
+that it actually parsed handlers using the `@Query() dto` construct), and was confirmed to
+go red when the pattern was deliberately reintroduced.
+
+## 2. A second bug was hiding behind the first
+
+The audit-log Action dropdown offered `login` and `logout`, while `auth.service.ts` writes
+`user_login` and `user_logout`, and `user_registered` had no option at all. Filtering by
+"Login" would have returned nothing for a user who had just logged in. Nobody could notice
+while every filter 400'd before reaching the query. Options corrected and a comment added
+tying the list to what the services actually write.
+
+## 3. The realtime gateway fabricated device freshness
+
+`DeviceGateway`'s status catch-up — sent to every dashboard that joins an org room —
+mapped `lastSeen: device.lastHeartbeat?.toISOString() || now`. For a display that has
+**never reported**, that sent the current time, so the fleet view showed
+"Last seen: Just now" for a screen that had never checked in, and re-stamped it on every
+page load. Now sends `null`; the client's `update.lastSeen ?? d.lastSeen` leaves its own
+value alone, so the row keeps rendering "Never".
+
+This is the **same bug class already documented in this repo**, in
+`DeviceStatusContext.mergeStatus`: *"The lastSeen loss was worse than cosmetic — the caller
+fell back to `new Date()`, so every row displayed a fabricated 'just now' timestamp."*
+That one was fixed on the client; this one was arriving from the server.
+
+It also directly contradicts the invariant in CLAUDE.md that device status is "a recent
+observation, not a live fact" and that the UI "must present freshness alongside status
+rather than implying live truth".
+
+## Why local could not find these
+
+**The local dashboard socket never authenticates.** Every dashboard page logs
+`[Socket] Error: join:organization Not authenticated`, so the client never joins the org
+room and never receives the status catch-up — the exact message carrying the fabricated
+`lastSeen`. Prod realtime logs show zero unauthenticated attempts and dashboards joining
+org rooms normally, so this is a local-environment fault. It was dismissed earlier in the
+day as harmless noise. It was not: it was suppressing a whole class of observation.
+
+The filter bugs were invisible for a different reason — no test had ever exercised a
+filter, because the tests that claimed to were among the 31 inert assertions.
+
+## A trap worth remembering
+
+`getByRole('button', { name: 'Next' })` matched **"Open Next.js Dev Tools"**. Playwright's
+accessible-name match is a case-insensitive *substring* by default, and both the local
+stack and the CI job run `next dev`, which renders that button on every page. A test
+asserting "this page has no pager" counted one. Any loose role-name query in this suite
+can collide with the dev-tools button; use `exact: true`.
