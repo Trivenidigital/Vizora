@@ -256,22 +256,28 @@ convention adopted throughout the repaired suite is the **reach control**: any a
 that something is absent must be paired with a second assertion proving the locator was
 searching somewhere that really does contain comparable elements.
 
-## The last flake was a hydration race, and it took two wrong guesses
+## The last flake was a hydration race, and it took three attempts
 
-The login test timed out waiting for the dashboard redirect. The obvious reading was a
-slow navigation, so the first attempt raised that timeout — to 45s, **under a 30s
-per-test timeout**, where it could never fire. The second attempt noticed the artifact
-upload ran `if: failure()`, and that a flake which passes on retry makes the job
-*succeed*, so two flakes had left no screenshot, video or trace at all. Fixing the
-upload to `always()` is what produced the evidence.
+The login test timed out waiting for the dashboard redirect. Each wrong reading is
+worth recording, because they are the instructive part.
 
-The screenshot showed the page still on `/login`, **both fields empty**, with "Please
-enter a valid email address" under the email. The login had never submitted. It is a
-controlled React form, and a `fill` that lands before hydration is discarded when the
-client re-renders, leaving the field empty and tripping its own validation. No
-navigation was ever going to happen; no timeout would have fixed it. The test now
-asserts the values survived before submitting.
+1. **Raised the timeout.** The symptom was `waitForURL` timing out, so the obvious fix
+   was a bigger budget — 45s. It could never fire: Playwright's per-test timeout is
+   30s, so the test died at 30s while pointing at a line asking for 45000ms.
+   **A sub-timeout above the enclosing test timeout is not a timeout.**
+2. **No evidence existed to check.** The artifact upload ran `if: failure()`, and a
+   flake that passes on retry makes the job *succeed* — so two flakes left no
+   screenshot, video or trace. Switching it to `always()` produced the evidence:
+   the page still on `/login`, **both fields empty**, "Please enter a valid email
+   address" under the email. The login had never submitted.
+3. **Awaited the value instead of re-filling.** The form is a controlled React form, so
+   a `fill` landing before hydration is discarded on re-render. The fix asserted
+   `toHaveValue` after filling, assuming it only needed waiting out. It did not: the
+   assertion held an empty string for its full 5s. **React owns the input by then and
+   the lost keystrokes never come back.**
 
-Two lessons worth keeping: **a sub-timeout above the enclosing test timeout is not a
-timeout**, and **a retry policy that hides flakes must not also discard their
-evidence**.
+The working fix repeats the fill rather than awaiting it — `expect(...).toPass()` around
+a fill-then-verify block, retrying until the value survives a re-render.
+
+Result: **327/327, 0 flaky**, and the run artifact drops to the bare HTML report, which
+is itself the signal that no test needed a retry.
