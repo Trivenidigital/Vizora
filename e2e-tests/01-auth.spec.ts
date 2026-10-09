@@ -52,20 +52,33 @@ test.describe('Authentication Flow', () => {
     // Submit and wait for navigation (or error)
     await page.click('button[type="submit"]');
 
-    // Wait longer for URL change since registration involves API calls
+    /*
+     * 30s under a 60s test budget. 15s was tight enough that the navigation
+     * landed just after the deadline: the catch block then reported
+     * "Registration timeout. Still at: http://localhost:3001/dashboard" —
+     * naming the destination it had just reached, which reads as a product
+     * failure and is not one. A sub-timeout must also stay below the enclosing
+     * test timeout or it can never fire; both are set here deliberately.
+     */
+    test.setTimeout(60_000);
     try {
-      await page.waitForURL(/dashboard/, { timeout: 15000 });
-    } catch (e) {
-      // If we didn't navigate to dashboard, check for errors
-      const errorElement = page.locator('.bg-red-50, [role="alert"]');
+      await page.waitForURL(/dashboard/, { timeout: 30000 });
+    } catch {
+      /*
+       * `.first()` matters: this selector is a multi-match, so isVisible()
+       * threw a strict-mode error that `.catch(() => false)` turned into "no
+       * error shown" — the branch that exists to surface the product's own
+       * message could never run.
+       */
+      const errorElement = page.locator('.bg-red-50, [role="alert"]').first();
       const hasError = await errorElement.isVisible({ timeout: 2000 }).catch(() => false);
       if (hasError) {
         const error = await errorElement.textContent().catch(() => 'Unknown error');
         throw new Error(`Registration failed with error: ${error}`);
       }
-      // If no error and still on register page, may be loading
-      const currentUrl = page.url();
-      throw new Error(`Registration timeout. Still at: ${currentUrl}`);
+      throw new Error(
+        `Registration did not reach the dashboard within 30s. URL at failure: ${page.url()}`,
+      );
     }
 
     // Verify dashboard loaded
@@ -99,30 +112,38 @@ test.describe('Authentication Flow', () => {
     // Wait for login form to be visible - accept either "login" or "sign in"
     await expect(page.locator('h1')).toContainText(/log in|login|sign in/i);
 
-    await page.fill('input[type="email"]', email);
-    await page.fill('input[type="password"]', password);
-    await page.click('button[type="submit"]');
+    const emailInput = page.locator('input[type="email"]');
+    const passwordInput = page.locator('input[type="password"]');
+
+    await emailInput.fill(email);
+    await passwordInput.fill(password);
 
     /*
-     * This is the one test that flaked in CI: it timed out on the first attempt
-     * and passed on retry. The wait is for a NAVIGATION, not a latency
-     * assertion — the budget exists so a redirect that never happens fails the
-     * test, and nothing here measures how fast the dashboard renders. The stack
-     * runs `next dev` in CI, where this navigation can pay a route-compilation
-     * cost on a loaded single-worker runner.
+     * Assert the values survived before submitting. This is the actual fix for
+     * the only test that flaked in CI, and it took two wrong guesses to find.
      *
-     * A first attempt to fix this raised ONLY this timeout to 45s, which did
-     * nothing: Playwright's per-test timeout is 30s, so the test died at 30s
-     * and the 45s was unreachable. A sub-timeout above the enclosing test
-     * timeout can never fire. The test budget is raised here too, and is kept
-     * above the navigation budget so that a genuine failure to redirect is
-     * reported as such rather than as a generic test timeout.
+     * The symptom was `waitForURL(/dashboard/)` timing out, so the first
+     * attempt raised that timeout — to 45s, under a 30s per-test timeout, which
+     * meant it could never fire at all. The second CI run then retained the
+     * screenshot (the artifact upload had been `if: failure()`, and a flake
+     * that passes on retry makes the job SUCCEED, so the first two flakes left
+     * no evidence). The snapshot showed the page still on /login with BOTH
+     * fields empty and "Please enter a valid email address" under the email.
      *
-     * If this times out at 45s, the redirect really is broken. Diagnose it
-     * rather than raising the number again.
+     * So the login never submitted. This is a controlled React form: a fill
+     * that lands before hydration is discarded when the client re-renders,
+     * leaving the field empty and tripping its own validation. No navigation
+     * was ever going to happen, and no timeout would have fixed it.
+     *
+     * `toHaveValue` auto-retries, so this both waits hydration out and fails
+     * with a useful message if the value really does not stick.
      */
-    test.setTimeout(90_000);
-    await page.waitForURL(/dashboard/, { timeout: 45000 });
+    await expect(emailInput).toHaveValue(email);
+    await expect(passwordInput).toHaveValue(password);
+
+    await page.click('button[type="submit"]');
+
+    await page.waitForURL(/dashboard/, { timeout: 30000 });
   });
 
   test('should show validation errors for invalid input', async ({ page }) => {
