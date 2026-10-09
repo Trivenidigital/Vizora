@@ -204,7 +204,7 @@ test.describe('Audit Log (Wave 2)', () => {
       await expect(dates).toHaveCount(2);
 
       await expect(
-        authenticatedPage.getByText('User Registered', { exact: true }),
+        authenticatedPage.getByRole('cell', { name: 'User Registered', exact: true }),
       ).toBeVisible({ timeout: 10000 });
 
       // The filter is wired, not decorative: a start date in the future
@@ -219,7 +219,7 @@ test.describe('Audit Log (Wave 2)', () => {
       // the filter's doing and not a log that was empty all along.
       await authenticatedPage.getByRole('button', { name: 'Clear all filters' }).click();
       await expect(
-        authenticatedPage.getByText('User Registered', { exact: true }),
+        authenticatedPage.getByRole('cell', { name: 'User Registered', exact: true }),
       ).toBeVisible({ timeout: 10000 });
     });
 
@@ -241,7 +241,7 @@ test.describe('Audit Log (Wave 2)', () => {
       await expect(actionFilter.getByRole('option', { name: 'All Actions' })).toHaveCount(1);
 
       await expect(
-        authenticatedPage.getByText('User Registered', { exact: true }),
+        authenticatedPage.getByRole('cell', { name: 'User Registered', exact: true }),
       ).toBeVisible({ timeout: 10000 });
 
       // Wired: a fresh organization has created no content, so filtering to
@@ -254,7 +254,7 @@ test.describe('Audit Log (Wave 2)', () => {
       // CONTROL: back to All Actions and the rows return.
       await actionFilter.selectOption('');
       await expect(
-        authenticatedPage.getByText('User Registered', { exact: true }),
+        authenticatedPage.getByRole('cell', { name: 'User Registered', exact: true }),
       ).toBeVisible({ timeout: 10000 });
     });
 
@@ -315,7 +315,7 @@ test.describe('Audit Log (Wave 2)', () => {
        * page", not "the table failed to render".
        */
       await expect(
-        authenticatedPage.getByText('User Registered', { exact: true }),
+        authenticatedPage.getByRole('cell', { name: 'User Registered', exact: true }),
       ).toBeVisible({ timeout: 10000 });
       await expect(authenticatedPage.getByRole('button', { name: 'Export CSV' })).toBeEnabled();
 
@@ -323,8 +323,19 @@ test.describe('Audit Log (Wave 2)', () => {
       expect(rows).toBeGreaterThan(1); // header + at least one entry
       expect(rows).toBeLessThan(22); // header + at most one page of 20
 
-      await expect(authenticatedPage.getByRole('button', { name: 'Next' })).toHaveCount(0);
-      await expect(authenticatedPage.getByRole('button', { name: 'Previous' })).toHaveCount(0);
+      /*
+       * `exact: true` is load-bearing. getByRole's name match is a
+       * case-insensitive SUBSTRING by default, and the stack runs `next dev`
+       * both locally and in CI, which renders an "Open Next.js Dev Tools"
+       * button on every page. A loose 'Next' matched that and reported one
+       * pager button on a page that has none.
+       */
+      await expect(
+        authenticatedPage.getByRole('button', { name: 'Next', exact: true }),
+      ).toHaveCount(0);
+      await expect(
+        authenticatedPage.getByRole('button', { name: 'Previous', exact: true }),
+      ).toHaveCount(0);
     });
   });
 
