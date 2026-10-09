@@ -115,31 +115,40 @@ test.describe('Authentication Flow', () => {
     const emailInput = page.locator('input[type="email"]');
     const passwordInput = page.locator('input[type="password"]');
 
-    await emailInput.fill(email);
-    await passwordInput.fill(password);
-
     /*
-     * Assert the values survived before submitting. This is the actual fix for
-     * the only test that flaked in CI, and it took two wrong guesses to find.
+     * Re-fill until the value sticks. This is the only test that flaked in CI,
+     * and it took three attempts to get right — each wrong one is recorded
+     * because the wrong readings are the instructive part.
      *
-     * The symptom was `waitForURL(/dashboard/)` timing out, so the first
-     * attempt raised that timeout — to 45s, under a 30s per-test timeout, which
-     * meant it could never fire at all. The second CI run then retained the
-     * screenshot (the artifact upload had been `if: failure()`, and a flake
-     * that passes on retry makes the job SUCCEED, so the first two flakes left
-     * no evidence). The snapshot showed the page still on /login with BOTH
-     * fields empty and "Please enter a valid email address" under the email.
+     * 1. The symptom was `waitForURL(/dashboard/)` timing out, so the first fix
+     *    raised that timeout to 45s. It could never fire: Playwright's per-test
+     *    timeout is 30s, so the test died at 30s pointing at a line asking for
+     *    45000ms. A sub-timeout above the enclosing test timeout is not a
+     *    timeout.
+     * 2. No screenshot existed to check, because the artifact upload ran
+     *    `if: failure()` and a flake that passes on retry makes the job
+     *    SUCCEED. Switching that to `always()` is what produced the evidence:
+     *    the page was still on /login with BOTH fields empty and "Please enter
+     *    a valid email address" under the email. The login never submitted.
+     * 3. So the fill was being discarded — this is a controlled React form, and
+     *    a `fill` that lands before hydration is thrown away when the client
+     *    re-renders. The second fix asserted `toHaveValue` after filling, on
+     *    the theory that it only needed waiting out. It did not: the assertion
+     *    held an empty string for its full 5s. React owns the input by then and
+     *    the lost keystrokes never come back.
      *
-     * So the login never submitted. This is a controlled React form: a fill
-     * that lands before hydration is discarded when the client re-renders,
-     * leaving the field empty and tripping its own validation. No navigation
-     * was ever going to happen, and no timeout would have fixed it.
-     *
-     * `toHaveValue` auto-retries, so this both waits hydration out and fails
-     * with a useful message if the value really does not stick.
+     * So the fill has to be REPEATED, not awaited. `toPass` retries the whole
+     * block, re-filling until the value survives a re-render.
      */
-    await expect(emailInput).toHaveValue(email);
-    await expect(passwordInput).toHaveValue(password);
+    const fillUntilSet = async (locator: typeof emailInput, value: string) => {
+      await expect(async () => {
+        await locator.fill(value);
+        await expect(locator).toHaveValue(value, { timeout: 1000 });
+      }).toPass({ timeout: 20000 });
+    };
+
+    await fillUntilSet(emailInput, email);
+    await fillUntilSet(passwordInput, password);
 
     await page.click('button[type="submit"]');
 
