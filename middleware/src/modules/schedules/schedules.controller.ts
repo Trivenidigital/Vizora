@@ -24,7 +24,7 @@ import { SchedulesService } from './schedules.service';
 import { CreateScheduleDto } from './dto/create-schedule.dto';
 import { UpdateScheduleDto } from './dto/update-schedule.dto';
 import { CheckConflictsDto } from './dto/check-conflicts.dto';
-import { PaginationDto } from '../common/dto/pagination.dto';
+import { ScheduleQueryDto } from './dto/schedule-query.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import {
@@ -64,16 +64,18 @@ export class SchedulesController {
   @Get()
   findAll(
     @CurrentUser('organizationId') organizationId: string,
-    @Query() pagination: PaginationDto,
-    @Query('displayId') displayId?: string,
-    @Query('displayGroupId') displayGroupId?: string,
-    @Query('isActive') isActive?: string,
+    @Query() query: ScheduleQueryDto,
   ) {
-    return this.schedulesService.findAll(organizationId, pagination, {
-      displayId,
-      displayGroupId,
-      isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
-    });
+    const { page, limit, displayId, displayGroupId, isActive } = query;
+    return this.schedulesService.findAll(
+      organizationId,
+      { page, limit },
+      {
+        displayId,
+        displayGroupId,
+        isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
+      },
+    );
   }
 
   @Get('active/:displayId')
