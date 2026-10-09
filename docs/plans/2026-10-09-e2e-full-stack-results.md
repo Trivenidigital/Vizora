@@ -215,11 +215,11 @@ can collide with the dev-tools button; use `exact: true`.
 | | |
 |---|---|
 | Tests | 327 |
-| Passed | 326 |
+| Passed | **327** |
 | Failed | 0 |
 | Skipped | 0 |
-| Flaky | 1 (login redirect, timeout raised to 45s with rationale) |
-| Wall time | ~16 min, 1 worker |
+| Flaky | 0 |
+| Wall time | 12.3 min, 1 worker |
 
 All seven CI jobs green: lint, test, migrations, e2e, **playwright**, build, security.
 
@@ -255,3 +255,23 @@ None of these show up as a failure. All three are invisible in a pass count. The
 convention adopted throughout the repaired suite is the **reach control**: any assertion
 that something is absent must be paired with a second assertion proving the locator was
 searching somewhere that really does contain comparable elements.
+
+## The last flake was a hydration race, and it took two wrong guesses
+
+The login test timed out waiting for the dashboard redirect. The obvious reading was a
+slow navigation, so the first attempt raised that timeout — to 45s, **under a 30s
+per-test timeout**, where it could never fire. The second attempt noticed the artifact
+upload ran `if: failure()`, and that a flake which passes on retry makes the job
+*succeed*, so two flakes had left no screenshot, video or trace at all. Fixing the
+upload to `always()` is what produced the evidence.
+
+The screenshot showed the page still on `/login`, **both fields empty**, with "Please
+enter a valid email address" under the email. The login had never submitted. It is a
+controlled React form, and a `fill` that lands before hydration is discarded when the
+client re-renders, leaving the field empty and tripping its own validation. No
+navigation was ever going to happen; no timeout would have fixed it. The test now
+asserts the values survived before submitting.
+
+Two lessons worth keeping: **a sub-timeout above the enclosing test timeout is not a
+timeout**, and **a retry policy that hides flakes must not also discard their
+evidence**.

@@ -7446,7 +7446,7 @@ Plan: `docs/plans/2026-06-01-content-library-search-performance-pass-18.md`
 - [x] D CI runs no Playwright at all — the `e2e` job is a middleware Jest subset plus realtime with `continue-on-error: true`
 
 ### Verification
-- [x] Full Playwright suite green in CI: 327 tests, 326 passed, 0 failed, 0 skipped, 1 flaky
+- [x] Full Playwright suite green in CI: 327 tests, 327 passed, 0 failed, 0 skipped, 0 flaky, 12.3 min
 - [x] Web/middleware/realtime unit suites green after the product changes
 
 ### Outcome 2026-10-09
