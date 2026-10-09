@@ -135,27 +135,40 @@ test.describe('Phase 7.0: Content Tagging System', () => {
     }
   });
 
-  test('should validate tag name (BOUNDARY)', async ({ authenticatedPage }) => {
+  /**
+   * PINNED GAP, renamed on 2026-10-09. There is no tag-name validation to
+   * assert because there is no tag-creation form anywhere in the dashboard.
+   * `ContentTagger` is mounted exactly once - in the tag-filter panel of
+   * `content/page-client.tsx` - and that call site does NOT pass `onCreateTag`,
+   * so the component's entire create branch ("+ Add Tag", the name input, the
+   * colour picker, the disabled-until-named Create button) never renders.
+   *
+   * The old test asked for a button matching /create.*tag|new.*tag/i, found
+   * none, and skipped its body; the `expect(isDisabled || true)` behind the
+   * guard could not have failed even if it had run. Tags reach the UI only
+   * through `GET /content/tags`, and the panel's own empty state tells the
+   * operator to "add tags to content" with nothing on offer that does so.
+   */
+  test('should offer no tag-creation form on the content page (pinned gap)', async ({ authenticatedPage }) => {
     await authenticatedPage.goto('/dashboard/content');
     await authenticatedPage.waitForLoadState('networkidle');
 
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create.*tag|new.*tag/i }).first();
+    const tagsToggle = authenticatedPage.getByRole('button', { name: /^Tags$/ });
+    await expect(tagsToggle).toBeVisible({ timeout: 10000 });
+    await tagsToggle.click();
 
-    if (await createButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await createButton.click();
-      await authenticatedPage.waitForTimeout(500);
+    // REACH CONTROL. Both halves of the zero below are searched for by the
+    // same two queries used here, and here they find things: a real
+    // role-named button, and the tag panel's own rendered copy. So a count of
+    // zero is a statement about the product, not about a locator that matches
+    // nothing on any page.
+    await expect(authenticatedPage.getByRole('button', { name: /Upload Content/ }).first()).toBeVisible();
+    await expect(authenticatedPage.getByText(/No content tags/)).toBeVisible();
 
-      // Find name input
-      const nameInput = authenticatedPage.locator('input[placeholder*="name"], input[placeholder*="Name"]').first();
-
-      if (await nameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-        // Test required field
-        const submitButton = authenticatedPage.locator('button').filter({ hasText: /save|create|submit/i }).last();
-        const isDisabled = await submitButton.isDisabled().catch(() => false);
-
-        expect(isDisabled || true).toBeTruthy();
-      }
-    }
+    await expect(
+      authenticatedPage.getByRole('button', { name: /add tag|create.*tag|new tag/i }),
+    ).toHaveCount(0);
+    await expect(authenticatedPage.getByPlaceholder(/tag name/i)).toHaveCount(0);
   });
 
   test('should support tag color selection (DOMAIN)', async ({ authenticatedPage }) => {

@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/auth.fixture';
 
 /**
@@ -29,6 +29,18 @@ async function createFolder(page: Page, name: string): Promise<void> {
 
   await expect(dialog).toBeHidden({ timeout: 10000 });
 }
+
+/**
+ * The folder sidebar.
+ *
+ * FolderTree's root carries no landmark role, id or test id, so it is reached as
+ * the container that holds its "New Folder" control. Scoping to it matters: the
+ * content page's own action buttons and the permanently-mounted cookie-consent
+ * bar both match loose text locators, and the consent bar matches them on every
+ * page.
+ */
+const folderSidebar = (page: Page): Locator =>
+  page.locator('div.w-64').filter({ has: page.getByRole('button', { name: 'New Folder' }) });
 
 test.describe('Content Folders (Wave 4)', () => {
   test.describe('Folder Tree Sidebar', () => {
@@ -147,35 +159,60 @@ test.describe('Content Folders (Wave 4)', () => {
       await expect(toggle).toBeHidden();
     });
 
-    test('should rename folder', async ({ authenticatedPage }) => {
+    /*
+     * Removed 2026-10-09: 'should delete folder with confirmation'.
+     *
+     * It looked for a button reading /delete folder|remove folder/i, found
+     * nothing, and skipped its whole body — then the surviving line was
+     * `expect(hasDelete || true)`. Folder deletion has no UI at all (see the
+     * test below, which pins that), so there was nothing to assert. Its subject
+     * is folded into the pinned-gap test that follows.
+     */
+    test('folder tree offers neither a rename nor a delete control (pinned gap)', async ({ authenticatedPage }) => {
       await authenticatedPage.goto('/dashboard/content');
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Look for rename option in context menu
-      const folder = authenticatedPage.locator('[data-testid="folder-item"]').first();
-      const hasFolder = await folder.isVisible({ timeout: 5000 }).catch(() => false);
+      const folderName = `Gap Test ${Date.now()}`;
+      await createFolder(authenticatedPage, folderName);
 
-      if (hasFolder) {
-        await folder.click({ button: 'right' });
-        const renameOption = authenticatedPage.locator('[role="menuitem"]').filter({ hasText: /rename/i });
-        const hasRename = await renameOption.isVisible({ timeout: 3000 }).catch(() => false);
+      /*
+       * `updateFolder` and `deleteFolder` exist on the API client
+       * (web/src/lib/api/content.ts) but have NO call site anywhere in web/src.
+       * FolderTree renders one control per folder — the expand/collapse toggle,
+       * which is `invisible` for a childless folder — plus the tree-level "New
+       * Folder" button, and nothing else. There is no context menu
+       * (`onContextMenu` appears nowhere in web/src) and no per-folder actions
+       * menu.
+       *
+       * The old pair of tests claimed to cover rename and delete; both skipped
+       * their bodies and ended on `expect(<x> || true)`. Renaming and deleting a
+       * folder are real product gaps, reported rather than built, and pinned
+       * here so that adding either is a visible change.
+       *
+       * REACH CONTROL: the sidebar is asserted to contain the folder just
+       * created AND to expose exactly one role=button, which is the "New Folder"
+       * control. That proves the role query below is searching a region that
+       * really does contain findable buttons — without it, every count of 0
+       * would equally mean "the locator pointed at nothing".
+       */
+      const sidebar = folderSidebar(authenticatedPage);
+      await expect(sidebar.getByText(folderName, { exact: true })).toBeVisible({ timeout: 10000 });
+      await expect(sidebar.getByRole('button')).toHaveCount(1);
+      await expect(sidebar.getByRole('button')).toHaveText(/New Folder/);
 
-        expect(hasRename || true).toBeTruthy(); // Rename may not be available if no folders exist
-      }
-    });
+      await expect(sidebar.getByRole('button', { name: /rename/i })).toHaveCount(0);
+      await expect(sidebar.getByRole('button', { name: /delete|remove/i })).toHaveCount(0);
 
-    test('should delete folder with confirmation', async ({ authenticatedPage }) => {
-      await authenticatedPage.goto('/dashboard/content');
-      await authenticatedPage.waitForLoadState('networkidle');
-
-      const deleteButton = authenticatedPage.locator('button').filter({ hasText: /delete folder|remove folder/i }).first();
-      const hasDelete = await deleteButton.isVisible({ timeout: 5000 }).catch(() => false);
-
-      if (hasDelete) {
-        await deleteButton.click();
-        const confirmDialog = authenticatedPage.locator('[role="dialog"], [role="alertdialog"]');
-        await expect(confirmDialog).toBeVisible({ timeout: 3000 });
-      }
+      // Right-clicking the folder opens no menu either. Page-scoped on purpose:
+      // a context menu would most plausibly render in a portal outside the
+      // sidebar. The only role="menu" in the app is NotificationDropdown, which
+      // is unmounted while closed.
+      const folderRow = sidebar
+        .getByText(folderName, { exact: true })
+        .locator('xpath=..');
+      await folderRow.click({ button: 'right' });
+      await expect(authenticatedPage.getByRole('menu')).toHaveCount(0);
+      await expect(authenticatedPage.getByRole('menuitem')).toHaveCount(0);
     });
   });
 });

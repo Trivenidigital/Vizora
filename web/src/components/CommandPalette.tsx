@@ -181,7 +181,18 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
       {/* Command Palette Modal */}
       {open && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20">
-          <div className="w-full max-w-xl mx-4 bg-[var(--surface)] rounded-lg shadow-2xl border border-[var(--border)] overflow-hidden">
+          {/* The palette is a keyboard-first affordance, so it has to announce
+              itself as one. Until 2026-10-09 this card was a bare <div>: no
+              role, no aria-modal, no accessible name. A screen-reader user got
+              a search box appearing in the page with nothing saying a modal had
+              opened. `aria-label` rather than aria-labelledby — the card has no
+              visible title to point at. */}
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Command palette"
+            className="w-full max-w-xl mx-4 bg-[var(--surface)] rounded-lg shadow-2xl border border-[var(--border)] overflow-hidden"
+          >
             {/* Search Input */}
             <div className="p-4 border-b border-[var(--border)]">
               <div className="flex items-center gap-3">
