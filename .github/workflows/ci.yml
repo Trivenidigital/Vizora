@@ -334,26 +334,20 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
 
-      # MinIO cannot be a `services:` container here: it needs the `server /data`
-      # command and GitHub service containers take no command override. The
-      # bucket itself is created by StorageService on boot when missing.
-      - name: Start MinIO
-        run: |
-          # quay.io, not Docker Hub: an anonymous `docker pull minio/minio` from
-          # an Actions runner fails with "pull access denied ... may require
-          # 'docker login'". quay.io/minio/minio carries the same RELEASE tags
-          # and needs no credentials.
-          docker run -d --name minio -p 9000:9000 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin quay.io/minio/minio:RELEASE.2024-06-13T22-53-53Z server /data
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:9000/minio/health/live; then
-              echo "MinIO ready"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "::error::MinIO never became healthy"
-          docker logs minio || true
-          exit 1
+      # No MinIO here, deliberately. Two reasons, both checked rather than assumed:
+      #   1. No spec in e2e-tests/ uploads a file — `setInputFiles` appears in
+      #      none of them — so the browser suite never exercises object storage.
+      #   2. StorageService fails OPEN outside production: it logs
+      #      "MinIO connection failed ... falling back to local storage" and sets
+      #      available=false. It throws only when NODE_ENV=production, and this
+      #      job runs development.
+      # Pulling it was also the first two failures of this job: anonymous
+      # `docker pull minio/minio` from a runner is denied by Docker Hub, and the
+      # same RELEASE tag on quay.io answers "unauthorized". If a spec ever needs
+      # real uploads, add the container back with a registry that permits
+      # anonymous pulls and re-check both points above.
+      # The MINIO_* env above is left in place so the service still takes its
+      # normal configuration path and the fallback is what gets exercised.
 
       - name: Generate Prisma client
         run: |
@@ -405,7 +399,6 @@ jobs:
           echo '--- middleware ---'; tail -200 /tmp/middleware.log || true
           echo '--- realtime ---';   tail -200 /tmp/realtime.log   || true
           echo '--- web ---';        tail -200 /tmp/web.log        || true
-          echo '--- minio ---';      docker logs --tail 50 minio   || true
 
       - uses: actions/upload-artifact@v4
         if: failure()
