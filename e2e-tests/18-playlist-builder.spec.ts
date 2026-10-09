@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures/auth.fixture';
+import { test, expect, apiPost, readData } from './fixtures/auth.fixture';
 
 test.describe('Playlist Builder (Wave 5)', () => {
   test.describe('Playlist List Page', () => {
@@ -69,49 +69,62 @@ test.describe('Playlist Builder (Wave 5)', () => {
   test.describe('3-Panel Playlist Builder', () => {
     let playlistId: string;
 
-    test.beforeEach(async ({ authenticatedPage }) => {
-      // Create a playlist via API for testing the builder
-      const timestamp = Date.now();
+    /*
+     * Every test in this block used to skip itself. Two bugs made `playlistId`
+     * permanently undefined, so all seven silently reported as skipped and the
+     * playlist builder has never actually been exercised:
+     *
+     *   1. The POST sent only the auth cookie. CsrfMiddleware enforces a
+     *      double-submit pair, so the request came back 403 and `response.ok()`
+     *      was false. `apiPost` from the fixture sends both credentials.
+     *   2. Even on success, the global ResponseEnvelopeInterceptor wraps every
+     *      response as `{ success, data, meta }`, so `data.id` read `undefined`
+     *      off the envelope rather than the playlist. `readData` unwraps it.
+     *
+     * Setup failure now FAILS rather than skipping. A test that quietly skips
+     * itself when its fixture breaks reports green forever while covering
+     * nothing, which is exactly how this block went unnoticed.
+     */
+    test.beforeEach(async ({ authenticatedPage, token }) => {
+      const res = await apiPost(
+        authenticatedPage,
+        token,
+        'http://localhost:3000/api/v1/playlists',
+        { name: `Builder Test ${Date.now()}` },
+      );
+      expect(res.ok(), `playlist create failed: ${res.status()} ${await res.text()}`).toBeTruthy();
 
-      // Get auth token
-      const cookies = await authenticatedPage.context().cookies();
-      const authCookie = cookies.find(c => c.name === 'vizora_auth_token');
-      const token = authCookie?.value || '';
-
-      const response = await authenticatedPage.request.post('http://localhost:3000/api/v1/playlists', {
-        headers: { Cookie: `vizora_auth_token=${token}` },
-        data: { name: `Builder Test ${timestamp}` },
-      });
-
-      if (response.ok()) {
-        const data = await response.json();
-        playlistId = data.id;
-      }
+      const created = await readData<{ id: string }>(res);
+      expect(created?.id, 'playlist create returned no id').toBeTruthy();
+      playlistId = created.id;
     });
 
     test('should display 3-panel layout', async ({ authenticatedPage }) => {
-      if (!playlistId) {
-        test.skip();
-        return;
-      }
-
       await authenticatedPage.goto(`/dashboard/playlists/${playlistId}`);
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Check for panel structure (content library, editor, preview)
-      const panels = authenticatedPage.locator('[class*="panel"], [class*="column"], [class*="grid"] > div');
-      const panelCount = await panels.count();
-
-      // Should have at least 2-3 panels
-      expect(panelCount).toBeGreaterThanOrEqual(2);
+      /*
+       * Was `[class*="panel"], [class*="column"], [class*="grid"] > div` with
+       * `count >= 2`. The builder is a `flex flex-col h-screen` layout and uses
+       * none of those class names, so this counted zero — it only ever passed
+       * because the whole block skipped itself (see the beforeEach).
+       *
+       * "3-panel" means the three regions are on screen together, so that is
+       * what this asserts, using the same anchors the three sibling tests use
+       * individually. Class names are not the contract; the regions are.
+       */
+      await expect(
+        authenticatedPage.locator('text=/content library|available content|add content/i').first(),
+      ).toBeVisible({ timeout: 10000 });
+      await expect(
+        authenticatedPage.locator('text=/playlist items|sequence|order|playlist editor/i').first(),
+      ).toBeVisible({ timeout: 10000 });
+      await expect(
+        authenticatedPage.locator('text=/preview|live preview/i').first(),
+      ).toBeVisible({ timeout: 10000 });
     });
 
     test('should show content library panel', async ({ authenticatedPage }) => {
-      if (!playlistId) {
-        test.skip();
-        return;
-      }
-
       await authenticatedPage.goto(`/dashboard/playlists/${playlistId}`);
       await authenticatedPage.waitForLoadState('networkidle');
 
@@ -121,11 +134,6 @@ test.describe('Playlist Builder (Wave 5)', () => {
     });
 
     test('should show playlist editor panel', async ({ authenticatedPage }) => {
-      if (!playlistId) {
-        test.skip();
-        return;
-      }
-
       await authenticatedPage.goto(`/dashboard/playlists/${playlistId}`);
       await authenticatedPage.waitForLoadState('networkidle');
 
@@ -140,11 +148,6 @@ test.describe('Playlist Builder (Wave 5)', () => {
     });
 
     test('should show preview panel', async ({ authenticatedPage }) => {
-      if (!playlistId) {
-        test.skip();
-        return;
-      }
-
       await authenticatedPage.goto(`/dashboard/playlists/${playlistId}`);
       await authenticatedPage.waitForLoadState('networkidle');
 
@@ -159,11 +162,6 @@ test.describe('Playlist Builder (Wave 5)', () => {
     });
 
     test('should have save button', async ({ authenticatedPage }) => {
-      if (!playlistId) {
-        test.skip();
-        return;
-      }
-
       await authenticatedPage.goto(`/dashboard/playlists/${playlistId}`);
       await authenticatedPage.waitForLoadState('networkidle');
 
@@ -172,31 +170,33 @@ test.describe('Playlist Builder (Wave 5)', () => {
     });
 
     test('should have undo/redo buttons', async ({ authenticatedPage }) => {
-      if (!playlistId) {
-        test.skip();
-        return;
-      }
-
       await authenticatedPage.goto(`/dashboard/playlists/${playlistId}`);
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Look for undo/redo buttons or icons
-      const undoButton = authenticatedPage.locator('button[aria-label*="undo" i], button:has-text("Undo"), [data-testid="undo"]').first();
-      const redoButton = authenticatedPage.locator('button[aria-label*="redo" i], button:has-text("Redo"), [data-testid="redo"]').first();
+      /*
+       * Both controls exist; the old selectors could not see them. They are
+       * icon-only buttons whose ONLY label is a `title` ("Undo (Ctrl+Z)" /
+       * "Redo (Ctrl+Y)") — no aria-label, no text, no test id. That is an a11y
+       * gap reported rather than fixed here; `title` does serve as the
+       * accessible name of last resort, so a role query by name finds them.
+       *
+       * Both are asserted, not "at least one": a builder with undo and no redo
+       * is a defect, and the old `||` would have hidden it.
+       */
+      const undo = authenticatedPage.getByRole('button', { name: /undo/i });
+      const redo = authenticatedPage.getByRole('button', { name: /redo/i });
 
-      const hasUndo = await undoButton.isVisible({ timeout: 5000 }).catch(() => false);
-      const hasRedo = await redoButton.isVisible({ timeout: 5000 }).catch(() => false);
+      await expect(undo).toBeVisible({ timeout: 10000 });
+      await expect(redo).toBeVisible({ timeout: 10000 });
 
-      // At least one should be present
-      expect(hasUndo || hasRedo).toBeTruthy();
+      // Both start disabled on a freshly loaded playlist: nothing to undo yet.
+      // This is the reach control — it proves the locators resolved the real
+      // history controls and not some other button whose name contains "undo".
+      await expect(undo).toBeDisabled();
+      await expect(redo).toBeDisabled();
     });
 
     test('should support keyboard shortcuts for undo', async ({ authenticatedPage }) => {
-      if (!playlistId) {
-        test.skip();
-        return;
-      }
-
       await authenticatedPage.goto(`/dashboard/playlists/${playlistId}`);
       await authenticatedPage.waitForLoadState('networkidle');
 
