@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures/auth.fixture';
+import { apiGet, seedContent, seedDisplay, seedDisplayGroup, seedPlaylist, seedTag, tagContent } from './fixtures/seed';
 
 /**
  * COMPREHENSIVE INTEGRATION TEST SUITE - PHASE 6-7 FEATURES
@@ -14,349 +15,173 @@ import { test, expect } from './fixtures/auth.fixture';
 
 test.describe('Comprehensive Integration Tests - Phases 6-7', () => {
 
-  test('should navigate from schedules to devices and back (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // See the gate note in 06-schedules.spec.ts — SCHEDULES_ENABLED ships off.
-    const gated = await authenticatedPage
-      .locator('text=/Scheduling is temporarily unavailable/i')
-      .first()
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-    test.skip(gated, 'SCHEDULES_ENABLED is off — schedules route is gated out of this build');
-
-    await expect(authenticatedPage.locator('h2').filter({ hasText: 'Schedules' })).toBeVisible();
-
-    // Navigate to devices
-    const devicesLink = authenticatedPage.locator('text=/Devices/i').first();
-    if (await devicesLink.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await devicesLink.click();
-      await authenticatedPage.waitForLoadState('networkidle');
-
-      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Devices' })).toBeVisible();
-    }
-
-    // Navigate back to schedules
-    const schedulesLink = authenticatedPage.locator('text=/Schedules/i').first();
-    if (await schedulesLink.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await schedulesLink.click();
-      await authenticatedPage.waitForLoadState('networkidle');
-
-      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Schedules' })).toBeVisible();
-    }
-  });
-
-  test('should use command palette to navigate between features (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Use command palette to navigate
-    await authenticatedPage.keyboard.press('Meta+k').catch(() => authenticatedPage.keyboard.press('Control+k'));
-    await authenticatedPage.waitForTimeout(500);
-
-    const palette = authenticatedPage.locator('[role="dialog"], [class*="palette"]').first();
-
-    if (await palette.isVisible({ timeout: 2000 }).catch(() => false)) {
-      // Navigate through commands
-      for (let i = 0; i < 3; i++) {
-        await authenticatedPage.keyboard.press('ArrowDown');
-        await authenticatedPage.waitForTimeout(200);
-      }
-
-      // Execute command
-      await authenticatedPage.keyboard.press('Enter');
-      await authenticatedPage.waitForTimeout(1000);
-
-      // Executing a palette command must land on a rendered page.
-      await expect(authenticatedPage.locator('h2').first()).toBeVisible({ timeout: 5000 });
-    } else {
-      test.info().annotations.push({
-        type: 'skipped-branch',
-        description: 'command palette did not open on Meta/Control+K — palette navigation not exercised',
-      });
-    }
-  });
-
-  test('should filter content by tag and search simultaneously (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/content');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Apply tag filter
-    const tagCheckbox = authenticatedPage.locator('input[type="checkbox"]').first();
-
-    if (await tagCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await tagCheckbox.check({ force: true });
-      await authenticatedPage.waitForTimeout(500);
-    }
-
-    // Apply search
-    const searchInput = authenticatedPage.locator('input[placeholder*="Search"]').first();
-
-    if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await searchInput.fill('test');
-      await authenticatedPage.waitForTimeout(500);
-
-      // The library must stay rendered with both filters applied.
-      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Content' })).toBeVisible();
-    } else {
-      test.info().annotations.push({
-        type: 'skipped-branch',
-        description: 'no search input on the content page — combined tag+search filter not exercised',
-      });
-    }
-  });
-
-  test('should maintain device group selection across navigation (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/devices');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Select a device group
-    const groupCheckbox = authenticatedPage.locator('input[type="checkbox"]').first();
-
-    if (await groupCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await groupCheckbox.check({ force: true });
-      await authenticatedPage.waitForTimeout(500);
-
-      // Navigate away
-      const contentLink = authenticatedPage.locator('text=/Content/i').first();
-      if (await contentLink.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await contentLink.click();
-        await authenticatedPage.waitForLoadState('networkidle');
-      }
-
-      // Navigate back
-      const devicesLink = authenticatedPage.locator('text=/Devices/i').first();
-      if (await devicesLink.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await devicesLink.click();
-        await authenticatedPage.waitForLoadState('networkidle');
-
-        // Group selection may or may not be maintained - just verify page works
-        await expect(authenticatedPage.locator('h2').filter({ hasText: 'Devices' })).toBeVisible();
-      }
-    }
-  });
-
-  test('should view device health while managing schedules (DOMAIN)', async ({ authenticatedPage }) => {
-    // Start at health page
+  test('should navigate between features through the sidebar (DOMAIN)', async ({ authenticatedPage }) => {
     await authenticatedPage.goto('/dashboard/health');
     await authenticatedPage.waitForLoadState('networkidle');
+    await expect(authenticatedPage.getByRole('heading', { level: 2, name: 'Device Health' })).toBeVisible({ timeout: 10000 });
 
-    await expect(authenticatedPage.locator('h2').filter({ hasText: /Health|Monitor/i })).toBeVisible();
-
-    // Navigate to schedules
-    const schedulesLink = authenticatedPage.locator('text=/Schedules/i').first();
-
-    if (await schedulesLink.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await schedulesLink.click();
-      await authenticatedPage.waitForLoadState('networkidle');
-
-      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Schedules' })).toBeVisible();
+    // Schedules is in the nav only when SCHEDULES_ENABLED is built on, which
+    // the e2e stack requires; a missing link here is an environment failure.
+    const hops: Array<[string, RegExp, string]> = [
+      ['Schedules', /\/dashboard\/schedules$/, 'Schedules'],
+      ['Devices', /\/dashboard\/devices$/, 'Devices'],
+      ['Analytics', /\/dashboard\/analytics$/, 'Analytics'],
+      ['Content', /\/dashboard\/content$/, 'Content Library'],
+      ['Schedules', /\/dashboard\/schedules$/, 'Schedules'],
+    ];
+    for (const [link, url, heading] of hops) {
+      await authenticatedPage.getByRole('link', { name: link, exact: true }).click();
+      await expect(authenticatedPage).toHaveURL(url);
+      await expect(authenticatedPage.getByRole('heading', { level: 2, name: heading, exact: true })).toBeVisible({ timeout: 10000 });
     }
   });
 
-  test('should see real-time device status while filtering devices (DOMAIN)', async ({ authenticatedPage }) => {
+  test('should use the command palette to hop between features (MUTATION)', async ({ authenticatedPage }) => {
     await authenticatedPage.goto('/dashboard/devices');
     await authenticatedPage.waitForLoadState('networkidle');
 
-    // Apply device group filter
-    const groupCheckbox = authenticatedPage.locator('input[type="checkbox"]').first();
-
-    if (await groupCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await groupCheckbox.check({ force: true });
-      await authenticatedPage.waitForTimeout(500);
-    }
-
-    // Status should still be visible
-    const status = authenticatedPage.locator('text=/online|offline|idle/i').first();
-
-    if (await status.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(status).toBeVisible();
-    }
-  });
-
-  test('should access analytics from command palette (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Open command palette
-    await authenticatedPage.keyboard.press('Meta+k').catch(() => authenticatedPage.keyboard.press('Control+k'));
-    await authenticatedPage.waitForTimeout(500);
-
-    // Search for analytics
-    await authenticatedPage.keyboard.type('analytics');
-    await authenticatedPage.waitForTimeout(500);
-
-    const analyticsCommand = authenticatedPage.locator('text=/analytics/i').first();
-
-    if (await analyticsCommand.isVisible({ timeout: 2000 }).catch(() => false)) {
+    const search = authenticatedPage.getByPlaceholder('Search commands...');
+    const hops: Array<[string, RegExp, string]> = [
+      ['schedules', /\/dashboard\/schedules$/, 'Schedules'],
+      ['analytics', /\/dashboard\/analytics$/, 'Analytics'],
+      ['content', /\/dashboard\/content$/, 'Content Library'],
+    ];
+    for (const [query, url, heading] of hops) {
+      await authenticatedPage.keyboard.press('Control+k');
+      await expect(search).toBeVisible({ timeout: 5000 });
+      await search.fill(query);
+      // The highlighted option is the one Enter will run.
+      await expect(authenticatedPage.getByRole('option', { selected: true })).toContainText(`Go to ${heading === 'Content Library' ? 'Content' : heading}`);
       await authenticatedPage.keyboard.press('Enter');
-      await authenticatedPage.waitForTimeout(1000);
-
-      // Should navigate to analytics
-      const analyticsHeading = authenticatedPage.locator('h2').filter({ hasText: /Analytics/i });
-
-      if (await analyticsHeading.isVisible({ timeout: 3000 }).catch(() => false)) {
-        await expect(analyticsHeading).toBeVisible();
-      }
+      await expect(authenticatedPage).toHaveURL(url);
+      await expect(authenticatedPage.getByRole('heading', { level: 2, name: heading, exact: true })).toBeVisible({ timeout: 10000 });
+      await expect(search).toBeHidden();
     }
   });
 
-  test('should change analytics date range while viewing devices (BOUNDARY)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/analytics');
-    await authenticatedPage.waitForLoadState('networkidle');
+  test('should filter content by tag and search simultaneously (MUTATION)', async ({ authenticatedPage, token }) => {
+    const stamp = Date.now();
+    const hit = await seedContent(authenticatedPage, token, { name: `Alpha Promo ${stamp}` });
+    const taggedMiss = await seedContent(authenticatedPage, token, { name: `Beta Promo ${stamp}` });
+    const searchMiss = await seedContent(authenticatedPage, token, { name: `Alpha Plain ${stamp}` });
+    const tag = await seedTag(authenticatedPage, token, { name: `Promo ${stamp}` });
+    await tagContent(authenticatedPage, token, [hit.id, taggedMiss.id], [tag.id]);
 
-    // Change date range
-    const weekButton = authenticatedPage.locator('button').filter({ hasText: /week/i }).first();
-
-    if (await weekButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await weekButton.click();
-      await authenticatedPage.waitForTimeout(500);
-
-      // Navigate to devices
-      const devicesLink = authenticatedPage.locator('text=/Devices/i').first();
-
-      if (await devicesLink.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await devicesLink.click();
-        await authenticatedPage.waitForLoadState('networkidle');
-
-        // Device page should load normally
-        await expect(authenticatedPage.locator('h2').filter({ hasText: 'Devices' })).toBeVisible();
-      }
-    }
-  });
-
-  test('should tag content and view tagged items in list (MUTATION)', async ({ authenticatedPage }) => {
     await authenticatedPage.goto('/dashboard/content');
     await authenticatedPage.waitForLoadState('networkidle');
+    await authenticatedPage.getByRole('button', { name: 'List view' }).click();
+    const rows = authenticatedPage.locator('table tbody tr');
+    await expect(rows).toHaveCount(3, { timeout: 10000 });
 
-    // Select a tag
-    const tagCheckbox = authenticatedPage.locator('input[type="checkbox"]').first();
+    await authenticatedPage.getByRole('button', { name: /^Tags( \(\d+\))?$/ }).click();
+    await authenticatedPage.getByRole('button', { name: tag.name, exact: true }).click();
+    await expect(rows).toHaveCount(2, { timeout: 10000 });
 
-    if (await tagCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await tagCheckbox.check({ force: true });
-      await authenticatedPage.waitForTimeout(500);
-
-      // Content should be filtered
-      const content = authenticatedPage.locator('[class*="card"], [role="listitem"]');
-      const filteredCount = await content.count();
-
-      // Clear filter
-      await tagCheckbox.uncheck({ force: true });
-      await authenticatedPage.waitForTimeout(500);
-
-      const unfilteredCount = await content.count();
-
-      // Removing a filter can never show fewer items than the filtered view.
-      expect(unfilteredCount).toBeGreaterThanOrEqual(filteredCount);
-    } else {
-      test.info().annotations.push({
-        type: 'skipped-branch',
-        description: 'no tag checkbox on the content page — tag filtering not exercised',
-      });
-    }
+    await authenticatedPage.getByPlaceholder('Search content by title...').fill('alpha');
+    await expect(rows).toHaveCount(1, { timeout: 10000 });
+    await expect(rows.first()).toContainText(hit.name);
+    await expect(authenticatedPage.getByText(searchMiss.name)).toHaveCount(0);
   });
 
-  test('should create schedule with device group assignment (MUTATION)', async ({ authenticatedPage }) => {
+  test('should keep each device status visible while filtering by group (DOMAIN)', async ({ authenticatedPage, token }) => {
+    const online = await seedDisplay(authenticatedPage, token, { status: 'online' });
+    const error = await seedDisplay(authenticatedPage, token, { status: 'error' });
+    const outside = await seedDisplay(authenticatedPage, token, { status: 'offline' });
+    const group = await seedDisplayGroup(authenticatedPage, token, { name: `Floor ${Date.now()}`, displayIds: [online.id, error.id] });
+
+    await authenticatedPage.goto('/dashboard/devices');
+    await authenticatedPage.waitForLoadState('networkidle');
+    await authenticatedPage.getByRole('button', { name: 'Device Groups (1)' }).click();
+    await authenticatedPage.locator('#device-group-filter').getByRole('checkbox', { name: new RegExp(`^${group.name}`) }).check();
+
+    const rows = authenticatedPage.locator('table.eh-datatable tbody tr');
+    await expect(rows).toHaveCount(2);
+    const badge = (name: string) => rows.filter({ hasText: name }).locator('td[data-label="Status"] span[title]');
+    await expect(badge(online.name)).toHaveText('Online');
+    await expect(badge(error.name)).toHaveText('Error');
+    await expect(rows.filter({ hasText: outside.name })).toHaveCount(0);
+
+    // The status chips stay fleet-wide while the table is filtered.
+    await expect(
+      authenticatedPage.getByRole('group', { name: /Filter devices by status/ }).getByRole('button', { name: /All devices$/ }),
+    ).toHaveText(/3\s*All devices/);
+  });
+
+  test('should create a schedule targeting a device group (MUTATION)', async ({ authenticatedPage, token }) => {
+    const playlist = await seedPlaylist(authenticatedPage, token);
+    const display = await seedDisplay(authenticatedPage, token);
+    const group = await seedDisplayGroup(authenticatedPage, token, { name: `Region ${Date.now()}`, displayIds: [display.id] });
+    const name = `Group Schedule ${Date.now()}`;
+
     await authenticatedPage.goto('/dashboard/schedules');
     await authenticatedPage.waitForLoadState('networkidle');
+    await authenticatedPage.getByRole('button', { name: 'Create Schedule' }).first().click();
+    const dialog = authenticatedPage.getByRole('dialog', { name: 'Create Schedule' });
+    await expect(dialog).toBeVisible();
 
-    // Open create schedule modal
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create|new/i }).first();
+    await dialog.getByPlaceholder('e.g., Morning Content, Holiday Special').fill(name);
+    await dialog.locator('select').first().selectOption({ label: playlist.name });
+    await dialog.getByRole('button', { name: 'Device Group' }).click();
+    const groupSelect = dialog.locator('select').filter({ has: authenticatedPage.locator('option', { hasText: 'Select a group...' }) });
+    await groupSelect.selectOption({ label: `${group.name} (1 devices)` });
+    await dialog.getByRole('button', { name: /^create$/i }).click();
 
-    if (await createButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await createButton.click();
-      await authenticatedPage.waitForTimeout(500);
+    await expect(dialog).toBeHidden({ timeout: 10000 });
+    const card = authenticatedPage.locator('div.eh-dash-card').filter({ has: authenticatedPage.getByRole('heading', { level: 3, name }) });
+    await expect(card).toContainText(`${group.name} (1 devices)`);
 
-      const modal = authenticatedPage.locator('[role="dialog"]').first();
-
-      if (await modal.isVisible({ timeout: 2000 }).catch(() => false)) {
-        // Try to fill schedule form
-        const nameInput = authenticatedPage.locator('input[placeholder*="name"], input[placeholder*="Name"]').first();
-
-        if (await nameInput.isVisible({ timeout: 1000 }).catch(() => false)) {
-          await nameInput.fill('Integration Test Schedule');
-        }
-
-        // Close without saving
-        await authenticatedPage.keyboard.press('Escape');
-      }
-    }
+    const schedules = await apiGet<{ data: Array<{ name: string; displayGroupId: string | null; displayId: string | null }> }>(
+      authenticatedPage,
+      token,
+      '/schedules?page=1&limit=50',
+    );
+    expect(schedules.data).toEqual([expect.objectContaining({ name, displayGroupId: group.id, displayId: null })]);
   });
 
-  test('should search devices and apply group filter (MUTATION)', async ({ authenticatedPage }) => {
+  test('should combine device search with a group filter (MUTATION)', async ({ authenticatedPage, token }) => {
+    const stamp = Date.now();
+    const a = await seedDisplay(authenticatedPage, token, { name: `Lobby A ${stamp}` });
+    const b = await seedDisplay(authenticatedPage, token, { name: `Kitchen B ${stamp}` });
+    const c = await seedDisplay(authenticatedPage, token, { name: `Lobby C ${stamp}` });
+    const group = await seedDisplayGroup(authenticatedPage, token, { name: `Ground ${stamp}`, displayIds: [a.id, b.id] });
+
     await authenticatedPage.goto('/dashboard/devices');
     await authenticatedPage.waitForLoadState('networkidle');
+    const rows = authenticatedPage.locator('table.eh-datatable tbody tr');
+    await expect(rows).toHaveCount(3, { timeout: 10000 });
 
-    // Apply search
-    const searchInput = authenticatedPage.locator('input[placeholder*="Search"]').first();
+    await authenticatedPage.getByPlaceholder('Search devices by name or location...').fill('lobby');
+    await expect(rows).toHaveCount(2);
 
-    if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await searchInput.fill('Display');
-      await authenticatedPage.waitForTimeout(500);
-
-      // Apply group filter
-      const groupCheckbox = authenticatedPage.locator('input[type="checkbox"]').first();
-
-      if (await groupCheckbox.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await groupCheckbox.check({ force: true });
-        await authenticatedPage.waitForTimeout(500);
-
-        // The devices page must stay rendered with both filters applied.
-        await expect(authenticatedPage.locator('h2').filter({ hasText: 'Devices' })).toBeVisible();
-      }
-    }
+    await authenticatedPage.getByRole('button', { name: 'Device Groups (1)' }).click();
+    await authenticatedPage.locator('#device-group-filter').getByRole('checkbox', { name: new RegExp(`^${group.name}`) }).check();
+    await expect(rows).toHaveCount(1);
+    await expect(rows.first()).toContainText(a.name);
+    await expect(rows.filter({ hasText: c.name })).toHaveCount(0);
   });
 
-  test('should refresh health data and navigate to devices (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
+  test('should combine content search with a type filter (ADVERSARIAL)', async ({ authenticatedPage, token }) => {
+    const stamp = Date.now();
+    const imagePromo = await seedContent(authenticatedPage, token, { name: `Promo Shot ${stamp}`, type: 'image' });
+    await seedContent(authenticatedPage, token, { name: `Promo Link ${stamp}`, type: 'url' });
+    await seedContent(authenticatedPage, token, { name: `Other Shot ${stamp}`, type: 'image' });
 
-    // Click refresh button
-    const refreshButton = authenticatedPage.locator('button').filter({ hasText: /refresh/i }).first();
-
-    if (await refreshButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await refreshButton.click();
-      await authenticatedPage.waitForTimeout(1000);
-
-      // Navigate to devices
-      const devicesLink = authenticatedPage.locator('text=/Devices/i').first();
-
-      if (await devicesLink.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await devicesLink.click();
-        await authenticatedPage.waitForLoadState('networkidle');
-
-        await expect(authenticatedPage.locator('h2').filter({ hasText: 'Devices' })).toBeVisible();
-      }
-    }
-  });
-
-  test('should handle multiple simultaneous filters (ADVERSARIAL)', async ({ authenticatedPage }) => {
     await authenticatedPage.goto('/dashboard/content');
     await authenticatedPage.waitForLoadState('networkidle');
+    await authenticatedPage.getByRole('button', { name: 'List view' }).click();
+    const rows = authenticatedPage.locator('table tbody tr');
+    await expect(rows).toHaveCount(3, { timeout: 10000 });
 
-    // Apply tag filter
-    const tagCheckbox = authenticatedPage.locator('input[type="checkbox"]').nth(0);
-    if (await tagCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await tagCheckbox.check({ force: true });
-    }
+    await authenticatedPage.getByPlaceholder('Search content by title...').fill('promo');
+    await expect(rows).toHaveCount(2, { timeout: 10000 });
+    await authenticatedPage.getByRole('button', { name: 'Image', exact: true }).click();
+    await expect(rows).toHaveCount(1, { timeout: 10000 });
+    await expect(rows.first()).toContainText(imagePromo.name);
+    await expect(authenticatedPage.getByText('Type: image')).toBeVisible();
 
-    // Apply search
-    const searchInput = authenticatedPage.locator('input[placeholder*="Search"]').first();
-    if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await searchInput.fill('test');
-      await authenticatedPage.waitForTimeout(500);
-    }
-
-    // Apply type filter
-    const typeButton = authenticatedPage.locator('button').filter({ hasText: /image|video|pdf/i }).first();
-    if (await typeButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await typeButton.click();
-      await authenticatedPage.waitForTimeout(500);
-    }
-
-    // Page should still be functional
-    await expect(authenticatedPage.locator('h2').filter({ hasText: 'Content' })).toBeVisible();
+    // "Clear all" drops every filter at once.
+    await authenticatedPage.getByRole('button', { name: 'Clear all' }).click();
+    await expect(rows).toHaveCount(3, { timeout: 10000 });
   });
 
   test('should navigate full feature workflow (DOMAIN)', async ({ authenticatedPage }) => {
