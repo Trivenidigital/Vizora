@@ -1,4 +1,5 @@
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import ContentClient from '../page-client';
 
 const mockGetContent = jest.fn();
@@ -1976,6 +1977,43 @@ describe('ContentClient', () => {
 
       expect(screen.queryByRole('button', { name: 'Rename Folder Menus' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Delete Folder Menus' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Edit Content dialog and Enter', () => {
+    const openEdit = async () => {
+      mockGetContent.mockResolvedValue({
+        data: [sampleContent[0]],
+        meta: { page: 1, limit: 50, total: 1, totalPages: 1 },
+      });
+      render(<ContentClient />);
+      await waitFor(() => expect(screen.getByText('Welcome Banner')).toBeInTheDocument());
+      await waitForAuxiliaryRequestsToSettle();
+      fireEvent.click(screen.getByText('Edit'));
+      await waitFor(() => expect(screen.getByText('Edit Content')).toBeInTheDocument());
+    };
+
+    it('saves when Enter is pressed in the title field', async () => {
+      const user = userEvent.setup();
+      await openEdit();
+
+      const title = screen.getByPlaceholderText('e.g., Summer Sale Banner');
+      await user.clear(title);
+      await user.type(title, 'Lobby Banner{Enter}');
+
+      await waitFor(() => {
+        expect(mockUpdateContent).toHaveBeenCalledWith('c1', expect.objectContaining({ title: 'Lobby Banner' }));
+      });
+    });
+
+    it('does not save the title/duration form on Enter in a lifecycle field', async () => {
+      const user = userEvent.setup();
+      await openEdit();
+
+      await user.type(screen.getByLabelText('Expires at'), '{Enter}');
+
+      expect(mockUpdateContent).not.toHaveBeenCalled();
+      expect(screen.getByText('Edit Content')).toBeInTheDocument();
     });
   });
 });

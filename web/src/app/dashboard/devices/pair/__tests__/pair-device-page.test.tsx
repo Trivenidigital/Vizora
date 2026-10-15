@@ -1,4 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import PairDevicePage from '../page';
 
 const mockPush = jest.fn();
@@ -118,5 +119,35 @@ describe('PairDevicePage', () => {
         location: 'Lobby',
       });
     });
+  });
+
+  it('pairs when Enter is pressed in the device name field', async () => {
+    const user = userEvent.setup();
+    render(<PairDevicePage />);
+
+    await user.type(screen.getByLabelText(/Pairing Code/i), 'abc123');
+    await user.type(screen.getByLabelText(/Device Name/i), 'Lobby Screen{Enter}');
+
+    await waitFor(() => {
+      expect(mockCompletePairing).toHaveBeenCalledWith({
+        code: 'ABC123',
+        nickname: 'Lobby Screen',
+        location: undefined,
+      });
+    });
+    expect(mockCompletePairing).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not pair, or toast an error, when Enter is pressed with an incomplete code', async () => {
+    const user = userEvent.setup();
+    render(<PairDevicePage />);
+
+    await user.type(screen.getByLabelText(/Pairing Code/i), 'abc');
+    await user.type(screen.getByLabelText(/Device Name/i), 'Lobby Screen{Enter}');
+    // A direct submit exercises the form's own guard, not just the disabled button.
+    fireEvent.submit(screen.getByLabelText(/Device Name/i).closest('form')!);
+
+    expect(mockCompletePairing).not.toHaveBeenCalled();
+    expect(mockToast.error).not.toHaveBeenCalled();
   });
 });
