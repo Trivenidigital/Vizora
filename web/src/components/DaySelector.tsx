@@ -76,6 +76,7 @@ export default function DaySelector({
         {/* Quick Select Buttons */}
         <div className="flex gap-2 flex-wrap">
           <button
+            type="button"
             onClick={toggleAll}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               selected.length === 7
@@ -87,6 +88,7 @@ export default function DaySelector({
           </button>
 
           <button
+            type="button"
             onClick={toggleWeekdays}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               allWeekdaysSelected
@@ -98,6 +100,7 @@ export default function DaySelector({
           </button>
 
           <button
+            type="button"
             onClick={toggleWeekends}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
               allWeekendsSelected
@@ -115,6 +118,7 @@ export default function DaySelector({
             const isSelected = selected.includes(day.id);
             return (
               <button
+                type="button"
                 key={day.id}
                 onClick={() => toggleDay(day.id)}
                 className={`py-3 px-2 rounded-lg font-semibold text-sm transition-all ${
