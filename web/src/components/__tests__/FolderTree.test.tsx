@@ -83,8 +83,55 @@ describe('FolderTree', () => {
   it('should highlight "All Content" when no folder is selected', () => {
     render(<FolderTree {...defaultProps} selectedFolderId={null} />);
 
-    const allContent = screen.getByText('All Content').closest('div');
+    const allContent = screen.getByText('All Content').closest('button');
     expect(allContent).toHaveClass('bg-brand/10');
+    expect(allContent).toHaveAttribute('aria-current', 'true');
+  });
+
+  it('exposes the selected folder with aria-current and only on that folder', () => {
+    render(<FolderTree {...defaultProps} selectedFolderId="folder-2" />);
+
+    expect(screen.getByText('Sales').closest('button')).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByText('Marketing').closest('button')).not.toHaveAttribute('aria-current');
+    expect(screen.getByText('All Content').closest('button')).not.toHaveAttribute('aria-current');
+  });
+
+  it('names the expand toggle and reports its expanded state', () => {
+    render(<FolderTree {...defaultProps} />);
+
+    const toggle = screen.getByRole('button', { name: 'Expand folder Marketing' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(toggle);
+    expect(screen.getByRole('button', { name: 'Collapse folder Marketing' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('hides rename and delete actions when no handlers are given', () => {
+    render(<FolderTree {...defaultProps} />);
+
+    expect(screen.queryByRole('button', { name: /Rename folder/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Delete folder/ })).not.toBeInTheDocument();
+  });
+
+  it('calls rename and delete handlers with the folder, without selecting it', () => {
+    const onSelectFolder = jest.fn();
+    const onRenameFolder = jest.fn();
+    const onDeleteFolder = jest.fn();
+    render(
+      <FolderTree
+        {...defaultProps}
+        onSelectFolder={onSelectFolder}
+        onRenameFolder={onRenameFolder}
+        onDeleteFolder={onDeleteFolder}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rename folder Sales' }));
+    expect(onRenameFolder).toHaveBeenCalledWith(expect.objectContaining({ id: 'folder-2', name: 'Sales' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete folder Marketing' }));
+    expect(onDeleteFolder).toHaveBeenCalledWith(expect.objectContaining({ id: 'folder-1' }));
+
+    expect(onSelectFolder).not.toHaveBeenCalled();
   });
 
   it('should call onSelectFolder when clicking a folder', () => {

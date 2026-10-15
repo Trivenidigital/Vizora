@@ -43,4 +43,24 @@ describe('SettingsPage source guards', () => {
     expect(saveBlock).toContain('defaultDuration: settings.defaultDuration');
     expect(saveBlock).not.toContain('email');
   });
+
+  it('bounds the default duration input and validates it before saving', () => {
+    const source = settingsSource();
+    const inputBlock = sourceBetween(source, 'id="settings-default-duration"', '/>');
+
+    expect(source).toContain('htmlFor="settings-default-duration"');
+    expect(inputBlock).toContain('min={DEFAULT_DURATION_MIN_SECONDS}');
+    expect(inputBlock).toContain('max={DEFAULT_DURATION_MAX_SECONDS}');
+    expect(inputBlock).toContain('step={1}');
+    // parseInt('') is NaN and was stored as-is, then serialised as null.
+    expect(inputBlock).not.toContain('parseInt(');
+
+    const saveHandler = sourceBetween(
+      source,
+      "if (orgSettingsStatus !== 'loaded' || !settings.organizationId)",
+      'await apiClient.updateOrganization(settings.organizationId',
+    );
+    expect(saveHandler).toContain('validateDefaultDuration(settings.defaultDuration)');
+    expect(saveHandler).toMatch(/if \(durationError\) \{[\s\S]*return;/);
+  });
 });

@@ -77,10 +77,20 @@ export default function DisplayPickerModal({
 
   const allSelected = displays.length > 0 && selectedIds.size === displays.length;
   const someSelected = selectedIds.size > 0 && selectedIds.size < displays.length;
+  // Mirrors the Push button's `disabled`, so Enter cannot push with nothing
+  // selected or while a push is already in flight.
+  const submitDisabled = selectedIds.size === 0 || loading;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Push to Screens" size="md">
-      <div className="flex flex-col gap-4">
+      <form
+        noValidate
+        className="flex flex-col gap-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!submitDisabled) handleConfirm();
+        }}
+      >
         {/* Loading state */}
         {fetching && (
           <div className="flex items-center justify-center py-12">
@@ -191,9 +201,8 @@ export default function DisplayPickerModal({
             Cancel
           </button>
           <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={selectedIds.size === 0 || loading}
+            type="submit"
+            disabled={submitDisabled}
             className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm font-medium text-[var(--primary-contrast)] transition hover:bg-[var(--primary-light)] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {loading ? (
@@ -225,7 +234,7 @@ export default function DisplayPickerModal({
             )}
           </button>
         </div>
-      </div>
+      </form>
     </Modal>
   );
 }

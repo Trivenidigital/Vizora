@@ -149,4 +149,33 @@ describe('content api methods', () => {
       duration: 15,
     });
   });
+
+  it('creates a tag and applies tags through the request client (so CSRF is sent)', async () => {
+    const client = new ApiClient('/api/v1');
+    const requestSpy = jest.spyOn(client, 'request').mockResolvedValue({} as any);
+
+    await client.createContentTag('Holiday', 'red');
+    expect(requestSpy).toHaveBeenLastCalledWith(
+      '/content/tags',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(JSON.parse((requestSpy.mock.calls[0][1] as RequestInit).body as string)).toEqual({
+      name: 'Holiday',
+      color: 'red',
+    });
+
+    await client.bulkTagContent(['c1', 'c2'], ['t1']);
+    expect(requestSpy).toHaveBeenLastCalledWith(
+      '/content/bulk/tags',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(JSON.parse((requestSpy.mock.calls[1][1] as RequestInit).body as string)).toEqual({
+      contentIds: ['c1', 'c2'],
+      tagIds: ['t1'],
+      operation: 'add',
+    });
+
+    await client.bulkTagContent(['c1'], ['t1'], 'remove');
+    expect(JSON.parse((requestSpy.mock.calls[2][1] as RequestInit).body as string).operation).toBe('remove');
+  });
 });

@@ -1,4 +1,10 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { CreateFolderDto } from './dto/create-folder.dto';
 import { UpdateFolderDto } from './dto/update-folder.dto';
@@ -35,18 +41,22 @@ export class FoldersService {
       }
     }
 
-    return this.db.contentFolder.create({
-      data: {
-        name: dto.name,
-        parentId: dto.parentId || null,
-        organizationId,
-      },
-      include: {
-        _count: {
-          select: { content: true },
+    try {
+      return await this.db.contentFolder.create({
+        data: {
+          name: dto.name,
+          parentId: dto.parentId || null,
+          organizationId,
         },
-      },
-    });
+        include: {
+          _count: {
+            select: { content: true },
+          },
+        },
+      });
+    } catch (error) {
+      throw this.mapSiblingNameConflict(error, `A folder named "${dto.name}" already exists here`);
+    }
   }
 
   async findAll(organizationId: string) {
@@ -150,13 +160,21 @@ export class FoldersService {
 
     // Org-scoped in the write itself (tenant-guard enforce prereq): updateMany
     // requires id AND organizationId, so a cross-tenant id affects zero rows.
-    const scoped = await this.db.contentFolder.updateMany({
-      where: { id, organizationId },
-      data: {
-        name: dto.name,
-        parentId: dto.parentId,
-      },
-    });
+    let scoped: { count: number };
+    try {
+      scoped = await this.db.contentFolder.updateMany({
+        where: { id, organizationId },
+        data: {
+          name: dto.name,
+          parentId: dto.parentId,
+        },
+      });
+    } catch (error) {
+      throw this.mapSiblingNameConflict(
+        error,
+        'A folder with that name already exists in the destination folder',
+      );
+    }
     if (scoped.count === 0) {
       throw new NotFoundException('Folder not found');
     }
@@ -175,25 +193,48 @@ export class FoldersService {
   async remove(organizationId: string, id: string) {
     const folder = await this.findOne(organizationId, id);
 
-    // Move content from this folder to parent folder (or null if no parent)
-    await this.db.content.updateMany({
-      where: { folderId: id, organizationId },
-      data: { folderId: folder.parentId },
-    });
+    // One transaction: re-parenting a child onto a parent that already holds a
+    // folder of the same name is a P2002, and without it the content move
+    // before it would have committed - a half-deleted folder.
+    try {
+      await this.db.$transaction(async (tx) => {
+        // Move content from this folder to parent folder (or null if no parent)
+        await tx.content.updateMany({
+          where: { folderId: id, organizationId },
+          data: { folderId: folder.parentId },
+        });
 
-    // Move child folders to parent folder (or make them root)
-    await this.db.contentFolder.updateMany({
-      where: { parentId: id, organizationId },
-      data: { parentId: folder.parentId },
-    });
+        // Move child folders to parent folder (or make them root)
+        await tx.contentFolder.updateMany({
+          where: { parentId: id, organizationId },
+          data: { parentId: folder.parentId },
+        });
 
-    const result = await this.db.contentFolder.deleteMany({
-      where: { id, organizationId },
-    });
-    if (result.count === 0) {
-      throw new NotFoundException('Folder not found');
+        const result = await tx.contentFolder.deleteMany({
+          where: { id, organizationId },
+        });
+        if (result.count === 0) {
+          throw new NotFoundException('Folder not found');
+        }
+      });
+    } catch (error) {
+      throw this.mapSiblingNameConflict(
+        error,
+        'A folder with that name already exists in the parent folder. Rename or move the subfolder first.',
+      );
     }
     return folder;
+  }
+
+  /**
+   * @@unique([organizationId, name, parentId]) - a sibling-name clash is the
+   * operator's conflict to resolve, never a 500. Anything else passes through.
+   */
+  private mapSiblingNameConflict(error: unknown, message: string): unknown {
+    if ((error as { code?: string })?.code === 'P2002') {
+      return new ConflictException(message);
+    }
+    return error;
   }
 
   async moveContent(organizationId: string, folderId: string, dto: MoveContentDto) {

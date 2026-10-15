@@ -64,6 +64,7 @@ export default function TimePicker({
     <div className={className}>
       <div className="relative">
         <button
+          type="button"
           onClick={() => setIsOpen(!isOpen)}
           className="w-full px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--surface)] text-[var(--foreground)] flex items-center justify-between hover:border-[var(--foreground-tertiary)] transition-colors"
         >
@@ -83,6 +84,7 @@ export default function TimePicker({
                 </div>
                 {presets.map(preset => (
                   <button
+                    type="button"
                     key={preset.value}
                     onClick={() => {
                       onChange(preset.value);
@@ -103,6 +105,7 @@ export default function TimePicker({
               <div className="max-h-60 overflow-y-auto">
                 {timeOptions.map(option => (
                   <button
+                    type="button"
                     key={option.value}
                     onClick={() => {
                       onChange(option.value);

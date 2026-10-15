@@ -64,13 +64,16 @@ test.describe('Team Management (Wave 2)', () => {
 
       await authenticatedPage.click('button:has-text("Invite"), button:has-text("Add Member"), button:has-text("Add User")');
 
-      const roleSelect = authenticatedPage.locator('select, [data-testid="role-select"]').first();
-      const roleRadios = authenticatedPage.locator('input[type="radio"][name*="role" i]');
-
-      const hasSelect = await roleSelect.isVisible({ timeout: 5000 }).catch(() => false);
-      const hasRadios = await roleRadios.first().isVisible({ timeout: 3000 }).catch(() => false);
-
-      expect(hasSelect || hasRadios).toBeTruthy();
+      // A single role <select> offering exactly the three roles, viewer first.
+      const dialog = authenticatedPage.getByRole('dialog');
+      const roleSelect = dialog.locator('select');
+      await expect(roleSelect).toHaveCount(1, { timeout: 5000 });
+      await expect(roleSelect).toHaveValue('viewer');
+      expect(await roleSelect.locator('option').evaluateAll((o) => o.map((e) => (e as HTMLOptionElement).value))).toEqual([
+        'viewer',
+        'manager',
+        'admin',
+      ]);
     });
 
     test('should show role options (Admin, Editor, Viewer)', async ({ authenticatedPage }) => {
@@ -177,13 +180,12 @@ test.describe('Audit Log (Wave 2)', () => {
       await authenticatedPage.goto('/dashboard/settings/audit-log');
       await authenticatedPage.waitForLoadState('networkidle');
 
-      const logTable = authenticatedPage.locator('table, [role="table"], [data-testid="audit-log"]');
-      const emptyState = authenticatedPage.locator('text=/no activity|no logs|empty/i').first();
-
-      const hasTable = await logTable.isVisible({ timeout: 5000 }).catch(() => false);
-      const hasEmpty = await emptyState.isVisible({ timeout: 3000 }).catch(() => false);
-
-      expect(hasTable || hasEmpty).toBeTruthy();
+      // Registering the fixture's org writes an audit entry, so the log is
+      // never empty here: assert the entry rather than accepting either state.
+      const table = authenticatedPage.locator('table');
+      await expect(table).toBeVisible({ timeout: 10000 });
+      await expect(table.getByText('User Registered', { exact: true })).toBeVisible();
+      await expect(authenticatedPage.getByText('No audit log entries')).toHaveCount(0);
     });
 
     test('should have date filter', async ({ authenticatedPage }) => {

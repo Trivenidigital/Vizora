@@ -64,35 +64,41 @@ test.describe('Playlist Management', () => {
     await authenticatedPage.goto('/dashboard/playlists');
     await authenticatedPage.waitForLoadState('networkidle');
 
-    // The playlist just created must be listed and openable.
-    const playlistRow = authenticatedPage.locator(`text="${playlist.name}"`).first();
-    await expect(playlistRow).toBeVisible({ timeout: 10000 });
-    await playlistRow.click();
+    // The playlist just created must be listed, and its Edit action opens the
+    // builder (the card title itself is not a link).
+    await expect(authenticatedPage.locator(`text="${playlist.name}"`).first()).toBeVisible({ timeout: 10000 });
+    await authenticatedPage.getByRole('button', { name: `Edit ${playlist.name}`, exact: true }).click();
+    await expect(authenticatedPage).toHaveURL(new RegExp(`/dashboard/playlists/${playlist.id}$`), { timeout: 10000 });
 
-    // Wait for page/modal to load
-    await authenticatedPage.waitForTimeout(1000);
+    /*
+     * The builder adds content by DRAG (dnd-kit): there is no "add content"
+     * button, which is why the old body - guarded on one - never ran. Dropping
+     * a library item on the editor calls addPlaylistItem immediately, so the
+     * oracle is the API. dnd-kit's PointerSensor needs real intermediate mouse
+     * moves; a single `dragTo` jump does not register as a drag.
+     */
+    const source = authenticatedPage.locator('[aria-roledescription="draggable"]').filter({ hasText: content.name });
+    const target = authenticatedPage.getByText('Drag content from the library to build your playlist');
+    await expect(source).toBeVisible({ timeout: 10000 });
+    await expect(target).toBeVisible();
 
-    // Look for add content button
-    const addButton = authenticatedPage.locator('button').filter({ hasText: /add content|add item|add to playlist/i }).first();
-    if (await addButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await addButton.click();
+    const from = (await source.boundingBox())!;
+    const to = (await target.boundingBox())!;
+    await authenticatedPage.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    await authenticatedPage.mouse.down();
+    await authenticatedPage.mouse.move(from.x + from.width / 2 + 10, from.y + from.height / 2 + 10, { steps: 5 });
+    await authenticatedPage.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 15 });
+    await authenticatedPage.mouse.up();
 
-      // Try to select content
-      await authenticatedPage.waitForTimeout(500);
-      const contentItem = authenticatedPage.locator(`text="${content.name}"`).first();
-      await expect(contentItem).toBeVisible({ timeout: 5000 });
-      await contentItem.click();
-    } else {
-      test.info().annotations.push({
-        type: 'skipped-branch',
-        description: 'no "add content" control on the playlist detail view — add-to-playlist not exercised',
+    await expect(authenticatedPage.getByText('Empty Playlist')).toHaveCount(0, { timeout: 10000 });
+    await expect(async () => {
+      const res = await authenticatedPage.request.get(`http://localhost:3000/api/v1/playlists/${playlist.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-    }
-
-    // Navigate back to playlists and verify page is functional
-    await authenticatedPage.goto('/dashboard/playlists');
-    await authenticatedPage.waitForLoadState('networkidle');
-    await expect(authenticatedPage.locator('h2').filter({ hasText: 'Playlists' })).toBeVisible();
+      expect(res.ok()).toBeTruthy();
+      const fresh = await readData(res);
+      expect((fresh.items ?? []).map((i: { contentId: string }) => i.contentId)).toEqual([content.id]);
+    }).toPass({ timeout: 10000 });
   });
 
   /**
@@ -243,16 +249,12 @@ test.describe('Playlist Management', () => {
     await expect(deleteButton).toBeVisible({ timeout: 5000 });
     await deleteButton.click();
 
-    // Confirm in dialog if it appears
-    const confirmButton = authenticatedPage.locator('[role="dialog"]').locator('button').filter({ hasText: /confirm|yes|delete/i }).first();
-    if (await confirmButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await confirmButton.click();
-    } else {
-      test.info().annotations.push({
-        type: 'skipped-branch',
-        description: 'no delete confirmation dialog appeared — delete assumed immediate',
-      });
-    }
+    // Deletion is confirmed in a named dialog that states what is deleted.
+    const confirm = authenticatedPage.getByRole('dialog', { name: 'Delete Playlist' });
+    await expect(confirm).toBeVisible({ timeout: 5000 });
+    await expect(confirm).toContainText(playlist.name);
+    await confirm.getByRole('button', { name: /^(confirm|delete)$/i }).click();
+    await expect(confirm).toBeHidden({ timeout: 10000 });
 
     // The deleted playlist must actually disappear from the list.
     await expect(authenticatedPage.locator('text=' + playlist.name)).toHaveCount(0, { timeout: 10000 });

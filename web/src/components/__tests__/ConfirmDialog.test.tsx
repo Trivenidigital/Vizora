@@ -1,4 +1,5 @@
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import ConfirmDialog from '../ConfirmDialog';
 
 jest.mock('@/theme/icons', () => ({
@@ -133,5 +134,41 @@ describe('ConfirmDialog', () => {
   it('renders warning icon for warning type', () => {
     render(<ConfirmDialog {...defaultProps} type="warning" />);
     expect(screen.getByTestId('icon-warning')).toBeInTheDocument();
+  });
+
+  describe('as a form', () => {
+    it('makes the confirm action the submit button and Cancel a plain button', () => {
+      render(<ConfirmDialog {...defaultProps} />);
+      expect(screen.getByRole('button', { name: 'Confirm' })).toHaveAttribute('type', 'submit');
+      expect(screen.getByRole('button', { name: 'Cancel' })).toHaveAttribute('type', 'button');
+    });
+
+    it('does not confirm when Enter is pressed with the initial focus (Cancel)', async () => {
+      const onConfirm = jest.fn();
+      const onClose = jest.fn();
+      const user = userEvent.setup();
+      render(<ConfirmDialog {...defaultProps} onConfirm={onConfirm} onClose={onClose} />);
+
+      expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+      await user.keyboard('{Enter}');
+
+      expect(onConfirm).not.toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('confirms once, not twice, when submitted again while the first confirm is pending', async () => {
+      const onConfirm = jest.fn(() => new Promise<void>(() => {}));
+      render(<ConfirmDialog {...defaultProps} onConfirm={onConfirm} />);
+      const form = screen.getByRole('button', { name: 'Confirm' }).closest('form')!;
+
+      await act(async () => {
+        fireEvent.submit(form);
+      });
+      await act(async () => {
+        fireEvent.submit(form);
+      });
+
+      expect(onConfirm).toHaveBeenCalledTimes(1);
+    });
   });
 });

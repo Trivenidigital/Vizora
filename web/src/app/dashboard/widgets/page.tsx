@@ -620,6 +620,11 @@ export default function WidgetsPage() {
     }
   };
 
+  // Each dialog's submit guard mirrors its primary button's `disabled`, so Enter
+  // cannot reach a handler the disabled button used to keep out of reach.
+  const createSubmitDisabled = actionLoading || !widgetName.trim() || createMissingFields.length > 0;
+  const updateSubmitDisabled = actionLoading || editMissingFields.length > 0;
+
   return (
     <div className="space-y-8">
       <toast.ToastContainer />
@@ -821,7 +826,14 @@ export default function WidgetsPage() {
         )}
 
         {wizardStep === 'configure' && selectedType && (
-          <div className="space-y-4">
+          <form
+            noValidate
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!createSubmitDisabled) void handleCreateWidget();
+            }}
+          >
             {/* Widget Name */}
             <div>
               <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-1">
@@ -868,6 +880,7 @@ export default function WidgetsPage() {
 
             <div className="flex justify-between pt-4">
               <button
+                type="button"
                 onClick={() => setWizardStep('select')}
                 className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition"
               >
@@ -875,6 +888,7 @@ export default function WidgetsPage() {
               </button>
               <div className="flex gap-2">
                 <button
+                  type="button"
                   onClick={() => setWizardStep('preview')}
                   disabled={!widgetName.trim() || createMissingFields.length > 0}
                   className="px-4 py-2 text-sm font-medium text-[var(--foreground)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition disabled:opacity-50"
@@ -882,8 +896,8 @@ export default function WidgetsPage() {
                   Preview
                 </button>
                 <button
-                  onClick={handleCreateWidget}
-                  disabled={actionLoading || !widgetName.trim() || createMissingFields.length > 0}
+                  type="submit"
+                  disabled={createSubmitDisabled}
                   className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium transition disabled:opacity-50 flex items-center gap-2"
                 >
                   {actionLoading && <LoadingSpinner size="sm" />}
@@ -891,7 +905,7 @@ export default function WidgetsPage() {
                 </button>
               </div>
             </div>
-          </div>
+          </form>
         )}
 
         {wizardStep === 'preview' && selectedType && (
@@ -1043,7 +1057,14 @@ export default function WidgetsPage() {
         title={`Edit Widget: ${editingWidget?.name || ''}`}
       >
         {editingWidget && (
-          <div className="space-y-4">
+          <form
+            noValidate
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!updateSubmitDisabled) void handleUpdateWidget();
+            }}
+          >
             <div className="flex items-center gap-3 p-3 bg-[var(--background)] rounded-lg">
               <div className={`w-10 h-10 rounded-lg ${getColorForType(editingWidget.widgetType)} flex items-center justify-center`}>
                 <Icon name={getIconForType(editingWidget.widgetType)} size="md" className={getGlyphInkForType(editingWidget.widgetType)} />
@@ -1072,6 +1093,7 @@ export default function WidgetsPage() {
 
             <div className="flex justify-end gap-3 pt-4">
               <button
+                type="button"
                 onClick={() => {
                   setIsEditModalOpen(false);
                   setEditingWidget(null);
@@ -1081,15 +1103,15 @@ export default function WidgetsPage() {
                 Cancel
               </button>
               <button
-                onClick={handleUpdateWidget}
-                disabled={actionLoading || editMissingFields.length > 0}
+                type="submit"
+                disabled={updateSubmitDisabled}
                 className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium transition disabled:opacity-50 flex items-center gap-2"
               >
                 {actionLoading && <LoadingSpinner size="sm" />}
                 Save Changes
               </button>
             </div>
-          </div>
+          </form>
         )}
       </Modal>
     </div>

@@ -9,6 +9,10 @@ interface FolderTreeProps {
   selectedFolderId?: string | null;
   onSelectFolder: (id: string | null) => void;
   onCreateFolder?: () => void;
+  /** Omit (e.g. for viewers) to hide the per-folder rename action. */
+  onRenameFolder?: (folder: ContentFolder) => void;
+  /** Omit (e.g. for viewers) to hide the per-folder delete action. */
+  onDeleteFolder?: (folder: ContentFolder) => void;
 }
 
 interface FolderNodeProps {
@@ -18,6 +22,8 @@ interface FolderNodeProps {
   expandedFolders: Set<string>;
   onToggleExpand: (id: string) => void;
   onSelectFolder: (id: string | null) => void;
+  onRenameFolder?: (folder: ContentFolder) => void;
+  onDeleteFolder?: (folder: ContentFolder) => void;
 }
 
 function FolderNode({
@@ -27,6 +33,8 @@ function FolderNode({
   expandedFolders,
   onToggleExpand,
   onSelectFolder,
+  onRenameFolder,
+  onDeleteFolder,
 }: FolderNodeProps) {
   const isExpanded = expandedFolders.has(folder.id);
   const isSelected = selectedFolderId === folder.id;
@@ -35,20 +43,19 @@ function FolderNode({
   return (
     <div>
       <div
-        className={`flex items-center py-2 px-2 rounded-md cursor-pointer transition-colors ${
+        className={`group flex items-center py-2 px-2 rounded-md transition-colors ${
           isSelected
             ? 'bg-brand/10 text-[var(--primary-ink)]'
             : 'hover:bg-[var(--surface-hover)] text-[var(--foreground-secondary)]'
         }`}
         style={{ paddingLeft: `${level * 16 + 8}px` }}
-        onClick={() => onSelectFolder(folder.id)}
       >
         {/* Expand/Collapse Toggle */}
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleExpand(folder.id);
-          }}
+          type="button"
+          aria-label={`${isExpanded ? 'Collapse' : 'Expand'} folder ${folder.name}`}
+          aria-expanded={hasChildren ? isExpanded : undefined}
+          onClick={() => onToggleExpand(folder.id)}
           className={`mr-1 p-0.5 rounded hover:bg-[var(--surface-hover)] ${
             !hasChildren ? 'invisible' : ''
           }`}
@@ -66,21 +73,55 @@ function FolderNode({
           </svg>
         </button>
 
-        {/* Folder Icon */}
-        <Icon
-          name={isExpanded ? 'folder' : 'folder'}
-          size="md"
-          className={`mr-2 ${isSelected ? 'text-[var(--primary-ink)]' : 'text-[var(--warning-ink)]'}`}
-        />
+        {/* Select target. aria-current marks the folder whose content is
+            listed: these rows are plain buttons, not a tree widget, so
+            aria-selected (which needs an option/treeitem role) would be wrong. */}
+        <button
+          type="button"
+          aria-current={isSelected ? 'true' : undefined}
+          onClick={() => onSelectFolder(folder.id)}
+          className="flex flex-1 min-w-0 items-center text-left cursor-pointer"
+        >
+          {/* Folder Icon */}
+          <Icon
+            name={isExpanded ? 'folder' : 'folder'}
+            size="md"
+            className={`mr-2 ${isSelected ? 'text-[var(--primary-ink)]' : 'text-[var(--warning-ink)]'}`}
+          />
 
-        {/* Folder Name */}
-        <span className="flex-1 text-sm font-medium truncate">{folder.name}</span>
+          {/* Folder Name */}
+          <span className="flex-1 text-sm font-medium truncate">{folder.name}</span>
 
-        {/* Content Count Badge */}
-        {folder.contentCount !== undefined && folder.contentCount > 0 && (
-          <span className="ml-2 px-2 py-0.5 text-xs bg-[var(--background-tertiary)] text-[var(--foreground-secondary)] rounded-full">
-            {folder.contentCount}
-          </span>
+          {/* Content Count Badge */}
+          {folder.contentCount !== undefined && folder.contentCount > 0 && (
+            <span className="ml-2 px-2 py-0.5 text-xs bg-[var(--background-tertiary)] text-[var(--foreground-secondary)] rounded-full">
+              {folder.contentCount}
+            </span>
+          )}
+        </button>
+
+        {/* Folder actions: shown on row hover, and always on keyboard focus */}
+        {onRenameFolder && (
+          <button
+            type="button"
+            aria-label={`Rename folder ${folder.name}`}
+            title="Rename"
+            onClick={() => onRenameFolder(folder)}
+            className="ml-1 p-0.5 rounded opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-[var(--surface-hover)] text-[var(--foreground-tertiary)] hover:text-[var(--foreground)]"
+          >
+            <Icon name="edit" size="sm" />
+          </button>
+        )}
+        {onDeleteFolder && (
+          <button
+            type="button"
+            aria-label={`Delete folder ${folder.name}`}
+            title="Delete"
+            onClick={() => onDeleteFolder(folder)}
+            className="ml-0.5 p-0.5 rounded opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-[var(--surface-hover)] text-[var(--foreground-tertiary)] hover:text-[var(--error-ink)]"
+          >
+            <Icon name="delete" size="sm" />
+          </button>
         )}
       </div>
 
@@ -96,6 +137,8 @@ function FolderNode({
               expandedFolders={expandedFolders}
               onToggleExpand={onToggleExpand}
               onSelectFolder={onSelectFolder}
+              onRenameFolder={onRenameFolder}
+              onDeleteFolder={onDeleteFolder}
             />
           ))}
         </div>
@@ -109,6 +152,8 @@ export default function FolderTree({
   selectedFolderId,
   onSelectFolder,
   onCreateFolder,
+  onRenameFolder,
+  onDeleteFolder,
 }: FolderTreeProps) {
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
 
@@ -131,6 +176,7 @@ export default function FolderTree({
         <h3 className="text-sm font-semibold text-[var(--foreground)]">Folders</h3>
         {onCreateFolder && (
           <button
+            type="button"
             onClick={onCreateFolder}
             className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-[var(--primary-ink)] bg-brand/10 rounded-md hover:bg-brand/20 transition"
           >
@@ -143,8 +189,10 @@ export default function FolderTree({
       {/* Folder List */}
       <div className="flex-1 overflow-y-auto p-2">
         {/* All Content Option */}
-        <div
-          className={`flex items-center py-2 px-3 rounded-md cursor-pointer transition-colors ${
+        <button
+          type="button"
+          aria-current={selectedFolderId === null ? 'true' : undefined}
+          className={`w-full flex items-center py-2 px-3 rounded-md cursor-pointer text-left transition-colors ${
             selectedFolderId === null
               ? 'bg-brand/10 text-[var(--primary-ink)]'
               : 'hover:bg-[var(--surface-hover)] text-[var(--foreground-secondary)]'
@@ -153,7 +201,7 @@ export default function FolderTree({
         >
           <Icon name="grid" size="md" className="mr-2 text-[var(--foreground-tertiary)]" />
           <span className="text-sm font-medium">All Content</span>
-        </div>
+        </button>
 
         {/* Folder Tree */}
         {folders.length > 0 ? (
@@ -167,6 +215,8 @@ export default function FolderTree({
                 expandedFolders={expandedFolders}
                 onToggleExpand={toggleExpand}
                 onSelectFolder={onSelectFolder}
+                onRenameFolder={onRenameFolder}
+                onDeleteFolder={onDeleteFolder}
               />
             ))}
           </div>

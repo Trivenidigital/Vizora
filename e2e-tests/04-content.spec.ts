@@ -61,39 +61,45 @@ test.describe('Content Management', () => {
   });
 
   test('should filter content by type', async ({ authenticatedPage, token }) => {
-    // Create different content types via API
-    const contentTypes = ['image', 'video'];
-    
-    for (const type of contentTypes) {
+    // One item of each of two types, so every filter state has a known answer.
+    const stamp = Date.now();
+    const names: Record<string, string> = {};
+    for (const type of ['image', 'video']) {
+      names[type] = `Test ${type} ${stamp}`;
       const res = await apiPost(authenticatedPage, token, 'http://localhost:3000/api/v1/content', {
-        name: `Test ${type} ${Date.now()}`,
+        name: names[type],
         type,
         url: `https://example.com/test.${type === 'image' ? 'jpg' : 'mp4'}`,
       });
       expect(res.ok(), `content create failed: ${res.status()} ${await res.text()}`).toBeTruthy();
     }
-    
+
     await authenticatedPage.goto('/dashboard/content');
     await authenticatedPage.waitForLoadState('networkidle');
-    
-    // Page should be loaded
     await expect(authenticatedPage.locator('h2').filter({ hasText: 'Content Library' })).toBeVisible({ timeout: 5000 });
-    
-    // Look for filter controls (buttons or dropdowns)
-    const filterButtons = authenticatedPage.locator('button').filter({ hasText: /all|image|video/i });
 
-    if (await filterButtons.first().isVisible({ timeout: 3000 }).catch(() => false)) {
-      await filterButtons.first().click();
-      await authenticatedPage.waitForTimeout(500);
-      // The library must survive the filter round-trip.
-      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Content Library' })).toBeVisible();
-    } else {
-      test.info().annotations.push({
-        type: 'skipped-branch',
-        description: 'no type-filter controls rendered — content type filtering not exercised',
-      });
-      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Content Library' })).toBeVisible();
-    }
+    await authenticatedPage.getByRole('button', { name: 'List view' }).click();
+    const rows = authenticatedPage.locator('table tbody tr');
+    await expect(rows).toHaveCount(2, { timeout: 10000 });
+
+    // The type pills are exact-named buttons; the old /all|image|video/i
+    // matcher's first hit was whatever came first in the DOM.
+    await authenticatedPage.getByRole('button', { name: 'Image', exact: true }).click();
+    await expect(rows).toHaveCount(1, { timeout: 10000 });
+    await expect(rows.first()).toContainText(names.image);
+    await expect(authenticatedPage.getByText('Type: image')).toBeVisible();
+
+    await authenticatedPage.getByRole('button', { name: 'Video', exact: true }).click();
+    await expect(rows).toHaveCount(1, { timeout: 10000 });
+    await expect(rows.first()).toContainText(names.video);
+
+    // A type with nothing in it is the filtered-empty state, not "No content yet".
+    await authenticatedPage.getByRole('button', { name: 'Pdf', exact: true }).click();
+    await expect(rows).toHaveCount(0, { timeout: 10000 });
+    await expect(authenticatedPage.getByText('No matching content')).toBeVisible();
+
+    await authenticatedPage.getByRole('button', { name: 'All', exact: true }).click();
+    await expect(rows).toHaveCount(2, { timeout: 10000 });
   });
 
   test('should delete content', async ({ authenticatedPage, token }) => {

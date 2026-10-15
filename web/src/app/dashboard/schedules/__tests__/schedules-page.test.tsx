@@ -1,4 +1,5 @@
 import { act, render, screen, waitFor, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@/lib/error-handler';
 import SchedulesClient from '../page-client';
 
@@ -108,8 +109,12 @@ jest.mock('@/components/DaySelector', () => {
   };
 });
 
+let mockCalendarSchedules: any[] = [];
 jest.mock('@/components/ScheduleCalendar', () => {
-  return function MockCalendar() { return <div data-testid="calendar">Calendar</div>; };
+  return function MockCalendar({ schedules }: any) {
+    mockCalendarSchedules = schedules;
+    return <div data-testid="calendar">Calendar</div>;
+  };
 });
 
 jest.mock('date-fns', () => ({
@@ -318,8 +323,9 @@ describe('SchedulesClient', () => {
     await waitFor(() => {
       expect(screen.getByText('Holiday Schedule')).toBeInTheDocument();
     });
-    expect(screen.getAllByText('Active')).toHaveLength(2);
-    expect(screen.getByText('Inactive')).toBeInTheDocument();
+    // Scoped to the status badges (spans); the status filter chips are buttons.
+    expect(screen.getAllByText('Active', { selector: 'span' })).toHaveLength(2);
+    expect(screen.getByText('Inactive', { selector: 'span' })).toBeInTheDocument();
   });
 
   it('renders schedules read-only for viewer users', async () => {
@@ -718,5 +724,166 @@ describe('SchedulesClient', () => {
       expect(mockDuplicateSchedule).toHaveBeenCalledWith('s2');
     });
     expect(mockCreateSchedule).not.toHaveBeenCalled();
+  });
+
+  it('never fabricates a schedule timezone in loaded, created, updated or duplicated state', async () => {
+    mockGetSchedules.mockResolvedValue({ data: sampleSchedules });
+    mockGetPlaylists.mockResolvedValue({ data: samplePlaylists });
+    mockGetDisplays.mockResolvedValue({ data: sampleDisplays });
+    mockGetDisplayGroups.mockResolvedValue({ data: sampleGroups });
+
+    render(<SchedulesClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Morning Announcements')).toBeInTheDocument();
+    });
+
+    // Edit + save s1, then duplicate it, so every state-stamping path has run.
+    fireEvent.click(screen.getAllByText('Edit')[0]);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Update' }));
+    });
+    await waitFor(() => expect(mockUpdateSchedule).toHaveBeenCalled());
+    expect(mockUpdateSchedule.mock.calls[0][1]).not.toHaveProperty('timezone');
+    await act(async () => {
+      fireEvent.click(screen.getAllByText('Duplicate')[0]);
+    });
+    await waitFor(() => expect(mockDuplicateSchedule).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Calendar' }));
+    await waitFor(() => expect(screen.getByTestId('calendar')).toBeInTheDocument());
+    expect(mockCalendarSchedules.length).toBeGreaterThan(0);
+    for (const schedule of mockCalendarSchedules) {
+      expect(schedule).not.toHaveProperty('timezone');
+    }
+  });
+
+  describe('search and status filter', () => {
+    beforeEach(() => {
+      mockGetSchedules.mockResolvedValue({ data: sampleSchedules });
+    });
+
+    it('labels the search box and the status filter group', async () => {
+      render(<SchedulesClient />);
+      await waitFor(() => expect(screen.getByText('Morning Announcements')).toBeInTheDocument());
+
+      expect(screen.getByRole('textbox', { name: 'Search schedules by name' })).toBeInTheDocument();
+      const group = screen.getByRole('group', { name: 'Filter schedules by status' });
+      expect(group).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^3\s*All$/ })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: /^2\s*Active$/ })).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.getByRole('button', { name: /^1\s*Inactive$/ })).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('filters by name, case-insensitively', async () => {
+      render(<SchedulesClient />);
+      await waitFor(() => expect(screen.getByText('Morning Announcements')).toBeInTheDocument());
+
+      fireEvent.change(screen.getByRole('textbox', { name: 'Search schedules by name' }), {
+        target: { value: 'WEEKEND' },
+      });
+
+      expect(screen.getByText('Weekend Specials')).toBeInTheDocument();
+      expect(screen.queryByText('Morning Announcements')).not.toBeInTheDocument();
+      expect(screen.queryByText('Holiday Schedule')).not.toBeInTheDocument();
+    });
+
+    it('filters by active and inactive status', async () => {
+      render(<SchedulesClient />);
+      await waitFor(() => expect(screen.getByText('Morning Announcements')).toBeInTheDocument());
+
+      fireEvent.click(screen.getByRole('button', { name: /Inactive$/ }));
+      expect(screen.getByText('Holiday Schedule')).toBeInTheDocument();
+      expect(screen.queryByText('Morning Announcements')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Inactive$/ })).toHaveAttribute('aria-pressed', 'true');
+
+      fireEvent.click(screen.getByRole('button', { name: /^2\s*Active$/ }));
+      expect(screen.getByText('Morning Announcements')).toBeInTheDocument();
+      expect(screen.getByText('Weekend Specials')).toBeInTheDocument();
+      expect(screen.queryByText('Holiday Schedule')).not.toBeInTheDocument();
+    });
+
+    it('shows a filtered-empty state distinct from the no-schedules state', async () => {
+      render(<SchedulesClient />);
+      await waitFor(() => expect(screen.getByText('Morning Announcements')).toBeInTheDocument());
+
+      fireEvent.change(screen.getByRole('textbox', { name: 'Search schedules by name' }), {
+        target: { value: 'no such schedule' },
+      });
+
+      expect(screen.getByText('No schedules match these filters')).toBeInTheDocument();
+      expect(screen.getByText(/3 schedules exist, but none match/)).toBeInTheDocument();
+      expect(screen.queryByText('No schedules yet')).not.toBeInTheDocument();
+    });
+
+    it('does not render filter controls when there are no schedules', async () => {
+      mockGetSchedules.mockResolvedValue({ data: [] });
+      render(<SchedulesClient />);
+      await waitFor(() => expect(screen.getByText('No schedules yet')).toBeInTheDocument());
+
+      expect(screen.queryByRole('textbox', { name: 'Search schedules by name' })).not.toBeInTheDocument();
+      expect(screen.queryByText('No schedules match these filters')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('create/edit dialog submits on Enter', () => {
+    const NAME_PLACEHOLDER = 'e.g., Morning Content, Holiday Special';
+
+    const openAndFillCreate = async () => {
+      mockGetPlaylists.mockResolvedValue({ data: samplePlaylists });
+      mockGetDisplays.mockResolvedValue({ data: sampleDisplays });
+      render(<SchedulesClient />);
+      await waitFor(() => {
+        expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
+      });
+      fireEvent.click(screen.getAllByText('Create Schedule')[0]);
+      fireEvent.click(screen.getByText('Select Weekdays'));
+      fireEvent.change(screen.getByDisplayValue('Select a playlist...'), { target: { value: 'p1' } });
+      fireEvent.click(screen.getByLabelText('Lobby Display'));
+    };
+
+    it('creates the schedule when Enter is pressed in the name field', async () => {
+      const user = userEvent.setup();
+      await openAndFillCreate();
+
+      await user.type(screen.getByPlaceholderText(NAME_PLACEHOLDER), 'Morning Loop{Enter}');
+
+      await waitFor(() => {
+        expect(mockCreateSchedule).toHaveBeenCalledTimes(1);
+      });
+      expect(mockCreateSchedule).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Morning Loop', displayId: 'd1' }),
+      );
+    });
+
+    it('shows the inline validation error instead of calling the API when Enter is pressed with no name', async () => {
+      const user = userEvent.setup();
+      await openAndFillCreate();
+
+      await user.type(screen.getByPlaceholderText(NAME_PLACEHOLDER), '{Enter}');
+
+      expect(mockCreateSchedule).not.toHaveBeenCalled();
+    });
+
+    it('ignores a second submit while the create is in flight', async () => {
+      let resolveCreate: (value: unknown) => void = () => {};
+      mockCreateSchedule.mockReturnValue(
+        new Promise((resolve) => {
+          resolveCreate = resolve;
+        }),
+      );
+      const user = userEvent.setup();
+      await openAndFillCreate();
+
+      const name = screen.getByPlaceholderText(NAME_PLACEHOLDER);
+      await user.type(name, 'Morning Loop{Enter}');
+      await waitFor(() => expect(mockCreateSchedule).toHaveBeenCalledTimes(1));
+
+      fireEvent.submit(name.closest('form')!);
+      expect(mockCreateSchedule).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        resolveCreate({ id: 'schedule-d1', name: 'Morning Loop', displayId: 'd1', isActive: true });
+      });
+    });
   });
 });

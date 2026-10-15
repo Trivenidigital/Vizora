@@ -1,4 +1,5 @@
 import { test, expect, apiPost, readData } from './fixtures/auth.fixture';
+import { seedPlaylist } from './fixtures/seed';
 
 test.describe('Playlist Builder (Wave 5)', () => {
   test.describe('Playlist List Page', () => {
@@ -21,14 +22,10 @@ test.describe('Playlist Builder (Wave 5)', () => {
       await authenticatedPage.goto('/dashboard/playlists');
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Either empty state or playlist cards
-      const emptyState = authenticatedPage.locator('text=/no playlists|create your first|get started/i').first();
-      const playlistCards = authenticatedPage.locator('[data-testid="playlist-card"], .playlist-card, article');
-
-      const hasEmptyState = await emptyState.isVisible({ timeout: 5000 }).catch(() => false);
-      const hasCards = await playlistCards.first().isVisible({ timeout: 5000 }).catch(() => false);
-
-      expect(hasEmptyState || hasCards).toBeTruthy();
+      // The fixture's org is brand new: the empty state is certain, so it is
+      // asserted instead of accepting either outcome.
+      await expect(authenticatedPage.getByText('No playlists yet')).toBeVisible({ timeout: 10000 });
+      await expect(authenticatedPage.getByRole('button', { name: /^Edit / })).toHaveCount(0);
     });
 
     test('should create a new playlist', async ({ authenticatedPage }) => {
@@ -137,28 +134,17 @@ test.describe('Playlist Builder (Wave 5)', () => {
       await authenticatedPage.goto(`/dashboard/playlists/${playlistId}`);
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Look for editor or playlist items section
-      const editor = authenticatedPage.locator('text=/playlist items|sequence|order|playlist editor/i').first();
-      const itemsList = authenticatedPage.locator('[data-testid="playlist-items"], .playlist-items, ul, ol').first();
-
-      const hasEditor = await editor.isVisible({ timeout: 5000 }).catch(() => false);
-      const hasItems = await itemsList.isVisible({ timeout: 5000 }).catch(() => false);
-
-      expect(hasEditor || hasItems).toBeTruthy();
+      // The editor panel is a named section with an empty-playlist state.
+      await expect(authenticatedPage.getByRole('heading', { level: 3, name: 'Playlist Items' })).toBeVisible({ timeout: 10000 });
+      await expect(authenticatedPage.getByText('Empty Playlist')).toBeVisible();
+      await expect(authenticatedPage.getByText('Drag content from the library to build your playlist')).toBeVisible();
     });
 
     test('should show preview panel', async ({ authenticatedPage }) => {
       await authenticatedPage.goto(`/dashboard/playlists/${playlistId}`);
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Look for preview section
-      const preview = authenticatedPage.locator('text=/preview|live preview/i').first();
-      const previewArea = authenticatedPage.locator('[class*="preview"], [data-testid="preview"]').first();
-
-      const hasPreviewLabel = await preview.isVisible({ timeout: 5000 }).catch(() => false);
-      const hasPreviewArea = await previewArea.isVisible({ timeout: 5000 }).catch(() => false);
-
-      expect(hasPreviewLabel || hasPreviewArea).toBeTruthy();
+      await expect(authenticatedPage.getByRole('heading', { level: 3, name: 'Preview' })).toBeVisible({ timeout: 10000 });
     });
 
     test('should have save button', async ({ authenticatedPage }) => {
@@ -211,35 +197,42 @@ test.describe('Playlist Builder (Wave 5)', () => {
   });
 
   test.describe('Playlist Actions', () => {
-    test('should duplicate playlist', async ({ authenticatedPage }) => {
+    test('should duplicate playlist', async ({ authenticatedPage, token }) => {
+      const playlist = await seedPlaylist(authenticatedPage, token);
       await authenticatedPage.goto('/dashboard/playlists');
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Look for a playlist with actions menu
-      const actionsButton = authenticatedPage.locator('button[aria-label*="actions" i], button[aria-label*="menu" i], [data-testid="playlist-actions"]').first();
-      const hasActions = await actionsButton.isVisible({ timeout: 5000 }).catch(() => false);
-
-      if (hasActions) {
-        await actionsButton.click();
-        const duplicateOption = authenticatedPage.locator('button, [role="menuitem"]').filter({ hasText: /duplicate|copy/i }).first();
-        await expect(duplicateOption).toBeVisible({ timeout: 3000 });
-      }
+      // Each card carries a named Duplicate action (there is no actions menu,
+      // which is what the old guard looked for and never found).
+      await authenticatedPage.getByRole('button', { name: `Duplicate ${playlist.name}`, exact: true }).click();
+      await expect(authenticatedPage.getByRole('alert').filter({ hasText: 'Playlist duplicated' })).toBeVisible();
+      await expect(
+        authenticatedPage.getByRole('button', { name: `Edit ${playlist.name} (Copy)`, exact: true }),
+      ).toBeVisible({ timeout: 10000 });
+      await expect(authenticatedPage.getByRole('button', { name: `Edit ${playlist.name}`, exact: true })).toBeVisible();
     });
 
-    test('should delete playlist with confirmation', async ({ authenticatedPage }) => {
+    test('should delete playlist with confirmation', async ({ authenticatedPage, token }) => {
+      const playlist = await seedPlaylist(authenticatedPage, token);
       await authenticatedPage.goto('/dashboard/playlists');
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Look for delete button or menu option
-      const deleteButton = authenticatedPage.locator('button').filter({ hasText: /delete|remove/i }).first();
-      const hasDelete = await deleteButton.isVisible({ timeout: 5000 }).catch(() => false);
+      const del = authenticatedPage.getByRole('button', { name: `Delete ${playlist.name}`, exact: true });
+      await del.click();
+      const confirm = authenticatedPage.getByRole('dialog', { name: 'Delete Playlist' });
+      await expect(confirm).toBeVisible({ timeout: 5000 });
+      await expect(confirm).toContainText(`Are you sure you want to delete "${playlist.name}"?`);
 
-      if (hasDelete) {
-        await deleteButton.click();
-        // Should show confirmation dialog
-        const confirmDialog = authenticatedPage.locator('[role="dialog"], [role="alertdialog"], .modal');
-        await expect(confirmDialog).toBeVisible({ timeout: 3000 });
-      }
+      // Cancelling keeps the playlist.
+      await confirm.getByRole('button', { name: 'Cancel' }).click();
+      await expect(confirm).toBeHidden();
+      await expect(del).toBeVisible();
+
+      // Confirming removes it.
+      await del.click();
+      await confirm.getByRole('button', { name: 'Delete', exact: true }).click();
+      await expect(confirm).toBeHidden({ timeout: 10000 });
+      await expect(del).toHaveCount(0, { timeout: 10000 });
     });
   });
 });

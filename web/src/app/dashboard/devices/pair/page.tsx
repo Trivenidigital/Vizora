@@ -78,6 +78,11 @@ export default function PairDevicePage() {
  }
  };
 
+ // Mirrors the Pair button's `disabled`: Enter must not reach handlePairing
+ // while the button would refuse the click (incomplete code, or in flight).
+ const pairSubmitDisabled =
+ loading || !form.pairingCode || form.pairingCode.length !== 6 || !form.deviceName.trim();
+
  const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
  const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
  setForm({ ...form, pairingCode: value });
@@ -132,7 +137,14 @@ export default function PairDevicePage() {
 
  {/* Main Form */}
  <div className="bg-[var(--surface)] rounded-lg shadow-md p-8">
- <div className="space-y-6">
+ <form
+   noValidate
+   className="space-y-6"
+   onSubmit={(event) => {
+     event.preventDefault();
+     if (!pairSubmitDisabled) void handlePairing();
+   }}
+ >
  {/* Step Instructions */}
  <div className="bg-brand/5 rounded-lg p-6 border border-brand/30">
  <h3 className="font-semibold text-[var(--foreground)] mb-3 flex items-center gap-2">
@@ -240,6 +252,7 @@ export default function PairDevicePage() {
  {/* Action Buttons */}
  <div className="flex gap-3 pt-6">
  <button
+ type="button"
  onClick={() => router.push('/dashboard/devices')}
  className="flex-1 px-6 py-3 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition"
  disabled={loading}
@@ -247,9 +260,9 @@ export default function PairDevicePage() {
  Cancel
  </button>
  <button
- onClick={handlePairing}
+ type="submit"
  className="flex-1 px-6 py-3 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center justify-center gap-2"
- disabled={loading || !form.pairingCode || form.pairingCode.length !== 6 || !form.deviceName.trim()}
+ disabled={pairSubmitDisabled}
  >
  {loading ? (
  <>
@@ -264,7 +277,7 @@ export default function PairDevicePage() {
  )}
  </button>
  </div>
- </div>
+ </form>
  </div>
 
  {/* Help Section */}

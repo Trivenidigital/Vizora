@@ -14,8 +14,10 @@ import { test, expect } from './fixtures/auth.fixture';
  * Every locator in this file used to be `[role="dialog"], [class*="palette"],
  * [class*="command"]`. The palette (web/src/components/CommandPalette.tsx)
  * matches NONE of those: its modal is a bare <div> with no role, its command
- * rows are plain <button>s with no `option` role, and no class in the component
- * contains the string "palette" or "command". So `palette.isVisible()` was
+ * rows were plain <button>s with no `option` role, and no class in the component
+ * contains the string "palette" or "command". (Since 2026-10-15 the rows are
+ * `role="option"` inside a `role="listbox"` named "Commands", with the
+ * highlighted row carrying `aria-selected="true"`.) So `palette.isVisible()` was
  * always false, every `if (await palette.isVisible(...))` body was dead, and
  * the handful of assertions that did run were `expect(<x> || true)`.
  *
@@ -69,11 +71,11 @@ const paletteCard = (page: Page): Locator =>
   page.getByRole('dialog', { name: 'Command palette' });
 
 const commands = (page: Page): Locator =>
-  paletteCard(page).getByRole('button', { name: /^Go to / });
+  paletteCard(page).getByRole('option', { name: /^Go to / });
 
 /**
  * One command row. `hasText` rather than an exact accessible name: each row
- * renders its title AND its description, so the button's accessible name is
+ * renders its title AND its description, so the option's accessible name is
  * "Go to Devices Manage your devices", not "Go to Devices".
  */
 const command = (page: Page, title: string): Locator =>
@@ -211,15 +213,57 @@ test.describe('Phase 7.2: Command Palette (Power User Navigation)', () => {
 
     await openPalette(authenticatedPage);
 
-    // Exactly one row is highlighted at a time — "highlighted" being a class,
-    // because the component exposes no aria state for it (see the file header).
-    const highlighted = paletteCard(authenticatedPage).locator('button[class*="lw-forest"]');
+    // Exactly one row is highlighted at a time, and it is the one assistive
+    // tech is told about: aria-selected, not just the forest ground.
+    const highlighted = paletteCard(authenticatedPage).getByRole('option', { selected: true });
     await expect(highlighted).toHaveCount(1);
     await expect(highlighted).toHaveText(/Go to Dashboard/);
 
     await authenticatedPage.keyboard.press('ArrowDown');
     await expect(highlighted).toHaveCount(1);
     await expect(highlighted).toHaveText(/Go to Devices/);
+  });
+
+  test('exposes a combobox-controlled listbox of options (DOMAIN)', async ({ authenticatedPage }) => {
+    await authenticatedPage.goto('/dashboard');
+    await authenticatedPage.waitForLoadState('networkidle');
+    await openPalette(authenticatedPage);
+
+    const card = paletteCard(authenticatedPage);
+    const combobox = card.getByRole('combobox', { name: 'Search commands' });
+    const listbox = card.getByRole('listbox', { name: 'Commands' });
+    await expect(combobox).toBeVisible();
+    await expect(listbox).toBeVisible();
+
+    // The input owns the list, and points at the highlighted option.
+    const listboxId = await listbox.getAttribute('id');
+    expect(listboxId).toBeTruthy();
+    await expect(combobox).toHaveAttribute('aria-controls', listboxId!);
+    await expect(combobox).toHaveAttribute('aria-expanded', 'true');
+
+    // Every row is an option inside the listbox, each carrying aria-selected,
+    // and no command row is a bare button any more. REACH CONTROL: the option
+    // query finds every navigation command.
+    const options = listbox.getByRole('option');
+    await expect(options.filter({ hasText: /^Go to / })).toHaveCount(await commands(authenticatedPage).count());
+    expect(await options.count()).toBeGreaterThan(1);
+    for (const value of await options.evaluateAll((els) => els.map((e) => e.getAttribute('aria-selected')))) {
+      expect(['true', 'false']).toContain(value);
+    }
+    await expect(listbox.getByRole('button')).toHaveCount(0);
+
+    const selected = listbox.getByRole('option', { selected: true });
+    await expect(combobox).toHaveAttribute('aria-activedescendant', (await selected.getAttribute('id'))!);
+    await authenticatedPage.keyboard.press('ArrowDown');
+    await expect(combobox).toHaveAttribute('aria-activedescendant', (await selected.getAttribute('id'))!);
+    await expect(selected).toHaveText(/Go to Devices/);
+
+    // With nothing matching, the listbox is gone and the input says so.
+    await searchField(authenticatedPage).fill('zzzz-no-such-command');
+    await expect(card.getByText('No commands found')).toBeVisible();
+    await expect(listbox).toHaveCount(0);
+    await expect(combobox).toHaveAttribute('aria-expanded', 'false');
+    await expect(combobox).not.toHaveAttribute('aria-activedescendant', /.+/);
   });
 
   test('should execute command with Enter (MUTATION)', async ({ authenticatedPage }) => {
@@ -463,7 +507,7 @@ test.describe('Phase 7.2: Command Palette (Power User Navigation)', () => {
     await expect(hint(authenticatedPage)).toBeVisible();
   });
 
-  test('keeps the typed query when reopened, and persists no command history across reloads (pinned gap)', async ({ authenticatedPage }) => {
+  test('clears the typed query on Escape, and persists no command history across reloads', async ({ authenticatedPage }) => {
     await authenticatedPage.goto('/dashboard');
     await authenticatedPage.waitForLoadState('networkidle');
 
@@ -474,13 +518,15 @@ test.describe('Phase 7.2: Command Palette (Power User Navigation)', () => {
     await expect(searchField(authenticatedPage)).toBeHidden();
 
     /*
-     * Escape closes the palette WITHOUT clearing `search` — unlike Enter and a
-     * backdrop click, both of which call `setSearch('')`. That asymmetry is
-     * reported as a product inconsistency rather than fixed here; it is pinned
-     * so that making the three paths consistent is a deliberate, visible change.
+     * Escape used to close WITHOUT clearing `search`, unlike Enter and a
+     * backdrop click, so reopening showed a stale, pre-filtered list. Every
+     * close path now goes through one close(); this was pinned as a gap until
+     * 2026-10-15. Reach control: the commands must be back, so an empty field
+     * means "cleared", not "the palette failed to render".
      */
     await authenticatedPage.keyboard.press('Control+k');
-    await expect(searchField(authenticatedPage)).toHaveValue('devices');
+    await expect(searchField(authenticatedPage)).toHaveValue('');
+    await expect(command(authenticatedPage, 'Go to Dashboard')).toBeVisible();
 
     /*
      * There is no command history: nothing is written to storage and no

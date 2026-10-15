@@ -194,7 +194,19 @@ export default function ContentLifecyclePanel({
         ) : (
           <p className="text-xs text-[var(--foreground-tertiary)]">No expiration set</p>
         )}
-        <div className="grid gap-3 sm:grid-cols-2">
+        {/* Inside the content edit form: without this, Enter in the date field
+            would save + close the whole edit modal and silently drop the
+            expiration typed here. Enter schedules it instead, under the same
+            guard as the Schedule expiration button. */}
+        <div
+          className="grid gap-3 sm:grid-cols-2"
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || !(event.target instanceof HTMLInputElement)) return;
+            event.preventDefault();
+            if (busy || !expiresAt) return;
+            void handleSetExpiration();
+          }}
+        >
           <div>
             <label
               htmlFor="content-expires-at"

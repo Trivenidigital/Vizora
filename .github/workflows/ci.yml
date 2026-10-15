@@ -435,6 +435,11 @@ jobs:
       - name: Build middleware
         run: npx nx build @vizora/middleware
 
+      # A bundled class-transformer silently disables every DTO @Type/@Transform
+      # (see scripts/ops/lib/bundle-externals.ts). Unit tests cannot see it.
+      - name: Assert middleware bundle externals
+        run: npx tsx scripts/ops/assert-bundle-externals.ts middleware/dist/main.js
+
       - name: Build web
         env:
           NEXT_PUBLIC_API_URL: https://vizora.cloud
@@ -504,6 +509,34 @@ jobs:
 
       - name: Build realtime
         run: npx nx build @vizora/realtime
+
+      # Same gate for realtime: a bundled class-transformer stripped the nested
+      # `command` from every internal device command (whitelist + inert @Type).
+      - name: Assert realtime bundle externals
+        run: npx tsx scripts/ops/assert-bundle-externals.ts realtime/dist/main.js
+
+      # Server bundles, so a middleware/realtime release can be deployed the
+      # same way as web: built here on Linux from the exact commit, never
+      # compiled on the memory-starved VPS. Both dist trees are self-contained
+      # webpack output (+ assets/widget-templates); dependencies stay external
+      # and resolve from the box's node_modules. Uploaded only after the
+      # bundle-externals gates above have passed for both.
+      - name: Write server build metadata
+        run: |
+          for svc in middleware realtime; do
+            printf 'sourceCommit=%s\nrunId=%s\nbuiltBy=github-actions\n' \
+              '${{ github.sha }}' '${{ github.run_id }}' > "$svc/dist/build-metadata.env"
+          done
+
+      - name: Upload server build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-dist-${{ github.sha }}
+          path: |
+            middleware/dist
+            realtime/dist
+          retention-days: 30
+          if-no-files-found: error
 
       - name: Build display client
         working-directory: display

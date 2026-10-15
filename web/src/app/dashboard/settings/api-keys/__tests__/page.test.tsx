@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import userEvent from '@testing-library/user-event';
 
 const mockGetApiKeys = jest.fn();
 const mockCreateApiKey = jest.fn();
@@ -200,5 +201,47 @@ describe('ApiKeysPage', () => {
       expect(screen.getByText('How to use API Keys')).toBeInTheDocument();
     });
     expect(screen.getByText('X-API-Key')).toBeInTheDocument();
+  });
+
+  describe('create dialog submits on Enter', () => {
+    const openCreate = async () => {
+      render(<ApiKeysPage />);
+      await waitFor(() => expect(screen.getByText('Production API Key')).toBeInTheDocument());
+      fireEvent.click(screen.getByRole('button', { name: /Create API Key/ }));
+      return screen.getByLabelText(/Key Name/);
+    };
+
+    it('creates the key when Enter is pressed in the name field', async () => {
+      const user = userEvent.setup();
+      const name = await openCreate();
+
+      await user.type(name, 'CI Key{Enter}');
+
+      await waitFor(() => {
+        expect(mockCreateApiKey).toHaveBeenCalledWith(expect.objectContaining({ name: 'CI Key' }));
+      });
+      expect(mockCreateApiKey).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not create when submitted with no name', async () => {
+      const name = await openCreate();
+
+      fireEvent.submit(name.closest('form')!);
+
+      expect(mockCreateApiKey).not.toHaveBeenCalled();
+      expect(mockToast.error).not.toHaveBeenCalled();
+    });
+
+    it('does not create a second key while the first create is in flight', async () => {
+      mockCreateApiKey.mockReturnValue(new Promise(() => {}));
+      const user = userEvent.setup();
+      const name = await openCreate();
+
+      await user.type(name, 'CI Key{Enter}');
+      await waitFor(() => expect(mockCreateApiKey).toHaveBeenCalledTimes(1));
+      fireEvent.submit(name.closest('form')!);
+
+      expect(mockCreateApiKey).toHaveBeenCalledTimes(1);
+    });
   });
 });

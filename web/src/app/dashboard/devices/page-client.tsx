@@ -51,6 +51,13 @@ const FLEET_STATUS_LABEL: Record<FleetStatus, string> = {
  online: 'Online',
 };
 
+/**
+ * Background device-list refresh cadence while the tab is visible. 60s, not
+ * faster: each tick walks every page of /displays (100 per page) against a
+ * per-IP throttle shared by every tab behind the same NAT.
+ */
+export const DEVICES_BACKGROUND_REFRESH_MS = 60_000;
+
 /** Anything the API sends that is not a state we present falls to `unknown`. */
 const toFleetStatus = (status: unknown): FleetStatus =>
  (FLEET_STATUSES as readonly string[]).includes(String(status))
@@ -173,11 +180,16 @@ export default function DevicesClient({
  const [bulkGroupId, setBulkGroupId] = useState('');
  const [bulkOutcome, setBulkOutcome] = useState<BulkOutcome | null>(null);
  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline' | 'error'>('offline');
+ // Bumped by every foreground load and every local write to `devices`. A
+ // background refresh that resolves under a different generation than it
+ // started with carries data older than what is on screen, so it is dropped.
+ const devicesGenerationRef = useRef(0);
  const hasCompleteInitialDevices = initialDevicesComplete ?? initialDevices.length > 0;
  const hasCompleteInitialPlaylists = initialPlaylistsComplete ?? initialPlaylists.length > 0;
 
  // Memoized callback for device status changes
  const handleDeviceStatusChange = useCallback((update: { deviceId: string; status: DisplayStatus; lastSeen?: string | null; currentPlaylistId?: string }) => {
+ devicesGenerationRef.current += 1;
  setDevices((prev) =>
  prev.map((d) =>
  d.id === update.deviceId
@@ -242,7 +254,61 @@ export default function DevicesClient({
  loadGroups();
  }, []);
 
+ /**
+  * Background refresh: freshness otherwise depends entirely on the realtime
+  * channel, so a missed socket event left a stale row until a manual reload.
+  *
+  * Deliberately NOT loadDevices(false). That path is for refetches the operator
+  * caused, so it toasts and swaps the table for DashboardSectionError on
+  * failure - and an empty table prunes the selection to nothing (see the
+  * visibleIdsKey effect). A transient blip on a timer must do neither: on
+  * failure it keeps the last good list. On success it only replaces `devices`;
+  * search, filters and page are separate state, and selection survives for
+  * every row still visible.
+  *
+  * Skips while hidden, refreshes on becoming visible again, and never stacks
+  * onto a request already in flight (foreground or background). A result that
+  * lands after a foreground load or local edit started is discarded
+  * (devicesGenerationRef) - it would overwrite newer state with older.
+  *
+  * Deliberately NOT skipped while the realtime socket is connected: the socket
+  * carries status only. Renames, location edits and devices added elsewhere emit
+  * no realtime event, so a connected socket is not evidence the list is fresh.
+  */
+ const devicesRequestsInFlightRef = useRef(0);
+ useEffect(() => {
+ let cancelled = false;
+ const refresh = async () => {
+ if (document.visibilityState !== 'visible') return;
+ if (devicesRequestsInFlightRef.current > 0) return;
+ devicesRequestsInFlightRef.current += 1;
+ const generation = devicesGenerationRef.current;
+ try {
+ const devicesList = await fetchAllPaginated((params) => apiClient.getDisplays(params));
+ if (cancelled || generation !== devicesGenerationRef.current) return;
+ setDevices(devicesList);
+ setDevicesLoadError(null);
+ } catch {
+ // Keep the last good list; a foreground load surfaces errors.
+ } finally {
+ devicesRequestsInFlightRef.current -= 1;
+ }
+ };
+ const interval = setInterval(() => { void refresh(); }, DEVICES_BACKGROUND_REFRESH_MS);
+ const handleVisibilityChange = () => {
+ if (document.visibilityState === 'visible') void refresh();
+ };
+ document.addEventListener('visibilitychange', handleVisibilityChange);
+ return () => {
+ cancelled = true;
+ clearInterval(interval);
+ document.removeEventListener('visibilitychange', handleVisibilityChange);
+ };
+ }, []);
+
  const loadDevices = async (showLoading = true) => {
+ devicesRequestsInFlightRef.current += 1;
+ devicesGenerationRef.current += 1;
  try {
  if (showLoading) setLoading(true);
  setDevicesLoadError(null);
@@ -265,6 +331,7 @@ export default function DevicesClient({
  const message = error?.message || 'Failed to load devices';
  setDevicesLoadError(error instanceof Error ? error : new Error(message));
  } finally {
+ devicesRequestsInFlightRef.current -= 1;
  if (showLoading) setLoading(false);
  }
  };
@@ -328,6 +395,7 @@ export default function DevicesClient({
  // Same reason as confirmDelete: the optimistic copy is not what the table
  // renders, so the renamed device kept its old name until a reload.
  commitOptimistic(updateId);
+ devicesGenerationRef.current += 1;
  setDevices((prev) =>
  prev.map((d) =>
  d.id === selectedDevice.id
@@ -385,6 +453,7 @@ export default function DevicesClient({
  // commitOptimistic alone left the deleted row on screen until a reload.
  // Same pairing the content page uses (content/page-client.tsx).
  commitOptimistic(deleteId);
+ devicesGenerationRef.current += 1;
  setDevices((prev) => prev.filter((d) => d.id !== deletedDeviceId));
  toast.success('Device deleted successfully');
  setIsDeleteModalOpen(false);
@@ -675,6 +744,12 @@ export default function DevicesClient({
  useEffect(() => {
  if (selectAllRef.current) selectAllRef.current.indeterminate = someVisibleSelected;
  }, [someVisibleSelected]);
+
+ // Each dialog's submit guard mirrors its primary button's `disabled`, so Enter
+ // cannot reach a handler the disabled button used to keep out of reach.
+ const editSubmitDisabled = actionLoading || !editForm.nickname.trim();
+ const bulkPlaylistSubmitDisabled = !bulkPlaylistId || actionLoading;
+ const bulkGroupSubmitDisabled = !bulkGroupId || actionLoading;
 
  return (
  <div className="space-y-6">
@@ -1156,7 +1231,14 @@ export default function DevicesClient({
  )}
 
  <Modal isOpen={isEditModalOpen && permissions.canManageDevices} onClose={() => setIsEditModalOpen(false)} title="Edit Device">
- <div className="space-y-5">
+ <form
+   noValidate
+   className="space-y-5"
+   onSubmit={(event) => {
+     event.preventDefault();
+     if (!editSubmitDisabled) void handleSaveEdit();
+   }}
+ >
  <div>
  <label htmlFor="device-nickname" className="mb-2 block text-sm font-medium text-[var(--foreground-secondary)]">Device Nickname</label>
  <input id="device-nickname" type="text" value={editForm.nickname} onChange={(e) => setEditForm({ ...editForm, nickname: e.target.value })} className="eh-input" placeholder="e.g., Store Front Display" />
@@ -1166,10 +1248,10 @@ export default function DevicesClient({
  <input id="device-location" type="text" value={editForm.location} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })} className="eh-input" placeholder="e.g., Main Entrance" />
  </div>
  <div className="flex justify-end gap-3 pt-4">
- <button onClick={() => setIsEditModalOpen(false)} className="eh-btn-ghost eh-btn-sm min-h-[44px] rounded-xl px-4" disabled={actionLoading}>Cancel</button>
- <button onClick={handleSaveEdit} className="eh-btn-neon eh-btn-sm flex min-h-[44px] items-center gap-2 rounded-xl px-4 disabled:opacity-50" disabled={actionLoading || !editForm.nickname.trim()}>{actionLoading && <LoadingSpinner size="sm" />}Save Changes</button>
+ <button type="button" onClick={() => setIsEditModalOpen(false)} className="eh-btn-ghost eh-btn-sm min-h-[44px] rounded-xl px-4" disabled={actionLoading}>Cancel</button>
+ <button type="submit" className="eh-btn-neon eh-btn-sm flex min-h-[44px] items-center gap-2 rounded-xl px-4 disabled:opacity-50" disabled={editSubmitDisabled}>{actionLoading && <LoadingSpinner size="sm" />}Save Changes</button>
  </div>
- </div>
+ </form>
  </Modal>
 
  <ConfirmDialog isOpen={isDeleteModalOpen && permissions.canDeleteDevices} onClose={() => setIsDeleteModalOpen(false)} onConfirm={confirmDelete} title="Delete Device" message={`Are you sure you want to delete "${selectedDevice?.nickname}"? This action cannot be undone.`} confirmText="Delete" type="danger" />
@@ -1185,7 +1267,14 @@ export default function DevicesClient({
  />
 
  <Modal isOpen={isBulkPlaylistModalOpen && permissions.canManageDevices} onClose={() => { setIsBulkPlaylistModalOpen(false); setBulkPlaylistId(''); }} title="Assign Playlist to Selected Devices">
- <div className="space-y-5">
+ <form
+   noValidate
+   className="space-y-5"
+   onSubmit={(event) => {
+     event.preventDefault();
+     if (!bulkPlaylistSubmitDisabled) void handleBulkAssignPlaylist();
+   }}
+ >
  <p className="text-sm text-[var(--foreground-secondary)]">Assign a playlist to {selectedDeviceIds.size} selected device{selectedDeviceIds.size !== 1 ? 's' : ''}.</p>
  <select value={bulkPlaylistId} onChange={(e) => setBulkPlaylistId(e.target.value)} className="eh-select" aria-label="Playlist to assign">
  <option value="">Select a playlist...</option>
@@ -1197,24 +1286,31 @@ export default function DevicesClient({
  This sets the assignment. Non-online devices will update when they come online.
  </p>
  <div className="flex justify-end gap-3">
- <button onClick={() => { setIsBulkPlaylistModalOpen(false); setBulkPlaylistId(''); }} className="eh-btn-ghost eh-btn-sm min-h-[44px] rounded-xl px-4">Cancel</button>
- <button onClick={handleBulkAssignPlaylist} disabled={!bulkPlaylistId || actionLoading} className="eh-btn-neon eh-btn-sm min-h-[44px] rounded-xl px-4 disabled:opacity-50">Assign</button>
+ <button type="button" onClick={() => { setIsBulkPlaylistModalOpen(false); setBulkPlaylistId(''); }} className="eh-btn-ghost eh-btn-sm min-h-[44px] rounded-xl px-4">Cancel</button>
+ <button type="submit" disabled={bulkPlaylistSubmitDisabled} className="eh-btn-neon eh-btn-sm min-h-[44px] rounded-xl px-4 disabled:opacity-50">Assign</button>
  </div>
- </div>
+ </form>
  </Modal>
 
  <Modal isOpen={isBulkGroupModalOpen && permissions.canManageDevices} onClose={() => { setIsBulkGroupModalOpen(false); setBulkGroupId(''); }} title="Add Selected Devices to Group">
- <div className="space-y-5">
+ <form
+   noValidate
+   className="space-y-5"
+   onSubmit={(event) => {
+     event.preventDefault();
+     if (!bulkGroupSubmitDisabled) void handleBulkAssignGroup();
+   }}
+ >
  <p className="text-sm text-[var(--foreground-secondary)]">Add {selectedDeviceIds.size} selected device{selectedDeviceIds.size !== 1 ? 's' : ''} to a group.</p>
  <select value={bulkGroupId} onChange={(e) => setBulkGroupId(e.target.value)} className="eh-select" aria-label="Group to add devices to">
  <option value="">Select a group...</option>
  {deviceGroups.map((g: any) => (<option key={g.id} value={g.id}>{g.name}</option>))}
  </select>
  <div className="flex justify-end gap-3">
- <button onClick={() => { setIsBulkGroupModalOpen(false); setBulkGroupId(''); }} className="eh-btn-ghost eh-btn-sm min-h-[44px] rounded-xl px-4">Cancel</button>
- <button onClick={handleBulkAssignGroup} disabled={!bulkGroupId || actionLoading} className="eh-btn-neon eh-btn-sm min-h-[44px] rounded-xl px-4 disabled:opacity-50">Add to Group</button>
+ <button type="button" onClick={() => { setIsBulkGroupModalOpen(false); setBulkGroupId(''); }} className="eh-btn-ghost eh-btn-sm min-h-[44px] rounded-xl px-4">Cancel</button>
+ <button type="submit" disabled={bulkGroupSubmitDisabled} className="eh-btn-neon eh-btn-sm min-h-[44px] rounded-xl px-4 disabled:opacity-50">Add to Group</button>
  </div>
- </div>
+ </form>
  </Modal>
 
  {selectedDevice && (

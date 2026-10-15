@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Icon } from '@/theme/icons';
 
 export interface ContentTag {
@@ -13,7 +13,12 @@ interface ContentTaggerProps {
   tags: ContentTag[];
   selectedTags: string[];
   onChange: (tagIds: string[]) => void;
-  onCreateTag?: (name: string, color: string) => void;
+  /**
+   * May return a promise. If it rejects, the create form stays open with the
+   * operator's input intact (the caller is responsible for showing why — e.g.
+   * a 409 for a duplicate name); it only resets once creation succeeds.
+   */
+  onCreateTag?: (name: string, color: string) => void | Promise<unknown>;
   className?: string;
 }
 
@@ -56,6 +61,7 @@ export default function ContentTagger({
   const [isCreating, setIsCreating] = useState(false);
   const [newTagName, setNewTagName] = useState('');
   const [selectedColor, setSelectedColor] = useState(TAG_COLORS[0].name);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleToggleTag = (tagId: string) => {
     if (selectedTags.includes(tagId)) {
@@ -65,12 +71,24 @@ export default function ContentTagger({
     }
   };
 
-  const handleCreateTag = () => {
-    if (newTagName.trim() && onCreateTag) {
-      onCreateTag(newTagName, selectedColor);
-      setNewTagName('');
-      setSelectedColor(TAG_COLORS[0].name);
-      setIsCreating(false);
+  const resetCreateForm = () => {
+    setIsCreating(false);
+    setNewTagName('');
+    setSelectedColor(TAG_COLORS[0].name);
+  };
+
+  const handleCreateTag = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const name = newTagName.trim();
+    if (!name || !onCreateTag || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await onCreateTag(name, selectedColor);
+      resetCreateForm();
+    } catch {
+      // Keep the form open with the input intact; the caller reports the error.
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -90,6 +108,8 @@ export default function ContentTagger({
             return (
               <button
                 key={tag.id}
+                type="button"
+                aria-pressed={isSelected}
                 onClick={() => handleToggleTag(tag.id)}
                 className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
                   isSelected
@@ -109,15 +129,22 @@ export default function ContentTagger({
         <>
           {!isCreating ? (
             <button
+              type="button"
               onClick={() => setIsCreating(true)}
               className="px-3 py-1.5 rounded-full text-xs font-medium border-2 border-dashed border-[var(--border)] text-[var(--foreground-secondary)] hover:border-[var(--primary-ink)] hover:text-[var(--primary-ink)] transition"
             >
               + Add Tag
             </button>
           ) : (
-            <div className="border border-[var(--border)] rounded-lg p-3 space-y-2">
+            <form
+              onSubmit={handleCreateTag}
+              aria-label="Create tag"
+              className="border border-[var(--border)] rounded-lg p-3 space-y-2"
+            >
               <input
                 type="text"
+                aria-label="Tag name"
+                maxLength={50}
                 value={newTagName}
                 onChange={e => setNewTagName(e.target.value)}
                 placeholder="Tag name (e.g., Holiday, Promotion, Q4)"
@@ -126,10 +153,13 @@ export default function ContentTagger({
               />
 
               {/* Color Picker */}
-              <div className="flex gap-2">
+              <div className="flex gap-2" role="group" aria-label="Tag colour">
                 {TAG_COLORS.map(color => (
                   <button
                     key={color.name}
+                    type="button"
+                    aria-label={color.name}
+                    aria-pressed={selectedColor === color.name}
                     onClick={() => setSelectedColor(color.name)}
                     className={`w-6 h-6 rounded-full border-2 transition ${
                       selectedColor === color.name
@@ -144,24 +174,21 @@ export default function ContentTagger({
               {/* Action Buttons */}
               <div className="flex gap-2">
                 <button
-                  onClick={handleCreateTag}
-                  disabled={!newTagName.trim()}
+                  type="submit"
+                  disabled={!newTagName.trim() || isSubmitting}
                   className="flex-1 px-3 py-1.5 text-sm bg-[var(--primary)] text-[var(--primary-contrast)] rounded hover:bg-[var(--primary-light)] disabled:opacity-50 transition"
                 >
                   Create
                 </button>
                 <button
-                  onClick={() => {
-                    setIsCreating(false);
-                    setNewTagName('');
-                    setSelectedColor(TAG_COLORS[0].name);
-                  }}
+                  type="button"
+                  onClick={resetCreateForm}
                   className="flex-1 px-3 py-1.5 text-sm bg-[var(--background-tertiary)] text-[var(--foreground)] rounded hover:bg-[var(--surface-hover)] transition"
                 >
                   Cancel
                 </button>
               </div>
-            </div>
+            </form>
           )}
         </>
       )}

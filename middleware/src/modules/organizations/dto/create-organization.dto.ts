@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsObject, IsEnum } from 'class-validator';
+import { IsValidOrgSettings } from './org-settings.validator';
 
 export class CreateOrganizationDto {
   @IsString()
@@ -17,6 +18,7 @@ export class CreateOrganizationDto {
 
   @IsOptional()
   @IsObject()
+  @IsValidOrgSettings()
   settings?: Record<string, unknown>;
 
   @IsOptional()

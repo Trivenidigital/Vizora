@@ -133,4 +133,54 @@ describe('ContentLifecyclePanel', () => {
     await waitFor(() => expect(mockRestoreContentVersion).toHaveBeenCalledWith('c1-v1'));
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
   });
+
+  describe('Enter in the expiration row (panel sits inside the content edit form)', () => {
+    function renderInForm(onSubmit: jest.Mock) {
+      return render(
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSubmit();
+          }}
+        >
+          <ContentLifecyclePanel content={makeContent()} replacementCandidates={[]} onChanged={jest.fn()} />
+        </form>,
+      );
+    }
+
+    it('schedules the expiration instead of submitting the outer form', async () => {
+      const onSubmit = jest.fn();
+      mockSetContentExpiration.mockResolvedValue(makeContent());
+      renderInForm(onSubmit);
+      await waitFor(() => expect(mockGetContentVersions).toHaveBeenCalled());
+
+      const input = screen.getByLabelText('Expires at');
+      fireEvent.change(input, { target: { value: '2099-06-15T10:30' } });
+      // fireEvent returns false when the handler called preventDefault — that is
+      // what stops the browser's implicit submission of the enclosing form.
+      expect(fireEvent.keyDown(input, { key: 'Enter' })).toBe(false);
+
+      await waitFor(() => expect(mockSetContentExpiration).toHaveBeenCalledTimes(1));
+      expect(mockSetContentExpiration.mock.calls[0][0]).toBe('c1');
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it('swallows Enter without scheduling when no date is chosen', async () => {
+      const onSubmit = jest.fn();
+      renderInForm(onSubmit);
+      await waitFor(() => expect(mockGetContentVersions).toHaveBeenCalled());
+
+      expect(fireEvent.keyDown(screen.getByLabelText('Expires at'), { key: 'Enter' })).toBe(false);
+
+      expect(mockSetContentExpiration).not.toHaveBeenCalled();
+      expect(onSubmit).not.toHaveBeenCalled();
+    });
+
+    it('leaves other keys alone', async () => {
+      renderInForm(jest.fn());
+      await waitFor(() => expect(mockGetContentVersions).toHaveBeenCalled());
+
+      expect(fireEvent.keyDown(screen.getByLabelText('Expires at'), { key: 'Tab' })).toBe(true);
+    });
+  });
 });

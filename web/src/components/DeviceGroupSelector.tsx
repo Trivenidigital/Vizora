@@ -7,7 +7,6 @@ export interface DeviceGroup {
   id: string;
   name: string;
   description: string;
-  parentGroupId?: string;
   deviceIds: string[];
 }
 
@@ -54,35 +53,28 @@ export default function DeviceGroupSelector({
     return group.deviceIds.length;
   };
 
-  // Build hierarchical structure
-  const renderGroups = (parentId?: string, level = 0) => {
-    const childGroups = groups.filter(g => g.parentGroupId === parentId);
-
-    return childGroups.map(group => (
-      <div key={group.id} className="space-y-2">
-        <label className={`flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-[var(--surface-hover)] transition ${'ml-' + (level * 4)}`}>
-          <input
-            type="checkbox"
-            checked={selectedGroupIds.includes(group.id)}
-            onChange={() => handleToggleGroup(group.id)}
-            className="rounded border-[var(--border)] text-[var(--primary-ink)] focus:ring-[var(--primary-ink)]"
-          />
-          <div className="flex-1">
-            <div className="text-sm font-medium text-[var(--foreground)]">{group.name}</div>
-            <div className="text-xs text-[var(--foreground-tertiary)]">
-              {getGroupDeviceCount(group)} device{getGroupDeviceCount(group) !== 1 ? 's' : ''}
-            </div>
+  // Display groups are flat: DisplayGroup has no parent column and the API
+  // sends none. This used to recurse on a `parentGroupId` nothing ever set.
+  const renderGroups = () =>
+    groups.map(group => (
+      <label key={group.id} className="flex items-center gap-3 cursor-pointer p-2 rounded hover:bg-[var(--surface-hover)] transition">
+        <input
+          type="checkbox"
+          checked={selectedGroupIds.includes(group.id)}
+          onChange={() => handleToggleGroup(group.id)}
+          className="rounded border-[var(--border)] text-[var(--primary-ink)] focus:ring-[var(--primary-ink)]"
+        />
+        <div className="flex-1">
+          <div className="text-sm font-medium text-[var(--foreground)]">{group.name}</div>
+          <div className="text-xs text-[var(--foreground-tertiary)]">
+            {getGroupDeviceCount(group)} device{getGroupDeviceCount(group) !== 1 ? 's' : ''}
           </div>
-          {group.description && (
-            <Icon name="info" size="sm" title={group.description} />
-          )}
-        </label>
-
-        {/* Nested groups */}
-        {renderGroups(group.id, level + 1)}
-      </div>
+        </div>
+        {group.description && (
+          <Icon name="info" size="sm" title={group.description} />
+        )}
+      </label>
     ));
-  };
 
   return (
     <div className={`space-y-3 ${className}`}>

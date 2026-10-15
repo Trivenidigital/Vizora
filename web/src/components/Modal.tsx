@@ -54,6 +54,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
           <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)]">
             <h3 id={titleId} className="eh-dash-title text-lg">{title}</h3>
             <button
+              type="button"
               ref={closeButtonRef}
               onClick={onClose}
               className="eh-icon-btn"

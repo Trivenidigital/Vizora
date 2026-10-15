@@ -6,7 +6,7 @@ jest.mock('isomorphic-dompurify', () => ({
   },
 }));
 
-import { NotFoundException, BadRequestException, BadGatewayException } from '@nestjs/common';
+import { NotFoundException, BadRequestException, BadGatewayException, ConflictException } from '@nestjs/common';
 import { ContentService, TemplateMetadata } from './content.service';
 import { DatabaseService } from '../database/database.service';
 import { TemplateRenderingService } from './template-rendering.service';
@@ -93,6 +93,7 @@ describe('ContentService', () => {
       tag: {
         count: jest.fn(),
         findMany: jest.fn(),
+        create: jest.fn(),
       },
       contentTag: {
         createMany: jest.fn(),
@@ -601,13 +602,6 @@ describe('ContentService', () => {
       expect(mockDatabaseService.tag.findMany).toHaveBeenCalledWith({
         where: {
           organizationId: 'org-123',
-          content: {
-            some: {
-              content: {
-                organizationId: 'org-123',
-              },
-            },
-          },
         },
         select: {
           id: true,
@@ -633,6 +627,74 @@ describe('ContentService', () => {
         { id: 'tag-menu', name: 'Menu', color: 'green', contentCount: 2 },
         { id: 'tag-promo', name: 'Promo', color: null, contentCount: 1 },
       ]);
+    });
+
+    it('should include tags with no content attached, so a new tag can be applied', async () => {
+      mockDatabaseService.tag.findMany.mockResolvedValue([
+        { id: 'tag-new', name: 'New', color: 'pink', _count: { content: 0 } },
+      ]);
+
+      const result = await service.listContentTags('org-123');
+
+      const where = mockDatabaseService.tag.findMany.mock.calls[0][0].where;
+      expect(where).not.toHaveProperty('content');
+      expect(result).toEqual([
+        { id: 'tag-new', name: 'New', color: 'pink', contentCount: 0 },
+      ]);
+    });
+  });
+
+  describe('createContentTag', () => {
+    it('should create the tag inside the caller org', async () => {
+      mockDatabaseService.tag.create.mockResolvedValue({
+        id: 'tag-1',
+        name: 'Holiday',
+        color: 'red',
+      });
+
+      const result = await service.createContentTag('org-123', { name: 'Holiday', color: 'red' });
+
+      expect(mockDatabaseService.tag.create).toHaveBeenCalledWith({
+        data: { organizationId: 'org-123', name: 'Holiday', color: 'red' },
+        select: { id: true, name: true, color: true },
+      });
+      expect(result).toEqual({ id: 'tag-1', name: 'Holiday', color: 'red', contentCount: 0 });
+    });
+
+    it('should take the org only from the principal, never from the payload', async () => {
+      mockDatabaseService.tag.create.mockResolvedValue({ id: 'tag-1', name: 'X', color: null });
+
+      await service.createContentTag('org-a', { name: 'X', organizationId: 'org-b' } as any);
+
+      expect(mockDatabaseService.tag.create.mock.calls[0][0].data.organizationId).toBe('org-a');
+    });
+
+    it('should persist a null colour when none is given', async () => {
+      mockDatabaseService.tag.create.mockResolvedValue({ id: 'tag-1', name: 'X', color: null });
+
+      await service.createContentTag('org-123', { name: 'X' });
+
+      expect(mockDatabaseService.tag.create.mock.calls[0][0].data.color).toBeNull();
+    });
+
+    it('should map a duplicate name (P2002) to 409 Conflict', async () => {
+      mockDatabaseService.tag.create.mockRejectedValue(
+        Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }),
+      );
+
+      await expect(service.createContentTag('org-123', { name: 'Promo' })).rejects.toThrow(
+        ConflictException,
+      );
+      await expect(service.createContentTag('org-123', { name: 'Promo' })).rejects.toThrow(
+        'A tag named "Promo" already exists',
+      );
+    });
+
+    it('should rethrow any other database error unchanged', async () => {
+      const dbError = new Error('connection lost');
+      mockDatabaseService.tag.create.mockRejectedValue(dbError);
+
+      await expect(service.createContentTag('org-123', { name: 'Promo' })).rejects.toBe(dbError);
     });
   });
 

@@ -282,3 +282,64 @@ export function extractFieldErrors(zodError: z.ZodError): Record<string, string>
     return acc;
   }, {} as Record<string, string>);
 }
+
+/**
+ * Organization default content duration, in seconds. Mirrors the middleware's
+ * `ORG_DEFAULT_DURATION_MIN/MAX_SECONDS` (organizations/dto/org-settings.validator.ts),
+ * which in turn matches the per-item playlist duration bound — change all
+ * together.
+ */
+export const DEFAULT_DURATION_MIN_SECONDS = 1;
+export const DEFAULT_DURATION_MAX_SECONDS = 86400;
+
+/**
+ * Returns an error message, or null when valid. NaN (an emptied number input)
+ * is rejected rather than saved: JSON serialises it as `null`.
+ */
+export function validateDefaultDuration(value: number): string | null {
+  if (!Number.isFinite(value)) return 'Enter a default duration in seconds';
+  if (!Number.isInteger(value)) return 'Default duration must be a whole number of seconds';
+  if (value < DEFAULT_DURATION_MIN_SECONDS || value > DEFAULT_DURATION_MAX_SECONDS) {
+    return `Default duration must be between ${DEFAULT_DURATION_MIN_SECONDS} and ${DEFAULT_DURATION_MAX_SECONDS} seconds`;
+  }
+  return null;
+}
+
+/**
+ * Alert-rule recipient target, per channel. Mirrors the middleware's
+ * `IsValidRecipientTarget` + `CreateRecipientDto` (notifications/alert-rules/dto)
+ * — change together. The server is still the authority; this exists because a
+ * production 400 hides its message, so a typo'd address otherwise surfaced as a
+ * generic failure with no hint which recipient was wrong. Email shape is zod's
+ * check, the same one every other email field here uses — close to, not
+ * byte-identical with, the server's validator.js isEmail.
+ */
+export const ALERT_RECIPIENT_TARGET_MAX_LENGTH = 2000;
+// Mirrors SLACK_WEBHOOK_REGEX in alert-rule.types.ts.
+export const SLACK_WEBHOOK_URL_PATTERN = /^https:\/\/hooks\.slack\.com\/services\//;
+
+const recipientEmail = z.string().email();
+
+export function validateAlertRecipientTarget(
+  channel: 'in_app' | 'email' | 'slack_webhook',
+  target: string,
+): string | null {
+  const value = target.trim();
+  if (value.length > ALERT_RECIPIENT_TARGET_MAX_LENGTH) {
+    return `Must be at most ${ALERT_RECIPIENT_TARGET_MAX_LENGTH} characters`;
+  }
+  switch (channel) {
+    case 'in_app':
+      return value ? null : 'Choose a team member';
+    case 'email':
+      if (!value) return 'Enter an email address';
+      return recipientEmail.safeParse(value).success ? null : 'Enter a valid email address';
+    case 'slack_webhook':
+      if (!value) return 'Enter a Slack webhook URL';
+      return SLACK_WEBHOOK_URL_PATTERN.test(value)
+        ? null
+        : 'Slack webhook must start with https://hooks.slack.com/services/';
+    default:
+      return 'Choose a recipient type';
+  }
+}

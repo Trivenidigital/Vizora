@@ -8,6 +8,7 @@ import Modal from '@/components/Modal';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import EmptyState from '@/components/EmptyState';
+import SearchFilter from '@/components/SearchFilter';
 import TimePicker from '@/components/TimePicker';
 import DaySelector from '@/components/DaySelector';
 import dynamic from 'next/dynamic';
@@ -40,7 +41,6 @@ interface Schedule {
  days?: string[];
  deviceIds?: string[];
  duration?: number;
- timezone?: string;
  active?: boolean;
 }
 
@@ -99,6 +99,14 @@ const getScheduleActiveState = (schedule: Schedule): boolean => {
  return schedule.isActive ?? schedule.active ?? false;
 };
 
+type ScheduleStatusFilter = 'all' | 'active' | 'inactive';
+
+const STATUS_FILTER_LABEL: Record<ScheduleStatusFilter, string> = {
+ all: 'All',
+ active: 'Active',
+ inactive: 'Inactive',
+};
+
 const dateToIso = (date?: Date | string | null): string | undefined => {
  if (!date) return undefined;
  return typeof date === 'string' ? new Date(date).toISOString() : date.toISOString();
@@ -133,6 +141,10 @@ export default function SchedulesClient() {
  const conflictRequestCacheRef = useRef<Map<string, Promise<any[]>>>(new Map());
  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
  const [loadError, setLoadError] = useState<string | null>(null);
+ // Filtering is client-side: loadData walks every page via fetchAllPaginated,
+ // so `schedules` is the whole organization's list, not one page of it.
+ const [searchQuery, setSearchQuery] = useState('');
+ const [statusFilter, setStatusFilter] = useState<ScheduleStatusFilter>('all');
 
  // Modal states
  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -146,7 +158,6 @@ export default function SchedulesClient() {
  startTime: '09:00',
  duration: 60,
  days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
- timezone: 'America/New_York',
  playlistId: '',
  deviceIds: [] as string[],
  });
@@ -318,8 +329,6 @@ export default function SchedulesClient() {
  deviceIds: s.displayId ? [s.displayId] : s.displayGroupId ? [s.displayGroupId] : [],
  // Calculate duration from integer startTime and endTime
  duration: calculateDuration(s.startTime as number | undefined, s.endTime as number | undefined),
- // Default timezone
- timezone: 'America/New_York',
  // Map isActive to active for UI compatibility
  active: s.isActive,
  }));
@@ -449,7 +458,6 @@ export default function SchedulesClient() {
  days: dayNumbersToNames(createdSchedule.daysOfWeek || []),
  deviceIds: createdSchedule.displayId ? [createdSchedule.displayId] : createdSchedule.displayGroupId ? [createdSchedule.displayGroupId] : [],
  duration: calculateDuration(createdSchedule.startTime, createdSchedule.endTime),
- timezone: formData.timezone,
  active: createdSchedule.isActive,
  }));
 
@@ -491,7 +499,6 @@ export default function SchedulesClient() {
  days: dayNumbersToNames(updatedSchedule.daysOfWeek || []),
  deviceIds: updatedSchedule.displayId ? [updatedSchedule.displayId] : updatedSchedule.displayGroupId ? [updatedSchedule.displayGroupId] : [],
  duration: calculateDuration(updatedSchedule.startTime, updatedSchedule.endTime),
- timezone: formData.timezone,
  active: updatedSchedule.isActive,
  };
 
@@ -535,7 +542,6 @@ export default function SchedulesClient() {
  startTime: schedule.startTime != null ? minutesToHHMM(schedule.startTime) : '09:00',
  duration: schedule.duration || 60,
  days: schedule.days || [],
- timezone: schedule.timezone || 'UTC',
  playlistId: schedule.playlistId,
  deviceIds: schedule.deviceIds || [],
  });
@@ -557,7 +563,6 @@ export default function SchedulesClient() {
  startTime: '09:00',
  duration: 60,
  days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
- timezone: 'America/New_York',
  playlistId: '',
  deviceIds: [],
  });
@@ -584,7 +589,6 @@ export default function SchedulesClient() {
  days: dayNumbersToNames(duplicatedSchedule.daysOfWeek || []),
  deviceIds: duplicatedSchedule.displayId ? [duplicatedSchedule.displayId] : duplicatedSchedule.displayGroupId ? [duplicatedSchedule.displayGroupId] : [],
  duration: calculateDuration(duplicatedSchedule.startTime, duplicatedSchedule.endTime),
- timezone: schedule.timezone || 'UTC',
  active: duplicatedSchedule.isActive,
  };
  setSchedules((prev) => [uiSchedule, ...prev]);
@@ -674,6 +678,23 @@ export default function SchedulesClient() {
  return occurrences;
  };
 
+ const normalizedSearch = searchQuery.trim().toLowerCase();
+ const visibleSchedules = schedules.filter((schedule) => {
+ if (normalizedSearch && !(schedule.name || '').toLowerCase().includes(normalizedSearch)) return false;
+ if (statusFilter === 'active') return getScheduleActiveState(schedule);
+ if (statusFilter === 'inactive') return !getScheduleActiveState(schedule);
+ return true;
+ });
+ const statusCounts: Record<ScheduleStatusFilter, number> = {
+ all: schedules.length,
+ active: schedules.filter((schedule) => getScheduleActiveState(schedule)).length,
+ inactive: schedules.filter((schedule) => !getScheduleActiveState(schedule)).length,
+ };
+ const clearFilters = () => {
+ setSearchQuery('');
+ setStatusFilter('all');
+ };
+
  if (loading) {
  return (
  <div className="bg-[var(--surface)] rounded-lg shadow p-12">
@@ -741,10 +762,37 @@ export default function SchedulesClient() {
  </div>
  )}
 
+ {schedules.length > 0 && (
+ <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+ <div className="flex-1">
+ <SearchFilter
+ value={searchQuery}
+ onChange={setSearchQuery}
+ placeholder="Search schedules by name..."
+ ariaLabel="Search schedules by name"
+ />
+ </div>
+ <div className="flex flex-wrap gap-2" role="group" aria-label="Filter schedules by status">
+ {(Object.keys(STATUS_FILTER_LABEL) as ScheduleStatusFilter[]).map((status) => (
+ <button
+ key={status}
+ type="button"
+ onClick={() => setStatusFilter(status)}
+ aria-pressed={statusFilter === status}
+ className="eh-fleet-chip"
+ >
+ <span className="eh-fleet-chip-count">{statusCounts[status]}</span>
+ {STATUS_FILTER_LABEL[status]}
+ </button>
+ ))}
+ </div>
+ </div>
+ )}
+
  {/* Content Area */}
  {viewMode === 'calendar' ? (
  <ScheduleCalendar
- schedules={schedules}
+ schedules={visibleSchedules}
  onSelectEvent={(schedule) => openEditModal(schedule)}
  onSelectSlot={(slotInfo) => {
  if (!permissions.canManageSchedules) return;
@@ -772,10 +820,18 @@ export default function SchedulesClient() {
  onClick: openCreateModal,
  } : undefined}
  />
+ ) : schedules.length > 0 && visibleSchedules.length === 0 ? (
+ /* Filtered-empty is not empty: the schedules exist, the filters hide them. */
+ <EmptyState
+ icon="search"
+ title="No schedules match these filters"
+ description={`${schedules.length} schedule${schedules.length !== 1 ? 's exist' : ' exists'}, but none match the current search or status filter.`}
+ action={{ label: 'Clear filters', onClick: clearFilters }}
+ />
  ) : (
  /* Schedules List */
  <div className="space-y-4">
- {schedules.map(schedule => {
+ {visibleSchedules.map(schedule => {
  const scheduleActive = getScheduleActiveState(schedule);
  const targetDescription = getScheduleTargetDescription(schedule);
  return (
@@ -884,6 +940,16 @@ export default function SchedulesClient() {
  }}
  title={selectedSchedule ? 'Edit Schedule' : 'Create Schedule'}
  size="lg"
+ >
+ <form
+   noValidate
+   onSubmit={(event) => {
+     event.preventDefault();
+     // The button is disabled only while in flight; validation stays in the
+     // handlers, which render the inline errors and never reach the API.
+     if (actionLoading) return;
+     void (selectedSchedule ? handleUpdate() : handleCreate());
+   }}
  >
  <div className="space-y-6 max-h-[75vh] overflow-y-auto">
  {/* Name */}
@@ -1136,8 +1202,7 @@ export default function SchedulesClient() {
  Cancel
  </button>
  <button
- type="button"
- onClick={selectedSchedule ? handleUpdate : handleCreate}
+ type="submit"
  disabled={actionLoading}
  className="eh-btn-neon rounded-xl px-4 py-2 disabled:opacity-60 transition flex items-center gap-2"
  >
@@ -1150,6 +1215,7 @@ export default function SchedulesClient() {
  {selectedSchedule ? 'Update' : 'Create'}
  </button>
  </div>
+ </form>
  </Modal>
  )}
 

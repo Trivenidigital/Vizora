@@ -67,14 +67,8 @@ test.describe('In-App Notifications (Wave 4)', () => {
       const bellButton = authenticatedPage.locator('button[aria-label*="notification" i], [data-testid="notification-bell"]').first();
       await bellButton.click();
 
-      // Either empty state or notifications
-      const emptyState = authenticatedPage.locator('text=/no notifications|all caught up|empty/i').first();
-      const notificationItem = authenticatedPage.locator('[data-testid="notification-item"], .notification-item').first();
-
-      const hasEmpty = await emptyState.isVisible({ timeout: 5000 }).catch(() => false);
-      const hasItems = await notificationItem.isVisible({ timeout: 3000 }).catch(() => false);
-
-      expect(hasEmpty || hasItems).toBeTruthy();
+      // A brand-new org has no notifications: assert the empty state.
+      await expect(authenticatedPage.getByText('No notifications', { exact: true })).toBeVisible({ timeout: 5000 });
     });
 
     test('should mark all notifications as read', async ({ authenticatedPage, token }) => {

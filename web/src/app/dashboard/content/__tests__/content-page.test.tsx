@@ -1,4 +1,5 @@
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import ContentClient from '../page-client';
 
 const mockGetContent = jest.fn();
@@ -12,6 +13,10 @@ const mockDeleteContent = jest.fn();
 const mockBulkDeleteContent = jest.fn();
 const mockBulkArchiveContent = jest.fn();
 const mockBulkSetContentDuration = jest.fn();
+const mockCreateContentTag = jest.fn();
+const mockBulkTagContent = jest.fn();
+const mockUpdateFolder = jest.fn();
+const mockDeleteFolder = jest.fn();
 const mockGetContentVersions = jest.fn().mockResolvedValue([]);
 const mockSetContentExpiration = jest.fn();
 const mockClearContentExpiration = jest.fn();
@@ -40,6 +45,10 @@ jest.mock('@/lib/api', () => ({
     bulkDeleteContent: (...args: any[]) => mockBulkDeleteContent(...args),
     bulkArchiveContent: (...args: any[]) => mockBulkArchiveContent(...args),
     bulkSetContentDuration: (...args: any[]) => mockBulkSetContentDuration(...args),
+    createContentTag: (...args: any[]) => mockCreateContentTag(...args),
+    bulkTagContent: (...args: any[]) => mockBulkTagContent(...args),
+    updateFolder: (...args: any[]) => mockUpdateFolder(...args),
+    deleteFolder: (...args: any[]) => mockDeleteFolder(...args),
     getContentVersions: (...args: any[]) => mockGetContentVersions(...args),
     setContentExpiration: (...args: any[]) => mockSetContentExpiration(...args),
     clearContentExpiration: (...args: any[]) => mockClearContentExpiration(...args),
@@ -167,7 +176,7 @@ jest.mock('@/components/PreviewModal', () => {
 });
 
 jest.mock('@/components/ConfirmDialog', () => {
-  return function MockConfirm({ isOpen, onClose, onConfirm, title }: any) {
+  return function MockConfirm({ isOpen, onClose, onConfirm, title, message }: any) {
     const handleConfirm = async () => {
       try {
         await onConfirm();
@@ -180,6 +189,7 @@ jest.mock('@/components/ConfirmDialog', () => {
     return isOpen ? (
       <div data-testid="confirm-dialog">
         <span>{title}</span>
+        {message && <p data-testid="confirm-message">{message}</p>}
         <button onClick={handleConfirm}>Confirm</button>
       </div>
     ) : null;
@@ -193,7 +203,7 @@ jest.mock('@/components/SearchFilter', () => {
 });
 
 jest.mock('@/components/ContentTagger', () => {
-  return function MockTagger({ tags, selectedTags, onChange }: any) {
+  return function MockTagger({ tags, selectedTags, onChange, onCreateTag }: any) {
     return (
       <div data-testid="content-tagger">
         {tags.map((tag: any) => (
@@ -201,6 +211,17 @@ jest.mock('@/components/ContentTagger', () => {
             Select {tag.name} Tag
           </button>
         ))}
+        {onCreateTag && (
+          <button
+            type="button"
+            onClick={() => {
+              // The real tagger swallows the rejection and keeps its form open.
+              Promise.resolve(onCreateTag('New Tag', 'pink')).catch(() => {});
+            }}
+          >
+            Create New Tag
+          </button>
+        )}
         <span data-testid="selected-tags">{selectedTags.join(',')}</span>
       </div>
     );
@@ -208,11 +229,20 @@ jest.mock('@/components/ContentTagger', () => {
 });
 
 jest.mock('@/components/FolderTree', () => {
-  return function MockFolderTree({ onSelectFolder }: any) {
+  const folder = { id: 'folder-1', name: 'Menus', parentId: null };
+  return function MockFolderTree({ onSelectFolder, onRenameFolder, onDeleteFolder }: any) {
     return (
-      <button data-testid="select-folder" onClick={() => onSelectFolder('folder-1')}>
-        Select Folder
-      </button>
+      <div>
+        <button data-testid="select-folder" onClick={() => onSelectFolder('folder-1')}>
+          Select Folder
+        </button>
+        {onRenameFolder && (
+          <button type="button" onClick={() => onRenameFolder(folder)}>Rename Folder Menus</button>
+        )}
+        {onDeleteFolder && (
+          <button type="button" onClick={() => onDeleteFolder(folder)}>Delete Folder Menus</button>
+        )}
+      </div>
     );
   };
 });
@@ -306,6 +336,10 @@ describe('ContentClient', () => {
     mockBulkDeleteContent.mockResolvedValue({ deleted: 0, failed: 0, failedIds: [] });
     mockBulkArchiveContent.mockResolvedValue({ archived: 0 });
     mockBulkSetContentDuration.mockResolvedValue({ updated: 0 });
+    mockCreateContentTag.mockResolvedValue({ id: 'tag-new', name: 'New Tag', color: 'pink', contentCount: 0 });
+    mockBulkTagContent.mockResolvedValue({ added: 0 });
+    mockUpdateFolder.mockResolvedValue({ id: 'folder-1', name: 'Renamed' });
+    mockDeleteFolder.mockResolvedValue(undefined);
     mockGetContentVersions.mockResolvedValue([]);
     mockSetContentExpiration.mockResolvedValue(sampleContent[0]);
     mockClearContentExpiration.mockResolvedValue(sampleContent[0]);
@@ -1743,5 +1777,243 @@ describe('ContentClient', () => {
     });
     expect(screen.getByText('Retry 1 Failed')).toBeInTheDocument();
     expect(screen.getByText('Network timeout')).toBeInTheDocument();
+  });
+  describe('content tags', () => {
+    const selectFirstTwoItems = async () => {
+      const itemCheckboxes = screen.getAllByRole('checkbox');
+      await act(async () => {
+        fireEvent.click(itemCheckboxes[0]);
+        fireEvent.click(itemCheckboxes[1]);
+      });
+    };
+
+    it('leads an empty tag panel to the create control and creates a tag', async () => {
+      mockGetContentTags.mockResolvedValueOnce([]).mockResolvedValue([
+        { id: 'tag-new', name: 'New Tag', color: 'pink', contentCount: 0 },
+      ]);
+      render(<ContentClient />);
+      await waitForInitialRequestsToSettle();
+
+      fireEvent.click(screen.getByText(/^Tags/));
+      expect(
+        screen.getByText('No content tags yet. Create one here, then select content and choose Tag to apply it.'),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/Add tags to content before using tag filters/)).not.toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Create New Tag' }));
+      });
+
+      expect(mockCreateContentTag).toHaveBeenCalledWith('New Tag', 'pink');
+      await waitFor(() => {
+        expect(mockToast.success).toHaveBeenCalledWith('Tag "New Tag" created');
+      });
+      expect(mockGetContentTags).toHaveBeenCalledTimes(2);
+      await waitFor(() => {
+        expect(screen.getByText('Select New Tag Tag')).toBeInTheDocument();
+      });
+    });
+
+    it('surfaces the API message when the tag name is taken', async () => {
+      mockCreateContentTag.mockRejectedValueOnce(new Error('A tag named "New Tag" already exists'));
+      render(<ContentClient />);
+      await waitForInitialRequestsToSettle();
+
+      fireEvent.click(screen.getByText(/^Tags/));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Create New Tag' }));
+      });
+
+      await waitFor(() => {
+        expect(mockToast.error).toHaveBeenCalledWith('A tag named "New Tag" already exists');
+      });
+    });
+
+    it('does not offer viewers tag creation', async () => {
+      mockUser = { ...mockUser, role: 'viewer' };
+      mockGetContentTags.mockResolvedValue([]);
+      render(<ContentClient />);
+      await waitForInitialRequestsToSettle();
+
+      fireEvent.click(screen.getByText(/^Tags/));
+      expect(screen.getByText('No content tags yet. An admin or manager can create them.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Create New Tag' })).not.toBeInTheDocument();
+    });
+
+    it('applies the chosen tags to the selected content via the bulk endpoint', async () => {
+      mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+      render(<ContentClient />);
+      await waitFor(() => {
+        expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+      });
+      await waitForAuxiliaryRequestsToSettle();
+      await selectFirstTwoItems();
+
+      fireEvent.click(screen.getByRole('button', { name: /^tag Tag$/ }));
+      expect(screen.getByRole('heading', { name: 'Tag Selected Content' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Add to Selected' })).toBeDisabled();
+
+      fireEvent.click(screen.getByText('Select Marketing Tag'));
+      mockGetContent.mockClear();
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Add to Selected' }));
+      });
+
+      expect(mockBulkTagContent).toHaveBeenCalledWith(['c1', 'c2'], ['1'], 'add');
+      await waitFor(() => {
+        expect(mockToast.success).toHaveBeenCalledWith('Added 1 tag to 2 items');
+      });
+      expect(screen.queryByRole('heading', { name: 'Tag Selected Content' })).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(mockGetContent).toHaveBeenCalled();
+      });
+    });
+
+    it('removes the chosen tags from the selected content', async () => {
+      mockGetContent.mockResolvedValue({ data: sampleContent, meta: { total: 3 } });
+      render(<ContentClient />);
+      await waitFor(() => {
+        expect(screen.getByText('Welcome Banner')).toBeInTheDocument();
+      });
+      await waitForAuxiliaryRequestsToSettle();
+      await selectFirstTwoItems();
+
+      fireEvent.click(screen.getByRole('button', { name: /^tag Tag$/ }));
+      fireEvent.click(screen.getByText('Select Marketing Tag'));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Remove from Selected' }));
+      });
+
+      expect(mockBulkTagContent).toHaveBeenCalledWith(['c1', 'c2'], ['1'], 'remove');
+      await waitFor(() => {
+        expect(mockToast.success).toHaveBeenCalledWith('Removed 1 tag from 2 items');
+      });
+    });
+  });
+
+  describe('folder rename and delete', () => {
+    it('renames a folder through a submittable form', async () => {
+      render(<ContentClient />);
+      await waitForInitialRequestsToSettle();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Rename Folder Menus' }));
+      const input = screen.getByLabelText('Folder Name');
+      expect(input).toHaveValue('Menus');
+      fireEvent.change(input, { target: { value: '  Breakfast Menus  ' } });
+      mockGetFolders.mockClear();
+
+      await act(async () => {
+        fireEvent.submit(input.closest('form')!);
+      });
+
+      expect(mockUpdateFolder).toHaveBeenCalledWith('folder-1', { name: 'Breakfast Menus' });
+      expect(mockToast.success).toHaveBeenCalledWith('Folder renamed');
+      expect(mockGetFolders).toHaveBeenCalled();
+      expect(screen.queryByRole('heading', { name: 'Rename Folder' })).not.toBeInTheDocument();
+    });
+
+    it('keeps the rename form open and shows the API error on failure', async () => {
+      mockUpdateFolder.mockRejectedValueOnce(new Error('Folder name too long'));
+      render(<ContentClient />);
+      await waitForInitialRequestsToSettle();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Rename Folder Menus' }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+      });
+
+      expect(mockToast.error).toHaveBeenCalledWith('Folder name too long');
+      expect(screen.getByRole('heading', { name: 'Rename Folder' })).toBeInTheDocument();
+    });
+
+    it('states that deleting a folder moves its content up, and resets a deleted selection to root', async () => {
+      render(<ContentClient />);
+      await waitForInitialRequestsToSettle();
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('select-folder'));
+      });
+      await waitFor(() => {
+        expect(mockGetFolderContent).toHaveBeenCalledWith('folder-1', expect.anything());
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Folder Menus' }));
+      expect(screen.getByTestId('confirm-message')).toHaveTextContent(
+        'Delete the folder "Menus"? No content is deleted: everything in it, including any subfolders, moves to the top level (All Content).',
+      );
+
+      mockGetContent.mockClear();
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+      });
+
+      expect(mockDeleteFolder).toHaveBeenCalledWith('folder-1');
+      expect(mockToast.success).toHaveBeenCalledWith('Folder "Menus" deleted');
+      // Selection is back at root, so the root listing is fetched again.
+      await waitFor(() => {
+        expect(mockGetContent).toHaveBeenCalled();
+      });
+      expect(screen.queryByTestId('confirm-dialog')).not.toBeInTheDocument();
+    });
+
+    it('keeps the delete confirmation open and surfaces the API message on failure', async () => {
+      mockDeleteFolder.mockRejectedValueOnce(new Error('Folder not found'));
+      render(<ContentClient />);
+      await waitForInitialRequestsToSettle();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Delete Folder Menus' }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+      });
+
+      expect(mockToast.error).toHaveBeenCalledWith('Folder not found');
+      expect(screen.getByTestId('confirm-dialog')).toBeInTheDocument();
+    });
+
+    it('does not give viewers folder rename or delete', async () => {
+      mockUser = { ...mockUser, role: 'viewer' };
+      render(<ContentClient />);
+      await waitForInitialRequestsToSettle();
+
+      expect(screen.queryByRole('button', { name: 'Rename Folder Menus' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Delete Folder Menus' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Edit Content dialog and Enter', () => {
+    const openEdit = async () => {
+      mockGetContent.mockResolvedValue({
+        data: [sampleContent[0]],
+        meta: { page: 1, limit: 50, total: 1, totalPages: 1 },
+      });
+      render(<ContentClient />);
+      await waitFor(() => expect(screen.getByText('Welcome Banner')).toBeInTheDocument());
+      await waitForAuxiliaryRequestsToSettle();
+      fireEvent.click(screen.getByText('Edit'));
+      await waitFor(() => expect(screen.getByText('Edit Content')).toBeInTheDocument());
+    };
+
+    it('saves when Enter is pressed in the title field', async () => {
+      const user = userEvent.setup();
+      await openEdit();
+
+      const title = screen.getByPlaceholderText('e.g., Summer Sale Banner');
+      await user.clear(title);
+      await user.type(title, 'Lobby Banner{Enter}');
+
+      await waitFor(() => {
+        expect(mockUpdateContent).toHaveBeenCalledWith('c1', expect.objectContaining({ title: 'Lobby Banner' }));
+      });
+    });
+
+    it('does not save the title/duration form on Enter in a lifecycle field', async () => {
+      const user = userEvent.setup();
+      await openEdit();
+
+      await user.type(screen.getByLabelText('Expires at'), '{Enter}');
+
+      expect(mockUpdateContent).not.toHaveBeenCalled();
+      expect(screen.getByText('Edit Content')).toBeInTheDocument();
+    });
   });
 });

@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import userEvent from '@testing-library/user-event';
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), refresh: jest.fn() }),
@@ -114,5 +115,154 @@ describe('AlertsPage', () => {
     fireEvent.click(screen.getByText('Delete'));
     fireEvent.click(screen.getByText('Delete Rule'));
     await waitFor(() => expect(mockDeleteAlertRule).toHaveBeenCalledWith('rule-1'));
+  });
+
+  describe('rule dialog submits on Enter', () => {
+    const NAME_PLACEHOLDER = 'e.g. Lobby screens offline';
+
+    const openEdit = async () => {
+      render(<AlertsPage />);
+      await waitFor(() => expect(screen.getByText('Lobby offline')).toBeInTheDocument());
+      fireEvent.click(screen.getByText('Edit'));
+      expect(screen.getByText('Edit Alert Rule')).toBeInTheDocument();
+    };
+
+    it('saves the rule when Enter is pressed in the rule name field', async () => {
+      mockUpdateAlertRule.mockResolvedValue({ ...sampleRule, name: 'Lobby screens down' });
+      const user = userEvent.setup();
+      await openEdit();
+
+      const name = screen.getByPlaceholderText(NAME_PLACEHOLDER);
+      await user.clear(name);
+      await user.type(name, 'Lobby screens down{Enter}');
+
+      await waitFor(() => {
+        expect(mockUpdateAlertRule).toHaveBeenCalledWith(
+          'rule-1',
+          expect.objectContaining({ name: 'Lobby screens down' }),
+        );
+      });
+      expect(mockUpdateAlertRule).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not save when submitted with an empty rule name', async () => {
+      await openEdit();
+
+      const name = screen.getByPlaceholderText(NAME_PLACEHOLDER);
+      fireEvent.change(name, { target: { value: '  ' } });
+      fireEvent.submit(name.closest('form')!);
+
+      expect(mockUpdateAlertRule).not.toHaveBeenCalled();
+    });
+
+    it('adds the recipient, and does not save the rule, on Enter in the new-recipient field', async () => {
+      mockAddRecipient.mockResolvedValue({
+        id: 'rec-2',
+        alertRuleId: 'rule-1',
+        channel: 'email',
+        target: 'oncall@example.com',
+        createdAt: '',
+      });
+      const user = userEvent.setup();
+      await openEdit();
+
+      // The add-recipient row is the only channel select still on its default.
+      fireEvent.change(screen.getByDisplayValue('In-app notification'), { target: { value: 'email' } });
+      await user.type(screen.getByPlaceholderText('alerts@example.com'), 'oncall@example.com{Enter}');
+
+      await waitFor(() => {
+        expect(mockAddRecipient).toHaveBeenCalledWith('rule-1', {
+          channel: 'email',
+          target: 'oncall@example.com',
+        });
+      });
+      expect(mockUpdateAlertRule).not.toHaveBeenCalled();
+    });
+
+    it('does nothing on Enter in an empty new-recipient field', async () => {
+      const user = userEvent.setup();
+      await openEdit();
+
+      fireEvent.change(screen.getByDisplayValue('In-app notification'), { target: { value: 'email' } });
+      await user.type(screen.getByPlaceholderText('alerts@example.com'), '{Enter}');
+
+      expect(mockAddRecipient).not.toHaveBeenCalled();
+      expect(mockUpdateAlertRule).not.toHaveBeenCalled();
+    });
+  });
+
+  // A production 400 hides its message, so a recipient the server would reject
+  // must be caught here and named inline — before any request is sent.
+  describe('recipient targets are checked against the server rule before sending', () => {
+    const NAME_PLACEHOLDER = 'e.g. Lobby screens offline';
+
+    const openCreateWithName = async () => {
+      render(<AlertsPage />);
+      await waitFor(() => expect(screen.getByText('Lobby offline')).toBeInTheDocument());
+      fireEvent.click(screen.getByText('New Alert Rule'));
+      fireEvent.change(screen.getByPlaceholderText(NAME_PLACEHOLDER), { target: { value: 'Lobby down' } });
+    };
+
+    const setDraftChannel = (channel: string) =>
+      fireEvent.change(screen.getByDisplayValue('In-app notification'), { target: { value: channel } });
+
+    it("shows an inline error for a typo'd email and does not create the rule", async () => {
+      await openCreateWithName();
+      setDraftChannel('email');
+      const target = screen.getByPlaceholderText('alerts@example.com');
+      fireEvent.change(target, { target: { value: 'ops@example' } });
+      fireEvent.click(screen.getByText('Create Rule'));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Enter a valid email address');
+      expect(target).toHaveAttribute('aria-invalid', 'true');
+      expect(target).toHaveAccessibleDescription('Enter a valid email address');
+      expect(mockCreateAlertRule).not.toHaveBeenCalled();
+    });
+
+    it('clears the error when the address is corrected, then creates the rule', async () => {
+      mockCreateAlertRule.mockResolvedValue({ ...sampleRule, id: 'rule-2' });
+      await openCreateWithName();
+      setDraftChannel('email');
+      const target = screen.getByPlaceholderText('alerts@example.com');
+      fireEvent.change(target, { target: { value: 'ops@example' } });
+      fireEvent.click(screen.getByText('Create Rule'));
+      await screen.findByRole('alert');
+
+      fireEvent.change(target, { target: { value: 'ops@example.com' } });
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByText('Create Rule'));
+
+      await waitFor(() =>
+        expect(mockCreateAlertRule).toHaveBeenCalledWith(
+          expect.objectContaining({ recipients: [{ channel: 'email', target: 'ops@example.com' }] }),
+        ),
+      );
+    });
+
+    it('rejects a Slack URL that is not a hooks.slack.com/services webhook', async () => {
+      await openCreateWithName();
+      setDraftChannel('slack_webhook');
+      fireEvent.change(screen.getByPlaceholderText('https://hooks.slack.com/services/…'), {
+        target: { value: 'https://example.com/hook' },
+      });
+      fireEvent.click(screen.getByText('Create Rule'));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Slack webhook must start with https://hooks.slack.com/services/',
+      );
+      expect(mockCreateAlertRule).not.toHaveBeenCalled();
+    });
+
+    it('rejects an invalid address added to an existing rule, without calling the API', async () => {
+      render(<AlertsPage />);
+      await waitFor(() => expect(screen.getByText('Lobby offline')).toBeInTheDocument());
+      fireEvent.click(screen.getByText('Edit'));
+      setDraftChannel('email');
+      fireEvent.change(screen.getByPlaceholderText('alerts@example.com'), { target: { value: 'not-an-email' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('Enter a valid email address');
+      expect(mockAddRecipient).not.toHaveBeenCalled();
+    });
   });
 });

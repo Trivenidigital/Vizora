@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import {
+  validateAlertRecipientTarget,
+  ALERT_RECIPIENT_TARGET_MAX_LENGTH,
   contentUploadSchema,
   loginSchema,
   registerSchema,
@@ -8,6 +10,9 @@ import {
   validateField,
   validateForm,
   extractFieldErrors,
+  validateDefaultDuration,
+  DEFAULT_DURATION_MIN_SECONDS,
+  DEFAULT_DURATION_MAX_SECONDS,
 } from '../validation';
 
 describe('contentUploadSchema', () => {
@@ -436,5 +441,56 @@ describe('extractFieldErrors', () => {
     const emptyZodError = new z.ZodError([]);
     const errors = extractFieldErrors(emptyZodError);
     expect(errors).toEqual({});
+  });
+});
+
+describe('validateDefaultDuration', () => {
+  it('matches the middleware bound (1..86400 seconds)', () => {
+    expect(DEFAULT_DURATION_MIN_SECONDS).toBe(1);
+    expect(DEFAULT_DURATION_MAX_SECONDS).toBe(86400);
+  });
+
+  it.each([1, 30, 86400])('accepts %p', (value) => {
+    expect(validateDefaultDuration(value)).toBeNull();
+  });
+
+  it('rejects NaN, which is what an emptied number input parses to', () => {
+    expect(validateDefaultDuration(parseInt('', 10))).toBe('Enter a default duration in seconds');
+    expect(validateDefaultDuration(Number.NaN)).toBe('Enter a default duration in seconds');
+  });
+
+  it.each([0, -1, 86401])('rejects out-of-range %p', (value) => {
+    expect(validateDefaultDuration(value)).toBe('Default duration must be between 1 and 86400 seconds');
+  });
+
+  it('rejects a fractional value instead of silently truncating it', () => {
+    expect(validateDefaultDuration(1.5)).toBe('Default duration must be a whole number of seconds');
+  });
+});
+
+describe('validateAlertRecipientTarget (mirrors the server IsValidRecipientTarget)', () => {
+  it.each([
+    ['in_app', 'user-1'],
+    ['email', 'ops@example.com'],
+    ['email', '  ops@example.com  '],
+    ['slack_webhook', 'https://hooks.slack.com/services/T000/B000/XXXX'],
+  ] as const)('accepts %s %j', (channel, target) => {
+    expect(validateAlertRecipientTarget(channel, target)).toBeNull();
+  });
+
+  it.each([
+    ['in_app', '', 'Choose a team member'],
+    ['email', '', 'Enter an email address'],
+    ['email', 'ops@example', 'Enter a valid email address'],
+    ['email', 'ops.example.com', 'Enter a valid email address'],
+    ['slack_webhook', 'http://hooks.slack.com/services/T000', 'Slack webhook must start with https://hooks.slack.com/services/'],
+    ['slack_webhook', 'https://hooks.slack.com/workflows/T000', 'Slack webhook must start with https://hooks.slack.com/services/'],
+  ] as const)('rejects %s %j', (channel, target, message) => {
+    expect(validateAlertRecipientTarget(channel, target)).toBe(message);
+  });
+
+  it('rejects a target longer than the server MaxLength', () => {
+    const long = 'https://hooks.slack.com/services/' + 'x'.repeat(ALERT_RECIPIENT_TARGET_MAX_LENGTH);
+    expect(validateAlertRecipientTarget('slack_webhook', long)).toMatch(/at most 2000/);
   });
 });

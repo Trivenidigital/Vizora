@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, Logger, ServiceUnavailableException, BadGatewayException, HttpException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger, ServiceUnavailableException, BadGatewayException, HttpException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Prisma } from '@vizora/database';
 import { DatabaseService } from '../database/database.service';
@@ -9,6 +9,7 @@ import { CreateTemplateDto } from './dto/create-template.dto';
 import { UpdateTemplateDto } from './dto/update-template.dto';
 import { PreviewTemplateDto } from './dto/preview-template.dto';
 import { BulkUpdateDto, BulkArchiveDto, BulkRestoreDto, BulkDeleteDto, BulkTagDto, BulkDurationDto } from './dto/bulk-operations.dto';
+import { CreateTagDto } from './dto/create-tag.dto';
 import { PaginationDto, PaginatedResponse } from '../common/dto/pagination.dto';
 import { CronLeaderService } from '../common/services/cron-leader.service';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -194,17 +195,19 @@ export class ContentService {
     return new PaginatedResponse(mappedData, total, page, limit);
   }
 
+  /**
+   * Every tag in the org, with how many of the org's content items carry it.
+   *
+   * Deliberately NOT filtered to tags already attached to content: tags are
+   * created empty (`createContentTag`) and applied afterwards via the bulk
+   * endpoint, so a used-only listing would hide a freshly created tag from the
+   * very picker needed to apply it. Tags are one org-wide namespace shared with
+   * displays, so a display-only tag appears here with `contentCount: 0`.
+   */
   async listContentTags(organizationId: string) {
     const tags = await this.db.tag.findMany({
       where: {
         organizationId,
-        content: {
-          some: {
-            content: {
-              organizationId,
-            },
-          },
-        },
       },
       select: {
         id: true,
@@ -233,6 +236,27 @@ export class ContentService {
       color: tag.color,
       contentCount: tag._count.content,
     }));
+  }
+
+  async createContentTag(organizationId: string, dto: CreateTagDto) {
+    try {
+      const tag = await this.db.tag.create({
+        data: {
+          organizationId,
+          name: dto.name,
+          color: dto.color ?? null,
+        },
+        select: { id: true, name: true, color: true },
+      });
+      return { ...tag, contentCount: 0 };
+    } catch (error) {
+      // @@unique([organizationId, name]) — a duplicate is the operator's
+      // conflict to resolve, never a 500.
+      if ((error as { code?: string })?.code === 'P2002') {
+        throw new ConflictException(`A tag named "${dto.name}" already exists`);
+      }
+      throw error;
+    }
   }
 
   /**

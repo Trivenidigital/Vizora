@@ -1,13 +1,10 @@
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsOptional, IsString } from 'class-validator';
+import { toBooleanQuery } from '../../common/dto/boolean-query.transform';
 
 export class ListTagRulesQueryDto {
   @IsOptional()
-  @Transform(({ value }) => {
-    if (value === 'true' || value === true) return true;
-    if (value === 'false' || value === false) return false;
-    return value;
-  })
+  @Transform(toBooleanQuery)
   @IsBoolean()
   isActive?: boolean;
 
