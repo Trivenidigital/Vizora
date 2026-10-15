@@ -151,6 +151,22 @@ export async function tagContent(
   await sendOk(page, token, 'POST', '/content/bulk/tags', { contentIds, tagIds, operation: 'add' });
 }
 
+export async function seedDisplayGroup(
+  page: Page,
+  token: string,
+  opts: { name?: string; description?: string; displayIds?: string[] } = {},
+): Promise<Seeded> {
+  const group = await sendOk(page, token, 'POST', '/display-groups', {
+    name: opts.name ?? `E2E Group ${stamp()}`,
+    ...(opts.description ? { description: opts.description } : {}),
+  });
+  expect(group.id, 'created group must carry an id').toBeTruthy();
+  if (opts.displayIds?.length) {
+    await sendOk(page, token, 'POST', `/display-groups/${group.id}/displays`, { displayIds: opts.displayIds });
+  }
+  return { id: group.id, name: group.name };
+}
+
 export async function seedFolder(
   page: Page,
   token: string,
