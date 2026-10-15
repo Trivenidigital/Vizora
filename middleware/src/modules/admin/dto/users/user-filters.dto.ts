@@ -1,5 +1,6 @@
 import { IsString, IsOptional, IsInt, Min, IsIn, IsBoolean } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+import { toBooleanQuery } from '../../../common/dto/boolean-query.transform';
 
 export class UserFiltersDto {
   @IsInt()
@@ -25,12 +26,12 @@ export class UserFiltersDto {
 
   @IsBoolean()
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(toBooleanQuery)
   isActive?: boolean;
 
   @IsBoolean()
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(toBooleanQuery)
   isSuperAdmin?: boolean;
 
   @IsString()
