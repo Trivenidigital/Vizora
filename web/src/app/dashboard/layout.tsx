@@ -158,10 +158,16 @@ export default function DashboardLayout({
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-4">
               <button
+                type="button"
                 onClick={() => setSidebarOpen(!sidebarOpen)}
+                // A fixed name; aria-expanded carries the open/closed state.
+                aria-label="Navigation menu"
+                aria-expanded={sidebarOpen}
+                aria-controls="dashboard-sidebar"
                 className="p-2 rounded-md text-[var(--foreground-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--surface-hover)] transition lg:hidden"
               >
                 <svg
+                  aria-hidden="true"
                   className="w-6 h-6"
                   fill="none"
                   stroke="currentColor"
@@ -307,6 +313,7 @@ export default function DashboardLayout({
           active item had no ground, only a left rule.
         */}
         <aside
+          id="dashboard-sidebar"
           className={`${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           } fixed lg:relative lg:translate-x-0 w-56 bg-[var(--background-secondary)] min-h-[calc(100vh-4rem)] border-r border-[var(--border)] transition-transform duration-300 ease-in-out z-20`}
