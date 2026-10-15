@@ -132,6 +132,25 @@ describe('AuditLogClient', () => {
     });
   });
 
+  it('associates every filter label with its control', async () => {
+    render(<AuditLogClient />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Start Date')).toBeInTheDocument();
+    });
+
+    expect(screen.getByLabelText('Action').tagName).toBe('SELECT');
+    expect(screen.getByLabelText('Entity Type').tagName).toBe('SELECT');
+    expect(screen.getByLabelText('User').tagName).toBe('SELECT');
+    expect(screen.getByLabelText('Start Date')).toHaveAttribute('type', 'date');
+    expect(screen.getByLabelText('End Date')).toHaveAttribute('type', 'date');
+
+    // No orphan labels anywhere on the page.
+    for (const label of Array.from(document.querySelectorAll('label'))) {
+      expect((label as HTMLLabelElement).control).not.toBeNull();
+    }
+  });
+
   it('renders table headers', async () => {
     render(<AuditLogClient />);
 

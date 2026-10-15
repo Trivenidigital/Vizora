@@ -226,10 +226,11 @@ export default function AuditLogClient() {
  <div className="bg-[var(--surface)] rounded-lg shadow p-4">
  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
  <div>
- <label className="block text-xs font-medium text-[var(--foreground-tertiary)] uppercase mb-1">
+ <label htmlFor="audit-filter-action" className="block text-xs font-medium text-[var(--foreground-tertiary)] uppercase mb-1">
  Action
  </label>
  <select
+ id="audit-filter-action"
  value={actionFilter}
  onChange={(e) => setActionFilter(e.target.value)}
  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-sm text-[var(--foreground)]"
@@ -242,10 +243,11 @@ export default function AuditLogClient() {
  </select>
  </div>
  <div>
- <label className="block text-xs font-medium text-[var(--foreground-tertiary)] uppercase mb-1">
+ <label htmlFor="audit-filter-entity-type" className="block text-xs font-medium text-[var(--foreground-tertiary)] uppercase mb-1">
  Entity Type
  </label>
  <select
+ id="audit-filter-entity-type"
  value={entityTypeFilter}
  onChange={(e) => setEntityTypeFilter(e.target.value)}
  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-sm text-[var(--foreground)]"
@@ -258,10 +260,11 @@ export default function AuditLogClient() {
  </select>
  </div>
  <div>
- <label className="block text-xs font-medium text-[var(--foreground-tertiary)] uppercase mb-1">
+ <label htmlFor="audit-filter-user" className="block text-xs font-medium text-[var(--foreground-tertiary)] uppercase mb-1">
  User
  </label>
  <select
+ id="audit-filter-user"
  value={userIdFilter}
  onChange={(e) => setUserIdFilter(e.target.value)}
  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-sm text-[var(--foreground)]"
@@ -275,10 +278,11 @@ export default function AuditLogClient() {
  </select>
  </div>
  <div>
- <label className="block text-xs font-medium text-[var(--foreground-tertiary)] uppercase mb-1">
+ <label htmlFor="audit-filter-start-date" className="block text-xs font-medium text-[var(--foreground-tertiary)] uppercase mb-1">
  Start Date
  </label>
  <input
+ id="audit-filter-start-date"
  type="date"
  value={startDate}
  onChange={(e) => setStartDate(e.target.value)}
@@ -286,10 +290,11 @@ export default function AuditLogClient() {
  />
  </div>
  <div>
- <label className="block text-xs font-medium text-[var(--foreground-tertiary)] uppercase mb-1">
+ <label htmlFor="audit-filter-end-date" className="block text-xs font-medium text-[var(--foreground-tertiary)] uppercase mb-1">
  End Date
  </label>
  <input
+ id="audit-filter-end-date"
  type="date"
  value={endDate}
  onChange={(e) => setEndDate(e.target.value)}
