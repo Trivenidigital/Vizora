@@ -17,7 +17,7 @@ module.exports = {
     // 400'd), `?flag=false` implicit-converted to `true`, and @ValidateNested
     // received plain objects, so nested DTOs were never validated. ts-jest does
     // not bundle, so no unit test could see it. Guarded by
-    // scripts/ops/assert-middleware-bundle-externals.ts (CI build job).
+    // scripts/ops/assert-bundle-externals.ts (CI build job).
     ({ request }, callback) => {
       if (request === 'class-transformer/storage') {
         return callback(undefined, 'commonjs class-transformer/cjs/storage.js');

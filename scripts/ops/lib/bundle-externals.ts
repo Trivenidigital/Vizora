@@ -1,6 +1,6 @@
 /**
- * Packages that MUST be require()d from node_modules by the middleware bundle,
- * never inlined into it.
+ * Packages that MUST be require()d from node_modules by the middleware and
+ * realtime bundles, never inlined into them.
  *
  * class-transformer keeps its decorator metadata in a module-local store. The
  * Nest ValidationPipe lives in the EXTERNAL @nestjs/common and require()s the

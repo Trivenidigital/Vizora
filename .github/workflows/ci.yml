@@ -438,7 +438,7 @@ jobs:
       # A bundled class-transformer silently disables every DTO @Type/@Transform
       # (see scripts/ops/lib/bundle-externals.ts). Unit tests cannot see it.
       - name: Assert middleware bundle externals
-        run: npx tsx scripts/ops/assert-middleware-bundle-externals.ts middleware/dist/main.js
+        run: npx tsx scripts/ops/assert-bundle-externals.ts middleware/dist/main.js
 
       - name: Build web
         env:
@@ -509,6 +509,11 @@ jobs:
 
       - name: Build realtime
         run: npx nx build @vizora/realtime
+
+      # Same gate for realtime: a bundled class-transformer stripped the nested
+      # `command` from every internal device command (whitelist + inert @Type).
+      - name: Assert realtime bundle externals
+        run: npx tsx scripts/ops/assert-bundle-externals.ts realtime/dist/main.js
 
       - name: Build display client
         working-directory: display
