@@ -71,4 +71,24 @@ describe('DeviceGroupSelector', () => {
     fireEvent.click(screen.getByText('Create'));
     expect(onCreateGroup).toHaveBeenCalledWith('New Group', '');
   });
+
+  it('renders every group as a flat list, in order, with no nesting indentation', () => {
+    render(<DeviceGroupSelector {...defaultProps} />);
+    const checkboxes = screen.getAllByRole('checkbox');
+    expect(checkboxes).toHaveLength(2);
+    expect(checkboxes[0].closest('label')).toHaveTextContent('Lobby Screens');
+    expect(checkboxes[1].closest('label')).toHaveTextContent('Conference Rooms');
+    for (const checkbox of checkboxes) {
+      expect(checkbox.closest('label')!.className).not.toMatch(/ml-/);
+    }
+  });
+
+  it('never hides a group behind a parent id (DisplayGroup has no hierarchy)', () => {
+    // The old recursion only rendered groups whose parentGroupId matched an
+    // ancestor, so a stray parent id made a group silently disappear.
+    const strayParent = { ...mockGroups[1], parentGroupId: 'missing-parent' } as unknown as DeviceGroup;
+    render(<DeviceGroupSelector {...defaultProps} groups={[mockGroups[0], strayParent]} />);
+    expect(screen.getByText('Conference Rooms')).toBeInTheDocument();
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2);
+  });
 });
