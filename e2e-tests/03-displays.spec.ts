@@ -40,18 +40,11 @@ test.describe('Display Management', () => {
     const pairingRes = await authenticatedPage.request.post('http://localhost:3000/api/v1/devices/pairing/request', {
       headers: { Authorization: `Bearer ${token}` },
       data: { deviceIdentifier: `e2e-gate-${Date.now()}` },
-    }).catch(() => null);
+    });
 
-    if (!pairingRes || !pairingRes.ok()) {
-      test.info().annotations.push({
-        type: 'skipped-branch',
-        description: `pairing request failed (status ${pairingRes?.status() ?? 'no response'}) — pairing form not exercised`,
-      });
-      await authenticatedPage.goto('/dashboard/devices/pair');
-      await authenticatedPage.waitForLoadState('networkidle');
-      await expect(authenticatedPage.locator('h2').filter({ hasText: /pair/i })).toBeVisible();
-      return;
-    }
+    // Setup failure FAILS: a pairing request that does not succeed used to
+    // send the test down a fallback that only checked a heading.
+    expect(pairingRes.ok(), `pairing request failed: ${pairingRes.status()} ${await pairingRes.text()}`).toBeTruthy();
 
     const pairing = await readData(pairingRes);
     expect(pairing.code, 'pairing response must carry a code').toBeTruthy();
