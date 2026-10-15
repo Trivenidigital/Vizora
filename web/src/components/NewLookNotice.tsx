@@ -76,11 +76,16 @@ import { useEffect, useState } from 'react';
  * mount, so the polite live region still does the one job D2 asks for: the user
  * is TOLD, once.
  *
- * What did change is navigability, which the overlay never had. The title is an
- * `<h2>` now rather than a styled `<p>`, so the notice appears in the heading
- * outline and a screen-reader user can reach it again after the announcement has
- * passed — which matters more for persistent content than for a card that used
- * to sit outside the document's reading order.
+ * The title is a styled `<p>`, NOT an `<h2>`. It was briefly an `<h2>`, on the
+ * reasoning that persistent content should stay reachable from the heading
+ * outline after the announcement has passed — sound in general, wrong here,
+ * because this component is mounted in the dashboard LAYOUT. That put a second
+ * `<h2>` above the `<h2>` page title of EVERY dashboard page ("Dashboard
+ * Overview" and the rest), so each page advertised two headings at the same
+ * level and the outline stopped saying which one was the page. The live region
+ * is what carries the announcement — `role="status"` + `aria-live="polite"` is
+ * announced with no heading at all — so dropping the heading costs this notice
+ * nothing and gives every page its single unambiguous title back.
  */
 const SEEN_KEY = 'vizora_new_look_seen';
 
@@ -115,7 +120,13 @@ export function NewLookNotice() {
       className="mb-6 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:flex sm:items-center sm:justify-between sm:gap-4"
     >
       <div className="min-w-0">
-        <h2 className="text-sm font-semibold text-[var(--foreground)]">Vizora has a new look</h2>
+        {/*
+          A <p>, not an <h2>: this component is mounted in the dashboard layout, so a
+          heading here would sit above every page's own <h2> title and leave two
+          same-level headings per page. The role="status" live region already
+          announces the notice without one.
+        */}
+        <p className="text-sm font-semibold text-[var(--foreground)]">Vizora has a new look</p>
         <p className="mt-1 text-sm text-[var(--foreground-secondary)]">
           We&apos;ve refreshed the interface with a lighter, calmer design. Your data and settings
           are unchanged.

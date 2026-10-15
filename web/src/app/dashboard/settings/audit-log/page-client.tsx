@@ -16,6 +16,14 @@ interface FilterUser {
  lastName: string;
 }
 
+/*
+ * Values must match what the services actually WRITE (grep `action: '` under
+ * middleware/src/modules). This list offered `login`/`logout` while auth.service
+ * writes `user_login`/`user_logout`, and omitted `user_registered` entirely, so
+ * filtering by Login returned nothing for a user who had just logged in. That was
+ * invisible until 2026-10-09 because EVERY filter on this page 400'd before
+ * reaching the query (see AuditLogQueryDto).
+ */
 const ACTION_OPTIONS = [
  { value: '', label: 'All Actions' },
  { value: 'user_invited', label: 'User Invited' },
@@ -30,8 +38,10 @@ const ACTION_OPTIONS = [
  { value: 'playlist_created', label: 'Playlist Created' },
  { value: 'playlist_updated', label: 'Playlist Updated' },
  { value: 'playlist_deleted', label: 'Playlist Deleted' },
- { value: 'login', label: 'Login' },
- { value: 'logout', label: 'Logout' },
+ { value: 'user_registered', label: 'User Registered' },
+ { value: 'user_login', label: 'Login' },
+ { value: 'user_logout', label: 'Logout' },
+ { value: 'password_reset', label: 'Password Reset' },
 ];
 
 const ENTITY_TYPE_OPTIONS = [

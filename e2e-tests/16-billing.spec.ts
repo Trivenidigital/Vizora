@@ -65,9 +65,29 @@ test.describe('Billing & Subscriptions (Wave 7)', () => {
       await authenticatedPage.goto('/dashboard/settings/billing/plans');
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Check for price displays ($0, $29, $99)
-      await expect(authenticatedPage.locator('text=/\\$0|free/i').first()).toBeVisible({ timeout: 10000 });
-      await expect(authenticatedPage.locator('text=/\\$29|\\$99/i').first()).toBeVisible({ timeout: 5000 });
+      /*
+       * $29 / $99 were never this product's prices. Amounts and currency are
+       * server-side (PLAN_TIERS, per the org's country) and plan-card.tsx renders
+       * them through Intl.NumberFormat — en-US or en-IN — plus a /month or /year
+       * suffix. So assert the SHAPE every card must render, not an amount:
+       *   a formatted currency amount with its interval, or the two labels that
+       *   legitimately carry no number ("Free" at price 0, "Custom" for enterprise).
+       * An empty or missing price block still fails.
+       */
+      const planCards = authenticatedPage.locator('div[class*="lg:grid-cols-4"] > div');
+      await expect(planCards.first()).toBeVisible({ timeout: 10000 });
+
+      const cardCount = await planCards.count();
+      expect(cardCount).toBeGreaterThan(0);
+
+      for (let i = 0; i < cardCount; i++) {
+        const card = planCards.nth(i);
+        // Plan name, then the price block that directly follows it.
+        await expect(card.getByRole('heading', { level: 3 })).toBeVisible({ timeout: 10000 });
+        await expect(card.locator('h3 + div')).toHaveText(
+          /^(Free|Custom|\D{1,4}\s?[\d,]+(\.\d{2})?\s*\/\s*(month|year))$/,
+        );
+      }
     });
 
     test('should show screen limits for each plan', async ({ authenticatedPage }) => {

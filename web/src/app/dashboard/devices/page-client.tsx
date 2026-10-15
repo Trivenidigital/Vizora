@@ -177,7 +177,7 @@ export default function DevicesClient({
  const hasCompleteInitialPlaylists = initialPlaylistsComplete ?? initialPlaylists.length > 0;
 
  // Memoized callback for device status changes
- const handleDeviceStatusChange = useCallback((update: { deviceId: string; status: DisplayStatus; lastSeen?: string; currentPlaylistId?: string }) => {
+ const handleDeviceStatusChange = useCallback((update: { deviceId: string; status: DisplayStatus; lastSeen?: string | null; currentPlaylistId?: string }) => {
  setDevices((prev) =>
  prev.map((d) =>
  d.id === update.deviceId

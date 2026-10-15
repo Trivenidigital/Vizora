@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuditLogController } from './audit-log.controller';
 import { AuditLogService } from './audit-log.service';
+import { AuditLogQueryDto } from './dto/audit-log-query.dto';
 
 describe('AuditLogController', () => {
   let controller: AuditLogController;
@@ -35,21 +36,17 @@ describe('AuditLogController', () => {
       };
       mockAuditLogService.findAll.mockResolvedValue(expectedResult as any);
 
-      const result = await controller.findAll(organizationId, pagination as any);
+      const result = await controller.findAll(organizationId, { ...pagination });
 
       expect(result).toEqual(expectedResult);
-      expect(mockAuditLogService.findAll).toHaveBeenCalledWith(
-        organizationId,
-        pagination,
-        { action: undefined, entityType: undefined, userId: undefined, startDate: undefined, endDate: undefined },
-      );
+      expect(mockAuditLogService.findAll).toHaveBeenCalledWith(organizationId, pagination, {});
     });
 
     it('should pass action filter', async () => {
       const expectedResult = { data: [], meta: { page: 1, limit: 10, total: 0, totalPages: 0 } };
       mockAuditLogService.findAll.mockResolvedValue(expectedResult as any);
 
-      await controller.findAll(organizationId, pagination as any, 'user_invited');
+      await controller.findAll(organizationId, { ...pagination, action: 'user_invited' });
 
       expect(mockAuditLogService.findAll).toHaveBeenCalledWith(
         organizationId,
@@ -62,7 +59,7 @@ describe('AuditLogController', () => {
       const expectedResult = { data: [], meta: { page: 1, limit: 10, total: 0, totalPages: 0 } };
       mockAuditLogService.findAll.mockResolvedValue(expectedResult as any);
 
-      await controller.findAll(organizationId, pagination as any, undefined, 'user');
+      await controller.findAll(organizationId, { ...pagination, entityType: 'user' });
 
       expect(mockAuditLogService.findAll).toHaveBeenCalledWith(
         organizationId,
@@ -75,7 +72,7 @@ describe('AuditLogController', () => {
       const expectedResult = { data: [], meta: { page: 1, limit: 10, total: 0, totalPages: 0 } };
       mockAuditLogService.findAll.mockResolvedValue(expectedResult as any);
 
-      await controller.findAll(organizationId, pagination as any, undefined, undefined, 'user-1');
+      await controller.findAll(organizationId, { ...pagination, userId: 'user-1' });
 
       expect(mockAuditLogService.findAll).toHaveBeenCalledWith(
         organizationId,
@@ -88,15 +85,11 @@ describe('AuditLogController', () => {
       const expectedResult = { data: [], meta: { page: 1, limit: 10, total: 0, totalPages: 0 } };
       mockAuditLogService.findAll.mockResolvedValue(expectedResult as any);
 
-      await controller.findAll(
-        organizationId,
-        pagination as any,
-        undefined,
-        undefined,
-        undefined,
-        '2026-01-01',
-        '2026-01-31',
-      );
+      await controller.findAll(organizationId, {
+        ...pagination,
+        startDate: '2026-01-01',
+        endDate: '2026-01-31',
+      });
 
       expect(mockAuditLogService.findAll).toHaveBeenCalledWith(
         organizationId,
@@ -109,15 +102,14 @@ describe('AuditLogController', () => {
       const expectedResult = { data: [], meta: { page: 1, limit: 10, total: 0, totalPages: 0 } };
       mockAuditLogService.findAll.mockResolvedValue(expectedResult as any);
 
-      await controller.findAll(
-        organizationId,
-        pagination as any,
-        'user_updated',
-        'user',
-        'user-1',
-        '2026-01-01',
-        '2026-01-31',
-      );
+      await controller.findAll(organizationId, {
+        ...pagination,
+        action: 'user_updated',
+        entityType: 'user',
+        userId: 'user-1',
+        startDate: '2026-01-01',
+        endDate: '2026-01-31',
+      });
 
       expect(mockAuditLogService.findAll).toHaveBeenCalledWith(
         organizationId,
@@ -130,6 +122,52 @@ describe('AuditLogController', () => {
           endDate: '2026-01-31',
         },
       );
+    });
+
+    // REGRESSION PIN. Every audit-log filter used to be declared as a bare
+    // `@Query('action')` parameter beside `@Query() pagination: PaginationDto`.
+    // Because the global ValidationPipe runs with whitelist + forbidNonWhitelisted,
+    // PaginationDto validated the WHOLE query object and any filter key was an
+    // unknown property, so `?startDate=2026-10-10` returned
+    // 400 ["property startDate should not exist"] -- every filter was dead.
+    // The fix is that the filters are DECLARED on AuditLogQueryDto. This test is
+    // typed as that DTO, so dropping a field from it breaks compilation here, and
+    // it asserts each declared filter is forwarded rather than silently discarded.
+    it('forwards every filter declared on AuditLogQueryDto to the service instead of dropping it', async () => {
+      mockAuditLogService.findAll.mockResolvedValue({
+        data: [],
+        meta: { page: 2, limit: 50, total: 0, totalPages: 0 },
+      } as any);
+
+      const query: AuditLogQueryDto = {
+        page: 2,
+        limit: 50,
+        action: 'content_deleted',
+        entityType: 'content',
+        userId: 'user-9',
+        startDate: '2026-10-01',
+        endDate: '2026-10-10',
+      };
+
+      await controller.findAll(organizationId, query);
+
+      expect(mockAuditLogService.findAll).toHaveBeenCalledWith(
+        organizationId,
+        { page: 2, limit: 50 },
+        {
+          action: 'content_deleted',
+          entityType: 'content',
+          userId: 'user-9',
+          startDate: '2026-10-01',
+          endDate: '2026-10-10',
+        },
+      );
+
+      // Not just "shape matches": prove nothing was dropped on the way through.
+      const filters = mockAuditLogService.findAll.mock.calls[0][2] as Record<string, unknown>;
+      for (const key of ['action', 'entityType', 'userId', 'startDate', 'endDate'] as const) {
+        expect(filters[key]).toBe(query[key]);
+      }
     });
   });
 });

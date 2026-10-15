@@ -1,4 +1,23 @@
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/auth.fixture';
+
+/**
+ * Open the create dialog and return it, scoped by its accessible name.
+ *
+ * A bare `[role="dialog"], .modal` resolves to three elements on this page — the
+ * real modal, the always-mounted cookie-consent bar and a dev overlay — which is
+ * a strict-mode violation rather than a product fault. The modal is rendered by
+ * components/Modal.tsx, which labels it with its title, so the role query picks
+ * out exactly one. Scoping the field lookups to it also keeps them off the
+ * page's other inputs.
+ */
+async function openCreateKeyDialog(page: Page): Promise<Locator> {
+  await page.getByRole('button', { name: 'Create API Key' }).first().click();
+
+  const dialog = page.getByRole('dialog', { name: 'Create API Key' });
+  await expect(dialog).toBeVisible({ timeout: 5000 });
+  return dialog;
+}
 
 test.describe('API Key Management (Wave 6)', () => {
   test.describe('API Keys Settings Page', () => {
@@ -34,23 +53,22 @@ test.describe('API Key Management (Wave 6)', () => {
       await authenticatedPage.goto('/dashboard/settings/api-keys');
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Click create button
-      await authenticatedPage.click('button:has-text("Create"), button:has-text("New"), button:has-text("Generate")');
+      const dialog = await openCreateKeyDialog(authenticatedPage);
 
-      // Modal should open
-      const modal = authenticatedPage.locator('[role="dialog"], .modal, [data-testid="create-key-modal"]');
-      await expect(modal).toBeVisible({ timeout: 5000 });
+      // The dialog is the create form, not just any overlay.
+      await expect(dialog.getByLabel(/key name/i)).toBeVisible();
     });
 
     test('should have name input in create modal', async ({ authenticatedPage }) => {
       await authenticatedPage.goto('/dashboard/settings/api-keys');
       await authenticatedPage.waitForLoadState('networkidle');
 
-      await authenticatedPage.click('button:has-text("Create"), button:has-text("New"), button:has-text("Generate")');
+      const dialog = await openCreateKeyDialog(authenticatedPage);
 
-      // Name input should be present
-      const nameInput = authenticatedPage.locator('input[name="name"], input[placeholder*="name" i]').first();
+      // The field is `#api-key-name` with an associated <label>Key Name</label>.
+      const nameInput = dialog.getByLabel(/key name/i);
       await expect(nameInput).toBeVisible({ timeout: 5000 });
+      await expect(nameInput).toHaveAttribute('id', 'api-key-name');
     });
 
     test('should have scopes selection in create modal', async ({ authenticatedPage }) => {
@@ -73,24 +91,27 @@ test.describe('API Key Management (Wave 6)', () => {
       await authenticatedPage.goto('/dashboard/settings/api-keys');
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Click create button
-      await authenticatedPage.click('button:has-text("Create"), button:has-text("New"), button:has-text("Generate")');
+      const keyName = `Test Key ${Date.now()}`;
+      const dialog = await openCreateKeyDialog(authenticatedPage);
 
-      // Fill name
-      const nameInput = authenticatedPage.locator('input[name="name"], input[placeholder*="name" i]').first();
-      await nameInput.fill(`Test Key ${Date.now()}`);
+      await dialog.getByLabel(/key name/i).fill(keyName);
 
-      // Submit
-      await authenticatedPage.click('button[type="submit"], button:has-text("Create"), button:has-text("Generate")');
+      const submit = dialog.getByRole('button', { name: 'Create Key' });
+      await expect(submit).toBeEnabled();
+      await submit.click();
 
-      // Should show the key (only shown once)
-      const keyDisplay = authenticatedPage.locator('text=/vz_|sk_|copy|your api key/i').first();
-      const copyButton = authenticatedPage.locator('button').filter({ hasText: /copy/i }).first();
+      // The dialog closes and the plaintext key is surfaced once, with a copy
+      // control, in the "New API Key Created" banner.
+      await expect(dialog).toBeHidden({ timeout: 10000 });
 
-      const hasKeyDisplay = await keyDisplay.isVisible({ timeout: 10000 }).catch(() => false);
-      const hasCopyButton = await copyButton.isVisible({ timeout: 5000 }).catch(() => false);
-
-      expect(hasKeyDisplay || hasCopyButton).toBeTruthy();
+      const banner = authenticatedPage
+        .getByRole('heading', { name: new RegExp(`New API Key Created: ${keyName}`) })
+        .locator('xpath=..');
+      await expect(banner).toBeVisible({ timeout: 10000 });
+      // `code` and the copy control are scoped to the banner: the page has other
+      // <code> blocks (the key-prefix column and the usage docs).
+      await expect(banner.locator('code')).toHaveText(/^vz_live_\S{16,}$/);
+      await expect(banner.getByRole('button', { name: /copy/i })).toBeVisible();
     });
   });
 
@@ -100,27 +121,17 @@ test.describe('API Key Management (Wave 6)', () => {
       await authenticatedPage.goto('/dashboard/settings/api-keys');
       await authenticatedPage.waitForLoadState('networkidle');
 
-      await authenticatedPage.click('button:has-text("Create"), button:has-text("New"), button:has-text("Generate")');
-      const nameInput = authenticatedPage.locator('input[name="name"], input[placeholder*="name" i]').first();
-      await nameInput.fill(`Revoke Test ${Date.now()}`);
-      await authenticatedPage.click('button[type="submit"], button:has-text("Create"), button:has-text("Generate")');
+      const dialog = await openCreateKeyDialog(authenticatedPage);
+      await dialog.getByLabel(/key name/i).fill(`Revoke Test ${Date.now()}`);
+      await dialog.getByRole('button', { name: 'Create Key' }).click();
 
-      // Close modal if still open
-      await authenticatedPage.keyboard.press('Escape');
-      await authenticatedPage.waitForTimeout(500);
+      // The product closes the dialog itself on success and reloads the list.
+      await expect(dialog).toBeHidden({ timeout: 10000 });
 
-      // Look for revoke button
-      const revokeButton = authenticatedPage.locator('button').filter({ hasText: /revoke|delete|remove/i }).first();
-      const hasRevoke = await revokeButton.isVisible({ timeout: 5000 }).catch(() => false);
-
-      // Either has revoke button or the key list needs refresh
-      if (!hasRevoke) {
-        await authenticatedPage.reload();
-        await authenticatedPage.waitForLoadState('networkidle');
-      }
-
-      const revokeButtonAfterRefresh = authenticatedPage.locator('button').filter({ hasText: /revoke|delete|remove/i }).first();
-      await expect(revokeButtonAfterRefresh).toBeVisible({ timeout: 5000 });
+      const revokeButton = authenticatedPage
+        .getByRole('button', { name: /revoke/i })
+        .first();
+      await expect(revokeButton).toBeVisible({ timeout: 10000 });
     });
 
     test('should confirm before revoking key', async ({ authenticatedPage }) => {

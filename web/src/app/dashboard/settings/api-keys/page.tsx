@@ -333,10 +333,12 @@ export default function ApiKeysPage() {
  >
  <div className="space-y-6">
  <div>
- <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
+ <label htmlFor="api-key-name" className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
  Key Name <span className="text-[var(--error-ink)]">*</span>
  </label>
  <input
+ id="api-key-name"
+ name="name"
  type="text"
  value={createForm.name}
  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}

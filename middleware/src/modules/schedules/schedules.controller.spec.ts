@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { SchedulesController } from './schedules.controller';
 import { SchedulesService } from './schedules.service';
+import { ScheduleQueryDto } from './dto/schedule-query.dto';
 import { SubscriptionActiveGuard } from '../billing/guards/subscription-active.guard';
 import { DatabaseService } from '../database/database.service';
 import { UnauthorizedException } from '@nestjs/common';
@@ -111,7 +112,7 @@ describe('SchedulesController', () => {
       };
       mockSchedulesService.findAll.mockResolvedValue(expectedResult as any);
 
-      const result = await controller.findAll(organizationId, pagination as any);
+      const result = await controller.findAll(organizationId, { ...pagination });
 
       expect(result).toEqual(expectedResult);
       expect(mockSchedulesService.findAll).toHaveBeenCalledWith(organizationId, pagination, {
@@ -124,13 +125,7 @@ describe('SchedulesController', () => {
     it('should pass displayId filter', async () => {
       mockSchedulesService.findAll.mockResolvedValue({ data: [], total: 0 } as any);
 
-      await controller.findAll(
-        organizationId,
-        pagination as any,
-        'display-123',
-        undefined,
-        undefined,
-      );
+      await controller.findAll(organizationId, { ...pagination, displayId: 'display-123' });
 
       expect(mockSchedulesService.findAll).toHaveBeenCalledWith(organizationId, pagination, {
         displayId: 'display-123',
@@ -142,13 +137,7 @@ describe('SchedulesController', () => {
     it('should pass displayGroupId filter', async () => {
       mockSchedulesService.findAll.mockResolvedValue({ data: [], total: 0 } as any);
 
-      await controller.findAll(
-        organizationId,
-        pagination as any,
-        undefined,
-        'group-123',
-        undefined,
-      );
+      await controller.findAll(organizationId, { ...pagination, displayGroupId: 'group-123' });
 
       expect(mockSchedulesService.findAll).toHaveBeenCalledWith(organizationId, pagination, {
         displayId: undefined,
@@ -160,13 +149,7 @@ describe('SchedulesController', () => {
     it('should convert isActive "true" to boolean true', async () => {
       mockSchedulesService.findAll.mockResolvedValue({ data: [], total: 0 } as any);
 
-      await controller.findAll(
-        organizationId,
-        pagination as any,
-        undefined,
-        undefined,
-        'true',
-      );
+      await controller.findAll(organizationId, { ...pagination, isActive: 'true' });
 
       expect(mockSchedulesService.findAll).toHaveBeenCalledWith(organizationId, pagination, {
         displayId: undefined,
@@ -178,13 +161,7 @@ describe('SchedulesController', () => {
     it('should convert isActive "false" to boolean false', async () => {
       mockSchedulesService.findAll.mockResolvedValue({ data: [], total: 0 } as any);
 
-      await controller.findAll(
-        organizationId,
-        pagination as any,
-        undefined,
-        undefined,
-        'false',
-      );
+      await controller.findAll(organizationId, { ...pagination, isActive: 'false' });
 
       expect(mockSchedulesService.findAll).toHaveBeenCalledWith(organizationId, pagination, {
         displayId: undefined,
@@ -193,22 +170,59 @@ describe('SchedulesController', () => {
       });
     });
 
+    // ScheduleQueryDto's @IsIn(['true','false']) means a value like this is a 400
+    // before the handler runs; this pins the handler's own defensive fallback so a
+    // non-literal can never be coerced into a filter that quietly matches nothing.
     it('should treat other isActive values as undefined', async () => {
       mockSchedulesService.findAll.mockResolvedValue({ data: [], total: 0 } as any);
 
-      await controller.findAll(
-        organizationId,
-        pagination as any,
-        undefined,
-        undefined,
-        'invalid',
-      );
+      await controller.findAll(organizationId, { ...pagination, isActive: 'invalid' });
 
       expect(mockSchedulesService.findAll).toHaveBeenCalledWith(organizationId, pagination, {
         displayId: undefined,
         displayGroupId: undefined,
         isActive: undefined,
       });
+    });
+
+    // REGRESSION PIN. All three schedule filters used to be bare `@Query('displayId')`
+    // parameters beside `@Query() pagination: PaginationDto`. The global ValidationPipe
+    // runs with whitelist + forbidNonWhitelisted, so PaginationDto validated the WHOLE
+    // query object and every filter key was an unknown property:
+    //   GET /api/v1/schedules?page=1&limit=10&isActive=true
+    //   -> 400 ["property isActive should not exist"]
+    // The fix is that the filters are DECLARED on ScheduleQueryDto. This test is typed
+    // as that DTO, so dropping a field from it breaks compilation here, and it asserts
+    // each declared filter is forwarded -- isActive still as a real boolean.
+    it('forwards every filter declared on ScheduleQueryDto to the service instead of dropping it', async () => {
+      mockSchedulesService.findAll.mockResolvedValue({ data: [], total: 0 } as any);
+
+      const query: ScheduleQueryDto = {
+        page: 3,
+        limit: 25,
+        displayId: 'display-777',
+        displayGroupId: 'group-777',
+        isActive: 'true',
+      };
+
+      await controller.findAll(organizationId, query);
+
+      expect(mockSchedulesService.findAll).toHaveBeenCalledWith(
+        organizationId,
+        { page: 3, limit: 25 },
+        {
+          displayId: 'display-777',
+          displayGroupId: 'group-777',
+          isActive: true,
+        },
+      );
+
+      // Not just "shape matches": prove nothing was dropped on the way through, and
+      // that isActive arrives as a boolean rather than the raw query string.
+      const filters = mockSchedulesService.findAll.mock.calls[0][2]!;
+      expect(filters.displayId).toBe(query.displayId);
+      expect(filters.displayGroupId).toBe(query.displayGroupId);
+      expect(filters.isActive).toBe(true);
     });
   });
 

@@ -23,7 +23,10 @@ describe('NewLookNotice', () => {
 
   it('shows once for a browser that has not seen it', () => {
     render(<NewLookNotice />);
-    expect(screen.getByRole('heading', { name: 'Vizora has a new look' })).toBeInTheDocument();
+    expect(screen.getByText('Vizora has a new look')).toBeInTheDocument();
+    // Deliberately NOT a heading: the notice is mounted in the dashboard layout, so a
+    // heading here competes with every page's own <h2> title.
+    expect(screen.queryByRole('heading', { name: 'Vizora has a new look' })).toBeNull();
   });
 
   it('does not render at all once the flag is set', () => {

@@ -7419,3 +7419,41 @@ Plan: `docs/plans/2026-06-01-content-library-search-performance-pass-18.md`
   - `$env:ESLINT_USE_FLAT_CONFIG='false'; npx eslint web/src/components/playlist/ContentLibraryPanel.tsx web/src/components/__tests__/PlaylistBuilder.test.tsx` - 0 errors, 0 warnings in touched files.
   - `NODE_OPTIONS=--max-old-space-size=4096 NEXT_PUBLIC_SOCKET_URL=http://localhost:3002 NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1 BACKEND_URL=http://localhost:3000 pnpm --filter @vizora/web build` - passed with existing Next middleware/proxy and TS project-reference warnings.
   - `git diff --check` - passed with CRLF warnings only.
+
+## 2026-10-09 — full-stack e2e run (requested 2026-10-02)
+- [x] Unit suites (middleware/realtime/web/ops) green
+- [x] API smoke 22/27 — remaining 5 are harness/dev-only
+- [x] Device pairing + content streaming direct test passes
+- [x] Playwright 332 tests spec-by-spec: 293 pass / 32 fail / 7 skip — all 32 attributed, see `docs/plans/2026-10-09-e2e-full-stack-results.md`
+- [x] Fix 01-auth `locator('h2')` selectors (NewLookNotice h2 — my regression)
+- [x] Decide fate of 18 stale specs (analytics mock copy, $29/$99, "Dashboard" nav label, view toggle)
+- [x] Add Playwright to CI `e2e` job (currently never runs)
+
+## 2026-10-09 — production-readiness pass on the e2e findings (branch `fix/e2e-production-readiness`)
+
+### Product defects (fix the product, not the test)
+- [x] A1 Settings index links nothing to `/dashboard/settings/team` or `/dashboard/settings/audit-log` — both pages ship but are reachable only by typing the URL
+- [x] A2 `NewLookNotice` renders an `<h2>` from the dashboard **layout**, so every dashboard page has two competing `h2`s; it is a transient `role="status"` card and needs no heading
+- [x] A3 API-key create input has no `id`/`name`; label not associated
+- [x] A4 Settings Region/Timezone selects have no `id`
+- [x] A5 `CookieConsent` claims `role="dialog"` while `aria-hidden` and off-screen
+
+### Stale specs (fix the test, product is correct)
+- [x] B 01-auth ×2, 06-schedules ×4, 08-settings ×3, 09-device-status ×3
+- [x] C 07-analytics ×5, 16-billing, 18-playlist-builder, 19-api-keys ×4, 20-content-folders ×3, 22-device-preview, 23-comprehensive ×3
+
+### Infrastructure
+- [x] D CI runs no Playwright at all — the `e2e` job is a middleware Jest subset plus realtime with `continue-on-error: true`
+
+### Verification
+- [x] Full Playwright suite green in CI: 327 tests, 327 passed, 0 failed, 0 skipped, 0 flaky, 12.3 min
+- [x] Web/middleware/realtime unit suites green after the product changes
+
+### Outcome 2026-10-09
+All seven CI jobs green on `f0b92ece`+. PR #390. Nine product defects fixed, 32 stale
+specs repaired, 31 inert assertions replaced, and three separate mechanisms by which the
+suite reported green while testing nothing. Deliberately NOT fixed (unbuilt scope, each
+recorded in `docs/plans/2026-10-09-e2e-full-stack-results.md`): content-tag creation has
+no UI, nested device groups are dead code, folder rename/delete have no UI, no
+`button[type="submit"]` under /dashboard, `require('@vizora/database')` returns only the
+Prisma exports in dev, and ~85 tests still sit wholly inside `if (isVisible())` guards.

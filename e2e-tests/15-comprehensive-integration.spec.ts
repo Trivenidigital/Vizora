@@ -52,7 +52,7 @@ test.describe('Comprehensive Integration Tests - Phases 6-7', () => {
     await authenticatedPage.waitForLoadState('networkidle');
 
     // Use command palette to navigate
-    await authenticatedPage.keyboard.press('Meta+K').catch(() => authenticatedPage.keyboard.press('Control+K'));
+    await authenticatedPage.keyboard.press('Meta+k').catch(() => authenticatedPage.keyboard.press('Control+k'));
     await authenticatedPage.waitForTimeout(500);
 
     const palette = authenticatedPage.locator('[role="dialog"], [class*="palette"]').first();
@@ -180,7 +180,7 @@ test.describe('Comprehensive Integration Tests - Phases 6-7', () => {
     await authenticatedPage.waitForLoadState('networkidle');
 
     // Open command palette
-    await authenticatedPage.keyboard.press('Meta+K').catch(() => authenticatedPage.keyboard.press('Control+K'));
+    await authenticatedPage.keyboard.press('Meta+k').catch(() => authenticatedPage.keyboard.press('Control+k'));
     await authenticatedPage.waitForTimeout(500);
 
     // Search for analytics
