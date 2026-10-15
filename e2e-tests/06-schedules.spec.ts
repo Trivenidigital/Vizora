@@ -1,681 +1,486 @@
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/auth.fixture';
+import { apiGet, seedDisplay, seedPlaylist, seedSchedule } from './fixtures/seed';
 
 /**
- * PHASE 6.0: COMPLETE SCHEDULES IMPLEMENTATION TEST SUITE
+ * SCHEDULES
  *
- * BMAD Method Coverage:
- * ├─ Boundary Tests: Time boundaries, duration limits, timezone edges
- * ├─ Mutation Tests: All CRUD operations, state changes
- * ├─ Adversarial Tests: Invalid inputs, edge cases, error handling
- * └─ Domain Tests: Business logic, business rule validation
+ * Rewritten 2026-10-15. 18 of the previous tests ran their bodies inside
+ * `if (await x.isVisible())` guards against a fresh org with no playlists, no
+ * displays and no schedules - so Edit/Delete/Duplicate/search never had a row
+ * to act on and passed by doing nothing. Every test now seeds what it touches
+ * through the API and asserts unconditionally.
  *
- * Test Coverage: 32 critical test cases for schedules
+ * The route is gated by the build-time NEXT_PUBLIC_SCHEDULES_ENABLED flag. The
+ * e2e stack (and CI's playwright job) builds it ON, so the gate notice here is
+ * a broken environment, not a product state: it FAILS rather than skipping
+ * the whole file, because a skipped count is not a safe count.
  */
 
-test.describe('Phase 6.0: Complete Schedules Implementation', () => {
+const schedulesHeading = (page: Page): Locator => page.locator('h2').filter({ hasText: 'Schedules' });
+const totalCount = (page: Page, n: number): Locator => page.getByText(`(${n} total)`);
+const createDialog = (page: Page): Locator => page.getByRole('dialog', { name: 'Create Schedule' });
 
-  /**
-   * `/dashboard/schedules` is gated behind SCHEDULES_ENABLED (build-time flag, ships
-   * off — see web/src/app/dashboard/schedules/page.tsx, the "interim C-7 mitigation").
-   * With the gate closed the route renders an "unavailable" notice instead of the CRUD
-   * UI, so every assertion below is moot. Skip visibly rather than leave the gate
-   * permanently red for a deliberate product state — an always-red gate is unreadable.
-   * These tests run again, unchanged, the moment the flag is built on.
-   */
-  test.beforeEach(async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
+/** One schedule card, found by its <h3> title. */
+const scheduleCard = (page: Page, name: string): Locator =>
+  page.locator('div.eh-dash-card').filter({ has: page.getByRole('heading', { level: 3, name, exact: true }) });
 
-    const gated = await authenticatedPage
-      .locator('text=/Scheduling is temporarily unavailable/i')
-      .first()
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
+/**
+ * The page's success toast. SOFT: at b14dd8bf the schedules page calls
+ * useToast() but never renders its ToastContainer, so no toast is ever shown
+ * (reported as a product defect). The soft assertion keeps that failure red
+ * while the rest of each CRUD test still verifies the actual outcome.
+ */
+const scheduleToast = (page: Page, text: string): Locator => page.getByRole('alert').filter({ hasText: text });
 
-    if (gated) {
-      test.info().annotations.push({
-        type: 'skipped-branch',
-        description: 'SCHEDULES_ENABLED is off — schedules CRUD UI is gated out of this build',
-      });
-    }
-    test.skip(gated, 'SCHEDULES_ENABLED is off — schedules CRUD UI is gated out of this build');
+const statusFilter = (page: Page): Locator => page.getByRole('group', { name: 'Filter schedules by status' });
+
+async function gotoSchedules(page: Page): Promise<void> {
+  await page.goto('/dashboard/schedules');
+  await page.waitForLoadState('networkidle');
+  await expect(
+    page.getByText(/Scheduling is temporarily unavailable/i),
+    'NEXT_PUBLIC_SCHEDULES_ENABLED must be true when the e2e web server starts',
+  ).toHaveCount(0);
+  await expect(schedulesHeading(page)).toBeVisible({ timeout: 10000 });
+}
+
+async function openCreateDialog(page: Page): Promise<Locator> {
+  await page.getByRole('button', { name: 'Create Schedule' }).first().click();
+  const dialog = createDialog(page);
+  await expect(dialog).toBeVisible({ timeout: 5000 });
+  return dialog;
+}
+
+/** DaySelector's summary line ("5 days selected: Monday, ..."). */
+const daySummary = (dialog: Locator): Locator => dialog.getByText(/\d+ days? selected:/);
+
+test.describe('Schedules', () => {
+  // ============= LOAD & EMPTY STATE =============
+
+  test('loads with heading, subtitle and a zero count in a fresh org', async ({ authenticatedPage }) => {
+    await gotoSchedules(authenticatedPage);
+    await expect(authenticatedPage.getByText(/Automate content playback/i).first()).toBeVisible();
+    await expect(totalCount(authenticatedPage, 0)).toBeVisible();
   });
 
-  // ============= LOAD & NAVIGATION TESTS =============
+  test('empty org shows the empty state with a create action, and no filter controls', async ({ authenticatedPage }) => {
+    await gotoSchedules(authenticatedPage);
 
-  test('should load schedules page successfully', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
+    await expect(authenticatedPage.getByText('No schedules yet')).toBeVisible();
+    // Two create controls: the header button and the empty state's action.
+    await expect(authenticatedPage.getByRole('button', { name: 'Create Schedule' })).toHaveCount(2);
 
-    // Verify page heading
-    await expect(authenticatedPage.locator('h2').filter({ hasText: 'Schedules' })).toBeVisible({ timeout: 10000 });
-    // Check for subtitle text (use first() to avoid strict mode violation)
-    await expect(authenticatedPage.locator('text=/Automate content playback/i').first()).toBeVisible();
+    // Search and status chips render only once schedules exist. REACH CONTROL:
+    // the List/Calendar toggle is in the same region and IS found.
+    await expect(authenticatedPage.getByRole('button', { name: /^(list|calendar)$/i })).toHaveCount(2);
+    await expect(authenticatedPage.getByRole('textbox', { name: 'Search schedules by name' })).toHaveCount(0);
+    await expect(statusFilter(authenticatedPage)).toHaveCount(0);
   });
 
-  test('should display schedule statistics', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
+  // ============= CREATE DIALOG =============
 
-    // Check for total schedules count - either in subtitle or as separate element
-    const countLocator = authenticatedPage.locator('text=/\\d+ total|total|schedules/i').first();
-    await expect(countLocator).toBeVisible({ timeout: 5000 });
+  test('opens the create dialog', async ({ authenticatedPage }) => {
+    await gotoSchedules(authenticatedPage);
+    const dialog = await openCreateDialog(authenticatedPage);
+    await expect(dialog.getByRole('heading', { name: 'Create Schedule' })).toBeVisible();
+
+    // Cancel closes it without creating anything.
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(totalCount(authenticatedPage, 0)).toBeVisible();
   });
 
-  test('schedules list offers no search input (pinned gap)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
+  test('submitting an empty form names every missing field and creates nothing (BOUNDARY)', async ({ authenticatedPage }) => {
+    await gotoSchedules(authenticatedPage);
+    const dialog = await openCreateDialog(authenticatedPage);
 
     /*
-     * This asserted search by checking only that the page heading was visible,
-     * so it passed whether or not a search box existed. The schedules page
-     * ships no search input at all (there is no searchQuery state in
-     * page-client.tsx). The absence is pinned here so the test goes red the day
-     * search is added, instead of certifying nothing.
+     * The product validates ON SUBMIT (the button carries
+     * `disabled={actionLoading}` only). Name, playlist and target are the
+     * fields a fresh form leaves empty; days and duration are pre-filled.
      */
-    const main = authenticatedPage.locator('main');
-    await expect(main.locator('input[placeholder*="Search" i], input[type="search"]')).toHaveCount(
-      0,
-    );
+    const submit = dialog.getByRole('button', { name: /^create$/i });
+    await expect(submit).toBeEnabled();
+    await submit.click();
 
-    // Reach control: the scoped region really does render the list, so the zero
-    // above is a finding and not a dead selector.
-    await expect(main.locator('h2').filter({ hasText: 'Schedules' })).toBeVisible();
-  });
-
-  // ============= CREATE SCHEDULE TESTS =============
-
-  test('should open create schedule modal', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Click create button
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create schedule/i }).first();
-    await expect(createButton).toBeVisible({ timeout: 5000 });
-    await createButton.click();
-
-    // A page-wide `[role="dialog"]` resolves to several elements here (Modal,
-    // ConfirmDialog and the cookie-consent bar all take the role), which is a
-    // strict-mode violation. Name the dialog instead: Modal wires
-    // `aria-labelledby` to its own title, so the create modal's accessible name
-    // is "Create Schedule".
-    const dialog = authenticatedPage.getByRole('dialog', { name: /create schedule/i });
-    await expect(dialog).toBeVisible({ timeout: 5000 });
-    // The heading must be visible inside THAT modal, not just anywhere on the page.
-    await expect(dialog.getByRole('heading', { name: /create schedule/i })).toBeVisible();
-  });
-
-  test('should validate schedule form - required fields (BOUNDARY)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Open create modal
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create|new|add schedule/i }).first();
-    await createButton.click({ timeout: 5000 });
-
-    const dialog = authenticatedPage.getByRole('dialog', { name: /create schedule/i });
-    await expect(dialog).toBeVisible({ timeout: 5000 });
-
-    /*
-     * The product does NOT disable submit on an incomplete form - that button
-     * carries `disabled={actionLoading}` only. It validates ON SUBMIT:
-     * handleCreate calls validateForm(), which fills `formErrors` and returns
-     * before any request is made. So the contract to assert is "submitting an
-     * empty form names every missing field and creates nothing", not "the button
-     * is disabled".
-     */
-    const submitButton = dialog.getByRole('button', { name: /^create$/i });
-    await expect(submitButton).toBeEnabled();
-    await submitButton.click();
-
-    // Exact copy from validateForm() in dashboard/schedules/page-client.tsx.
-    // Name, playlist and target are the three fields a freshly opened form leaves
-    // empty (days and duration are pre-filled), so all three errors must appear.
     await expect(dialog.getByText('Schedule name is required')).toBeVisible({ timeout: 5000 });
-    // `exact` matters: the playlist <select> carries a "Select a playlist..."
-    // placeholder option, so a substring match resolves to two elements.
+    // `exact`: the playlist <select>'s placeholder option is "Select a playlist...".
     await expect(dialog.getByText('Select a playlist', { exact: true })).toBeVisible();
     await expect(dialog.getByText('Select at least one device')).toBeVisible();
-
-    // The dialog stays open on a failed validation, and nothing was created: the
-    // header counter is rendered straight from the schedules list.
     await expect(dialog).toBeVisible();
-    await expect(authenticatedPage.getByText(/\(0 total\)/)).toBeVisible();
+    await expect(totalCount(authenticatedPage, 0)).toBeVisible();
   });
 
-  test('should validate schedule name (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
+  test('a whitespace-only name is rejected like an empty one (MUTATION)', async ({ authenticatedPage }) => {
+    await gotoSchedules(authenticatedPage);
+    const dialog = await openCreateDialog(authenticatedPage);
 
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create|new|add schedule/i }).first();
-    await createButton.click({ timeout: 5000 });
+    const name = dialog.getByPlaceholder('e.g., Morning Content, Holiday Special');
+    await name.fill('Test Schedule 001');
+    await expect(name).toHaveValue('Test Schedule 001');
 
-    // Find name input and test with various values
-    const nameInput = authenticatedPage.locator('input[placeholder*="Name"], input[placeholder*="Schedule"]').first();
-    if (await nameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-      // Test valid name
-      await nameInput.fill('Test Schedule 001');
-      await expect(nameInput).toHaveValue('Test Schedule 001');
+    await name.fill('   ');
+    await dialog.getByRole('button', { name: /^create$/i }).click();
+    await expect(dialog.getByText('Schedule name is required')).toBeVisible();
 
-      // Test clear
-      await nameInput.clear();
-      await expect(nameInput).toHaveValue('');
-
-      // Test long name
-      await nameInput.fill('A'.repeat(100));
-      const value = await nameInput.inputValue();
-      expect(value.length).toBeLessThanOrEqual(100);
-    }
+    // Typing clears the field's error.
+    await name.fill('Morning');
+    await expect(dialog.getByText('Schedule name is required')).toBeHidden();
   });
 
-  // ============= TIME PICKER TESTS =============
+  test('start time is picked from 15-minute slots and presets (DOMAIN)', async ({ authenticatedPage }) => {
+    await gotoSchedules(authenticatedPage);
+    const dialog = await openCreateDialog(authenticatedPage);
 
-  test('should have time picker component (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create|new|add schedule/i }).first();
-    await createButton.click({ timeout: 5000 });
-
-    // Look for time-related inputs
-    const timeInputs = authenticatedPage.locator('input[placeholder*="time"], input[placeholder*="Time"]', { timeout: 5000 });
-    if (await timeInputs.first().isVisible({ timeout: 2000 }).catch(() => false)) {
-      await expect(timeInputs.first()).toBeVisible();
-    }
-  });
-
-  test('should validate time range (BOUNDARY)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create|new|add schedule/i }).first();
-    await createButton.click({ timeout: 5000 });
-
-    const timeInputs = authenticatedPage.locator('input[placeholder*="time"], input[placeholder*="Time"], input[type="time"]', { timeout: 2000 });
-
-    if (await timeInputs.first().isVisible({ timeout: 1000 }).catch(() => false)) {
-      const count = await timeInputs.count();
-
-      // Test valid times (00:00 - 23:59)
-      if (count > 0) {
-        const firstTime = timeInputs.first();
-        await firstTime.fill('09:00', { force: true });
-        const value = await firstTime.inputValue();
-        expect(value).toMatch(/09:00|9:00/);
-      }
-
-      // Test invalid time boundary
-      if (count > 0) {
-        const firstTime = timeInputs.first();
-        await firstTime.fill('25:00', { force: true }); // Invalid
-        const value = await firstTime.inputValue();
-        // Input should either reject or normalize
-        expect(value).toBeTruthy();
-      }
-    }
-  });
-
-  test('should handle duration input (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create schedule/i }).first();
-    await createButton.click({ timeout: 5000 });
-
-    const durationInput = authenticatedPage.locator('input[placeholder*="duration"], input[placeholder*="Duration"], input[type="number"]').first();
-
-    if (await durationInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      // Test valid duration
-      await durationInput.fill('30');
-      await expect(durationInput).toHaveValue('30');
-
-      // Test boundary duration (minimum is 1)
-      await durationInput.fill('1');
-      const value = await durationInput.inputValue();
-      expect(value).toBe('1');
-
-      // Test negative duration (adversarial) - should be rejected or normalized
-      await durationInput.fill('-30');
-      const negValue = await durationInput.inputValue();
-      expect(negValue).toBeTruthy(); // Some value should exist
-    }
-  });
-
-  // ============= DAY SELECTOR TESTS =============
-
-  test('should have day selector buttons (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create schedule/i }).first();
-    await createButton.click({ timeout: 5000 });
-
-    // Look for day-related elements (buttons or other selectable elements)
-    const dayButtons = authenticatedPage.locator('button, [role="checkbox"], [role="option"]').filter({ hasText: /Mon|Tue|Wed|Thu|Fri|Sat|Sun|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday/i });
-
-    // A schedule needs a day-of-week selector; the modal must offer one.
-    const count = await dayButtons.count().catch(() => 0);
-    expect(count, 'schedule modal must offer day selection').toBeGreaterThan(0);
-  });
-
-  test('should toggle day selection (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create|new|add schedule/i }).first();
-    await createButton.click({ timeout: 5000 });
-
-    const dayButtons = authenticatedPage.locator('button').filter({ hasText: /Monday/i }, { timeout: 2000 }).first();
-
-    if (await dayButtons.isVisible({ timeout: 1000 }).catch(() => false)) {
-      const initialClass = await dayButtons.getAttribute('class');
-      await dayButtons.click();
-      const afterClickClass = await dayButtons.getAttribute('class');
-
-      // Clicking a day must visibly change its selection state.
-      expect(afterClickClass).not.toEqual(initialClass);
-    } else {
-      test.info().annotations.push({
-        type: 'skipped-branch',
-        description: 'no "Monday" day button rendered — day toggle not exercised',
-      });
-    }
-  });
-
-  test('should support weekday preset (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create|new|add schedule/i }).first();
-    await createButton.click({ timeout: 5000 });
-
-    const weekdaysButton = authenticatedPage.locator('button').filter({ hasText: /Weekdays/i }, { timeout: 2000 });
-
-    if (await weekdaysButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await weekdaysButton.click();
-      // All weekday buttons should be selected
-      await authenticatedPage.waitForTimeout(500);
-      await expect(weekdaysButton).toHaveClass(/selected|active|bg-/);
-    }
-  });
-
-  test('should support all days preset (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create|new|add schedule/i }).first();
-    await createButton.click({ timeout: 5000 });
-
-    const allDaysButton = authenticatedPage.locator('button').filter({ hasText: /All|Every Day/i }, { timeout: 2000 }).first();
-
-    if (await allDaysButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await allDaysButton.click();
-      await authenticatedPage.waitForTimeout(500);
-      // All days should be selected
-      await expect(allDaysButton).toHaveClass(/selected|active|bg-/);
-    }
-  });
-
-  // ============= TIMEZONE TESTS =============
-
-  /*
-   * Removed 2026-10-09: 'should support timezone selection (DOMAIN)'. Its whole
-   * body sat inside `if (await timezoneSelect.isVisible(...))`, which can never
-   * be true: the create-schedule dialog has no timezone picker, it shows an
-   * informational panel because each target display applies its own configured
-   * timezone at playback. The real contract is asserted by 'should handle
-   * timezone edge cases (BOUNDARY)' below.
-   */
-
-  test('should handle timezone edge cases (BOUNDARY)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create|new|add schedule/i }).first();
-    await createButton.click({ timeout: 5000 });
-
-    const dialog = authenticatedPage.getByRole('dialog', { name: /create schedule/i });
-    await expect(dialog).toBeVisible({ timeout: 5000 });
+    // TimePicker's trigger shows the current value, 09:00 by default.
+    const trigger = dialog.getByRole('button', { name: '09:00', exact: true });
+    await expect(trigger).toBeVisible();
+    await trigger.click();
 
     /*
-     * There is no timezone picker in this dialog any more, and the page-wide
-     * `select` this test used to grab resolved to a hidden element elsewhere, so
-     * it timed out. The edge case the product now has to get right is the
-     * opposite one: a schedule carries no zone of its own, every target display
-     * applies its own configured timezone at playback time, and the dialog has
-     * to SAY so rather than offer a choice it cannot honour.
+     * There is no free-text time entry, so an out-of-range value like 25:00
+     * cannot be typed (the old test filled one into a selector that matched
+     * nothing). The picker offers exactly 96 quarter-hour slots, 00:00..23:45,
+     * plus its trigger - 97 buttons of that shape.
      */
-    await expect(dialog.getByText('Target display timezone')).toBeVisible();
-    await expect(
-      dialog.getByText(/each target display applies its own configured timezone/i),
-    ).toBeVisible();
+    const slots = dialog.getByRole('button', { name: /^([01]\d|2[0-3]):(00|15|30|45)$/ });
+    await expect(slots).toHaveCount(97);
+    await expect(dialog.getByRole('button', { name: '23:45', exact: true })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: /^24:/ })).toHaveCount(0);
 
-    // So no select inside the dialog may offer a timezone. The count assertion is
-    // the control: the dialog really does render selects (playlist, target), so
-    // "no zone-shaped option value" is a finding and not an empty match.
-    const selects = dialog.locator('select');
-    expect(await selects.count()).toBeGreaterThanOrEqual(1);
-    const optionValues = await selects.locator('option').evaluateAll(opts =>
-      opts.map(o => (o as HTMLOptionElement).value),
+    await dialog.getByRole('button', { name: 'Lunch Time (12:00 PM)' }).click();
+    await expect(dialog.getByRole('button', { name: '12:00', exact: true })).toBeVisible();
+    await expect(dialog.getByText('Common Times')).toBeHidden();
+  });
+
+  test('duration clamps to at least one minute and validates the upper bound (BOUNDARY)', async ({ authenticatedPage }) => {
+    await gotoSchedules(authenticatedPage);
+    const dialog = await openCreateDialog(authenticatedPage);
+
+    const duration = dialog.locator('input[type="number"]');
+    await expect(duration).toHaveValue('60');
+    await expect(duration).toHaveAttribute('min', '1');
+    await expect(duration).toHaveAttribute('max', '1440');
+
+    await duration.fill('30');
+    await expect(duration).toHaveValue('30');
+
+    // onChange is Math.max(1, parseInt(v) || 0): negatives and zero become 1.
+    await duration.fill('-30');
+    await expect(duration).toHaveValue('1');
+    await duration.fill('0');
+    await expect(duration).toHaveValue('1');
+
+    // Above the max is accepted by the field and rejected on submit.
+    await duration.fill('1441');
+    await dialog.getByRole('button', { name: /^create$/i }).click();
+    await expect(dialog.getByText('Duration must be between 1 and 1440 minutes')).toBeVisible();
+  });
+
+  test('day toggles and presets drive the selected-days summary (DOMAIN)', async ({ authenticatedPage }) => {
+    await gotoSchedules(authenticatedPage);
+    const dialog = await openCreateDialog(authenticatedPage);
+
+    // Default: weekdays.
+    await expect(daySummary(dialog)).toHaveText(
+      '5 days selected: Monday, Tuesday, Wednesday, Thursday, Friday',
     );
-    expect(optionValues.filter(v => /^(UTC|[A-Za-z]+\/[A-Za-z_]+)$/.test(v))).toEqual([]);
+
+    // A single day toggles off (the button reads "Mon", titled "Monday").
+    await dialog.getByTitle('Monday').click();
+    await expect(daySummary(dialog)).toHaveText('4 days selected: Tuesday, Wednesday, Thursday, Friday');
+    await dialog.getByTitle('Monday').click();
+    await expect(daySummary(dialog)).toContainText('5 days selected');
+
+    // "Weekdays" toggles all five off when all five are on...
+    await dialog.getByRole('button', { name: 'Weekdays' }).click();
+    await expect(dialog.getByText('Please select at least one day')).toBeVisible();
+    await expect(daySummary(dialog)).toHaveCount(0);
+    // ...and with no days, the next-occurrences preview disappears too.
+    await expect(dialog.getByText('Next 10 Occurrences:')).toHaveCount(0);
+
+    // "Weekends" then "All Days".
+    await dialog.getByRole('button', { name: 'Weekends' }).click();
+    await expect(daySummary(dialog)).toHaveText('2 days selected: Saturday, Sunday');
+    await dialog.getByRole('button', { name: 'All Days' }).click();
+    await expect(daySummary(dialog)).toContainText('7 days selected');
+
+    // Submitting with no days names that error.
+    await dialog.getByRole('button', { name: 'All Days' }).click();
+    await dialog.getByRole('button', { name: /^create$/i }).click();
+    await expect(dialog.getByText('Select at least one day', { exact: true })).toBeVisible();
   });
 
-  // ============= PLAYLIST & DEVICE SELECTION TESTS =============
+  test('previews the next ten occurrences for the chosen days (DOMAIN)', async ({ authenticatedPage }) => {
+    await gotoSchedules(authenticatedPage);
+    const dialog = await openCreateDialog(authenticatedPage);
 
-  test('should allow playlist selection (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create|new|add schedule/i }).first();
-    await createButton.click({ timeout: 5000 });
-
-    const playlistSelect = authenticatedPage.locator('select, [role="listbox"]').filter({ hasText: /playlist/i }, { timeout: 2000 }).first();
-
-    if (await playlistSelect.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await expect(playlistSelect).toBeVisible();
-    }
+    const preview = dialog.getByText('Next 10 Occurrences:').locator('xpath=..');
+    await expect(preview).toBeVisible();
+    // Ten dates ("Oct 15, 26") joined by bullets.
+    const dates = (await preview.locator('div').innerText()).split(' • ');
+    expect(dates).toHaveLength(10);
+    for (const d of dates) expect(d).toMatch(/^[A-Z][a-z]{2} \d{1,2}, \d{2}$/);
   });
 
-  test('should allow device multi-select (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
+  test('says the target display applies its own timezone, and offers no zone picker (BOUNDARY)', async ({ authenticatedPage, token }) => {
+    // Seed a playlist so the dialog's playlist <select> has a real option.
+    await seedPlaylist(authenticatedPage, token);
+    await gotoSchedules(authenticatedPage);
+    const dialog = await openCreateDialog(authenticatedPage);
 
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create|new|add schedule/i }).first();
-    await createButton.click({ timeout: 5000 });
+    await expect(dialog.getByText('Target display timezone')).toBeVisible();
+    await expect(dialog.getByText(/each target display applies its own configured timezone/i)).toBeVisible();
 
-    // Look for device checkboxes
-    const deviceCheckboxes = authenticatedPage.locator('input[type="checkbox"]').filter({ timeout: 2000 });
-    const count = await deviceCheckboxes.count();
-
-    if (count > 0) {
-      const firstCheckbox = deviceCheckboxes.first();
-      const initialState = await firstCheckbox.isChecked();
-
-      // Toggle checkbox
-      await firstCheckbox.check({ force: true });
-      const afterCheck = await firstCheckbox.isChecked();
-
-      expect(afterCheck).toBeTruthy();
-
-      // Toggle back
-      await firstCheckbox.uncheck({ force: true });
-      const afterUncheck = await firstCheckbox.isChecked();
-
-      expect(afterUncheck).toBeFalsy();
-    }
+    // REACH CONTROL: the dialog renders a select with real options, so "no
+    // zone-shaped option value" is a finding and not an empty match.
+    const options = await dialog.locator('select option').evaluateAll((opts) =>
+      opts.map((o) => (o as HTMLOptionElement).value),
+    );
+    expect(options.length).toBeGreaterThanOrEqual(2);
+    expect(options.filter((v) => /^(UTC|[A-Za-z]+\/[A-Za-z_]+)$/.test(v))).toEqual([]);
   });
 
-  // ============= CRUD OPERATIONS TESTS =============
+  test('lists the org playlists and displays as targets (DOMAIN)', async ({ authenticatedPage, token }) => {
+    const playlist = await seedPlaylist(authenticatedPage, token);
+    const d1 = await seedDisplay(authenticatedPage, token);
+    const d2 = await seedDisplay(authenticatedPage, token);
 
-  test('should create schedule with all required fields (MUTATION)', async ({ authenticatedPage, token }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
+    await gotoSchedules(authenticatedPage);
+    const dialog = await openCreateDialog(authenticatedPage);
 
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create|new|add schedule/i }).first();
-    if (!await createButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      return; // Skip if button not visible
-    }
+    const playlistSelect = dialog.locator('select').filter({ has: authenticatedPage.locator('option', { hasText: 'Select a playlist...' }) });
+    await expect(playlistSelect.locator('option', { hasText: playlist.name })).toHaveCount(1);
+    await playlistSelect.selectOption({ label: playlist.name });
+    await expect(playlistSelect).toHaveValue(playlist.id);
 
-    await createButton.click();
-    await authenticatedPage.waitForTimeout(500);
-
-    // Fill form - try to interact with all fields
-    const inputs = authenticatedPage.locator('input[type="text"], input[placeholder*="name"]').first();
-    if (await inputs.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await inputs.fill(`Schedule ${Date.now()}`);
-    }
-
-    // Attempt to submit
-    const submitButton = authenticatedPage.locator('button').filter({ hasText: /create|save|submit/i }).last();
-    if (await submitButton.isVisible({ timeout: 2000 }).catch(() => false) &&
-        !await submitButton.isDisabled().catch(() => true)) {
-      await submitButton.click();
-      await authenticatedPage.waitForTimeout(1000);
-    }
-
-    // Verify page state after action
-    await expect(authenticatedPage.locator('h2').filter({ hasText: 'Schedules' })).toBeVisible();
+    // Device targets are labelled checkboxes. An admin may pick several.
+    const c1 = dialog.getByRole('checkbox', { name: d1.name });
+    const c2 = dialog.getByRole('checkbox', { name: d2.name });
+    await c1.check();
+    await expect(dialog.getByText('1 device selected')).toBeVisible();
+    await c2.check();
+    await expect(dialog.getByText('2 devices selected')).toBeVisible();
+    await c1.uncheck();
+    await expect(c1).not.toBeChecked();
+    await expect(dialog.getByText('1 device selected')).toBeVisible();
   });
 
-  test('should edit existing schedule (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
+  // ============= CRUD =============
 
-    // Look for edit buttons
-    const editButton = authenticatedPage.locator('button').filter({ hasText: /edit/i }).first();
+  test('creates a schedule and lists it (MUTATION)', async ({ authenticatedPage, token }) => {
+    const playlist = await seedPlaylist(authenticatedPage, token);
+    const display = await seedDisplay(authenticatedPage, token);
+    const name = `Morning Menu ${Date.now()}`;
 
-    if (await editButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await editButton.click();
-      await authenticatedPage.waitForTimeout(500);
+    await gotoSchedules(authenticatedPage);
+    const dialog = await openCreateDialog(authenticatedPage);
+    await dialog.getByPlaceholder('e.g., Morning Content, Holiday Special').fill(name);
+    await dialog.locator('select').first().selectOption({ label: playlist.name });
+    await dialog.getByRole('checkbox', { name: display.name }).check();
+    await dialog.getByRole('button', { name: /^create$/i }).click();
 
-      // Modal should appear for editing
-      const modal = authenticatedPage.locator('[role="dialog"]');
-      if (await modal.isVisible({ timeout: 2000 }).catch(() => false)) {
-        // Try to modify a field
-        const input = authenticatedPage.locator('input[type="text"]').first();
-        if (await input.isVisible({ timeout: 1000 }).catch(() => false)) {
-          const initialValue = await input.inputValue();
-          await input.fill(`Updated ${Date.now()}`);
-          const newValue = await input.inputValue();
-          expect(newValue).not.toEqual(initialValue);
-        }
+    await expect.soft(scheduleToast(authenticatedPage, 'Schedule created successfully')).toBeVisible();
+    await expect(dialog).toBeHidden();
+    await expect(totalCount(authenticatedPage, 1)).toBeVisible();
 
-        // Close modal without saving
-        await authenticatedPage.keyboard.press('Escape');
-      }
-    }
+    const card = scheduleCard(authenticatedPage, name);
+    await expect(card).toBeVisible();
+    await expect(card).toContainText('Active');
+    await expect(card).toContainText('09:00 - 10:00');
+    await expect(card).toContainText('Monday, Tuesday, Wednesday, Thursday, Friday');
+    await expect(card).toContainText(playlist.name);
+    await expect(card).toContainText(display.name);
+
+    const schedules = await apiGet<{ data: Array<{ name: string; displayId: string }> }>(
+      authenticatedPage,
+      token,
+      '/schedules?page=1&limit=50',
+    );
+    expect(schedules.data).toEqual([expect.objectContaining({ name, displayId: display.id })]);
   });
 
-  test('should delete schedule with confirmation (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
+  test('edits an existing schedule (MUTATION)', async ({ authenticatedPage, token }) => {
+    const playlist = await seedPlaylist(authenticatedPage, token);
+    const display = await seedDisplay(authenticatedPage, token);
+    const original = await seedSchedule(authenticatedPage, token, {
+      name: `Lunch ${Date.now()}`,
+      playlistId: playlist.id,
+      displayId: display.id,
+    });
+    const renamed = `Lunch Rush ${Date.now()}`;
 
-    // Find delete button
-    const deleteButton = authenticatedPage.locator('button').filter({ hasText: /delete/i }).first();
+    await gotoSchedules(authenticatedPage);
+    await scheduleCard(authenticatedPage, original.name).getByRole('button', { name: 'Edit' }).click();
 
-    if (await deleteButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await deleteButton.click();
+    const dialog = authenticatedPage.getByRole('dialog', { name: 'Edit Schedule' });
+    await expect(dialog).toBeVisible();
+    const nameInput = dialog.getByPlaceholder('e.g., Morning Content, Holiday Special');
+    await expect(nameInput).toHaveValue(original.name);
+    await nameInput.fill(renamed);
+    await dialog.getByRole('button', { name: 'Update' }).click();
 
-      // Confirmation dialog should appear
-      const confirmButton = authenticatedPage.locator('button').filter({ hasText: /confirm|yes|delete/i }).first();
-      if (await confirmButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await confirmButton.click();
-        await authenticatedPage.waitForTimeout(1000);
-
-        // Page should still be functional
-        await expect(authenticatedPage.locator('h2').filter({ hasText: 'Schedules' })).toBeVisible();
-      }
-    }
+    await expect.soft(scheduleToast(authenticatedPage, 'Schedule updated successfully')).toBeVisible();
+    await expect(scheduleCard(authenticatedPage, renamed)).toBeVisible();
+    await expect(scheduleCard(authenticatedPage, original.name)).toHaveCount(0);
+    await expect(totalCount(authenticatedPage, 1)).toBeVisible();
   });
 
-  test('should duplicate schedule (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
+  test('deletes a schedule after confirmation (MUTATION)', async ({ authenticatedPage, token }) => {
+    const playlist = await seedPlaylist(authenticatedPage, token);
+    const display = await seedDisplay(authenticatedPage, token);
+    const schedule = await seedSchedule(authenticatedPage, token, {
+      name: `Doomed ${Date.now()}`,
+      playlistId: playlist.id,
+      displayId: display.id,
+    });
 
-    const duplicateButton = authenticatedPage.locator('button').filter({ hasText: /duplicate|copy/i }).first();
+    await gotoSchedules(authenticatedPage);
+    await scheduleCard(authenticatedPage, schedule.name).getByRole('button', { name: 'Delete' }).click();
 
-    if (await duplicateButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      const initialCountText = await authenticatedPage.locator('text=/\\d+ schedules?/i').first().textContent();
+    const confirm = authenticatedPage.getByRole('dialog', { name: 'Delete Schedule' });
+    await expect(confirm).toContainText(`Are you sure you want to delete "${schedule.name}"?`);
+    await confirm.getByRole('button', { name: 'Confirm' }).click();
 
-      await duplicateButton.click();
-      await authenticatedPage.waitForTimeout(1000);
-
-      // Verify action completed
-      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Schedules' })).toBeVisible();
-    }
+    await expect.soft(scheduleToast(authenticatedPage, 'Schedule deleted successfully')).toBeVisible();
+    await expect(scheduleCard(authenticatedPage, schedule.name)).toHaveCount(0);
+    await expect(totalCount(authenticatedPage, 0)).toBeVisible();
+    await expect(authenticatedPage.getByText('No schedules yet')).toBeVisible();
   });
 
-  // ============= SEARCH & FILTER TESTS =============
+  test('duplicates a schedule (MUTATION)', async ({ authenticatedPage, token }) => {
+    const playlist = await seedPlaylist(authenticatedPage, token);
+    const display = await seedDisplay(authenticatedPage, token);
+    const schedule = await seedSchedule(authenticatedPage, token, {
+      name: `Original ${Date.now()}`,
+      playlistId: playlist.id,
+      displayId: display.id,
+    });
 
-  test('should filter schedules by search (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
+    await gotoSchedules(authenticatedPage);
+    await expect(totalCount(authenticatedPage, 1)).toBeVisible();
+    await scheduleCard(authenticatedPage, schedule.name).getByRole('button', { name: 'Duplicate' }).click();
 
-    const searchInput = authenticatedPage.locator('input[placeholder*="Search"]').first();
+    await expect.soft(scheduleToast(authenticatedPage, 'Schedule duplicated successfully')).toBeVisible();
+    await expect(totalCount(authenticatedPage, 2)).toBeVisible();
 
-    if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await searchInput.fill('Morning');
-      await authenticatedPage.waitForTimeout(500);
-
-      // Clear search
-      await searchInput.clear();
-      await authenticatedPage.waitForTimeout(300);
-
-      // The page must survive a filter round-trip.
-      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Schedules' })).toBeVisible();
-    } else {
-      test.info().annotations.push({
-        type: 'skipped-branch',
-        description: 'no search input rendered — schedule search filter not exercised',
-      });
-    }
+    const schedules = await apiGet<{ data: unknown[] }>(authenticatedPage, token, '/schedules?page=1&limit=50');
+    expect(schedules.data).toHaveLength(2);
   });
 
-  test('schedules list offers no status filter (pinned gap)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
+  // ============= SEARCH & STATUS FILTER =============
 
-    const main = authenticatedPage.locator('main');
+  test('searches schedules by name and filters by Active/Inactive, with a filtered-empty state', async ({ authenticatedPage, token }) => {
+    const playlist = await seedPlaylist(authenticatedPage, token);
+    const display = await seedDisplay(authenticatedPage, token);
+    const stamp = Date.now();
+    const morning = await seedSchedule(authenticatedPage, token, {
+      name: `Morning Menu ${stamp}`, playlistId: playlist.id, displayId: display.id, isActive: true,
+    });
+    const evening = await seedSchedule(authenticatedPage, token, {
+      name: `Evening Promo ${stamp}`, playlistId: playlist.id, displayId: display.id, isActive: true,
+    });
+    const paused = await seedSchedule(authenticatedPage, token, {
+      name: `Weekend Brunch ${stamp}`, playlistId: playlist.id, displayId: display.id, isActive: false,
+    });
 
-    /*
-     * Unscoped, `button` + /active|inactive|all/i matched the cookie-consent
-     * bar's "Accept All" - permanently mounted, translated off-screen - so the
-     * click waited forever. Scoped to the page's own content region the real
-     * answer is that the schedules page ships NO status filter: status is
-     * rendered per card as an Active/Inactive badge, and the only list control is
-     * the List/Calendar view toggle. That contract is pinned here explicitly so
-     * this test goes red the day a status filter is added (or an existing one
-     * removed) instead of passing either way.
-     */
-    const statusFilters = main.getByRole('button', { name: /^(all|active|inactive)$/i });
-    await expect(statusFilters).toHaveCount(0);
+    await gotoSchedules(authenticatedPage);
+    const cards = [morning, evening, paused].map((s) => scheduleCard(authenticatedPage, s.name));
+    for (const card of cards) await expect(card).toBeVisible();
 
-    // Reach control: the scoped locator above is searching a region that really
-    // does contain buttons, so the zero above is a finding and not a dead selector.
-    await expect(main.getByRole('button', { name: /^(list|calendar)$/i })).toHaveCount(2);
+    // Status chips carry live counts, and "All" starts pressed.
+    const chips = statusFilter(authenticatedPage);
+    const all = chips.getByRole('button', { name: /All$/ });
+    const active = chips.getByRole('button', { name: /Active$/ });
+    const inactive = chips.getByRole('button', { name: /Inactive$/ });
+    await expect(all).toHaveText(/3\s*All/);
+    await expect(active).toHaveText(/2\s*Active/);
+    await expect(inactive).toHaveText(/1\s*Inactive/);
+    await expect(all).toHaveAttribute('aria-pressed', 'true');
+
+    // Search is case-insensitive on name.
+    const search = authenticatedPage.getByRole('textbox', { name: 'Search schedules by name' });
+    await search.fill('MORNING');
+    await expect(cards[0]).toBeVisible();
+    await expect(cards[1]).toHaveCount(0);
+    await expect(cards[2]).toHaveCount(0);
+    await search.fill('');
+    for (const card of cards) await expect(card).toBeVisible();
+
+    // Inactive only.
+    await inactive.click();
+    await expect(inactive).toHaveAttribute('aria-pressed', 'true');
+    await expect(all).toHaveAttribute('aria-pressed', 'false');
+    await expect(cards[2]).toBeVisible();
+    await expect(cards[0]).toHaveCount(0);
+    await expect(cards[1]).toHaveCount(0);
+
+    // Active only.
+    await active.click();
+    await expect(cards[0]).toBeVisible();
+    await expect(cards[1]).toBeVisible();
+    await expect(cards[2]).toHaveCount(0);
+
+    // Active + a search that matches only the inactive one = filtered-empty,
+    // which is NOT the "No schedules yet" empty state.
+    await search.fill('brunch');
+    await expect(authenticatedPage.getByText('No schedules match these filters')).toBeVisible();
+    await expect(
+      authenticatedPage.getByText('3 schedules exist, but none match the current search or status filter.'),
+    ).toBeVisible();
+    await expect(authenticatedPage.getByText('No schedules yet')).toHaveCount(0);
+    // The header count is the org's, not the filtered view's.
+    await expect(totalCount(authenticatedPage, 3)).toBeVisible();
+
+    await authenticatedPage.getByRole('button', { name: 'Clear filters' }).click();
+    await expect(search).toHaveValue('');
+    await expect(all).toHaveAttribute('aria-pressed', 'true');
+    for (const card of cards) await expect(card).toBeVisible();
   });
 
-  // ============= DISPLAY & FORMATTING TESTS =============
+  // ============= NAVIGATION & LAYOUT =============
 
-  test('should display schedule details correctly (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
+  test('survives navigating away and back (DOMAIN)', async ({ authenticatedPage, token }) => {
+    const playlist = await seedPlaylist(authenticatedPage, token);
+    const display = await seedDisplay(authenticatedPage, token);
+    const schedule = await seedSchedule(authenticatedPage, token, {
+      name: `Sticky ${Date.now()}`, playlistId: playlist.id, displayId: display.id,
+    });
 
-    // Look for schedule detail elements
-    const scheduleItems = authenticatedPage.locator('[role="listitem"], .schedule-card, [class*="schedule"]').first();
+    await gotoSchedules(authenticatedPage);
+    await expect(scheduleCard(authenticatedPage, schedule.name)).toBeVisible();
 
-    if (await scheduleItems.isVisible({ timeout: 3000 }).catch(() => false)) {
-      // Should show time information
-      const timeElement = scheduleItems.locator('text=/\\d{1,2}:\\d{2}|AM|PM|time/i');
-      if (await timeElement.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await expect(timeElement).toBeVisible();
-      }
-
-      // Should show days
-      const daysElement = scheduleItems.locator('text=/Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|Weekdays|Daily/i');
-      if (await daysElement.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await expect(daysElement).toBeVisible();
-      }
-    }
+    await authenticatedPage.getByRole('link', { name: 'Overview', exact: true }).click();
+    await expect(authenticatedPage).toHaveURL(/\/dashboard$/);
+    await authenticatedPage.getByRole('link', { name: 'Schedules', exact: true }).click();
+    await expect(authenticatedPage).toHaveURL(/\/dashboard\/schedules$/);
+    await expect(scheduleCard(authenticatedPage, schedule.name)).toBeVisible({ timeout: 10000 });
   });
 
-  test('should show next occurrences preview (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
+  test('reopening the create dialog after Cancel starts from a clean form (ADVERSARIAL)', async ({ authenticatedPage }) => {
+    await gotoSchedules(authenticatedPage);
 
-    // Look for next occurrences preview
-    const nextOccurrences = authenticatedPage.locator('text=/Next|Upcoming|occurrence/i');
+    let dialog = await openCreateDialog(authenticatedPage);
+    await dialog.getByPlaceholder('e.g., Morning Content, Holiday Special').fill('Half-typed');
+    await dialog.getByRole('button', { name: /^create$/i }).click();
+    await expect(dialog.getByText('Select a playlist', { exact: true })).toBeVisible();
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog).toBeHidden();
 
-    if (await nextOccurrences.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(nextOccurrences).toBeVisible();
-    }
+    dialog = await openCreateDialog(authenticatedPage);
+    await expect(dialog.getByPlaceholder('e.g., Morning Content, Holiday Special')).toHaveValue('');
+    await expect(dialog.getByText('Select a playlist', { exact: true })).toHaveCount(0);
   });
 
-  test('should handle empty schedules state (ADVERSARIAL)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Page should display gracefully even if empty
-    const emptyState = authenticatedPage.locator('text=/no schedules|empty|get started/i');
-    const schedulesList = authenticatedPage.locator('[role="listitem"], .schedule-card').first();
-
-    if (await emptyState.isVisible({ timeout: 2000 }).catch(() => false)) {
-      // An empty state is only useful with a way out of it.
-      const cta = authenticatedPage.locator('button').filter({ hasText: /create|new|add/i });
-      expect(await cta.count(), 'empty state must offer a create CTA').toBeGreaterThan(0);
-    } else {
-      // Otherwise the list itself must be rendered.
-      await expect(schedulesList).toBeVisible({ timeout: 5000 });
-    }
-  });
-
-  // ============= INTEGRATION & PERFORMANCE TESTS =============
-
-  test('should maintain schedule state after navigation (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    const initialHeading = authenticatedPage.locator('h2').filter({ hasText: 'Schedules' });
-    await expect(initialHeading).toBeVisible();
-
-    // Navigate away
-    const homeLink = authenticatedPage.locator('text=/Dashboard|Home/i').first();
-    if (await homeLink.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await homeLink.click();
-      await authenticatedPage.waitForTimeout(500);
-
-      // Navigate back
-      const schedulesLink = authenticatedPage.locator('text=/Schedules/i').first();
-      if (await schedulesLink.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await schedulesLink.click();
-        await authenticatedPage.waitForLoadState('networkidle');
-
-        // Page should be functional
-        await expect(initialHeading).toBeVisible();
-      }
-    }
-  });
-
-  test('should handle rapid schedule operations (ADVERSARIAL)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Verify page loaded
-    await expect(authenticatedPage.locator('h2').filter({ hasText: 'Schedules' })).toBeVisible({ timeout: 5000 });
-
-    // Simulate rapid clicks on create button
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create schedule/i }).first();
-
-    if (await createButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      // Rapid clicks should not break UI
-      await createButton.click().catch(() => {});
-
-      // Close modal if opened
-      const closeButton = authenticatedPage.locator('button').filter({ hasText: /close|cancel|×/i }).first();
-      if (await closeButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await closeButton.click().catch(() => {});
-      }
-
-      // Page should still be functional
-      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Schedules' })).toBeVisible();
-    }
-  });
-
-  test('should display responsive schedule layout (DOMAIN)', async ({ authenticatedPage }) => {
-    // Test mobile viewport
+  test('is usable at phone width (DOMAIN)', async ({ authenticatedPage }) => {
     await authenticatedPage.setViewportSize({ width: 375, height: 667 });
-    await authenticatedPage.goto('/dashboard/schedules');
-    await authenticatedPage.waitForLoadState('networkidle');
+    await gotoSchedules(authenticatedPage);
 
-    // Page should be accessible
-    await expect(authenticatedPage.locator('h2').filter({ hasText: 'Schedules' })).toBeVisible();
-
-    // Create button should be accessible
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create|new|add/i }).first();
-    expect(await createButton.boundingBox()).not.toBeNull();
-
-    // Reset viewport
-    await authenticatedPage.setViewportSize({ width: 1280, height: 720 });
+    const create = authenticatedPage.getByRole('button', { name: 'Create Schedule' }).first();
+    await expect(create).toBeVisible();
+    await expect(create).toBeInViewport();
+    await create.click();
+    await expect(createDialog(authenticatedPage)).toBeVisible();
   });
 });
