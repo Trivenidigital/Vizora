@@ -1,373 +1,251 @@
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from './fixtures/auth.fixture';
+import {
+  apiGet,
+  apiSend,
+  seedContent,
+  seedTag,
+  signInAsNewMember,
+  tagContent,
+} from './fixtures/seed';
 
 /**
- * PHASE 7.0: CONTENT TAGGING SYSTEM TEST SUITE
+ * CONTENT TAGGING
  *
- * BMAD Method Coverage:
- * ├─ Boundary Tests: Max tags, tag limits
- * ├─ Mutation Tests: Tag creation, content tagging, filtering
- * ├─ Adversarial Tests: Duplicate tags, special characters
- * └─ Domain Tests: Tag hierarchy, bulk tagging
+ * Rewritten 2026-10-15. The previous file held 20 tests, 19 of them wholly
+ * inside `if (await x.isVisible())` guards and three ending on
+ * `expect(count).toBeGreaterThanOrEqual(0)`. Most probed a tag-creation surface
+ * that did not exist (ContentTagger was mounted without `onCreateTag`), against
+ * a fresh org with no content and no tags, so every guard was false and the
+ * file certified nothing. Several matched `input[type="checkbox"]` page-wide,
+ * which in an empty org resolved to nothing at all.
  *
- * Test Coverage: 24 critical test cases for content tagging
+ * Every test below seeds what it needs through the API and asserts the
+ * behaviour unconditionally:
+ *   - the tag panel creates a tag (admin), and a duplicate name surfaces the
+ *     server's 409 message without discarding the operator's input;
+ *   - the bulk "Tag" action adds a tag to selected content and removes it;
+ *   - the tag filter narrows the list to tagged content and can be cleared;
+ *   - a viewer is offered neither creation nor bulk tagging, and the API agrees.
+ *
+ * Content rows are addressed in LIST view: its row checkboxes carry
+ * `aria-label="Select <title>"`, while the grid view's checkboxes carry no
+ * accessible name at all (reported as an a11y gap, not worked around).
  */
 
-test.describe('Phase 7.0: Content Tagging System', () => {
+const tagsToggle = (page: Page): Locator => page.getByRole('button', { name: /^Tags( \(\d+\))?$/ });
 
-  test('should load content page with tag filter', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/content');
-    await authenticatedPage.waitForLoadState('networkidle');
+/** The expanded tag panel: the card that holds the tagger's controls. */
+const tagPanel = (page: Page): Locator =>
+  page.locator('div.eh-dash-card').filter({ has: page.getByRole('button', { name: '+ Add Tag' }) });
 
-    // Look for tag filter section
-    const tagFilter = authenticatedPage.locator('text=/tag|filter.*tag/i').first();
+const tagChip = (scope: Locator, name: string): Locator =>
+  scope.getByRole('button', { name, exact: true });
 
-    if (await tagFilter.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(tagFilter).toBeVisible();
-    }
+const contentRows = (page: Page): Locator => page.locator('table tbody tr');
+
+const rowFor = (page: Page, title: string): Locator =>
+  contentRows(page).filter({ has: page.getByRole('checkbox', { name: `Select ${title}`, exact: true }) });
+
+async function openContentListView(page: Page): Promise<void> {
+  await page.goto('/dashboard/content');
+  await page.waitForLoadState('networkidle');
+  await page.getByRole('button', { name: 'List view' }).click();
+  await expect(page.getByRole('button', { name: 'List view' })).toHaveAttribute('aria-pressed', 'true');
+}
+
+async function openTagPanel(page: Page): Promise<void> {
+  await expect(tagsToggle(page)).toBeVisible({ timeout: 10000 });
+  await tagsToggle(page).click();
+}
+
+test.describe('Content tagging', () => {
+  test('admin creates a tag from the tag panel and it is listed', async ({ authenticatedPage, token }) => {
+    const page = authenticatedPage;
+    await openContentListView(page);
+    await openTagPanel(page);
+
+    // Fresh org: the empty state now points at the create control it renders.
+    await expect(
+      page.getByText('No content tags yet. Create one here, then select content and choose Tag to apply it.'),
+    ).toBeVisible();
+
+    const name = `Promo ${Date.now()}`;
+    await tagPanel(page).getByRole('button', { name: '+ Add Tag' }).click();
+    const form = page.getByRole('form', { name: 'Create tag' });
+    await expect(form).toBeVisible();
+
+    // The colour picker is a labelled group; pick one that is not the default.
+    const colours = form.getByRole('group', { name: 'Tag colour' }).getByRole('button');
+    await expect(colours).toHaveCount(6);
+    await form.getByRole('button', { name: 'green', exact: true }).click();
+    await expect(form.getByRole('button', { name: 'green', exact: true })).toHaveAttribute('aria-pressed', 'true');
+
+    const create = form.getByRole('button', { name: 'Create', exact: true });
+    await expect(create).toBeDisabled(); // nothing typed yet
+    await form.getByRole('textbox', { name: 'Tag name' }).fill(name);
+    await expect(create).toBeEnabled();
+    await create.click();
+
+    await expect(page.getByRole('alert').filter({ hasText: `Tag "${name}" created` })).toBeVisible();
+    await expect(form).toBeHidden();
+    const chip = tagChip(page.locator('div.eh-dash-card'), name);
+    await expect(chip).toBeVisible();
+    await expect(chip).toHaveAttribute('aria-pressed', 'false');
+
+    // Persisted, with the colour that was picked.
+    const tags = await apiGet<Array<{ name: string; color: string | null; contentCount: number }>>(
+      page,
+      token,
+      '/content/tags',
+    );
+    expect(tags).toEqual([expect.objectContaining({ name, color: 'green', contentCount: 0 })]);
   });
 
-  test('should display tag selector component (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/content');
-    await authenticatedPage.waitForLoadState('networkidle');
+  test('a duplicate tag name shows the 409 message and keeps the form open', async ({ authenticatedPage, token }) => {
+    const page = authenticatedPage;
+    const existing = await seedTag(page, token, { name: `Holiday ${Date.now()}` });
 
-    // Look for tag selector UI
-    const tagSelector = authenticatedPage.locator('[class*="tag"], [class*="chip"]').first();
+    await openContentListView(page);
+    await openTagPanel(page);
+    await expect(tagChip(page.locator('div.eh-dash-card'), existing.name)).toBeVisible();
 
-    if (await tagSelector.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(tagSelector).toBeVisible();
-    }
-  });
-
-  test('should list available tags (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/content');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for tag options
-    const tags = authenticatedPage.locator('text=/Marketing|Seasonal|Featured|Archive/i').first();
-
-    if (await tags.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(tags).toBeVisible();
-    }
-  });
-
-  test('should show tag colors (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/content');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for colored tag elements
-    const coloredTags = authenticatedPage.locator('[class*="blue"], [class*="red"], [class*="green"], [class*="purple"]').first();
-
-    if (await coloredTags.isVisible({ timeout: 3000 }).catch(() => false)) {
-      const classes = await coloredTags.getAttribute('class');
-      expect(classes).toMatch(/blue|red|green|purple|yellow|pink/);
-    }
-  });
-
-  test('should allow single tag selection (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/content');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Find tag checkbox
-    const tagCheckbox = authenticatedPage.locator('input[type="checkbox"]').first();
-
-    if (await tagCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
-      const initialState = await tagCheckbox.isChecked();
-      await tagCheckbox.check({ force: true });
-      const afterClick = await tagCheckbox.isChecked();
-
-      expect(afterClick).toBe(true);
-    }
-  });
-
-  test('should allow multi-tag selection (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/content');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Select multiple tags
-    const firstCheckbox = authenticatedPage.locator('input[type="checkbox"]').nth(0);
-    const secondCheckbox = authenticatedPage.locator('input[type="checkbox"]').nth(1);
-
-    if (await firstCheckbox.isVisible({ timeout: 3000 }).catch(() => false) &&
-        await secondCheckbox.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await firstCheckbox.check({ force: true });
-      await secondCheckbox.check({ force: true });
-
-      expect(await firstCheckbox.isChecked()).toBe(true);
-      expect(await secondCheckbox.isChecked()).toBe(true);
-    }
-  });
-
-  test('should filter content by selected tags (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/content');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Select tag
-    const tagCheckbox = authenticatedPage.locator('input[type="checkbox"]').first();
-
-    if (await tagCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await tagCheckbox.check({ force: true });
-      await authenticatedPage.waitForTimeout(500);
-
-      // Content should be filtered
-      const contentItems = authenticatedPage.locator('[class*="card"], [role="listitem"]');
-      const count = await contentItems.count();
-
-      expect(count).toBeGreaterThanOrEqual(0);
-    }
-  });
-
-  test('should create new tag (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/content');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for create tag button
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create.*tag|new.*tag|add.*tag/i }).first();
-
-    if (await createButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await createButton.click();
-      await authenticatedPage.waitForTimeout(500);
-
-      // Modal or form should appear
-      const modal = authenticatedPage.locator('[role="dialog"], form').first();
-      if (await modal.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await expect(modal).toBeVisible();
-      }
-    }
-  });
-
-  /**
-   * PINNED GAP, renamed on 2026-10-09. There is no tag-name validation to
-   * assert because there is no tag-creation form anywhere in the dashboard.
-   * `ContentTagger` is mounted exactly once - in the tag-filter panel of
-   * `content/page-client.tsx` - and that call site does NOT pass `onCreateTag`,
-   * so the component's entire create branch ("+ Add Tag", the name input, the
-   * colour picker, the disabled-until-named Create button) never renders.
-   *
-   * The old test asked for a button matching /create.*tag|new.*tag/i, found
-   * none, and skipped its body; the `expect(isDisabled || true)` behind the
-   * guard could not have failed even if it had run. Tags reach the UI only
-   * through `GET /content/tags`, and the panel's own empty state tells the
-   * operator to "add tags to content" with nothing on offer that does so.
-   */
-  test('should offer no tag-creation form on the content page (pinned gap)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/content');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    const tagsToggle = authenticatedPage.getByRole('button', { name: /^Tags$/ });
-    await expect(tagsToggle).toBeVisible({ timeout: 10000 });
-    await tagsToggle.click();
-
-    // REACH CONTROL. Both halves of the zero below are searched for by the
-    // same two queries used here, and here they find things: a real
-    // role-named button, and the tag panel's own rendered copy. So a count of
-    // zero is a statement about the product, not about a locator that matches
-    // nothing on any page.
-    await expect(authenticatedPage.getByRole('button', { name: /Upload Content/ }).first()).toBeVisible();
-    await expect(authenticatedPage.getByText(/No content tags/)).toBeVisible();
+    await tagPanel(page).getByRole('button', { name: '+ Add Tag' }).click();
+    const form = page.getByRole('form', { name: 'Create tag' });
+    const input = form.getByRole('textbox', { name: 'Tag name' });
+    await input.fill(existing.name);
+    // Submitted with Enter: the create control is a real <form>.
+    await input.press('Enter');
 
     await expect(
-      authenticatedPage.getByRole('button', { name: /add tag|create.*tag|new tag/i }),
-    ).toHaveCount(0);
-    await expect(authenticatedPage.getByPlaceholder(/tag name/i)).toHaveCount(0);
+      page.getByRole('alert').filter({ hasText: `A tag named "${existing.name}" already exists` }),
+    ).toBeVisible();
+    await expect(form).toBeVisible();
+    await expect(input).toHaveValue(existing.name);
+
+    // Still exactly one tag of that name.
+    const tags = await apiGet<Array<{ name: string }>>(page, token, '/content/tags');
+    expect(tags.filter((t) => t.name === existing.name)).toHaveLength(1);
   });
 
-  test('should support tag color selection (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/content');
-    await authenticatedPage.waitForLoadState('networkidle');
+  test('bulk Tag action adds a tag to selected content, and the tag filter shows exactly those', async ({ authenticatedPage, token }) => {
+    const page = authenticatedPage;
+    const stamp = Date.now();
+    const a = await seedContent(page, token, { name: `Tag A ${stamp}` });
+    const b = await seedContent(page, token, { name: `Tag B ${stamp}` });
+    const c = await seedContent(page, token, { name: `Tag C ${stamp}` });
+    const tag = await seedTag(page, token, { name: `Featured ${stamp}` });
 
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create.*tag|new.*tag/i }).first();
+    await openContentListView(page);
+    await expect(contentRows(page)).toHaveCount(3, { timeout: 10000 });
 
-    if (await createButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await createButton.click();
-      await authenticatedPage.waitForTimeout(500);
+    await page.getByRole('checkbox', { name: `Select ${a.name}`, exact: true }).check();
+    await page.getByRole('checkbox', { name: `Select ${b.name}`, exact: true }).check();
+    await expect(page.getByText('2 items selected')).toBeVisible();
 
-      // Look for color picker
-      const colorButtons = authenticatedPage.locator('button').filter({ hasText: /blue|red|green|purple|yellow|pink/i });
-      const count = await colorButtons.count();
+    await page.getByRole('button', { name: 'Tag', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Tag Selected Content' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText('Choose tags to add to, or remove from, 2 selected items.')).toBeVisible();
 
-      expect(count).toBeGreaterThanOrEqual(0);
-    }
+    const add = dialog.getByRole('button', { name: 'Add to Selected' });
+    await expect(add).toBeDisabled(); // no tag chosen yet
+    await tagChip(dialog, tag.name).click();
+    await expect(tagChip(dialog, tag.name)).toHaveAttribute('aria-pressed', 'true');
+    await add.click();
+
+    await expect(page.getByRole('alert').filter({ hasText: 'Added 1 tag to 2 items' })).toBeVisible();
+    await expect(dialog).toBeHidden();
+    // Selection resets after a bulk action.
+    await expect(page.getByText(/items? selected/)).toBeHidden();
+
+    // Filter by the tag: exactly the two tagged items remain.
+    await openTagPanel(page);
+    await tagChip(page.locator('div.eh-dash-card'), tag.name).click();
+    await expect(tagsToggle(page)).toHaveText(/Tags\s*\(1\)/);
+    await expect(page.getByText(`Tag: ${tag.name}`)).toBeVisible();
+    await expect(contentRows(page)).toHaveCount(2, { timeout: 10000 });
+    await expect(rowFor(page, a.name)).toBeVisible();
+    await expect(rowFor(page, b.name)).toBeVisible();
+    await expect(rowFor(page, c.name)).toHaveCount(0);
+
+    // Clearing the tag filter brings the untagged item back.
+    await page.getByRole('button', { name: 'Clear tag filters' }).click();
+    await expect(contentRows(page)).toHaveCount(3, { timeout: 10000 });
+    await expect(rowFor(page, c.name)).toBeVisible();
+    await expect(tagChip(page.locator('div.eh-dash-card'), tag.name)).toHaveAttribute('aria-pressed', 'false');
   });
 
-  test('should delete tag (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/content');
-    await authenticatedPage.waitForLoadState('networkidle');
+  test('bulk Tag action removes a tag from selected content only', async ({ authenticatedPage, token }) => {
+    const page = authenticatedPage;
+    const stamp = Date.now();
+    const keep = await seedContent(page, token, { name: `Keep ${stamp}` });
+    const strip = await seedContent(page, token, { name: `Strip ${stamp}` });
+    const tag = await seedTag(page, token, { name: `Seasonal ${stamp}` });
+    await tagContent(page, token, [keep.id, strip.id], [tag.id]);
 
-    // Look for delete tag button
-    const deleteButton = authenticatedPage.locator('button').filter({ hasText: /delete.*tag|remove.*tag/i }).first();
+    await openContentListView(page);
+    await expect(contentRows(page)).toHaveCount(2, { timeout: 10000 });
 
-    if (await deleteButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await deleteButton.click();
-      await authenticatedPage.waitForTimeout(500);
+    await page.getByRole('checkbox', { name: `Select ${strip.name}`, exact: true }).check();
+    await page.getByRole('button', { name: 'Tag', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Tag Selected Content' });
+    const remove = dialog.getByRole('button', { name: 'Remove from Selected' });
+    await expect(remove).toBeDisabled();
+    await tagChip(dialog, tag.name).click();
+    await remove.click();
 
-      // Confirmation may appear
-      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Content Library' })).toBeVisible();
-    }
+    await expect(page.getByRole('alert').filter({ hasText: 'Removed 1 tag from 1 item' })).toBeVisible();
+    await expect(dialog).toBeHidden();
+
+    await openTagPanel(page);
+    await tagChip(page.locator('div.eh-dash-card'), tag.name).click();
+    await expect(contentRows(page)).toHaveCount(1, { timeout: 10000 });
+    await expect(rowFor(page, keep.name)).toBeVisible();
+
+    // And the server agrees on the usage count.
+    const tags = await apiGet<Array<{ id: string; contentCount: number }>>(page, token, '/content/tags');
+    expect(tags.find((t) => t.id === tag.id)?.contentCount).toBe(1);
   });
 
-  test('should display tag count (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/content');
-    await authenticatedPage.waitForLoadState('networkidle');
+  test('a viewer can filter by tag but is offered neither creation nor bulk tagging', async ({ authenticatedPage, token }) => {
+    const page = authenticatedPage;
+    const stamp = Date.now();
+    const item = await seedContent(page, token, { name: `Viewer Item ${stamp}` });
+    const tag = await seedTag(page, token, { name: `Viewer Tag ${stamp}` });
+    await tagContent(page, token, [item.id], [tag.id]);
 
-    // Look for tag count
-    const tagCount = authenticatedPage.locator('text=/\\d+ tag/i').first();
+    const viewerToken = await signInAsNewMember(page, token, 'viewer');
 
-    if (await tagCount.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(tagCount).toBeVisible();
-    }
+    await openContentListView(page);
+    await expect(rowFor(page, item.name)).toHaveCount(0); // viewers get no row checkboxes
+    await expect(page.getByRole('button', { name: `Preview ${item.name}` })).toBeVisible({ timeout: 10000 });
+
+    await openTagPanel(page);
+    // REACH CONTROL: the panel renders, and its tag chip is a findable button.
+    const chip = page.getByRole('button', { name: tag.name, exact: true });
+    await expect(chip).toBeVisible();
+    await expect(page.getByRole('button', { name: '+ Add Tag' })).toHaveCount(0);
+    await expect(page.getByRole('checkbox', { name: 'Select all content items' })).toHaveCount(0);
+
+    // Filtering still works for a viewer.
+    await chip.click();
+    await expect(chip).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByText(`Tag: ${tag.name}`)).toBeVisible();
+
+    // The server enforces the same boundary.
+    const res = await apiSend(page, viewerToken, 'POST', '/content/tags', { name: `Nope ${stamp}` });
+    expect(res.status()).toBe(403);
   });
 
-  test('should tag individual content item (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/content');
-    await authenticatedPage.waitForLoadState('networkidle');
+  test('a viewer in an org with no tags is told who can create them', async ({ authenticatedPage, token }) => {
+    const page = authenticatedPage;
+    await signInAsNewMember(page, token, 'viewer');
 
-    // Find content item
-    const contentItem = authenticatedPage.locator('[class*="card"], [role="listitem"]').first();
-
-    if (await contentItem.isVisible({ timeout: 3000 }).catch(() => false)) {
-      // Look for tag button on item
-      const tagButton = contentItem.locator('button').filter({ hasText: /tag|label|mark/i }).first();
-
-      if (await tagButton.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await tagButton.click();
-        await authenticatedPage.waitForTimeout(500);
-
-        // Tag selector should appear
-        await expect(authenticatedPage.locator('[role="dialog"], [role="listbox"]').first()).toBeVisible({ timeout: 2000 }).catch(() => {});
-      }
-    }
-  });
-
-  test('should support bulk tagging (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/content');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Select multiple content items
-    const firstCheckbox = authenticatedPage.locator('input[type="checkbox"]').nth(0);
-    const secondCheckbox = authenticatedPage.locator('input[type="checkbox"]').nth(1);
-
-    if (await firstCheckbox.isVisible({ timeout: 3000 }).catch(() => false) &&
-        await secondCheckbox.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await firstCheckbox.check({ force: true });
-      await secondCheckbox.check({ force: true });
-      await authenticatedPage.waitForTimeout(500);
-
-      // Look for bulk tag action
-      const bulkTagButton = authenticatedPage.locator('button').filter({ hasText: /bulk.*tag|tag.*all|apply.*tag/i }).first();
-
-      if (await bulkTagButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await expect(bulkTagButton).toBeVisible();
-      }
-    }
-  });
-
-  test('should show tag badge on tagged content (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/content');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for tag badges/chips
-    const tagBadges = authenticatedPage.locator('[class*="tag"], [class*="chip"], [class*="badge"]').first();
-
-    if (await tagBadges.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(tagBadges).toBeVisible();
-    }
-  });
-
-  test('should remove tag from content (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/content');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for remove tag button (usually X on tag chip)
-    const removeTagButton = authenticatedPage.locator('button').filter({ hasText: /remove|delete|×/i }).first();
-
-    if (await removeTagButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await removeTagButton.click();
-      await authenticatedPage.waitForTimeout(500);
-
-      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Content Library' })).toBeVisible();
-    }
-  });
-
-  test('should clear all tag filters (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/content');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Select tags
-    const tagCheckbox = authenticatedPage.locator('input[type="checkbox"]').first();
-
-    if (await tagCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await tagCheckbox.check({ force: true });
-      await authenticatedPage.waitForTimeout(500);
-
-      // Find clear button
-      const clearButton = authenticatedPage.locator('button').filter({ hasText: /clear.*tag|reset|clear.*filter/i }).first();
-
-      if (await clearButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await clearButton.click();
-        await authenticatedPage.waitForTimeout(500);
-
-        const isChecked = await tagCheckbox.isChecked();
-        expect(isChecked).toBe(false);
-      }
-    }
-  });
-
-  test('should support tag search (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/content');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for tag search
-    const searchInput = authenticatedPage.locator('input[placeholder*="search.*tag"], input[placeholder*="tag"]').first();
-
-    if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await searchInput.fill('Marketing');
-      await authenticatedPage.waitForTimeout(500);
-
-      // Results should filter
-      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Content' })).toBeVisible();
-
-      await searchInput.clear();
-    }
-  });
-
-  test('should handle tag with special characters (BOUNDARY)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/content');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    const createButton = authenticatedPage.locator('button').filter({ hasText: /create.*tag|new.*tag/i }).first();
-
-    if (await createButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await createButton.click();
-      await authenticatedPage.waitForTimeout(500);
-
-      const nameInput = authenticatedPage.locator('input[placeholder*="name"]').first();
-
-      if (await nameInput.isVisible({ timeout: 2000 }).catch(() => false)) {
-        // Test with special chars
-        await nameInput.fill('Tag@#$%');
-        const value = await nameInput.inputValue();
-
-        expect(value).toBeTruthy();
-      }
-    }
-  });
-
-  test('should show related tags (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/content');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Select a tag
-    const tagCheckbox = authenticatedPage.locator('input[type="checkbox"]').first();
-
-    if (await tagCheckbox.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await tagCheckbox.check({ force: true });
-      await authenticatedPage.waitForTimeout(500);
-
-      // Look for content filtered by tag
-      const filteredContent = authenticatedPage.locator('[class*="card"], [role="listitem"]');
-      const count = await filteredContent.count();
-
-      expect(count).toBeGreaterThanOrEqual(0);
-    }
+    await page.goto('/dashboard/content');
+    await page.waitForLoadState('networkidle');
+    await openTagPanel(page);
+    await expect(page.getByText('No content tags yet. An admin or manager can create them.')).toBeVisible();
+    await expect(page.getByRole('button', { name: '+ Add Tag' })).toHaveCount(0);
   });
 });
