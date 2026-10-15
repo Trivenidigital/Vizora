@@ -37,6 +37,7 @@ import { ReplaceFileDto } from './dto/replace-file.dto';
 import { SetContentExpirationDto } from './dto/set-content-expiration.dto';
 import { ContentQueryDto } from './dto/content-query.dto';
 import { FlagContentDto } from './dto/flag-content.dto';
+import { CreateTagDto } from './dto/create-tag.dto';
 import {
   SubmitForApprovalDto,
   ApproveContentDto,
@@ -404,6 +405,20 @@ export class ContentController {
   @Get('tags')
   listContentTags(@CurrentUser('organizationId') organizationId: string) {
     return this.contentService.listContentTags(organizationId);
+  }
+
+  /**
+   * Create an (initially unused) org tag. Applying it to content is a separate
+   * step — `POST /content/bulk/tags`. 409 on a duplicate name within the org.
+   */
+  @Post('tags')
+  @Roles('admin', 'manager')
+  @HttpCode(HttpStatus.CREATED)
+  createContentTag(
+    @CurrentUser('organizationId') organizationId: string,
+    @Body() dto: CreateTagDto,
+  ) {
+    return this.contentService.createContentTag(organizationId, dto);
   }
 
   @Get(':id')

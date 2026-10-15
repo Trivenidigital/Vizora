@@ -20,6 +20,7 @@ import { StorageService } from '../storage/storage.service';
 import { StorageQuotaService } from '../storage/storage-quota.service';
 import { SubscriptionActiveGuard } from '../billing/guards/subscription-active.guard';
 import { DatabaseService } from '../database/database.service';
+import { ROLES_KEY } from '../auth/decorators/roles.decorator';
 import { Readable, Writable } from 'stream';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -40,6 +41,7 @@ describe('ContentController', () => {
       create: jest.fn(),
       findAll: jest.fn(),
       listContentTags: jest.fn(),
+      createContentTag: jest.fn(),
       findOne: jest.fn(),
       update: jest.fn(),
       archive: jest.fn(),
@@ -503,6 +505,26 @@ describe('ContentController', () => {
 
       expect(result).toEqual(expectedTags);
       expect(mockContentService.listContentTags).toHaveBeenCalledWith(organizationId);
+    });
+  });
+
+  describe('createContentTag', () => {
+    it('should create the tag in the caller org', async () => {
+      const created = { id: 'tag-1', name: 'Holiday', color: 'red', contentCount: 0 };
+      mockContentService.createContentTag.mockResolvedValue(created as any);
+
+      const result = await controller.createContentTag(organizationId, { name: 'Holiday', color: 'red' });
+
+      expect(result).toEqual(created);
+      expect(mockContentService.createContentTag).toHaveBeenCalledWith(organizationId, {
+        name: 'Holiday',
+        color: 'red',
+      });
+    });
+
+    it('should be restricted to admin and manager', () => {
+      const roles = Reflect.getMetadata(ROLES_KEY, ContentController.prototype.createContentTag);
+      expect(roles).toEqual(['admin', 'manager']);
     });
   });
 
