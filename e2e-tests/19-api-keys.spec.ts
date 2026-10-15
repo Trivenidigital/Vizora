@@ -40,13 +40,9 @@ test.describe('API Key Management (Wave 6)', () => {
       await authenticatedPage.goto('/dashboard/settings/api-keys');
       await authenticatedPage.waitForLoadState('networkidle');
 
-      const emptyState = authenticatedPage.locator('text=/no api keys|create your first|get started/i').first();
-      const keyList = authenticatedPage.locator('table, [role="table"], [data-testid="api-key-list"]');
-
-      const hasEmptyState = await emptyState.isVisible({ timeout: 5000 }).catch(() => false);
-      const hasList = await keyList.isVisible({ timeout: 5000 }).catch(() => false);
-
-      expect(hasEmptyState || hasList).toBeTruthy();
+      // A brand-new org has no keys: assert the empty state, not either-or.
+      await expect(authenticatedPage.getByText('No API keys')).toBeVisible({ timeout: 10000 });
+      await expect(authenticatedPage.locator('table')).toHaveCount(0);
     });
 
     test('should open create key modal', async ({ authenticatedPage }) => {
@@ -77,14 +73,15 @@ test.describe('API Key Management (Wave 6)', () => {
 
       await authenticatedPage.click('button:has-text("Create"), button:has-text("New"), button:has-text("Generate")');
 
-      // Scopes selection should be present
-      const scopesSection = authenticatedPage.locator('text=/scopes|permissions|access/i').first();
-      const checkboxes = authenticatedPage.locator('input[type="checkbox"]');
-
-      const hasScopes = await scopesSection.isVisible({ timeout: 5000 }).catch(() => false);
-      const hasCheckboxes = await checkboxes.first().isVisible({ timeout: 5000 }).catch(() => false);
-
-      expect(hasScopes || hasCheckboxes).toBeTruthy();
+      // Eight scopes, each a labelled checkbox; "Read All" is the default.
+      const dialog = authenticatedPage.getByRole('dialog', { name: 'Create API Key' });
+      await expect(dialog.getByText('Scopes', { exact: true })).toBeVisible({ timeout: 5000 });
+      const scopes = dialog.getByRole('checkbox');
+      await expect(scopes).toHaveCount(8);
+      await expect(dialog.getByRole('checkbox', { name: /Read All/ })).toBeChecked();
+      await expect(dialog.getByRole('checkbox', { name: /Write Content/ })).not.toBeChecked();
+      await dialog.getByRole('checkbox', { name: /Write Content/ }).check();
+      await expect(dialog.getByRole('checkbox', { name: /Write Content/ })).toBeChecked();
     });
 
     test('should create API key and show it once', async ({ authenticatedPage }) => {
@@ -138,22 +135,32 @@ test.describe('API Key Management (Wave 6)', () => {
       await authenticatedPage.goto('/dashboard/settings/api-keys');
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Look for revoke button
-      const revokeButton = authenticatedPage.locator('button').filter({ hasText: /revoke|delete|remove/i }).first();
-      const hasRevoke = await revokeButton.isVisible({ timeout: 5000 }).catch(() => false);
+      // A fresh org has no keys, so create the one to revoke - the old body
+      // branched on a Revoke button that a fresh org never has.
+      const name = `Revoke Confirm ${Date.now()}`;
+      const dialog = await openCreateKeyDialog(authenticatedPage);
+      await dialog.getByLabel(/key name/i).fill(name);
+      await dialog.getByRole('button', { name: 'Create Key' }).click();
+      await expect(dialog).toBeHidden({ timeout: 10000 });
 
-      if (hasRevoke) {
-        await revokeButton.click();
+      const row = authenticatedPage.locator('tr').filter({ hasText: name });
+      await expect(row).toHaveCount(1, { timeout: 10000 });
+      await row.getByRole('button', { name: 'Revoke' }).click();
 
-        // Should show confirmation
-        const confirmDialog = authenticatedPage.locator('[role="dialog"], [role="alertdialog"], .modal');
-        const confirmText = authenticatedPage.locator('text=/are you sure|confirm|cannot be undone/i');
+      const confirm = authenticatedPage.getByRole('dialog', { name: 'Revoke API Key' });
+      await expect(confirm).toBeVisible({ timeout: 5000 });
+      await expect(confirm).toContainText(`Are you sure you want to revoke "${name}"?`);
+      await expect(confirm).toContainText('This action cannot be undone.');
 
-        const hasDialog = await confirmDialog.isVisible({ timeout: 3000 }).catch(() => false);
-        const hasConfirmText = await confirmText.isVisible({ timeout: 3000 }).catch(() => false);
+      // Cancel keeps the key; confirming revokes it.
+      await confirm.getByRole('button', { name: 'Cancel' }).click();
+      await expect(confirm).toBeHidden();
+      await expect(row).toHaveCount(1);
 
-        expect(hasDialog || hasConfirmText).toBeTruthy();
-      }
+      await row.getByRole('button', { name: 'Revoke' }).click();
+      await confirm.getByRole('button', { name: 'Revoke Key' }).click();
+      await expect(authenticatedPage.getByRole('alert').filter({ hasText: `API key "${name}" has been revoked` })).toBeVisible();
+      await expect(row).toHaveCount(0, { timeout: 10000 });
     });
   });
 

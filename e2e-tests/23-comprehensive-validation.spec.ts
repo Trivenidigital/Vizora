@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures/auth.fixture';
+import { seedContent } from './fixtures/seed';
 
 test.describe('Comprehensive UI Validation', () => {
   test.describe('Dashboard Page', () => {
@@ -164,47 +165,12 @@ test.describe('Comprehensive UI Validation', () => {
       await expect(submit).toBeEnabled();
     });
 
-    test('the default-duration field declares no minimum (pinned gap)', async ({ authenticatedPage }) => {
-      await authenticatedPage.goto('/dashboard/settings');
-      await authenticatedPage.waitForLoadState('networkidle');
-
-      const duration = authenticatedPage.locator('input[type="number"]').first();
-      await expect(duration).toBeVisible({ timeout: 10000 });
-
-      /*
-       * "Default Content Duration (seconds)" carries no min, no max and no step,
-       * so a negative duration is accepted and shipped to the API. The old body
-       * read `min`, found null, and skipped its only assertion — reporting green
-       * on a validation gap. Pinned here and reported; nothing under web/src is
-       * changed in this pass.
-       */
-      expect(await duration.getAttribute('min'), 'no min is declared').toBeNull();
-
-      await duration.fill('-5');
-      await duration.blur();
-      await expect(duration).toHaveValue('-5');
-      expect(
-        await duration.evaluate((el) => (el as HTMLInputElement).validity.valid),
-        '-5 seconds is accepted because no min is declared',
-      ).toBeTruthy();
-
-      /*
-       * REACH CONTROL: adding a min to this very element makes the identical
-       * check report INVALID. Without it, `validity.valid === true` would be
-       * indistinguishable from "constraint validation was never evaluated here"
-       * — the same shape of non-evidence as the assertion this replaces.
-       */
-      expect(
-        await duration.evaluate((el) => {
-          const input = el as HTMLInputElement;
-          input.min = '1';
-          const validWithMin = input.validity.valid;
-          input.removeAttribute('min');
-          return validWithMin;
-        }),
-        'the control proves a declared min WOULD be enforced',
-      ).toBeFalsy();
-    });
+    /*
+     * Removed 2026-10-15: 'the default-duration field declares no minimum
+     * (pinned gap)'. The field is now bounded (min 1, max 86400, step 1) in the
+     * browser and the API; 08-settings asserts the inline errors and that no
+     * invalid value is saved.
+     */
   });
 
   test.describe('Button States', () => {
@@ -343,26 +309,23 @@ test.describe('Comprehensive UI Validation', () => {
       await authenticatedPage.goto('/dashboard/content');
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Try to open any modal
-      const createButton = authenticatedPage.locator('button').filter({ hasText: /create|new|add/i }).first();
-      const hasCreate = await createButton.isVisible({ timeout: 5000 }).catch(() => false);
+      /*
+       * The old body clicked the first /create|new|add/i button and then
+       * branched twice on whether anything opened. The folder dialog is a
+       * named Modal; both of its dismiss controls must close it.
+       */
+      const open = authenticatedPage.getByRole('button', { name: 'New Folder' });
+      const dialog = authenticatedPage.getByRole('dialog', { name: 'Create New Folder' });
 
-      if (hasCreate) {
-        await createButton.click();
+      await open.click();
+      await expect(dialog).toBeVisible({ timeout: 5000 });
+      await dialog.getByRole('button', { name: 'Close modal' }).click();
+      await expect(dialog).toBeHidden();
 
-        const modal = authenticatedPage.locator('[role="dialog"]').first();
-        const isModalVisible = await modal.isVisible({ timeout: 5000 }).catch(() => false);
-
-        if (isModalVisible) {
-          // Click close button
-          const closeButton = authenticatedPage.locator('button[aria-label*="close" i], button:has-text("Cancel"), button:has-text("×")').first();
-          await closeButton.click();
-
-          await authenticatedPage.waitForTimeout(500);
-          const stillVisible = await modal.isVisible().catch(() => false);
-          expect(stillVisible).toBeFalsy();
-        }
-      }
+      await open.click();
+      await expect(dialog).toBeVisible({ timeout: 5000 });
+      await dialog.getByRole('button', { name: 'Cancel' }).click();
+      await expect(dialog).toBeHidden();
     });
   });
 
@@ -424,15 +387,21 @@ test.describe('Comprehensive UI Validation', () => {
 
   test.describe('Error Handling', () => {
     test('should show error state for failed API calls', async ({ authenticatedPage }) => {
+      await authenticatedPage.goto('/dashboard/content');
+      await authenticatedPage.waitForLoadState('networkidle');
+      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Content Library' })).toBeVisible({ timeout: 10000 });
+
       /*
-       * The old route glob ended in "/api/displays". The API lives under
-       * `/api/v1`, and the browser calls `/api/v1/displays` through the Next
-       * rewrite, so the glob matched nothing, the page loaded normally, and the
-       * test asserted `expect(hasError || true)` — green whether or not the
-       * product has any error state at all.
+       * This used to fail /api/v1/displays and load /dashboard/devices. That
+       * page is server-rendered with its device list (page.tsx serverFetch),
+       * and the client only refetches when the SSR list was incomplete - so in
+       * an environment where the SSR fetch succeeds, the browser never made the
+       * request the route was waiting to fail, and the test went red for a
+       * reason unrelated to error handling. The content list is fetched by the
+       * CLIENT on every filter change, so failing it there is deterministic.
        */
       await authenticatedPage.route(
-        (url) => url.pathname === '/api/v1/displays',
+        (url) => url.pathname === '/api/v1/content',
         (route) =>
           route.fulfill({
             status: 500,
@@ -440,28 +409,18 @@ test.describe('Comprehensive UI Validation', () => {
             body: JSON.stringify({ success: false, message: 'Server error' }),
           }),
       );
+      await authenticatedPage.getByRole('button', { name: 'Image', exact: true }).click();
 
-      await authenticatedPage.goto('/dashboard/devices');
-
-      /*
-       * DashboardSectionError's generic branch. The wait is long on purpose:
-       * loadDevices runs through `retry` (3 attempts, 1s initial backoff) before
-       * it sets devicesLoadError, so the error state is not expected instantly.
-       *
-       * Addressed by heading/button rather than by role=alert: toasts are also
-       * role="alert" and this page raises one per failed attempt.
-       */
-      await expect(
-        authenticatedPage.getByRole('heading', { name: 'Devices Error' }),
-      ).toBeVisible({ timeout: 30000 });
+      // DashboardSectionError, addressed by heading (toasts are role=alert too).
+      await expect(authenticatedPage.getByRole('heading', { name: 'Content Library Error' })).toBeVisible({ timeout: 30000 });
       await expect(
         authenticatedPage.getByText('Something went wrong loading this section. Please try again.'),
       ).toBeVisible();
-      await expect(authenticatedPage.getByRole('button', { name: 'Try Again' })).toBeVisible();
 
-      // ...and it replaces the fleet table rather than sitting beside a table
-      // that silently shows nothing.
-      await expect(authenticatedPage.locator('table.eh-datatable')).toHaveCount(0);
+      // Recovery: once the API answers again, Try Again restores the list.
+      await authenticatedPage.unrouteAll({ behavior: 'ignoreErrors' });
+      await authenticatedPage.getByRole('button', { name: 'Try Again' }).click();
+      await expect(authenticatedPage.getByRole('heading', { name: 'Content Library Error' })).toHaveCount(0, { timeout: 30000 });
     });
 
     test('should handle 404 pages gracefully', async ({ authenticatedPage }) => {
@@ -487,45 +446,46 @@ test.describe('Comprehensive UI Validation', () => {
   });
 
   test.describe('Loading States', () => {
-    test('should show loading indicators', async ({ authenticatedPage }) => {
+    test('should show loading indicators', async ({ authenticatedPage, token }) => {
       /*
        * The old body built two locators, used neither, and closed on
-       * `expect(true).toBeTruthy()` with the comment "Either loading indicators
-       * appeared or page loaded fast". Against a local stack the page loads fast
-       * every time, so nothing was ever observed.
-       *
-       * The fleet request is held open instead, which makes the loading state
-       * deterministic rather than a race with the API.
+       * `expect(true).toBeTruthy()`. Its replacement held /api/v1/displays and
+       * loaded /dashboard/devices - but that page is server-rendered with its
+       * device list and the client refetches only when the SSR list was
+       * incomplete, so where the SSR fetch succeeds the held request is never
+       * made and the indicator never shows. The content list is fetched by the
+       * CLIENT on every filter change, so holding it there is deterministic.
        */
+      await seedContent(authenticatedPage, token, { type: 'image' });
+      await authenticatedPage.goto('/dashboard/content');
+      await authenticatedPage.waitForLoadState('networkidle');
+      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Content Library' })).toBeVisible({ timeout: 10000 });
+
       let release!: () => void;
       const held = new Promise<void>((resolve) => {
         release = resolve;
       });
-
       await authenticatedPage.route(
-        (url) => url.pathname === '/api/v1/displays',
+        (url) => url.pathname === '/api/v1/content',
         async (route) => {
           await held;
           await route.fallback();
         },
       );
 
-      await authenticatedPage.goto('/dashboard/devices');
+      await authenticatedPage.getByRole('button', { name: 'Image', exact: true }).click();
 
-      // The skeleton announces itself rather than only looking busy. `.first()`
-      // because the route-level loading.tsx fallback carries the same markers.
-      const busy = authenticatedPage.locator('[aria-busy="true"]');
-      await expect(busy.first()).toBeVisible({ timeout: 15000 });
-      await expect(
-        authenticatedPage.getByText('Loading devices').first(),
-      ).toBeAttached();
-      await expect(authenticatedPage.locator('.eh-skeleton').first()).toBeVisible();
+      // LoadingSpinner announces itself (role=status, named "Loading").
+      const spinner = authenticatedPage.getByRole('status', { name: 'Loading' });
+      await expect(spinner).toBeVisible({ timeout: 15000 });
 
       release();
 
-      // CONTROL: the indicator is tied to the request, not permanent. Without
-      // this, a page stuck in a loading state forever would also pass.
-      await expect(busy).toHaveCount(0, { timeout: 20000 });
+      // CONTROL: the indicator is tied to the request, not permanent, and the
+      // list it was standing in for arrives.
+      await expect(spinner).toHaveCount(0, { timeout: 20000 });
+      await authenticatedPage.getByRole('button', { name: 'List view' }).click();
+      await expect(authenticatedPage.locator('table tbody tr')).toHaveCount(1, { timeout: 10000 });
     });
   });
 });

@@ -224,6 +224,48 @@ test.describe('Phase 7.2: Command Palette (Power User Navigation)', () => {
     await expect(highlighted).toHaveText(/Go to Devices/);
   });
 
+  test('exposes a combobox-controlled listbox of options (DOMAIN)', async ({ authenticatedPage }) => {
+    await authenticatedPage.goto('/dashboard');
+    await authenticatedPage.waitForLoadState('networkidle');
+    await openPalette(authenticatedPage);
+
+    const card = paletteCard(authenticatedPage);
+    const combobox = card.getByRole('combobox', { name: 'Search commands' });
+    const listbox = card.getByRole('listbox', { name: 'Commands' });
+    await expect(combobox).toBeVisible();
+    await expect(listbox).toBeVisible();
+
+    // The input owns the list, and points at the highlighted option.
+    const listboxId = await listbox.getAttribute('id');
+    expect(listboxId).toBeTruthy();
+    await expect(combobox).toHaveAttribute('aria-controls', listboxId!);
+    await expect(combobox).toHaveAttribute('aria-expanded', 'true');
+
+    // Every row is an option inside the listbox, each carrying aria-selected,
+    // and no command row is a bare button any more. REACH CONTROL: the option
+    // query finds every navigation command.
+    const options = listbox.getByRole('option');
+    await expect(options.filter({ hasText: /^Go to / })).toHaveCount(await commands(authenticatedPage).count());
+    expect(await options.count()).toBeGreaterThan(1);
+    for (const value of await options.evaluateAll((els) => els.map((e) => e.getAttribute('aria-selected')))) {
+      expect(['true', 'false']).toContain(value);
+    }
+    await expect(listbox.getByRole('button')).toHaveCount(0);
+
+    const selected = listbox.getByRole('option', { selected: true });
+    await expect(combobox).toHaveAttribute('aria-activedescendant', (await selected.getAttribute('id'))!);
+    await authenticatedPage.keyboard.press('ArrowDown');
+    await expect(combobox).toHaveAttribute('aria-activedescendant', (await selected.getAttribute('id'))!);
+    await expect(selected).toHaveText(/Go to Devices/);
+
+    // With nothing matching, the listbox is gone and the input says so.
+    await searchField(authenticatedPage).fill('zzzz-no-such-command');
+    await expect(card.getByText('No commands found')).toBeVisible();
+    await expect(listbox).toHaveCount(0);
+    await expect(combobox).toHaveAttribute('aria-expanded', 'false');
+    await expect(combobox).not.toHaveAttribute('aria-activedescendant', /.+/);
+  });
+
   test('should execute command with Enter (MUTATION)', async ({ authenticatedPage }) => {
     await authenticatedPage.goto('/dashboard');
     await authenticatedPage.waitForLoadState('networkidle');
