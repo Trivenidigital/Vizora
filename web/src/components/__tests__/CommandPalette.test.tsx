@@ -90,4 +90,57 @@ describe('CommandPalette', () => {
     fireEvent.change(input, { target: { value: 'home' } });
     expect(screen.getByText('Go to Dashboard')).toBeInTheDocument();
   });
+
+  it('clears the query on Escape (uncontrolled), so reopening shows every command', () => {
+    render(<CommandPalette commands={mockCommands} />);
+    fireEvent.keyDown(window, { key: 'k', metaKey: true });
+    fireEvent.change(screen.getByPlaceholderText('Search commands...'), { target: { value: 'Upload' } });
+    expect(screen.queryByText('Go to Dashboard')).not.toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByPlaceholderText('Search commands...')).not.toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'k', metaKey: true });
+    expect(screen.getByPlaceholderText('Search commands...')).toHaveValue('');
+    expect(screen.getByText('Go to Dashboard')).toBeInTheDocument();
+  });
+
+  it('exposes the list as a labelled listbox driven by a combobox input', () => {
+    render(<CommandPalette commands={mockCommands} open={true} />);
+    const input = screen.getByRole('combobox', { name: 'Search commands' });
+    const listbox = screen.getByRole('listbox', { name: 'Commands' });
+
+    expect(input).toHaveAttribute('aria-controls', listbox.id);
+    expect(input).toHaveAttribute('aria-expanded', 'true');
+
+    const options = screen.getAllByRole('option');
+    expect(options).toHaveLength(3);
+    expect(options[0]).toHaveAttribute('aria-selected', 'true');
+    expect(options[1]).toHaveAttribute('aria-selected', 'false');
+    expect(input).toHaveAttribute('aria-activedescendant', options[0].id);
+    expect(screen.getByRole('group', { name: 'navigation' })).toBeInTheDocument();
+  });
+
+  it('moves aria-selected and aria-activedescendant with the arrow keys', () => {
+    render(<CommandPalette commands={mockCommands} open={true} />);
+    const input = screen.getByRole('combobox', { name: 'Search commands' });
+
+    fireEvent.keyDown(window, { key: 'ArrowDown' });
+
+    const options = screen.getAllByRole('option');
+    expect(options[1]).toHaveAttribute('aria-selected', 'true');
+    expect(options[0]).toHaveAttribute('aria-selected', 'false');
+    expect(input).toHaveAttribute('aria-activedescendant', options[1].id);
+  });
+
+  it('drops the listbox reference when nothing matches', () => {
+    render(<CommandPalette commands={mockCommands} open={true} />);
+    const input = screen.getByRole('combobox', { name: 'Search commands' });
+    fireEvent.change(input, { target: { value: 'zzzzzzz' } });
+
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(input).toHaveAttribute('aria-expanded', 'false');
+    expect(input).not.toHaveAttribute('aria-controls');
+    expect(input).not.toHaveAttribute('aria-activedescendant');
+  });
 });

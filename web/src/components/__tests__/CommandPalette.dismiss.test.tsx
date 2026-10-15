@@ -65,7 +65,7 @@ describe('CommandPalette dismissal (controlled by CommandPaletteWrapper)', () =>
     render(<CommandPaletteWrapper />);
     openPalette();
 
-    const commands = screen.getAllByRole('button');
+    const commands = screen.getAllByRole('option');
     expect(commands.length).toBeGreaterThan(0);
     fireEvent.click(commands[0]);
 
@@ -87,5 +87,22 @@ describe('CommandPalette dismissal (controlled by CommandPaletteWrapper)', () =>
     openPalette();
 
     expect(paletteInput()).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['Escape', () => fireEvent.keyDown(window, { key: 'Escape' })],
+    ['a second Cmd+K', () => openPalette()],
+  ])('clears the query when closed via %s, so reopening is not pre-filtered', (_label, closePalette) => {
+    render(<CommandPaletteWrapper />);
+    openPalette();
+    fireEvent.change(paletteInput()!, { target: { value: 'zzz-no-match' } });
+    expect(screen.getByText('No commands found')).toBeInTheDocument();
+
+    closePalette();
+    expect(paletteInput()).not.toBeInTheDocument();
+
+    openPalette();
+    expect(paletteInput()).toHaveValue('');
+    expect(screen.queryByText('No commands found')).not.toBeInTheDocument();
   });
 });
