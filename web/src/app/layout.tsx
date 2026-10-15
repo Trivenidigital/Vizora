@@ -3,6 +3,7 @@ import { Sora, DM_Sans, JetBrains_Mono, Fraunces } from 'next/font/google';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { CustomizationProvider } from '@/components/providers/CustomizationProvider';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { ToastProvider } from '@/lib/hooks/useToast';
 import { CookieConsent } from '@/components/CookieConsent';
 
 import type { Viewport } from 'next';
@@ -91,7 +92,10 @@ export default function RootLayout({
               under design review and must stay pixel-identical, so any change
               to the chip moved a surface it had no business being on.
             */}
-            <CustomizationProvider>{children}</CustomizationProvider>
+            {/* The single toast stack — `useToast()` throws without it. */}
+            <ToastProvider>
+              <CustomizationProvider>{children}</CustomizationProvider>
+            </ToastProvider>
           </ThemeProvider>
         </ErrorBoundary>
         <CookieConsent />
