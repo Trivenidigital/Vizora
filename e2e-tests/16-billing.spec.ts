@@ -130,28 +130,53 @@ test.describe('Billing & Subscriptions (Wave 7)', () => {
       await authenticatedPage.goto('/dashboard/settings/billing/history');
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // New accounts should show empty state or no invoices message
-      const emptyState = authenticatedPage.locator('text=/no invoices|no transactions|empty/i').first();
-      const hasEmptyState = await emptyState.isVisible({ timeout: 5000 }).catch(() => false);
-
-      // Either empty state or invoice table should be present
-      if (!hasEmptyState) {
-        const invoiceTable = authenticatedPage.locator('table, [role="table"]');
-        await expect(invoiceTable).toBeVisible({ timeout: 5000 });
-      }
+      // The fixture registers a brand-new org, which has no invoices: the
+      // empty state is certain, so it is asserted rather than branched on.
+      await expect(authenticatedPage.getByText('No invoices yet')).toBeVisible({ timeout: 10000 });
+      await expect(authenticatedPage.locator('table')).toHaveCount(0);
     });
 
+    /**
+     * Invoices are written only by a payment provider's webhook, which a
+     * browser spec cannot drive, so the list response is fulfilled with one
+     * fixture invoice. What is under test is the page's rendering of it.
+     */
     test('should have invoice table structure', async ({ authenticatedPage }) => {
+      await authenticatedPage.route('**/api/v1/billing/invoices*', (route) =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            data: [
+              {
+                id: 'inv_e2e_1',
+                amount: 4900,
+                currency: 'usd',
+                status: 'paid',
+                description: null,
+                createdAt: '2026-09-01T12:00:00.000Z',
+                pdfUrl: null,
+              },
+            ],
+          }),
+        }),
+      );
+
       await authenticatedPage.goto('/dashboard/settings/billing/history');
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Check for table headers if table exists
-      const table = authenticatedPage.locator('table, [role="table"]');
-      const hasTable = await table.isVisible({ timeout: 5000 }).catch(() => false);
+      const table = authenticatedPage.locator('table');
+      await expect(table).toBeVisible({ timeout: 10000 });
+      await expect(table.locator('th')).toHaveText(['Date', 'Description', 'Amount', 'Status', /.*/]);
 
-      if (hasTable) {
-        await expect(authenticatedPage.locator('th, [role="columnheader"]').filter({ hasText: /date|amount|status/i }).first()).toBeVisible();
-      }
+      const row = table.locator('tbody tr');
+      await expect(row).toHaveCount(1);
+      await expect(row).toContainText('Sep 1, 2026');
+      await expect(row).toContainText('Subscription payment'); // null description
+      await expect(row).toContainText('$49.00');
+      await expect(row).toContainText('N/A'); // no PDF
+      await expect(authenticatedPage.getByText('No invoices yet')).toHaveCount(0);
     });
   });
 

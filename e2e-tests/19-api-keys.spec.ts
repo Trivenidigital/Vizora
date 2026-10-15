@@ -138,22 +138,32 @@ test.describe('API Key Management (Wave 6)', () => {
       await authenticatedPage.goto('/dashboard/settings/api-keys');
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Look for revoke button
-      const revokeButton = authenticatedPage.locator('button').filter({ hasText: /revoke|delete|remove/i }).first();
-      const hasRevoke = await revokeButton.isVisible({ timeout: 5000 }).catch(() => false);
+      // A fresh org has no keys, so create the one to revoke - the old body
+      // branched on a Revoke button that a fresh org never has.
+      const name = `Revoke Confirm ${Date.now()}`;
+      const dialog = await openCreateKeyDialog(authenticatedPage);
+      await dialog.getByLabel(/key name/i).fill(name);
+      await dialog.getByRole('button', { name: 'Create Key' }).click();
+      await expect(dialog).toBeHidden({ timeout: 10000 });
 
-      if (hasRevoke) {
-        await revokeButton.click();
+      const row = authenticatedPage.locator('tr').filter({ hasText: name });
+      await expect(row).toHaveCount(1, { timeout: 10000 });
+      await row.getByRole('button', { name: 'Revoke' }).click();
 
-        // Should show confirmation
-        const confirmDialog = authenticatedPage.locator('[role="dialog"], [role="alertdialog"], .modal');
-        const confirmText = authenticatedPage.locator('text=/are you sure|confirm|cannot be undone/i');
+      const confirm = authenticatedPage.getByRole('dialog', { name: 'Revoke API Key' });
+      await expect(confirm).toBeVisible({ timeout: 5000 });
+      await expect(confirm).toContainText(`Are you sure you want to revoke "${name}"?`);
+      await expect(confirm).toContainText('This action cannot be undone.');
 
-        const hasDialog = await confirmDialog.isVisible({ timeout: 3000 }).catch(() => false);
-        const hasConfirmText = await confirmText.isVisible({ timeout: 3000 }).catch(() => false);
+      // Cancel keeps the key; confirming revokes it.
+      await confirm.getByRole('button', { name: 'Cancel' }).click();
+      await expect(confirm).toBeHidden();
+      await expect(row).toHaveCount(1);
 
-        expect(hasDialog || hasConfirmText).toBeTruthy();
-      }
+      await row.getByRole('button', { name: 'Revoke' }).click();
+      await confirm.getByRole('button', { name: 'Revoke Key' }).click();
+      await expect(authenticatedPage.getByRole('alert').filter({ hasText: `API key "${name}" has been revoked` })).toBeVisible();
+      await expect(row).toHaveCount(0, { timeout: 10000 });
     });
   });
 

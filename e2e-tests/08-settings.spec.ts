@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures/auth.fixture';
+import { apiGet, apiSend } from './fixtures/seed';
 
 test.describe('Settings Management', () => {
   test('should show settings page', async ({ authenticatedPage }) => {
@@ -163,5 +164,94 @@ test.describe('Settings Management', () => {
     // Verify values persisted
     await expect(orgInput).toHaveValue('New Organization');
     await expect(durationInput).toHaveValue('60');
+  });
+
+  /**
+   * "Default Content Duration (seconds)" is bounded 1..86400, whole seconds,
+   * in the browser AND on the API. Each bad value must show the inline error,
+   * must not be saved, and the stored value must be unchanged after a reload.
+   */
+  test('rejects an invalid default duration inline and does not save it', async ({ authenticatedPage, token }) => {
+    const page = authenticatedPage;
+    await page.goto('/dashboard/settings');
+    await page.waitForLoadState('networkidle');
+
+    const duration = page.getByLabel('Default Content Duration (seconds)');
+    await expect(duration).toBeVisible({ timeout: 10000 });
+    await expect(duration).toHaveAttribute('min', '1');
+    await expect(duration).toHaveAttribute('max', '86400');
+    await expect(duration).toHaveAttribute('step', '1');
+    // The org loads asynchronously; wait for its value before editing, or the
+    // load overwrites what is typed.
+    await expect(duration).toHaveValue('30');
+
+    const save = page.getByRole('button', { name: 'Save Changes' }).last();
+    const error = page.locator('#settings-default-duration-error');
+
+    let saves = 0;
+    page.on('request', (r) => {
+      if (r.method() === 'PATCH' && /\/api\/v1\/organizations\//.test(r.url())) saves += 1;
+    });
+
+    const cases: Array<[string, string]> = [
+      ['-5', 'Default duration must be between 1 and 86400 seconds'],
+      ['', 'Enter a default duration in seconds'],
+      ['1.5', 'Default duration must be a whole number of seconds'],
+    ];
+    for (const [value, message] of cases) {
+      await duration.fill(value);
+      await save.click();
+      await expect(error).toHaveText(message);
+      await expect(duration).toHaveAttribute('aria-invalid', 'true');
+      // Editing clears the error.
+      await duration.fill('31');
+      await expect(error).toHaveCount(0);
+    }
+    expect(saves, 'no invalid value may reach the API').toBe(0);
+
+    // Nothing was stored: the server still holds the default.
+    const org = await apiGet<{ settings?: { defaultDuration?: number } }>(page, token, '/organizations/current');
+    expect(org.settings?.defaultDuration ?? 30).toBe(30);
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(duration).toHaveValue('30');
+
+    // CONTROL: a valid value does save (the API is the oracle; reload
+    // persistence is its own test below).
+    await duration.fill('45');
+    await save.click();
+    await expect(page.getByRole('alert').filter({ hasText: 'Settings saved successfully' })).toBeVisible();
+    await expect
+      .poll(async () => (await apiGet<{ settings?: { defaultDuration?: number } }>(page, token, '/organizations/current')).settings?.defaultDuration)
+      .toBe(45);
+
+    // The API enforces the same bound on its own.
+    const orgId = (await apiGet<{ id: string }>(page, token, '/organizations/current')).id;
+    const res = await apiSend(page, token, 'PATCH', `/organizations/${orgId}`, { settings: { defaultDuration: -5 } });
+    expect(res.status()).toBe(400);
+  });
+
+  /**
+   * A saved setting must be what the page shows after a reload. The page reads
+   * org settings from GET /auth/me, whose user+organization snapshot is cached
+   * in Redis for 60s (`user_auth:`, JwtStrategy.USER_CACHE_TTL) and is NOT
+   * invalidated by PATCH /organizations/:id - so a reload inside that window
+   * shows the OLD value, and the next Save writes it back over the new one.
+   * Reported as a product defect; this test stays red until it is fixed.
+   */
+  test('a saved default duration is shown after a reload', async ({ authenticatedPage }) => {
+    const page = authenticatedPage;
+    await page.goto('/dashboard/settings');
+    await page.waitForLoadState('networkidle');
+
+    const duration = page.getByLabel('Default Content Duration (seconds)');
+    await expect(duration).toHaveValue('30', { timeout: 10000 });
+    await duration.fill('45');
+    await page.getByRole('button', { name: 'Save Changes' }).last().click();
+    await expect(page.getByRole('alert').filter({ hasText: 'Settings saved successfully' })).toBeVisible();
+
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    await expect(duration).toHaveValue('45', { timeout: 10000 });
   });
 });
