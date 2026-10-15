@@ -49,6 +49,20 @@ interface UseDialogOptions {
 export function useDialog({ isOpen, onClose, initialFocusRef }: UseDialogOptions) {
   const containerRef = useRef<HTMLDivElement>(null);
 
+  /*
+   * `onClose` is read through a ref, NOT listed as an effect dependency. Nearly
+   * every call site passes an inline `onClose={() => ...}`, a new function on
+   * each parent render — and the parent re-renders on every keystroke into a
+   * dialog field. With `onClose` as a dependency each keystroke re-ran this
+   * effect: cleanup refocused the opener, then focus jumped to the initial
+   * element (the close button). You could type one character into any Modal
+   * field before focus left it.
+   */
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     if (!isOpen) {
       // Defensive: if the dialog unmounts without its cleanup running (parent
@@ -68,7 +82,7 @@ export function useDialog({ isOpen, onClose, initialFocusRef }: UseDialogOptions
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== 'Tab') return;
@@ -100,7 +114,7 @@ export function useDialog({ isOpen, onClose, initialFocusRef }: UseDialogOptions
       // the document with no idea where they are.
       previouslyFocused?.focus?.();
     };
-  }, [isOpen, onClose, initialFocusRef]);
+  }, [isOpen, initialFocusRef]);
 
   return containerRef;
 }

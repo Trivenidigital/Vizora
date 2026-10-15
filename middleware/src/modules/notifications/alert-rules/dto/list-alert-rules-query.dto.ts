@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsIn, IsOptional } from 'class-validator';
+import { toBooleanQuery } from '../../../common/dto/boolean-query.transform';
 import { TRIGGER_EVENTS, TriggerEvent } from '../alert-rule.types';
 
 export class ListAlertRulesQueryDto {
@@ -8,11 +9,7 @@ export class ListAlertRulesQueryDto {
    * arrive as text ("true" / "false") — Transform handles the coercion.
    */
   @IsOptional()
-  @Transform(({ value }) => {
-    if (value === 'true' || value === true) return true;
-    if (value === 'false' || value === false) return false;
-    return value;
-  })
+  @Transform(toBooleanQuery)
   @IsBoolean()
   isActive?: boolean;
 

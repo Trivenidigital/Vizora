@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { SupportDashboardClient } from '../page-client';
 import { apiClient } from '@/lib/api';
+import { ToastProvider } from '@/lib/hooks/useToast';
 
 jest.mock('@/lib/api', () => ({
   apiClient: {
@@ -135,14 +136,14 @@ describe('SupportDashboardClient', () => {
 
   it('renders the Support Dashboard heading', async () => {
     await act(async () => {
-      render(<SupportDashboardClient />);
+      render(<SupportDashboardClient />, { wrapper: ToastProvider });
     });
     expect(screen.getByText('Support Dashboard')).toBeInTheDocument();
   });
 
   it('renders stats cards with correct counts', async () => {
     await act(async () => {
-      render(<SupportDashboardClient />);
+      render(<SupportDashboardClient />, { wrapper: ToastProvider });
     });
 
     await waitFor(() => {
@@ -163,7 +164,7 @@ describe('SupportDashboardClient', () => {
 
   it('renders request list', async () => {
     await act(async () => {
-      render(<SupportDashboardClient />);
+      render(<SupportDashboardClient />, { wrapper: ToastProvider });
     });
 
     await waitFor(() => {
@@ -175,7 +176,7 @@ describe('SupportDashboardClient', () => {
 
   it('shows user names on request cards', async () => {
     await act(async () => {
-      render(<SupportDashboardClient />);
+      render(<SupportDashboardClient />, { wrapper: ToastProvider });
     });
 
     await waitFor(() => {
@@ -192,7 +193,7 @@ describe('SupportDashboardClient', () => {
     } as any);
 
     await act(async () => {
-      render(<SupportDashboardClient />);
+      render(<SupportDashboardClient />, { wrapper: ToastProvider });
     });
 
     await waitFor(() => {
@@ -218,7 +219,7 @@ describe('SupportDashboardClient', () => {
     mockApiClient.getSupportRequest.mockResolvedValue(fullRequest as any);
 
     await act(async () => {
-      render(<SupportDashboardClient />);
+      render(<SupportDashboardClient />, { wrapper: ToastProvider });
     });
 
     await waitFor(() => {
@@ -243,7 +244,7 @@ describe('SupportDashboardClient', () => {
     mockApiClient.getSupportRequest.mockResolvedValue(fullRequest as any);
 
     await act(async () => {
-      render(<SupportDashboardClient />);
+      render(<SupportDashboardClient />, { wrapper: ToastProvider });
     });
 
     await waitFor(() => {
@@ -290,7 +291,7 @@ describe('SupportDashboardClient', () => {
     mockApiClient.getSupportRequest.mockResolvedValue(fullRequest as any);
 
     await act(async () => {
-      render(<SupportDashboardClient />);
+      render(<SupportDashboardClient />, { wrapper: ToastProvider });
     });
 
     await waitFor(() => {
@@ -321,7 +322,7 @@ describe('SupportDashboardClient', () => {
     } as any);
 
     await act(async () => {
-      render(<SupportDashboardClient />);
+      render(<SupportDashboardClient />, { wrapper: ToastProvider });
     });
 
     await waitFor(() => {
@@ -358,7 +359,7 @@ describe('SupportDashboardClient', () => {
 
   it('filters update the request list', async () => {
     await act(async () => {
-      render(<SupportDashboardClient />);
+      render(<SupportDashboardClient />, { wrapper: ToastProvider });
     });
 
     await waitFor(() => {
@@ -391,7 +392,7 @@ describe('SupportDashboardClient', () => {
     } as any);
 
     await act(async () => {
-      render(<SupportDashboardClient />);
+      render(<SupportDashboardClient />, { wrapper: ToastProvider });
     });
 
     await waitFor(() => {
@@ -424,7 +425,7 @@ describe('SupportDashboardClient', () => {
 
   it('renders category badges on request cards', async () => {
     await act(async () => {
-      render(<SupportDashboardClient />);
+      render(<SupportDashboardClient />, { wrapper: ToastProvider });
     });
 
     await waitFor(() => {
@@ -437,7 +438,7 @@ describe('SupportDashboardClient', () => {
 
   it('renders the search input in filters', async () => {
     await act(async () => {
-      render(<SupportDashboardClient />);
+      render(<SupportDashboardClient />, { wrapper: ToastProvider });
     });
 
     await waitFor(() => {

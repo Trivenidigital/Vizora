@@ -1,5 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import DaySelector from '../DaySelector';
+import TimePicker from '../TimePicker';
 
 jest.mock('@/theme/icons', () => ({
   Icon: ({ name }: { name: string }) => <span data-testid={`icon-${name}`}>{name}</span>,
@@ -74,5 +76,45 @@ describe('DaySelector', () => {
   it('shows validation message when no days selected', () => {
     render(<DaySelector {...defaultProps} selected={[]} />);
     expect(screen.getByText('Please select at least one day')).toBeInTheDocument();
+  });
+});
+
+describe('DaySelector and TimePicker inside a form', () => {
+  it('lets Enter in a text field submit the form instead of toggling a day or the time picker', async () => {
+    const onSubmit = jest.fn((event: React.FormEvent) => event.preventDefault());
+    const onDays = jest.fn();
+    const onTime = jest.fn();
+    const user = userEvent.setup();
+    render(
+      <form onSubmit={onSubmit}>
+        <input aria-label="Name" />
+        <TimePicker value="09:00" onChange={onTime} />
+        <DaySelector selected={[]} onChange={onDays} />
+        <button type="submit">Save</button>
+      </form>,
+    );
+
+    await user.type(screen.getByLabelText('Name'), 'Morning{Enter}');
+
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    expect(onDays).not.toHaveBeenCalled();
+    expect(onTime).not.toHaveBeenCalled();
+  });
+
+  it('does not submit the form when a day or the time picker is clicked', async () => {
+    const onSubmit = jest.fn((event: React.FormEvent) => event.preventDefault());
+    const user = userEvent.setup();
+    render(
+      <form onSubmit={onSubmit}>
+        <TimePicker value="09:00" onChange={jest.fn()} />
+        <DaySelector selected={[]} onChange={jest.fn()} />
+        <button type="submit">Save</button>
+      </form>,
+    );
+
+    await user.click(screen.getByText('All Days'));
+    await user.click(screen.getAllByRole('button')[0]);
+
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 });

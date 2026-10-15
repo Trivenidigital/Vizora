@@ -1,5 +1,6 @@
 import { IsString, IsOptional, IsInt, Min, IsIn, IsBoolean } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+import { toBooleanQuery } from '../../../common/dto/boolean-query.transform';
 
 export class OrgFiltersDto {
   @IsInt()
@@ -39,7 +40,7 @@ export class OrgFiltersDto {
 
   @IsBoolean()
   @IsOptional()
-  @Type(() => Boolean)
+  @Transform(toBooleanQuery)
   hasOverduePayment?: boolean;
 
   @IsString()

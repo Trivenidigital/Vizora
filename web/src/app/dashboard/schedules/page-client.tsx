@@ -941,6 +941,16 @@ export default function SchedulesClient() {
  title={selectedSchedule ? 'Edit Schedule' : 'Create Schedule'}
  size="lg"
  >
+ <form
+   noValidate
+   onSubmit={(event) => {
+     event.preventDefault();
+     // The button is disabled only while in flight; validation stays in the
+     // handlers, which render the inline errors and never reach the API.
+     if (actionLoading) return;
+     void (selectedSchedule ? handleUpdate() : handleCreate());
+   }}
+ >
  <div className="space-y-6 max-h-[75vh] overflow-y-auto">
  {/* Name */}
  <div>
@@ -1192,8 +1202,7 @@ export default function SchedulesClient() {
  Cancel
  </button>
  <button
- type="button"
- onClick={selectedSchedule ? handleUpdate : handleCreate}
+ type="submit"
  disabled={actionLoading}
  className="eh-btn-neon rounded-xl px-4 py-2 disabled:opacity-60 transition flex items-center gap-2"
  >
@@ -1206,6 +1215,7 @@ export default function SchedulesClient() {
  {selectedSchedule ? 'Update' : 'Create'}
  </button>
  </div>
+ </form>
  </Modal>
  )}
 

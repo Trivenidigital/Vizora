@@ -1,4 +1,5 @@
 import { render, screen, waitFor, fireEvent, within, act } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import DevicesClient, { DEVICES_BACKGROUND_REFRESH_MS } from '../page-client';
 
 const mockPush = jest.fn();
@@ -1511,5 +1512,83 @@ describe('DevicesClient background refresh', () => {
     await tick(DEVICES_BACKGROUND_REFRESH_MS * 2);
     document.dispatchEvent(new Event('visibilitychange'));
     expect(mockGetDisplays).not.toHaveBeenCalled();
+  });
+});
+
+describe('DevicesClient dialogs submit on Enter', () => {
+  const renderLoaded = async () => {
+    render(
+      <DevicesClient
+        initialDevices={sampleDevices as any}
+        initialPlaylists={samplePlaylists as any}
+        initialDevicesComplete
+        initialPlaylistsComplete
+      />,
+    );
+    await waitFor(() => expect(screen.getByText('Lobby Display')).toBeInTheDocument());
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUser = {
+      id: 'u1',
+      email: 'test@test.com',
+      firstName: 'Test',
+      lastName: 'User',
+      organizationId: 'org-1',
+      role: 'admin',
+    };
+    mockGetDisplays.mockResolvedValue({ data: sampleDevices, meta: { total: 3 } });
+    mockGetDisplayGroups.mockResolvedValue({ data: [] });
+    mockUpdateDisplay.mockResolvedValue({});
+    mockBulkAssignPlaylist.mockResolvedValue({ updated: 2 });
+  });
+
+  it('saves the device edit when Enter is pressed in the nickname field', async () => {
+    const user = userEvent.setup();
+    await renderLoaded();
+
+    fireEvent.click(screen.getAllByText('Edit')[0]);
+    const nickname = screen.getByLabelText('Device Nickname');
+    await user.clear(nickname);
+    await user.type(nickname, 'Reception Screen{Enter}');
+
+    await waitFor(() => {
+      expect(mockUpdateDisplay).toHaveBeenCalledWith('d1', {
+        nickname: 'Reception Screen',
+        location: 'Building A - Lobby',
+      });
+    });
+    expect(mockUpdateDisplay).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not save the device edit when submitted with a blank nickname', async () => {
+    await renderLoaded();
+
+    fireEvent.click(screen.getAllByText('Edit')[0]);
+    const nickname = screen.getByLabelText('Device Nickname');
+    fireEvent.change(nickname, { target: { value: '   ' } });
+    fireEvent.submit(nickname.closest('form')!);
+
+    expect(mockUpdateDisplay).not.toHaveBeenCalled();
+  });
+
+  it('does not bulk-assign when the playlist form is submitted with no playlist chosen', async () => {
+    await renderLoaded();
+
+    const checkboxes = screen.getAllByRole('checkbox');
+    fireEvent.click(checkboxes[1]);
+    fireEvent.click(checkboxes[2]);
+    fireEvent.click(screen.getByText('Assign Playlist'));
+
+    const select = screen.getByLabelText('Playlist to assign');
+    fireEvent.submit(select.closest('form')!);
+    expect(mockBulkAssignPlaylist).not.toHaveBeenCalled();
+
+    fireEvent.change(select, { target: { value: 'p1' } });
+    fireEvent.submit(select.closest('form')!);
+    await waitFor(() => {
+      expect(mockBulkAssignPlaylist).toHaveBeenCalledWith(['d1', 'd2'], 'p1');
+    });
   });
 });

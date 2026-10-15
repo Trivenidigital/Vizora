@@ -4,6 +4,7 @@ import { AppModule } from './app/app.module';
 import { RedisIoAdapter } from './adapters/redis-io.adapter';
 import helmet from 'helmet';
 import { initializeSentry } from './config/sentry.config';
+import { VALIDATION_PIPE_OPTIONS } from './config/validation-pipe.options';
 
 // Initialize Sentry before app starts
 initializeSentry();
@@ -50,12 +51,7 @@ async function bootstrap() {
   });
 
   // Global validation pipe
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      transform: true,
-    }),
-  );
+  app.useGlobalPipes(new ValidationPipe(VALIDATION_PIPE_OPTIONS));
 
   // Use Redis-backed Socket.IO adapter for horizontal scaling
   const redisIoAdapter = new RedisIoAdapter(app);

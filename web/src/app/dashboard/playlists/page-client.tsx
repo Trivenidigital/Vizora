@@ -751,6 +751,11 @@ export default function PlaylistsClient() {
     setShapeFilter(null);
   };
 
+  // Each dialog's submit guard mirrors its primary button's `disabled`, so Enter
+  // cannot reach a handler the disabled button used to keep out of reach.
+  const createSubmitDisabled = actionLoading || !createForm.name.trim();
+  const assignSubmitDisabled = actionLoading || selectedAssignDeviceIds.size === 0;
+
   return (
     <div className="space-y-6">
       <toast.ToastContainer />
@@ -975,7 +980,14 @@ export default function PlaylistsClient() {
         onClose={() => setIsCreateModalOpen(false)}
         title="Create New Playlist"
       >
-        <div className="space-y-5">
+        <form
+          noValidate
+          className="space-y-5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!createSubmitDisabled) void handleCreate();
+          }}
+        >
           <div>
             <label htmlFor="playlist-name" className="mb-2 block text-sm font-medium text-[var(--foreground-secondary)]">
               Playlist Name
@@ -1004,21 +1016,22 @@ export default function PlaylistsClient() {
           </div>
           <div className="flex justify-end gap-3 pt-4">
             <button
+              type="button"
               onClick={() => setIsCreateModalOpen(false)}
               className="eh-btn-ghost eh-btn-sm min-h-[44px] rounded-xl px-4"
             >
               Cancel
             </button>
             <button
-              onClick={handleCreate}
+              type="submit"
               className="eh-btn-neon eh-btn-sm flex min-h-[44px] items-center gap-2 rounded-xl px-4 disabled:opacity-50"
-              disabled={actionLoading || !createForm.name.trim()}
+              disabled={createSubmitDisabled}
             >
               {actionLoading && <LoadingSpinner size="sm" />}
               Create Playlist
             </button>
           </div>
-        </div>
+        </form>
       </Modal>
 
       {/* Assign Modal */}
@@ -1028,7 +1041,15 @@ export default function PlaylistsClient() {
         title={`Assign ${assignPlaylist?.name || 'Playlist'} to Devices`}
         size="lg"
       >
-        <div className="space-y-5" aria-busy={actionLoading}>
+        <form
+          noValidate
+          className="space-y-5"
+          aria-busy={actionLoading}
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!assignSubmitDisabled) void confirmAssign();
+          }}
+        >
           <div>
             <p className="text-sm text-[var(--foreground-secondary)]">
               Select paired devices to assign this playlist to now.
@@ -1127,6 +1148,7 @@ export default function PlaylistsClient() {
 
           <div className="flex justify-end gap-3 border-t border-[var(--border)] pt-4">
             <button
+              type="button"
               onClick={requestCloseAssignModal}
               className="eh-btn-ghost eh-btn-sm min-h-[44px] rounded-xl px-4"
               disabled={actionLoading}
@@ -1134,15 +1156,15 @@ export default function PlaylistsClient() {
               Cancel
             </button>
             <button
-              onClick={confirmAssign}
+              type="submit"
               className="eh-btn-neon eh-btn-sm flex min-h-[44px] items-center gap-2 rounded-xl px-4 disabled:opacity-50"
-              disabled={actionLoading || selectedAssignDeviceIds.size === 0}
+              disabled={assignSubmitDisabled}
             >
               {actionLoading && <LoadingSpinner size="sm" />}
               Assign to {formatDeviceCount(selectedAssignDeviceIds.size)}
             </button>
           </div>
-        </div>
+        </form>
       </Modal>
 
       {/* Delete Confirmation */}

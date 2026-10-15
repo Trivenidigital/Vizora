@@ -303,6 +303,10 @@ export default function LayoutsPage() {
     return preset?.name || type;
   };
 
+  // Mirrors the Create button's `disabled`, so Enter cannot reach the handler
+  // while the button would refuse the click.
+  const createSubmitDisabled = actionLoading || !layoutName.trim();
+
   return (
     <div className="space-y-8">
       <toast.ToastContainer />
@@ -470,7 +474,14 @@ export default function LayoutsPage() {
               ))}
             </div>
           ) : (
-            <>
+            <form
+              noValidate
+              className="space-y-4"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (!createSubmitDisabled) void handleCreateLayout();
+              }}
+            >
               {/* Selected Preset Preview */}
               <div className="flex items-center gap-4 p-3 bg-[var(--background)] rounded-lg border border-[var(--border)]">
                 <div className="w-20 flex-shrink-0">
@@ -481,6 +492,7 @@ export default function LayoutsPage() {
                   <div className="text-xs text-[var(--foreground-tertiary)]">{getPresetZoneCount(selectedPreset)} zones</div>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setSelectedPreset(null)}
                   className="ml-auto text-xs text-[var(--primary-ink)] hover:underline"
                 >
@@ -519,6 +531,7 @@ export default function LayoutsPage() {
 
               <div className="flex justify-end gap-3 pt-4">
                 <button
+                  type="button"
                   onClick={() => {
                     setIsCreateModalOpen(false);
                     setSelectedPreset(null);
@@ -528,15 +541,15 @@ export default function LayoutsPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={handleCreateLayout}
-                  disabled={actionLoading || !layoutName.trim()}
+                  type="submit"
+                  disabled={createSubmitDisabled}
                   className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium transition disabled:opacity-50 flex items-center gap-2"
                 >
                   {actionLoading && <LoadingSpinner size="sm" />}
                   Create Layout
                 </button>
               </div>
-            </>
+            </form>
           )}
         </div>
       </Modal>

@@ -1,4 +1,5 @@
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import TeamClient from '../page-client';
 
 const mockGetUsers = jest.fn();
@@ -211,5 +212,41 @@ describe('TeamClient', () => {
 
     expect(screen.getByRole('button', { name: 'Edit role for admin@vizora.com' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Deactivate admin@vizora.com' })).toBeInTheDocument();
+  });
+
+  describe('invite dialog submits on Enter', () => {
+    const openInvite = async () => {
+      render(<TeamClient />);
+      await waitFor(() => expect(screen.getByText('admin@vizora.com')).toBeInTheDocument());
+      fireEvent.click(screen.getByRole('button', { name: /Invite User/ }));
+      expect(screen.getByText('Invite Team Member')).toBeInTheDocument();
+    };
+
+    it('sends the invite when Enter is pressed in the last name field', async () => {
+      const user = userEvent.setup();
+      await openInvite();
+
+      await user.type(screen.getByPlaceholderText('user@company.com'), 'new@vizora.com');
+      await user.type(screen.getByPlaceholderText('John'), 'New');
+      await user.type(screen.getByPlaceholderText('Doe'), 'Member{Enter}');
+
+      await waitFor(() => {
+        expect(mockInviteUser).toHaveBeenCalledWith(
+          expect.objectContaining({ email: 'new@vizora.com', firstName: 'New', lastName: 'Member' }),
+        );
+      });
+      expect(mockInviteUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not invite, or toast, when Enter is pressed with a required field missing', async () => {
+      const user = userEvent.setup();
+      await openInvite();
+
+      await user.type(screen.getByPlaceholderText('user@company.com'), 'new@vizora.com{Enter}');
+      fireEvent.submit(screen.getByPlaceholderText('user@company.com').closest('form')!);
+
+      expect(mockInviteUser).not.toHaveBeenCalled();
+      expect(mockToast.error).not.toHaveBeenCalled();
+    });
   });
 });

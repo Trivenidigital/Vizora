@@ -43,6 +43,9 @@ export default function SettingsPage() {
  const router = useRouter();
 
  const [saving, setSaving] = useState(false);
+ // Organization settings start as placeholder defaults; Save is only allowed
+ // once the real values have been loaded over them.
+ const [orgSettingsStatus, setOrgSettingsStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
  const [defaultDurationError, setDefaultDurationError] = useState<string | null>(null);
  const [exporting, setExporting] = useState(false);
 
@@ -117,21 +120,21 @@ export default function SettingsPage() {
    }
  };
 
- // Fetch real settings on mount
+ // Fetch real settings on mount. Organization fields come from GET
+ // /organizations/current, NOT the /auth/me snapshot: that one is cached
+ // server-side and is not invalidated by PATCH /organizations/:id, so reading
+ // it showed the pre-save values after a reload, and the next Save (which sends
+ // the whole settings object) silently reverted the change.
  useEffect(() => {
-   async function loadSettings() {
+   async function loadUser() {
      try {
        const user = await apiClient.getCurrentUser();
-       const orgSettings = (user.organization?.settings as Record<string, any>) || {};
+       // organizationId is only a fallback for branding; the org-settings Save
+       // is gated on orgSettingsStatus, not on this id being present.
        setSettings(prev => ({
          ...prev,
          email: user.email || prev.email,
-         organizationName: user.organization?.name || prev.organizationName,
-         organizationId: user.organizationId || prev.organizationId,
-         country: user.organization?.country || prev.country,
-         defaultDuration: orgSettings.defaultDuration ?? prev.defaultDuration,
-         timezone: orgSettings.timezone ?? prev.timezone,
-         notifications: orgSettings.notifications ?? prev.notifications,
+         organizationId: prev.organizationId || user.organizationId || '',
        }));
        setProfileForm({
          firstName: user.firstName || '',
@@ -142,11 +145,38 @@ export default function SettingsPage() {
        }
      } catch (err) {
        if (process.env.NODE_ENV === 'development') {
-         console.error('Failed to load settings:', err);
+         console.error('Failed to load user:', err);
        }
      }
    }
-   loadSettings();
+
+   async function loadOrganization() {
+     try {
+       const org = await apiClient.getOrganization();
+       if (!org?.id) throw new Error('No organization returned');
+       const orgSettings = (org.settings as Record<string, any>) || {};
+       setSettings(prev => ({
+         ...prev,
+         organizationName: org.name || prev.organizationName,
+         organizationId: org.id,
+         country: org.country || prev.country,
+         defaultDuration: orgSettings.defaultDuration ?? prev.defaultDuration,
+         timezone: orgSettings.timezone ?? prev.timezone,
+         notifications: orgSettings.notifications ?? prev.notifications,
+       }));
+       setOrgSettingsStatus('loaded');
+     } catch (err) {
+       // The form still holds placeholder defaults; saving them would overwrite
+       // the organization's real settings, so Save stays disabled.
+       setOrgSettingsStatus('error');
+       if (process.env.NODE_ENV === 'development') {
+         console.error('Failed to load organization settings:', err);
+       }
+     }
+   }
+
+   void loadUser();
+   void loadOrganization();
  }, []);
 
  // Sync branding form with context when brandConfig loads
@@ -315,6 +345,14 @@ export default function SettingsPage() {
      setDeleteLoading(false);
    }
  };
+
+ // Each dialog's submit guard mirrors its primary button's `disabled`, so Enter
+ // cannot reach a handler the disabled button used to keep out of reach. For
+ // account deletion that keeps the typed "DELETE MY ACCOUNT" gate load-bearing.
+ const passwordSubmitDisabled =
+   passwordLoading || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword;
+ const deleteSubmitDisabled =
+   deleteLoading || deleteForm.confirmation !== 'DELETE MY ACCOUNT' || !deleteForm.password;
 
  return (
  <div className="space-y-8">
@@ -924,11 +962,15 @@ export default function SettingsPage() {
  </div>
 
  {/* Save Button */}
- <div className="flex justify-end">
+ <div className="flex items-center justify-end gap-4">
+ {orgSettingsStatus === 'error' && (
+   <p role="alert" id="settings-org-load-error" className="text-sm text-[var(--error-ink)]">
+     Couldn&apos;t load your organization settings — reload to try again.
+   </p>
+ )}
  <button
    onClick={async () => {
-     if (!settings.organizationId) {
-       toast.error('Organization not loaded yet');
+     if (orgSettingsStatus !== 'loaded' || !settings.organizationId) {
        return;
      }
      const durationError = validateDefaultDuration(settings.defaultDuration);
@@ -955,7 +997,8 @@ export default function SettingsPage() {
        setSaving(false);
      }
    }}
-   disabled={saving}
+   disabled={saving || orgSettingsStatus !== 'loaded'}
+   aria-describedby={orgSettingsStatus === 'error' ? 'settings-org-load-error' : undefined}
    className="eh-btn-neon rounded-xl px-6 py-3 text-sm font-medium transition shadow-md disabled:opacity-50"
  >
    {saving ? 'Saving...' : 'Save Changes'}
@@ -971,7 +1014,14 @@ export default function SettingsPage() {
    }}
    title="Change Password"
  >
-   <div className="space-y-4">
+   <form
+     noValidate
+     className="space-y-4"
+     onSubmit={(event) => {
+       event.preventDefault();
+       if (!passwordSubmitDisabled) void handleChangePassword();
+     }}
+   >
      <div>
        <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-1">Current Password</label>
        <input
@@ -1001,6 +1051,7 @@ export default function SettingsPage() {
      </div>
      <div className="flex justify-end gap-3 pt-4">
        <button
+         type="button"
          onClick={() => {
            setShowChangePasswordModal(false);
            setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -1010,14 +1061,14 @@ export default function SettingsPage() {
          Cancel
        </button>
        <button
-         onClick={handleChangePassword}
-         disabled={passwordLoading || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
+         type="submit"
+         disabled={passwordSubmitDisabled}
          className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium transition disabled:opacity-50"
        >
          {passwordLoading ? 'Changing...' : 'Change Password'}
        </button>
      </div>
-   </div>
+   </form>
  </Modal>
  {/* Delete Account Modal */}
  <Modal
@@ -1029,7 +1080,14 @@ export default function SettingsPage() {
    }}
    title="Delete Account"
  >
-   <div className="space-y-4">
+   <form
+     noValidate
+     className="space-y-4"
+     onSubmit={(event) => {
+       event.preventDefault();
+       if (!deleteSubmitDisabled) void handleDeleteAccount();
+     }}
+   >
      <div className="p-4 bg-error/10 border border-error-ink/30 rounded-lg">
        <p className="text-sm text-[var(--error-ink)] font-medium mb-2">
          This action is permanent and cannot be undone.
@@ -1070,6 +1128,7 @@ export default function SettingsPage() {
      </div>
      <div className="flex justify-end gap-3 pt-4">
        <button
+         type="button"
          onClick={() => {
            setShowDeleteAccountModal(false);
            setDeleteForm({ password: '', confirmation: '' });
@@ -1080,14 +1139,14 @@ export default function SettingsPage() {
          Cancel
        </button>
        <button
-         onClick={handleDeleteAccount}
-         disabled={deleteLoading || deleteForm.confirmation !== 'DELETE MY ACCOUNT' || !deleteForm.password}
+         type="submit"
+         disabled={deleteSubmitDisabled}
          className="px-4 py-2 text-sm font-medium bg-[var(--danger-solid)] text-white rounded-lg hover:bg-[var(--danger-solid-hover)] transition disabled:opacity-50 disabled:cursor-not-allowed"
        >
          {deleteLoading ? 'Deleting...' : 'Permanently Delete Account'}
        </button>
      </div>
-   </div>
+   </form>
  </Modal>
  <toast.ToastContainer />
  </div>

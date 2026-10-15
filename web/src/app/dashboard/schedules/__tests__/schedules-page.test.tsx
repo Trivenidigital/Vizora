@@ -1,4 +1,5 @@
 import { act, render, screen, waitFor, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ApiError } from '@/lib/error-handler';
 import SchedulesClient from '../page-client';
 
@@ -821,6 +822,68 @@ describe('SchedulesClient', () => {
 
       expect(screen.queryByRole('textbox', { name: 'Search schedules by name' })).not.toBeInTheDocument();
       expect(screen.queryByText('No schedules match these filters')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('create/edit dialog submits on Enter', () => {
+    const NAME_PLACEHOLDER = 'e.g., Morning Content, Holiday Special';
+
+    const openAndFillCreate = async () => {
+      mockGetPlaylists.mockResolvedValue({ data: samplePlaylists });
+      mockGetDisplays.mockResolvedValue({ data: sampleDisplays });
+      render(<SchedulesClient />);
+      await waitFor(() => {
+        expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
+      });
+      fireEvent.click(screen.getAllByText('Create Schedule')[0]);
+      fireEvent.click(screen.getByText('Select Weekdays'));
+      fireEvent.change(screen.getByDisplayValue('Select a playlist...'), { target: { value: 'p1' } });
+      fireEvent.click(screen.getByLabelText('Lobby Display'));
+    };
+
+    it('creates the schedule when Enter is pressed in the name field', async () => {
+      const user = userEvent.setup();
+      await openAndFillCreate();
+
+      await user.type(screen.getByPlaceholderText(NAME_PLACEHOLDER), 'Morning Loop{Enter}');
+
+      await waitFor(() => {
+        expect(mockCreateSchedule).toHaveBeenCalledTimes(1);
+      });
+      expect(mockCreateSchedule).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Morning Loop', displayId: 'd1' }),
+      );
+    });
+
+    it('shows the inline validation error instead of calling the API when Enter is pressed with no name', async () => {
+      const user = userEvent.setup();
+      await openAndFillCreate();
+
+      await user.type(screen.getByPlaceholderText(NAME_PLACEHOLDER), '{Enter}');
+
+      expect(mockCreateSchedule).not.toHaveBeenCalled();
+    });
+
+    it('ignores a second submit while the create is in flight', async () => {
+      let resolveCreate: (value: unknown) => void = () => {};
+      mockCreateSchedule.mockReturnValue(
+        new Promise((resolve) => {
+          resolveCreate = resolve;
+        }),
+      );
+      const user = userEvent.setup();
+      await openAndFillCreate();
+
+      const name = screen.getByPlaceholderText(NAME_PLACEHOLDER);
+      await user.type(name, 'Morning Loop{Enter}');
+      await waitFor(() => expect(mockCreateSchedule).toHaveBeenCalledTimes(1));
+
+      fireEvent.submit(name.closest('form')!);
+      expect(mockCreateSchedule).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        resolveCreate({ id: 'schedule-d1', name: 'Morning Loop', displayId: 'd1', isActive: true });
+      });
     });
   });
 });

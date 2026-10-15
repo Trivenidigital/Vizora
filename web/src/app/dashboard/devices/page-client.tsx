@@ -726,6 +726,12 @@ export default function DevicesClient({
  if (selectAllRef.current) selectAllRef.current.indeterminate = someVisibleSelected;
  }, [someVisibleSelected]);
 
+ // Each dialog's submit guard mirrors its primary button's `disabled`, so Enter
+ // cannot reach a handler the disabled button used to keep out of reach.
+ const editSubmitDisabled = actionLoading || !editForm.nickname.trim();
+ const bulkPlaylistSubmitDisabled = !bulkPlaylistId || actionLoading;
+ const bulkGroupSubmitDisabled = !bulkGroupId || actionLoading;
+
  return (
  <div className="space-y-6">
  <toast.ToastContainer />
@@ -1206,7 +1212,14 @@ export default function DevicesClient({
  )}
 
  <Modal isOpen={isEditModalOpen && permissions.canManageDevices} onClose={() => setIsEditModalOpen(false)} title="Edit Device">
- <div className="space-y-5">
+ <form
+   noValidate
+   className="space-y-5"
+   onSubmit={(event) => {
+     event.preventDefault();
+     if (!editSubmitDisabled) void handleSaveEdit();
+   }}
+ >
  <div>
  <label htmlFor="device-nickname" className="mb-2 block text-sm font-medium text-[var(--foreground-secondary)]">Device Nickname</label>
  <input id="device-nickname" type="text" value={editForm.nickname} onChange={(e) => setEditForm({ ...editForm, nickname: e.target.value })} className="eh-input" placeholder="e.g., Store Front Display" />
@@ -1216,10 +1229,10 @@ export default function DevicesClient({
  <input id="device-location" type="text" value={editForm.location} onChange={(e) => setEditForm({ ...editForm, location: e.target.value })} className="eh-input" placeholder="e.g., Main Entrance" />
  </div>
  <div className="flex justify-end gap-3 pt-4">
- <button onClick={() => setIsEditModalOpen(false)} className="eh-btn-ghost eh-btn-sm min-h-[44px] rounded-xl px-4" disabled={actionLoading}>Cancel</button>
- <button onClick={handleSaveEdit} className="eh-btn-neon eh-btn-sm flex min-h-[44px] items-center gap-2 rounded-xl px-4 disabled:opacity-50" disabled={actionLoading || !editForm.nickname.trim()}>{actionLoading && <LoadingSpinner size="sm" />}Save Changes</button>
+ <button type="button" onClick={() => setIsEditModalOpen(false)} className="eh-btn-ghost eh-btn-sm min-h-[44px] rounded-xl px-4" disabled={actionLoading}>Cancel</button>
+ <button type="submit" className="eh-btn-neon eh-btn-sm flex min-h-[44px] items-center gap-2 rounded-xl px-4 disabled:opacity-50" disabled={editSubmitDisabled}>{actionLoading && <LoadingSpinner size="sm" />}Save Changes</button>
  </div>
- </div>
+ </form>
  </Modal>
 
  <ConfirmDialog isOpen={isDeleteModalOpen && permissions.canDeleteDevices} onClose={() => setIsDeleteModalOpen(false)} onConfirm={confirmDelete} title="Delete Device" message={`Are you sure you want to delete "${selectedDevice?.nickname}"? This action cannot be undone.`} confirmText="Delete" type="danger" />
@@ -1235,7 +1248,14 @@ export default function DevicesClient({
  />
 
  <Modal isOpen={isBulkPlaylistModalOpen && permissions.canManageDevices} onClose={() => { setIsBulkPlaylistModalOpen(false); setBulkPlaylistId(''); }} title="Assign Playlist to Selected Devices">
- <div className="space-y-5">
+ <form
+   noValidate
+   className="space-y-5"
+   onSubmit={(event) => {
+     event.preventDefault();
+     if (!bulkPlaylistSubmitDisabled) void handleBulkAssignPlaylist();
+   }}
+ >
  <p className="text-sm text-[var(--foreground-secondary)]">Assign a playlist to {selectedDeviceIds.size} selected device{selectedDeviceIds.size !== 1 ? 's' : ''}.</p>
  <select value={bulkPlaylistId} onChange={(e) => setBulkPlaylistId(e.target.value)} className="eh-select" aria-label="Playlist to assign">
  <option value="">Select a playlist...</option>
@@ -1247,24 +1267,31 @@ export default function DevicesClient({
  This sets the assignment. Non-online devices will update when they come online.
  </p>
  <div className="flex justify-end gap-3">
- <button onClick={() => { setIsBulkPlaylistModalOpen(false); setBulkPlaylistId(''); }} className="eh-btn-ghost eh-btn-sm min-h-[44px] rounded-xl px-4">Cancel</button>
- <button onClick={handleBulkAssignPlaylist} disabled={!bulkPlaylistId || actionLoading} className="eh-btn-neon eh-btn-sm min-h-[44px] rounded-xl px-4 disabled:opacity-50">Assign</button>
+ <button type="button" onClick={() => { setIsBulkPlaylistModalOpen(false); setBulkPlaylistId(''); }} className="eh-btn-ghost eh-btn-sm min-h-[44px] rounded-xl px-4">Cancel</button>
+ <button type="submit" disabled={bulkPlaylistSubmitDisabled} className="eh-btn-neon eh-btn-sm min-h-[44px] rounded-xl px-4 disabled:opacity-50">Assign</button>
  </div>
- </div>
+ </form>
  </Modal>
 
  <Modal isOpen={isBulkGroupModalOpen && permissions.canManageDevices} onClose={() => { setIsBulkGroupModalOpen(false); setBulkGroupId(''); }} title="Add Selected Devices to Group">
- <div className="space-y-5">
+ <form
+   noValidate
+   className="space-y-5"
+   onSubmit={(event) => {
+     event.preventDefault();
+     if (!bulkGroupSubmitDisabled) void handleBulkAssignGroup();
+   }}
+ >
  <p className="text-sm text-[var(--foreground-secondary)]">Add {selectedDeviceIds.size} selected device{selectedDeviceIds.size !== 1 ? 's' : ''} to a group.</p>
  <select value={bulkGroupId} onChange={(e) => setBulkGroupId(e.target.value)} className="eh-select" aria-label="Group to add devices to">
  <option value="">Select a group...</option>
  {deviceGroups.map((g: any) => (<option key={g.id} value={g.id}>{g.name}</option>))}
  </select>
  <div className="flex justify-end gap-3">
- <button onClick={() => { setIsBulkGroupModalOpen(false); setBulkGroupId(''); }} className="eh-btn-ghost eh-btn-sm min-h-[44px] rounded-xl px-4">Cancel</button>
- <button onClick={handleBulkAssignGroup} disabled={!bulkGroupId || actionLoading} className="eh-btn-neon eh-btn-sm min-h-[44px] rounded-xl px-4 disabled:opacity-50">Add to Group</button>
+ <button type="button" onClick={() => { setIsBulkGroupModalOpen(false); setBulkGroupId(''); }} className="eh-btn-ghost eh-btn-sm min-h-[44px] rounded-xl px-4">Cancel</button>
+ <button type="submit" disabled={bulkGroupSubmitDisabled} className="eh-btn-neon eh-btn-sm min-h-[44px] rounded-xl px-4 disabled:opacity-50">Add to Group</button>
  </div>
- </div>
+ </form>
  </Modal>
 
  {selectedDevice && (

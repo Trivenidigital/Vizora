@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import userEvent from '@testing-library/user-event';
 
 const mockPush = jest.fn();
 
@@ -746,6 +747,107 @@ describe('PlaylistsClient', () => {
       expect(screen.getByText('Content Preview')).toBeInTheDocument();
       expect(screen.getByText('Banner 1')).toBeInTheDocument();
       expect(screen.getByText('Banner 2')).toBeInTheDocument();
+    });
+  });
+});
+
+/**
+ * Dialog forms submit on Enter. Implicit submission is driven by user-event,
+ * which (like a browser) clicks the form's FIRST submit button — so these also
+ * prove no stray untyped button precedes the primary action.
+ */
+describe('PlaylistsClient dialogs submit on Enter', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUser = {
+      id: 'u1',
+      email: 'admin@test.com',
+      firstName: 'Admin',
+      lastName: 'User',
+      organizationId: 'org-1',
+      role: 'admin',
+    };
+    (apiClient.getPlaylists as jest.Mock).mockResolvedValue({ data: mockPlaylists });
+    (apiClient.getContent as jest.Mock).mockResolvedValue({ data: [] });
+    (apiClient.getDisplays as jest.Mock).mockResolvedValue({ data: mockDevices });
+    (apiClient.createPlaylist as jest.Mock).mockResolvedValue({ id: 'playlist-new', name: 'Lunch', items: [] });
+    (apiClient.bulkAssignPlaylist as jest.Mock).mockResolvedValue({ updated: 1 });
+  });
+
+  const openCreateModal = async () => {
+    render(<PlaylistsClient />);
+    await waitFor(() => expect(screen.getByText('Morning Promo')).toBeInTheDocument());
+    fireEvent.click(screen.getAllByText('Create Playlist')[0]);
+    await waitFor(() => expect(screen.getByText('Create New Playlist')).toBeInTheDocument());
+  };
+
+  it('creates the playlist when Enter is pressed in the name field', async () => {
+    const user = userEvent.setup();
+    await openCreateModal();
+
+    await user.type(screen.getByLabelText('Playlist Name'), 'Lunch{Enter}');
+
+    await waitFor(() => {
+      expect(apiClient.createPlaylist).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Lunch' }),
+      );
+    });
+    expect(apiClient.createPlaylist).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps Enter in the description as a newline, not a submit', async () => {
+    const user = userEvent.setup();
+    await openCreateModal();
+
+    await user.type(screen.getByLabelText('Playlist Name'), 'Lunch');
+    await user.type(screen.getByLabelText('Description (Optional)'), 'line one{Enter}line two');
+
+    expect(screen.getByLabelText('Description (Optional)')).toHaveValue('line one\nline two');
+    expect(apiClient.createPlaylist).not.toHaveBeenCalled();
+  });
+
+  it('does not create when submitted with an empty name', async () => {
+    await openCreateModal();
+
+    // A direct submit exercises the form's own guard, not just the disabled button.
+    fireEvent.submit(screen.getByLabelText('Playlist Name').closest('form')!);
+
+    expect(apiClient.createPlaylist).not.toHaveBeenCalled();
+  });
+
+  it('does not submit the create form a second time while the first is in flight', async () => {
+    let resolveCreate: (value: unknown) => void = () => {};
+    (apiClient.createPlaylist as jest.Mock).mockReturnValue(
+      new Promise((resolve) => {
+        resolveCreate = resolve;
+      }),
+    );
+    const user = userEvent.setup();
+    await openCreateModal();
+
+    await user.type(screen.getByLabelText('Playlist Name'), 'Lunch{Enter}');
+    await waitFor(() => expect(apiClient.createPlaylist).toHaveBeenCalledTimes(1));
+
+    fireEvent.submit(screen.getByLabelText('Playlist Name').closest('form')!);
+    expect(apiClient.createPlaylist).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveCreate({ id: 'playlist-new', name: 'Lunch', items: [] });
+    });
+  });
+
+  it('does not assign when the assignment form is submitted with no device selected', async () => {
+    render(<PlaylistsClient />);
+    await waitFor(() => expect(screen.getByText('Morning Promo')).toBeInTheDocument());
+    fireEvent.click(screen.getAllByText('Assign')[0]);
+
+    fireEvent.submit(screen.getByLabelText('Lobby Screen').closest('form')!);
+    expect(apiClient.bulkAssignPlaylist).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByLabelText('Lobby Screen'));
+    fireEvent.submit(screen.getByLabelText('Lobby Screen').closest('form')!);
+    await waitFor(() => {
+      expect(apiClient.bulkAssignPlaylist).toHaveBeenCalledWith(['display-1'], 'playlist-1');
     });
   });
 });

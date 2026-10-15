@@ -666,7 +666,15 @@ export default function TemplateDetailPage() {
                 <p className="text-sm text-[var(--foreground-secondary)] mt-1">Redirecting to your content library...</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <form
+                noValidate
+                className="space-y-4"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  // Mirrors the Clone button's `disabled`.
+                  if (!cloning) void handleClone();
+                }}
+              >
                 <p className="text-sm text-[var(--foreground-secondary)]">
                   Clone &quot;{template.name}&quot; to your organization&apos;s content library. You can optionally customize the name and description.
                 </p>
@@ -706,6 +714,7 @@ export default function TemplateDetailPage() {
 
                 <div className="flex justify-end gap-3 pt-2">
                   <button
+                    type="button"
                     onClick={() => setShowCloneModal(false)}
                     disabled={cloning}
                     className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition disabled:opacity-50"
@@ -713,7 +722,7 @@ export default function TemplateDetailPage() {
                     Cancel
                   </button>
                   <button
-                    onClick={handleClone}
+                    type="submit"
                     disabled={cloning}
                     className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
                   >
@@ -730,7 +739,7 @@ export default function TemplateDetailPage() {
                     )}
                   </button>
                 </div>
-              </div>
+              </form>
             )}
           </div>
         </div>
