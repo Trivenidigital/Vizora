@@ -43,6 +43,9 @@ export default function SettingsPage() {
  const router = useRouter();
 
  const [saving, setSaving] = useState(false);
+ // Organization settings start as placeholder defaults; Save is only allowed
+ // once the real values have been loaded over them.
+ const [orgSettingsStatus, setOrgSettingsStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
  const [defaultDurationError, setDefaultDurationError] = useState<string | null>(null);
  const [exporting, setExporting] = useState(false);
 
@@ -117,21 +120,21 @@ export default function SettingsPage() {
    }
  };
 
- // Fetch real settings on mount
+ // Fetch real settings on mount. Organization fields come from GET
+ // /organizations/current, NOT the /auth/me snapshot: that one is cached
+ // server-side and is not invalidated by PATCH /organizations/:id, so reading
+ // it showed the pre-save values after a reload, and the next Save (which sends
+ // the whole settings object) silently reverted the change.
  useEffect(() => {
-   async function loadSettings() {
+   async function loadUser() {
      try {
        const user = await apiClient.getCurrentUser();
-       const orgSettings = (user.organization?.settings as Record<string, any>) || {};
+       // organizationId is only a fallback for branding; the org-settings Save
+       // is gated on orgSettingsStatus, not on this id being present.
        setSettings(prev => ({
          ...prev,
          email: user.email || prev.email,
-         organizationName: user.organization?.name || prev.organizationName,
-         organizationId: user.organizationId || prev.organizationId,
-         country: user.organization?.country || prev.country,
-         defaultDuration: orgSettings.defaultDuration ?? prev.defaultDuration,
-         timezone: orgSettings.timezone ?? prev.timezone,
-         notifications: orgSettings.notifications ?? prev.notifications,
+         organizationId: prev.organizationId || user.organizationId || '',
        }));
        setProfileForm({
          firstName: user.firstName || '',
@@ -142,11 +145,38 @@ export default function SettingsPage() {
        }
      } catch (err) {
        if (process.env.NODE_ENV === 'development') {
-         console.error('Failed to load settings:', err);
+         console.error('Failed to load user:', err);
        }
      }
    }
-   loadSettings();
+
+   async function loadOrganization() {
+     try {
+       const org = await apiClient.getOrganization();
+       if (!org?.id) throw new Error('No organization returned');
+       const orgSettings = (org.settings as Record<string, any>) || {};
+       setSettings(prev => ({
+         ...prev,
+         organizationName: org.name || prev.organizationName,
+         organizationId: org.id,
+         country: org.country || prev.country,
+         defaultDuration: orgSettings.defaultDuration ?? prev.defaultDuration,
+         timezone: orgSettings.timezone ?? prev.timezone,
+         notifications: orgSettings.notifications ?? prev.notifications,
+       }));
+       setOrgSettingsStatus('loaded');
+     } catch (err) {
+       // The form still holds placeholder defaults; saving them would overwrite
+       // the organization's real settings, so Save stays disabled.
+       setOrgSettingsStatus('error');
+       if (process.env.NODE_ENV === 'development') {
+         console.error('Failed to load organization settings:', err);
+       }
+     }
+   }
+
+   void loadUser();
+   void loadOrganization();
  }, []);
 
  // Sync branding form with context when brandConfig loads
@@ -932,11 +962,15 @@ export default function SettingsPage() {
  </div>
 
  {/* Save Button */}
- <div className="flex justify-end">
+ <div className="flex items-center justify-end gap-4">
+ {orgSettingsStatus === 'error' && (
+   <p role="alert" id="settings-org-load-error" className="text-sm text-[var(--error-ink)]">
+     Couldn&apos;t load your organization settings — reload to try again.
+   </p>
+ )}
  <button
    onClick={async () => {
-     if (!settings.organizationId) {
-       toast.error('Organization not loaded yet');
+     if (orgSettingsStatus !== 'loaded' || !settings.organizationId) {
        return;
      }
      const durationError = validateDefaultDuration(settings.defaultDuration);
@@ -963,7 +997,8 @@ export default function SettingsPage() {
        setSaving(false);
      }
    }}
-   disabled={saving}
+   disabled={saving || orgSettingsStatus !== 'loaded'}
+   aria-describedby={orgSettingsStatus === 'error' ? 'settings-org-load-error' : undefined}
    className="eh-btn-neon rounded-xl px-6 py-3 text-sm font-medium transition shadow-md disabled:opacity-50"
  >
    {saving ? 'Saving...' : 'Save Changes'}

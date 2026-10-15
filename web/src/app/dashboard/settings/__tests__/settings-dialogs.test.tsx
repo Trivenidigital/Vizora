@@ -23,6 +23,9 @@ jest.mock('@/lib/api', () => ({
         organization: { name: 'Acme', country: 'US', settings: {} },
       }),
     ),
+    getOrganization: jest.fn(() =>
+      Promise.resolve({ id: 'org-1', name: 'Acme', country: 'US', settings: {} }),
+    ),
     changePassword: (...args: any[]) => mockChangePassword(...args),
     deleteAccount: (...args: any[]) => mockDeleteAccount(...args),
     setAuthenticated: jest.fn(),

@@ -57,7 +57,7 @@ describe('SettingsPage source guards', () => {
 
     const saveHandler = sourceBetween(
       source,
-      "toast.error('Organization not loaded yet')",
+      "if (orgSettingsStatus !== 'loaded' || !settings.organizationId)",
       'await apiClient.updateOrganization(settings.organizationId',
     );
     expect(saveHandler).toContain('validateDefaultDuration(settings.defaultDuration)');
