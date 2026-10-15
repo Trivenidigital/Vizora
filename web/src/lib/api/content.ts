@@ -23,6 +23,8 @@ export interface ContentTagSummary {
   contentCount: number;
 }
 
+export type ContentBulkTagOperation = 'add' | 'remove' | 'replace';
+
 export interface ContentBulkDeleteResult {
   deleted: number;
   failed: number;
@@ -54,6 +56,13 @@ declare module './client' {
     bulkDeleteContent(ids: string[]): Promise<ContentBulkDeleteResult>;
     bulkArchiveContent(ids: string[]): Promise<{ archived: number }>;
     bulkSetContentDuration(ids: string[], duration: number): Promise<{ updated: number }>;
+    // Content tags — POST /content/tags creates one; POST /content/bulk/tags applies/removes
+    createContentTag(name: string, color?: string): Promise<ContentTagSummary>;
+    bulkTagContent(
+      contentIds: string[],
+      tagIds: string[],
+      operation?: ContentBulkTagOperation,
+    ): Promise<{ added?: number; removed?: number }>;
     getContentDownloadUrl(id: string, expirySeconds?: number): Promise<{ url: string; expiresIn: number }>;
     generateThumbnail(contentId: string): Promise<{ thumbnail: string }>;
     uploadContentWithProgress(data: { title: string; type: string; file: File | Blob }, onProgress?: (percent: number) => void): Promise<Content>;
@@ -289,6 +298,27 @@ ApiClient.prototype.bulkSetContentDuration = async function (
   return this.request<{ updated: number }>('/content/bulk/duration', {
     method: 'POST',
     body: JSON.stringify({ ids, duration }),
+  });
+};
+
+ApiClient.prototype.createContentTag = async function (
+  name: string,
+  color?: string,
+): Promise<ContentTagSummary> {
+  return this.request<ContentTagSummary>('/content/tags', {
+    method: 'POST',
+    body: JSON.stringify({ name, color }),
+  });
+};
+
+ApiClient.prototype.bulkTagContent = async function (
+  contentIds: string[],
+  tagIds: string[],
+  operation: ContentBulkTagOperation = 'add',
+): Promise<{ added?: number; removed?: number }> {
+  return this.request<{ added?: number; removed?: number }>('/content/bulk/tags', {
+    method: 'POST',
+    body: JSON.stringify({ contentIds, tagIds, operation }),
   });
 };
 

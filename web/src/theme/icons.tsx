@@ -24,6 +24,7 @@ import {
   Grid,
   Menu,
   Folder,
+  Tag,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
@@ -91,6 +92,7 @@ export const iconMap = {
   document: FileText,
   link: LinkIcon,
   folder: Folder,
+  tag: Tag,
 
   // Status & Alerts
   success: CheckCircle2,

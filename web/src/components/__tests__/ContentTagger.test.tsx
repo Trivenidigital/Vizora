@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ContentTagger, { ContentTag } from '../ContentTagger';
 
 jest.mock('@/theme/icons', () => ({
@@ -69,5 +69,40 @@ describe('ContentTagger', () => {
     expect(screen.getByPlaceholderText(/Tag name/)).toBeInTheDocument();
     fireEvent.click(screen.getByText('Cancel'));
     expect(screen.queryByPlaceholderText(/Tag name/)).not.toBeInTheDocument();
+  });
+
+  it('does not render the create control without onCreateTag', () => {
+    render(<ContentTagger {...defaultProps} />);
+    expect(screen.queryByText('+ Add Tag')).not.toBeInTheDocument();
+  });
+
+  it('submits the create form with Enter, trimmed, with the picked colour', async () => {
+    const onCreateTag = jest.fn().mockResolvedValue(undefined);
+    render(<ContentTagger {...defaultProps} onCreateTag={onCreateTag} />);
+    fireEvent.click(screen.getByText('+ Add Tag'));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Tag name' }), { target: { value: '  Q4  ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'purple' }));
+    fireEvent.submit(screen.getByRole('form', { name: 'Create tag' }));
+
+    expect(onCreateTag).toHaveBeenCalledWith('Q4', 'purple');
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: 'Tag name' })).not.toBeInTheDocument());
+  });
+
+  it('keeps the form open with the input intact when creation fails', async () => {
+    const onCreateTag = jest.fn().mockRejectedValue(new Error('A tag named "Q4" already exists'));
+    render(<ContentTagger {...defaultProps} onCreateTag={onCreateTag} />);
+    fireEvent.click(screen.getByText('+ Add Tag'));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Tag name' }), { target: { value: 'Q4' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Create' })).not.toBeDisabled());
+    expect(onCreateTag).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('textbox', { name: 'Tag name' })).toHaveValue('Q4');
+  });
+
+  it('exposes tag selection state with aria-pressed', () => {
+    render(<ContentTagger {...defaultProps} selectedTags={['t2']} />);
+    expect(screen.getByRole('button', { name: 'Promotion' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Holiday' })).toHaveAttribute('aria-pressed', 'false');
   });
 });
