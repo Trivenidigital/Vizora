@@ -51,8 +51,12 @@ const FLEET_STATUS_LABEL: Record<FleetStatus, string> = {
  online: 'Online',
 };
 
-/** Background device-list refresh cadence while the tab is visible. */
-export const DEVICES_BACKGROUND_REFRESH_MS = 30_000;
+/**
+ * Background device-list refresh cadence while the tab is visible. 60s, not
+ * faster: each tick walks every page of /displays (100 per page) against a
+ * per-IP throttle shared by every tab behind the same NAT.
+ */
+export const DEVICES_BACKGROUND_REFRESH_MS = 60_000;
 
 /** Anything the API sends that is not a state we present falls to `unknown`. */
 const toFleetStatus = (status: unknown): FleetStatus =>
@@ -176,11 +180,16 @@ export default function DevicesClient({
  const [bulkGroupId, setBulkGroupId] = useState('');
  const [bulkOutcome, setBulkOutcome] = useState<BulkOutcome | null>(null);
  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline' | 'error'>('offline');
+ // Bumped by every foreground load and every local write to `devices`. A
+ // background refresh that resolves under a different generation than it
+ // started with carries data older than what is on screen, so it is dropped.
+ const devicesGenerationRef = useRef(0);
  const hasCompleteInitialDevices = initialDevicesComplete ?? initialDevices.length > 0;
  const hasCompleteInitialPlaylists = initialPlaylistsComplete ?? initialPlaylists.length > 0;
 
  // Memoized callback for device status changes
  const handleDeviceStatusChange = useCallback((update: { deviceId: string; status: DisplayStatus; lastSeen?: string | null; currentPlaylistId?: string }) => {
+ devicesGenerationRef.current += 1;
  setDevices((prev) =>
  prev.map((d) =>
  d.id === update.deviceId
@@ -258,7 +267,13 @@ export default function DevicesClient({
   * every row still visible.
   *
   * Skips while hidden, refreshes on becoming visible again, and never stacks
-  * onto a request already in flight (foreground or background).
+  * onto a request already in flight (foreground or background). A result that
+  * lands after a foreground load or local edit started is discarded
+  * (devicesGenerationRef) - it would overwrite newer state with older.
+  *
+  * Deliberately NOT skipped while the realtime socket is connected: the socket
+  * carries status only. Renames, location edits and devices added elsewhere emit
+  * no realtime event, so a connected socket is not evidence the list is fresh.
   */
  const devicesRequestsInFlightRef = useRef(0);
  useEffect(() => {
@@ -267,9 +282,10 @@ export default function DevicesClient({
  if (document.visibilityState !== 'visible') return;
  if (devicesRequestsInFlightRef.current > 0) return;
  devicesRequestsInFlightRef.current += 1;
+ const generation = devicesGenerationRef.current;
  try {
  const devicesList = await fetchAllPaginated((params) => apiClient.getDisplays(params));
- if (cancelled) return;
+ if (cancelled || generation !== devicesGenerationRef.current) return;
  setDevices(devicesList);
  setDevicesLoadError(null);
  } catch {
@@ -292,6 +308,7 @@ export default function DevicesClient({
 
  const loadDevices = async (showLoading = true) => {
  devicesRequestsInFlightRef.current += 1;
+ devicesGenerationRef.current += 1;
  try {
  if (showLoading) setLoading(true);
  setDevicesLoadError(null);
@@ -378,6 +395,7 @@ export default function DevicesClient({
  // Same reason as confirmDelete: the optimistic copy is not what the table
  // renders, so the renamed device kept its old name until a reload.
  commitOptimistic(updateId);
+ devicesGenerationRef.current += 1;
  setDevices((prev) =>
  prev.map((d) =>
  d.id === selectedDevice.id
@@ -435,6 +453,7 @@ export default function DevicesClient({
  // commitOptimistic alone left the deleted row on screen until a reload.
  // Same pairing the content page uses (content/page-client.tsx).
  commitOptimistic(deleteId);
+ devicesGenerationRef.current += 1;
  setDevices((prev) => prev.filter((d) => d.id !== deletedDeviceId));
  toast.success('Device deleted successfully');
  setIsDeleteModalOpen(false);

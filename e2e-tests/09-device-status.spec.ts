@@ -204,11 +204,13 @@ test.describe('Phase 6.1: Real-time Device Status Updates', () => {
   });
 
   /**
-   * The devices page refreshes its list in the background every 30s while the
+   * The devices page refreshes its list in the background every 60s while the
    * tab is visible (`DEVICES_BACKGROUND_REFRESH_MS`). A rename made through the
    * API emits no realtime event, so the timer is the ONLY path by which it can
    * reach an open page - which is what makes it a clean probe of the refresh.
-   * The page clock is fast-forwarded instead of waiting 30 real seconds.
+   * The page clock is fast-forwarded instead of waiting 60 real seconds. The
+   * refresh deliberately still runs while the socket is connected (it carries
+   * status only), so this holds whether or not realtime is up in the run.
    */
   test('should pick up a device change made elsewhere without a reload (MUTATION)', async ({ authenticatedPage, token }) => {
     const before = await seedDisplay(authenticatedPage, token, 'online');
@@ -235,7 +237,16 @@ test.describe('Phase 6.1: Real-time Device Status Updates', () => {
     await expect(deviceRow(authenticatedPage, before)).toHaveCount(1);
     await expect(authenticatedPage.getByText(after)).toHaveCount(0);
 
-    await authenticatedPage.clock.fastForward(31_000);
+    // CONTROL: 40s is past the old 30s cadence and short of the 60s one, so a
+    // regression back to a faster poll shows up here, not as a silent pass.
+    await authenticatedPage.clock.fastForward(40_000);
+    // Real time, not page time: give a (wrongly) fired refresh its round trip,
+    // or a toHaveCount(0) taken mid-request would pass vacuously.
+    await authenticatedPage.waitForTimeout(2000);
+    await expect(deviceRow(authenticatedPage, before)).toHaveCount(1);
+    await expect(authenticatedPage.getByText(after)).toHaveCount(0);
+
+    await authenticatedPage.clock.fastForward(21_000);
 
     await expect(statusBadge(authenticatedPage, after)).toHaveText('Offline', { timeout: 10000 });
     expect(await authenticatedPage.evaluate(() => (window as any).__e2eNoReload)).toBe(true);

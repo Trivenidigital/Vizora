@@ -1425,7 +1425,11 @@ describe('DevicesClient background refresh', () => {
     jest.useRealTimers();
   });
 
-  it('refetches every 30s while visible and renders the fresh list', async () => {
+  it('refreshes at 60s, not faster - each tick walks every page of /displays against a per-IP throttle', () => {
+    expect(DEVICES_BACKGROUND_REFRESH_MS).toBe(60_000);
+  });
+
+  it('refetches on the interval while visible and renders the fresh list', async () => {
     renderLoaded();
     expect(screen.getByText('Lobby Display')).toBeInTheDocument();
     expect(mockGetDisplays).not.toHaveBeenCalled();
@@ -1503,6 +1507,74 @@ describe('DevicesClient background refresh', () => {
     expect(screen.getByText('Conference Room')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: /Lobby Display/i })).toBeChecked();
     expect(mockToast.error).not.toHaveBeenCalled();
+  });
+
+  describe('a background result older than what is on screen is discarded', () => {
+    const renamed = (nickname: string) => ({
+      data: [{ ...sampleDevices[0], nickname }, ...sampleDevices.slice(1)],
+      meta: { total: sampleDevices.length },
+    });
+
+    // Starts a background refresh and leaves it pending; returns its resolver.
+    const startPendingRefresh = async () => {
+      let resolveFetch: (value: any) => void = () => {};
+      mockGetDisplays.mockImplementationOnce(
+        () => new Promise((resolve) => { resolveFetch = resolve; }),
+      );
+      await tick(DEVICES_BACKGROUND_REFRESH_MS);
+      expect(mockGetDisplays).toHaveBeenCalledTimes(1);
+      return (value: any) => act(async () => { resolveFetch(value); });
+    };
+
+    it('when a local edit lands while it is in flight', async () => {
+      mockUpdateDisplay.mockResolvedValue({});
+      renderLoaded();
+      const resolveStale = await startPendingRefresh();
+
+      fireEvent.click(screen.getAllByText('Edit')[0]);
+      fireEvent.change(screen.getByLabelText('Device Nickname'), {
+        target: { value: 'Reception Screen' },
+      });
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Save Changes/ }));
+      });
+      expect(mockUpdateDisplay).toHaveBeenCalled();
+      expect(screen.getByText('Reception Screen')).toBeInTheDocument();
+
+      // The fetch began before the edit, so it still carries the old name.
+      await resolveStale(renamed('Lobby Display'));
+
+      expect(screen.getByText('Reception Screen')).toBeInTheDocument();
+      expect(screen.queryByText('Lobby Display')).not.toBeInTheDocument();
+    });
+
+    it('when a realtime status update arrives while it is in flight', async () => {
+      renderLoaded();
+      const resolveStale = await startPendingRefresh();
+
+      act(() => {
+        mockRealtimeOptions.onDeviceStatusChange({ deviceId: 'd1', status: 'offline' });
+      });
+      await resolveStale(renamed('Stale Name'));
+
+      expect(screen.queryByText('Stale Name')).not.toBeInTheDocument();
+      expect(screen.getByText('Lobby Display')).toBeInTheDocument();
+    });
+
+    it('CONTROL: the next refresh, started after the edit, is applied', async () => {
+      renderLoaded();
+      const resolveStale = await startPendingRefresh();
+      act(() => {
+        mockRealtimeOptions.onDeviceStatusChange({ deviceId: 'd1', status: 'offline' });
+      });
+      await resolveStale(renamed('Stale Name'));
+
+      mockGetDisplays.mockResolvedValue(renamed('Fresh Name'));
+      await tick(DEVICES_BACKGROUND_REFRESH_MS);
+
+      expect(mockGetDisplays).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('Fresh Name')).toBeInTheDocument();
+    });
   });
 
   it('stops polling and listening on unmount', async () => {
