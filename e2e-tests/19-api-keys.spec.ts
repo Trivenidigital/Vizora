@@ -40,13 +40,9 @@ test.describe('API Key Management (Wave 6)', () => {
       await authenticatedPage.goto('/dashboard/settings/api-keys');
       await authenticatedPage.waitForLoadState('networkidle');
 
-      const emptyState = authenticatedPage.locator('text=/no api keys|create your first|get started/i').first();
-      const keyList = authenticatedPage.locator('table, [role="table"], [data-testid="api-key-list"]');
-
-      const hasEmptyState = await emptyState.isVisible({ timeout: 5000 }).catch(() => false);
-      const hasList = await keyList.isVisible({ timeout: 5000 }).catch(() => false);
-
-      expect(hasEmptyState || hasList).toBeTruthy();
+      // A brand-new org has no keys: assert the empty state, not either-or.
+      await expect(authenticatedPage.getByText('No API keys')).toBeVisible({ timeout: 10000 });
+      await expect(authenticatedPage.locator('table')).toHaveCount(0);
     });
 
     test('should open create key modal', async ({ authenticatedPage }) => {
@@ -77,14 +73,15 @@ test.describe('API Key Management (Wave 6)', () => {
 
       await authenticatedPage.click('button:has-text("Create"), button:has-text("New"), button:has-text("Generate")');
 
-      // Scopes selection should be present
-      const scopesSection = authenticatedPage.locator('text=/scopes|permissions|access/i').first();
-      const checkboxes = authenticatedPage.locator('input[type="checkbox"]');
-
-      const hasScopes = await scopesSection.isVisible({ timeout: 5000 }).catch(() => false);
-      const hasCheckboxes = await checkboxes.first().isVisible({ timeout: 5000 }).catch(() => false);
-
-      expect(hasScopes || hasCheckboxes).toBeTruthy();
+      // Eight scopes, each a labelled checkbox; "Read All" is the default.
+      const dialog = authenticatedPage.getByRole('dialog', { name: 'Create API Key' });
+      await expect(dialog.getByText('Scopes', { exact: true })).toBeVisible({ timeout: 5000 });
+      const scopes = dialog.getByRole('checkbox');
+      await expect(scopes).toHaveCount(8);
+      await expect(dialog.getByRole('checkbox', { name: /Read All/ })).toBeChecked();
+      await expect(dialog.getByRole('checkbox', { name: /Write Content/ })).not.toBeChecked();
+      await dialog.getByRole('checkbox', { name: /Write Content/ }).check();
+      await expect(dialog.getByRole('checkbox', { name: /Write Content/ })).toBeChecked();
     });
 
     test('should create API key and show it once', async ({ authenticatedPage }) => {

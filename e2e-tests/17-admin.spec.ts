@@ -68,38 +68,25 @@ test.describe('Admin System (Wave 8)', () => {
       await adminPage.goto('/admin');
       await adminPage.waitForLoadState('networkidle');
 
-      // Should be redirected or show access denied
-      const currentUrl = adminPage.url();
-      const isBlocked =
-        currentUrl.includes('/login') ||
-        currentUrl.includes('/dashboard') ||
-        await adminPage.locator('text=/access denied|unauthorized|forbidden|not authorized/i').isVisible({ timeout: 3000 }).catch(() => false);
-
-      expect(isBlocked).toBeTruthy();
+      // The admin layout replaces the route with /dashboard for anyone
+      // without isSuperAdmin; nothing else counts as blocked.
+      await expect(adminPage).toHaveURL(/\/dashboard$/, { timeout: 10000 });
     });
 
     test('should block access to admin plans page', async ({ adminPage }) => {
       await adminPage.goto('/admin/plans');
       await adminPage.waitForLoadState('networkidle');
 
-      const currentUrl = adminPage.url();
-      const isBlocked =
-        !currentUrl.includes('/admin/plans') ||
-        await adminPage.locator('text=/access denied|unauthorized|forbidden/i').isVisible({ timeout: 3000 }).catch(() => false);
-
-      expect(isBlocked).toBeTruthy();
+      await expect(adminPage).toHaveURL(/\/dashboard$/, { timeout: 10000 });
+      await expect(adminPage.getByRole('heading', { name: /dashboard overview/i })).toBeVisible();
     });
 
     test('should block access to admin organizations page', async ({ adminPage }) => {
       await adminPage.goto('/admin/organizations');
       await adminPage.waitForLoadState('networkidle');
 
-      const currentUrl = adminPage.url();
-      const isBlocked =
-        !currentUrl.includes('/admin/organizations') ||
-        await adminPage.locator('text=/access denied|unauthorized|forbidden/i').isVisible({ timeout: 3000 }).catch(() => false);
-
-      expect(isBlocked).toBeTruthy();
+      await expect(adminPage).toHaveURL(/\/dashboard$/, { timeout: 10000 });
+      await expect(adminPage.getByRole('heading', { name: /dashboard overview/i })).toBeVisible();
     });
   });
 
@@ -107,17 +94,12 @@ test.describe('Admin System (Wave 8)', () => {
     // These tests verify page structure exists even if access is blocked
     // They would pass with proper super admin credentials
 
-    test('admin dashboard should have expected layout', async ({ adminPage }) => {
-      await adminPage.goto('/admin');
-      await adminPage.waitForLoadState('networkidle');
-
-      // Check if admin layout elements exist (sidebar, header)
-      const hasSidebar = await adminPage.locator('nav, aside, [role="navigation"]').isVisible({ timeout: 3000 }).catch(() => false);
-      const hasContent = await adminPage.locator('main, [role="main"]').isVisible({ timeout: 3000 }).catch(() => false);
-
-      // Either has layout or is blocked (both are valid)
-      expect(hasSidebar || hasContent || adminPage.url().includes('/dashboard')).toBeTruthy();
-    });
+    /*
+     * Removed 2026-10-15: 'admin dashboard should have expected layout'. It
+     * passed if a nav OR a main OR a /dashboard URL existed - true on every
+     * dashboard page - so it asserted nothing about admin. The redirect tests
+     * above pin what a non-super-admin actually gets.
+     */
 
     test('admin pages should have consistent navigation', async ({ adminPage }) => {
       const adminPages = [

@@ -22,14 +22,10 @@ test.describe('Playlist Builder (Wave 5)', () => {
       await authenticatedPage.goto('/dashboard/playlists');
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Either empty state or playlist cards
-      const emptyState = authenticatedPage.locator('text=/no playlists|create your first|get started/i').first();
-      const playlistCards = authenticatedPage.locator('[data-testid="playlist-card"], .playlist-card, article');
-
-      const hasEmptyState = await emptyState.isVisible({ timeout: 5000 }).catch(() => false);
-      const hasCards = await playlistCards.first().isVisible({ timeout: 5000 }).catch(() => false);
-
-      expect(hasEmptyState || hasCards).toBeTruthy();
+      // The fixture's org is brand new: the empty state is certain, so it is
+      // asserted instead of accepting either outcome.
+      await expect(authenticatedPage.getByText('No playlists yet')).toBeVisible({ timeout: 10000 });
+      await expect(authenticatedPage.getByRole('button', { name: /^Edit / })).toHaveCount(0);
     });
 
     test('should create a new playlist', async ({ authenticatedPage }) => {
@@ -138,28 +134,17 @@ test.describe('Playlist Builder (Wave 5)', () => {
       await authenticatedPage.goto(`/dashboard/playlists/${playlistId}`);
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Look for editor or playlist items section
-      const editor = authenticatedPage.locator('text=/playlist items|sequence|order|playlist editor/i').first();
-      const itemsList = authenticatedPage.locator('[data-testid="playlist-items"], .playlist-items, ul, ol').first();
-
-      const hasEditor = await editor.isVisible({ timeout: 5000 }).catch(() => false);
-      const hasItems = await itemsList.isVisible({ timeout: 5000 }).catch(() => false);
-
-      expect(hasEditor || hasItems).toBeTruthy();
+      // The editor panel is a named section with an empty-playlist state.
+      await expect(authenticatedPage.getByRole('heading', { level: 3, name: 'Playlist Items' })).toBeVisible({ timeout: 10000 });
+      await expect(authenticatedPage.getByText('Empty Playlist')).toBeVisible();
+      await expect(authenticatedPage.getByText('Drag content from the library to build your playlist')).toBeVisible();
     });
 
     test('should show preview panel', async ({ authenticatedPage }) => {
       await authenticatedPage.goto(`/dashboard/playlists/${playlistId}`);
       await authenticatedPage.waitForLoadState('networkidle');
 
-      // Look for preview section
-      const preview = authenticatedPage.locator('text=/preview|live preview/i').first();
-      const previewArea = authenticatedPage.locator('[class*="preview"], [data-testid="preview"]').first();
-
-      const hasPreviewLabel = await preview.isVisible({ timeout: 5000 }).catch(() => false);
-      const hasPreviewArea = await previewArea.isVisible({ timeout: 5000 }).catch(() => false);
-
-      expect(hasPreviewLabel || hasPreviewArea).toBeTruthy();
+      await expect(authenticatedPage.getByRole('heading', { level: 3, name: 'Preview' })).toBeVisible({ timeout: 10000 });
     });
 
     test('should have save button', async ({ authenticatedPage }) => {
