@@ -76,7 +76,7 @@ test.describe('Display Management', () => {
     await expect(authenticatedPage.locator(`text="${displayName}"`).first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('should show pairing code for display', async ({ authenticatedPage, token }) => {
+  test('should offer pairing from the header, not per row', async ({ authenticatedPage, token }) => {
     // CreateDisplayDto takes { name, deviceId } and maps them to nickname /
     // deviceIdentifier; posting { nickname } is rejected as a non-whitelisted property.
     const displayRes = await apiPost(authenticatedPage, token, 'http://localhost:3000/api/v1/displays', {
@@ -93,28 +93,23 @@ test.describe('Display Management', () => {
     await authenticatedPage.goto('/dashboard/devices');
     await authenticatedPage.waitForLoadState('networkidle');
 
-    // The display the API just created must actually be listed in the UI.
-    const deviceRow = authenticatedPage.locator(`text="${display.nickname}"`).locator('..').locator('..');
-    await expect(deviceRow.first()).toBeVisible({ timeout: 10000 });
+    /*
+     * The old body looked for a per-row "pair/generate/code" button, found none
+     * and skipped itself. There is none by design: a pairing code is shown BY
+     * THE SCREEN and entered on the Pair New Device page (covered by the
+     * pairing test above). A listed device's row offers Preview, Edit and
+     * Delete. REACH CONTROL: those three are found by the same role query that
+     * finds no pairing action.
+     */
+    const row = authenticatedPage.locator('table.eh-datatable tbody tr').filter({ hasText: display.nickname });
+    await expect(row).toHaveCount(1, { timeout: 10000 });
+    await expect(row.getByRole('button', { name: `Preview ${display.nickname}` })).toBeVisible();
+    await expect(row.getByRole('button', { name: `Edit ${display.nickname}` })).toBeVisible();
+    await expect(row.getByRole('button', { name: `Delete ${display.nickname}` })).toBeVisible();
+    await expect(row.getByRole('button', { name: /pair|generate|code/i })).toHaveCount(0);
 
-    // Look for "Generate Pairing" or similar button
-    const pairButton = deviceRow.locator('button').filter({ hasText: /pair|generate|code/i }).first();
-
-    // If button exists, click it
-    if (await pairButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await pairButton.click();
-
-      // Should show pairing modal with code
-      await expect(authenticatedPage.locator('[role="dialog"]')).toBeVisible({ timeout: 5000 });
-
-      // Visual regression
-      // await expect(authenticatedPage).toHaveScreenshot('display-pairing.png', { maxDiffPixels: 100 });
-    } else {
-      test.info().annotations.push({
-        type: 'skipped-branch',
-        description: 'no per-row pairing/generate button rendered — pairing modal not exercised',
-      });
-    }
+    await authenticatedPage.getByRole('button', { name: /Pair New Device/ }).first().click();
+    await expect(authenticatedPage).toHaveURL(/\/dashboard\/devices\/pair/);
   });
 
   /**
