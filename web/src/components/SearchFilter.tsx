@@ -5,6 +5,8 @@ interface SearchFilterProps {
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  /** Accessible name for the input. A placeholder is not a label. */
+  ariaLabel?: string;
 }
 
 export default function SearchFilter({
@@ -12,6 +14,7 @@ export default function SearchFilter({
   onChange,
   placeholder = 'Search...',
   className = '',
+  ariaLabel,
 }: SearchFilterProps) {
   return (
     <div className={`relative ${className}`}>
@@ -20,6 +23,7 @@ export default function SearchFilter({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        aria-label={ariaLabel}
         /* `!` is load-bearing. `.eh-input` sets the `padding` shorthand and is
            defined in globals.css AFTER `@tailwind utilities`; both are
            single-class selectors, so source order wins and plain `pl-10`

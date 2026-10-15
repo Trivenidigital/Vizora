@@ -37,7 +37,6 @@ interface Schedule {
   days?: string[];
   deviceIds?: string[];
   duration?: number;
-  timezone?: string;
   active?: boolean;
 }
 

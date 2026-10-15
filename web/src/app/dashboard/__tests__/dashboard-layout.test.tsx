@@ -1,4 +1,4 @@
-import { act, render, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useEffect, type ReactNode } from 'react';
 import DashboardLayout from '../layout';
 import { useSocket } from '@/lib/hooks/useSocket';
@@ -132,5 +132,26 @@ describe('DashboardLayout shared socket integration', () => {
       expect(mockSocket.on).toHaveBeenCalledWith('device:status', expect.any(Function));
       expect(mockSocket.on).toHaveBeenCalledWith('child:event', expect.any(Function));
     });
+  });
+});
+
+describe('DashboardLayout mobile sidebar toggle', () => {
+  it('has an accessible name, controls the sidebar and reports its expanded state', () => {
+    render(
+      <DashboardLayout>
+        <div />
+      </DashboardLayout>,
+    );
+
+    const toggle = screen.getByRole('button', { name: 'Navigation menu' });
+    const controlled = toggle.getAttribute('aria-controls');
+    expect(controlled).toBe('dashboard-sidebar');
+    expect(document.getElementById(controlled!)?.tagName).toBe('ASIDE');
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
   });
 });

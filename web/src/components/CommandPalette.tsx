@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useId } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon } from '@/theme/icons';
 import { SCHEDULES_ENABLED } from '@/lib/feature-flags';
@@ -59,6 +59,29 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
     [isControlled, onOpenChange],
   );
 
+  /**
+   * Every dismissal goes through here so none can leave a stale query behind.
+   * Escape used to close without clearing `search`, so reopening showed the
+   * last query and a filtered list.
+   */
+  const close = useCallback(() => {
+    setOpen(false);
+    setSearch('');
+    setSelectedIndex(0);
+  }, [setOpen]);
+
+  // The wrapper's ⌘K closes a controlled palette without calling close(), so
+  // also reset whenever `open` drops for any reason.
+  useEffect(() => {
+    if (!open) {
+      setSearch('');
+      setSelectedIndex(0);
+    }
+  }, [open]);
+
+  const listboxId = useId();
+  const optionId = (cmd: Command) => `${listboxId}-option-${cmd.id}`;
+
   // Handle keyboard shortcut (Cmd+K or Ctrl+K)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -93,7 +116,7 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
       switch (e.key) {
         case 'Escape':
           e.preventDefault();
-          setOpen(false);
+          close();
           break;
         case 'ArrowDown':
           e.preventDefault();
@@ -107,8 +130,7 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
           e.preventDefault();
           if (filteredCommands[selectedIndex]) {
             filteredCommands[selectedIndex].onExecute();
-            setOpen(false);
-            setSearch('');
+            close();
           }
           break;
       }
@@ -116,7 +138,7 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [open, search, selectedIndex, setOpen, isControlled]);
+  }, [open, search, selectedIndex, setOpen, close, isControlled]);
 
   // Filter commands by search
   const filteredCommands = commands.filter(cmd => {
@@ -179,10 +201,7 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
       {open && (
         <div
           className="fixed inset-0 bg-black/50 z-40"
-          onClick={() => {
-            setOpen(false);
-            setSearch('');
-          }}
+          onClick={close}
         />
       )}
 
@@ -205,8 +224,19 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
             <div className="p-4 border-b border-[var(--border)]">
               <div className="flex items-center gap-3">
                 <Icon name="search" size="sm" className="text-[var(--foreground-tertiary)]" />
+                {/* Combobox pattern: focus stays in the input while
+                    aria-activedescendant tells assistive tech which option the
+                    arrow keys have highlighted. */}
                 <input
                   type="text"
+                  role="combobox"
+                  aria-label="Search commands"
+                  aria-autocomplete="list"
+                  aria-expanded={filteredCommands.length > 0}
+                  aria-controls={filteredCommands.length > 0 ? listboxId : undefined}
+                  aria-activedescendant={
+                    filteredCommands[selectedIndex] ? optionId(filteredCommands[selectedIndex]) : undefined
+                  }
                   value={search}
                   onChange={e => {
                     setSearch(e.target.value);
@@ -221,16 +251,20 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
             </div>
 
             {/* Commands List */}
-            <div className="max-h-96 overflow-y-auto">
-              {filteredCommands.length === 0 ? (
-                <div className="p-8 text-center">
-                  <p className="text-sm text-[var(--foreground-secondary)]">No commands found</p>
-                </div>
-              ) : (
-                sortedGroups.map(category => (
-                  <div key={category}>
+            {filteredCommands.length === 0 ? (
+              <div className="p-8 text-center">
+                <p className="text-sm text-[var(--foreground-secondary)]">No commands found</p>
+              </div>
+            ) : (
+              <div id={listboxId} role="listbox" aria-label="Commands" className="max-h-96 overflow-y-auto">
+                {sortedGroups.map(category => (
+                  <div key={category} role="group" aria-labelledby={`${listboxId}-group-${category}`}>
                     {/* Category Header */}
-                    <div className="px-4 py-2 text-xs font-semibold text-[var(--foreground-tertiary)] uppercase tracking-wider bg-[var(--background)]">
+                    <div
+                      id={`${listboxId}-group-${category}`}
+                      role="presentation"
+                      className="px-4 py-2 text-xs font-semibold text-[var(--foreground-tertiary)] uppercase tracking-wider bg-[var(--background)]"
+                    >
                       {category.replace('-', ' ')}
                     </div>
 
@@ -240,14 +274,16 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
                       const isSelected = globalIndex === selectedIndex;
 
                       return (
-                        <button
+                        <div
                           key={cmd.id}
+                          id={optionId(cmd)}
+                          role="option"
+                          aria-selected={isSelected}
                           onClick={() => {
                             cmd.onExecute();
-                            setOpen(false);
-                            setSearch('');
+                            close();
                           }}
-                          className={`w-full px-4 py-3 text-left flex items-center gap-3 transition-colors ${
+                          className={`w-full px-4 py-3 text-left flex items-center gap-3 transition-colors cursor-pointer ${
                             isSelected
                               ? 'bg-[var(--lw-forest)] text-[var(--lw-on-forest)]'
                               : 'text-[var(--foreground)] hover:bg-[var(--surface-hover)]'
@@ -262,13 +298,13 @@ export default function CommandPalette({ commands, open: controlledOpen, onOpenC
                               <div className="text-xs opacity-75">{cmd.description}</div>
                             )}
                           </div>
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
-                ))
-              )}
-            </div>
+                ))}
+              </div>
+            )}
 
             {/* Footer Help */}
             {filteredCommands.length > 0 && (

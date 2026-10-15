@@ -8,6 +8,9 @@ import {
   validateField,
   validateForm,
   extractFieldErrors,
+  validateDefaultDuration,
+  DEFAULT_DURATION_MIN_SECONDS,
+  DEFAULT_DURATION_MAX_SECONDS,
 } from '../validation';
 
 describe('contentUploadSchema', () => {
@@ -436,5 +439,29 @@ describe('extractFieldErrors', () => {
     const emptyZodError = new z.ZodError([]);
     const errors = extractFieldErrors(emptyZodError);
     expect(errors).toEqual({});
+  });
+});
+
+describe('validateDefaultDuration', () => {
+  it('matches the middleware bound (1..86400 seconds)', () => {
+    expect(DEFAULT_DURATION_MIN_SECONDS).toBe(1);
+    expect(DEFAULT_DURATION_MAX_SECONDS).toBe(86400);
+  });
+
+  it.each([1, 30, 86400])('accepts %p', (value) => {
+    expect(validateDefaultDuration(value)).toBeNull();
+  });
+
+  it('rejects NaN, which is what an emptied number input parses to', () => {
+    expect(validateDefaultDuration(parseInt('', 10))).toBe('Enter a default duration in seconds');
+    expect(validateDefaultDuration(Number.NaN)).toBe('Enter a default duration in seconds');
+  });
+
+  it.each([0, -1, 86401])('rejects out-of-range %p', (value) => {
+    expect(validateDefaultDuration(value)).toBe('Default duration must be between 1 and 86400 seconds');
+  });
+
+  it('rejects a fractional value instead of silently truncating it', () => {
+    expect(validateDefaultDuration(1.5)).toBe('Default duration must be a whole number of seconds');
   });
 });

@@ -179,4 +179,37 @@ describe('TeamClient', () => {
       expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
     });
   });
+
+  it('names each row action after the member it acts on', async () => {
+    render(<TeamClient />);
+    await waitFor(() => {
+      expect(screen.getByText('admin@vizora.com')).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByRole('button', { name: 'Edit role for Admin User (admin@vizora.com)' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Edit role for View Only (viewer@vizora.com)' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Deactivate Editor Smith (editor@vizora.com)' }),
+    ).toBeInTheDocument();
+    // Inactive members have no deactivate action.
+    expect(screen.queryByRole('button', { name: /^Deactivate View Only/ })).not.toBeInTheDocument();
+  });
+
+  it('falls back to the email when a member has no name', async () => {
+    mockGetUsers.mockResolvedValue({
+      data: [{ ...sampleUsers[0], firstName: '', lastName: '' }],
+      meta: { total: 1, totalPages: 1 },
+    });
+    render(<TeamClient />);
+    await waitFor(() => {
+      expect(screen.getByText('admin@vizora.com')).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('button', { name: 'Edit role for admin@vizora.com' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Deactivate admin@vizora.com' })).toBeInTheDocument();
+  });
 });
