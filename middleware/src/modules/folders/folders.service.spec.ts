@@ -1,4 +1,4 @@
-import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { FoldersService } from './folders.service';
 import { DatabaseService } from '../database/database.service';
 
@@ -51,6 +51,9 @@ describe('FoldersService', () => {
         count: jest.fn(),
       },
     };
+    // Interactive transaction runs against the same mocks, so the existing
+    // per-model assertions hold whether or not a write goes through `tx`.
+    mockDatabaseService.$transaction = jest.fn((fn: (tx: any) => unknown) => fn(mockDatabaseService));
 
     service = new FoldersService(mockDatabaseService as DatabaseService);
   });
@@ -115,6 +118,23 @@ describe('FoldersService', () => {
       await expect(
         service.create('org-123', { name: 'Child', parentId: 'parent-from-other-org' }),
       ).rejects.toThrow(BadRequestException);
+    });
+
+    it('maps a sibling-name clash (P2002) to 409, not 500', async () => {
+      mockDatabaseService.contentFolder.create.mockRejectedValue(
+        Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }),
+      );
+
+      const err = await service.create('org-123', { name: 'Marketing' }).catch((e) => e);
+      expect(err).toBeInstanceOf(ConflictException);
+      expect(err.message).toBe('A folder named "Marketing" already exists here');
+    });
+
+    it('rethrows any other create error unchanged', async () => {
+      const boom = Object.assign(new Error('connection lost'), { code: 'P1001' });
+      mockDatabaseService.contentFolder.create.mockRejectedValue(boom);
+
+      await expect(service.create('org-123', { name: 'X' })).rejects.toBe(boom);
     });
   });
 
@@ -328,6 +348,22 @@ describe('FoldersService', () => {
         service.update('org-123', 'folder-123', { parentId: 'child-123' }),
       ).rejects.toThrow(BadRequestException);
     });
+
+    it('maps a rename onto a sibling name (P2002) to 409, not 500', async () => {
+      mockDatabaseService.contentFolder.findFirst.mockResolvedValue({
+        ...mockFolder,
+        parent: null,
+        children: [],
+        _count: { content: 0 },
+      });
+      mockDatabaseService.contentFolder.updateMany.mockRejectedValue(
+        Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }),
+      );
+
+      const err = await service.update('org-123', 'folder-123', { name: 'Sales' }).catch((e) => e);
+      expect(err).toBeInstanceOf(ConflictException);
+      expect(err.message).toBe('A folder with that name already exists in the destination folder');
+    });
   });
 
   describe('remove', () => {
@@ -375,6 +411,67 @@ describe('FoldersService', () => {
       mockDatabaseService.contentFolder.findFirst.mockResolvedValue(null);
 
       await expect(service.remove('org-123', 'invalid-id')).rejects.toThrow(NotFoundException);
+    });
+
+    it('runs every write inside one transaction', async () => {
+      mockDatabaseService.contentFolder.findFirst.mockResolvedValue({
+        ...mockFolder,
+        parentId: 'parent-123',
+        parent: null,
+        children: [],
+        _count: { content: 0 },
+      });
+      const tx = {
+        content: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+        contentFolder: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+        },
+      };
+      mockDatabaseService.$transaction.mockImplementation((fn: (t: any) => unknown) => fn(tx));
+
+      await service.remove('org-123', 'folder-123');
+
+      expect(mockDatabaseService.$transaction).toHaveBeenCalledTimes(1);
+      expect(tx.content.updateMany).toHaveBeenCalled();
+      expect(tx.contentFolder.updateMany).toHaveBeenCalled();
+      expect(tx.contentFolder.deleteMany).toHaveBeenCalled();
+      // Nothing escapes the transaction onto the root client.
+      expect(mockDatabaseService.content.updateMany).not.toHaveBeenCalled();
+      expect(mockDatabaseService.contentFolder.updateMany).not.toHaveBeenCalled();
+      expect(mockDatabaseService.contentFolder.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('maps a child-reparent name clash (P2002) to 409 and does not delete', async () => {
+      mockDatabaseService.contentFolder.findFirst.mockResolvedValue({
+        ...mockFolder,
+        parentId: 'parent-123',
+        parent: null,
+        children: [],
+        _count: { content: 0 },
+      });
+      mockDatabaseService.content.updateMany.mockResolvedValue({ count: 3 });
+      mockDatabaseService.contentFolder.updateMany.mockRejectedValue(
+        Object.assign(new Error('Unique constraint failed'), { code: 'P2002' }),
+      );
+
+      const err = await service.remove('org-123', 'folder-123').catch((e) => e);
+      expect(err).toBeInstanceOf(ConflictException);
+      expect(err.message).toMatch(/already exists in the parent folder/);
+      expect(mockDatabaseService.contentFolder.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('keeps NotFoundException when the delete matches no row', async () => {
+      mockDatabaseService.contentFolder.findFirst.mockResolvedValue({
+        ...mockFolder,
+        parent: null,
+        children: [],
+        _count: { content: 0 },
+      });
+      mockDatabaseService.content.updateMany.mockResolvedValue({ count: 0 });
+      mockDatabaseService.contentFolder.deleteMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.remove('org-123', 'folder-123')).rejects.toThrow(NotFoundException);
     });
 
     it('should enforce organization isolation in remove', async () => {
