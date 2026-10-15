@@ -10,6 +10,11 @@ import Modal from '@/components/Modal';
 import { useToast } from '@/lib/hooks/useToast';
 import { useCustomization } from '@/components/providers/CustomizationProvider';
 import { brandTextInk, onFillInk } from '@/lib/customization';
+import {
+ DEFAULT_DURATION_MAX_SECONDS,
+ DEFAULT_DURATION_MIN_SECONDS,
+ validateDefaultDuration,
+} from '@/lib/validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,6 +43,7 @@ export default function SettingsPage() {
  const router = useRouter();
 
  const [saving, setSaving] = useState(false);
+ const [defaultDurationError, setDefaultDurationError] = useState<string | null>(null);
  const [exporting, setExporting] = useState(false);
 
  // Profile state
@@ -698,20 +704,38 @@ export default function SettingsPage() {
  <h3 className="eh-dash-subtitle text-lg font-semibold text-[var(--foreground)] mb-4">Display Settings</h3>
  <div className="space-y-4">
  <div>
- <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-2">
+ <label htmlFor="settings-default-duration" className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-2">
  Default Content Duration (seconds)
  </label>
+ {/* An emptied field is NaN, not 0: it renders blank and validation
+     rejects it on save. `Number` rather than `parseInt` so 1.5 is
+     rejected instead of silently truncated to 1. */}
  <input
+ id="settings-default-duration"
  type="number"
- value={settings.defaultDuration}
- onChange={(e) =>
- setSettings({ ...settings, defaultDuration: parseInt(e.target.value) })
- }
- className="eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
+ min={DEFAULT_DURATION_MIN_SECONDS}
+ max={DEFAULT_DURATION_MAX_SECONDS}
+ step={1}
+ value={Number.isNaN(settings.defaultDuration) ? '' : settings.defaultDuration}
+ onChange={(e) => {
+ setSettings({
+ ...settings,
+ defaultDuration: e.target.value === '' ? Number.NaN : Number(e.target.value),
+ });
+ if (defaultDurationError) setDefaultDurationError(null);
+ }}
+ aria-invalid={defaultDurationError ? true : undefined}
+ aria-describedby={defaultDurationError ? 'settings-default-duration-help settings-default-duration-error' : 'settings-default-duration-help'}
+ className={`eh-input w-full px-4 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent ${defaultDurationError ? '!border-[var(--error-ink)]' : ''}`}
  />
- <p className="mt-2 text-xs text-[var(--foreground-tertiary)]">
- How long each piece of content displays by default
+ <p id="settings-default-duration-help" className="mt-2 text-xs text-[var(--foreground-tertiary)]">
+ How long each piece of content displays by default ({DEFAULT_DURATION_MIN_SECONDS}–{DEFAULT_DURATION_MAX_SECONDS} seconds)
  </p>
+ {defaultDurationError && (
+ <p id="settings-default-duration-error" role="alert" className="mt-1 text-sm text-[var(--error-ink)]">
+ {defaultDurationError}
+ </p>
+ )}
  </div>
  <div>
  <label htmlFor="settings-timezone" className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-2">
@@ -905,6 +929,12 @@ export default function SettingsPage() {
    onClick={async () => {
      if (!settings.organizationId) {
        toast.error('Organization not loaded yet');
+       return;
+     }
+     const durationError = validateDefaultDuration(settings.defaultDuration);
+     if (durationError) {
+       setDefaultDurationError(durationError);
+       toast.error(durationError);
        return;
      }
      setSaving(true);

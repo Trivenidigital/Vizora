@@ -282,3 +282,25 @@ export function extractFieldErrors(zodError: z.ZodError): Record<string, string>
     return acc;
   }, {} as Record<string, string>);
 }
+
+/**
+ * Organization default content duration, in seconds. Mirrors the middleware's
+ * `ORG_DEFAULT_DURATION_MIN/MAX_SECONDS` (organizations/dto/org-settings.validator.ts),
+ * which in turn matches the per-item playlist duration bound — change all
+ * together.
+ */
+export const DEFAULT_DURATION_MIN_SECONDS = 1;
+export const DEFAULT_DURATION_MAX_SECONDS = 86400;
+
+/**
+ * Returns an error message, or null when valid. NaN (an emptied number input)
+ * is rejected rather than saved: JSON serialises it as `null`.
+ */
+export function validateDefaultDuration(value: number): string | null {
+  if (!Number.isFinite(value)) return 'Enter a default duration in seconds';
+  if (!Number.isInteger(value)) return 'Default duration must be a whole number of seconds';
+  if (value < DEFAULT_DURATION_MIN_SECONDS || value > DEFAULT_DURATION_MAX_SECONDS) {
+    return `Default duration must be between ${DEFAULT_DURATION_MIN_SECONDS} and ${DEFAULT_DURATION_MAX_SECONDS} seconds`;
+  }
+  return null;
+}
