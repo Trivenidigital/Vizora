@@ -367,6 +367,10 @@ export default function AlertsPage() {
     );
   };
 
+  // Mirrors the Save button's `disabled`, so Enter cannot reach handleSave while
+  // the button would refuse the click.
+  const saveSubmitDisabled = actionLoading || !form.name.trim();
+
   return (
     <div className="space-y-6">
       <toast.ToastContainer />
@@ -488,7 +492,14 @@ export default function AlertsPage() {
         title={editingRule ? 'Edit Alert Rule' : 'New Alert Rule'}
         size="lg"
       >
-        <div className="space-y-6">
+        <form
+          noValidate
+          className="space-y-6"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!saveSubmitDisabled) void handleSave();
+          }}
+        >
           <div>
             <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
               Rule Name <span className="text-[var(--error-ink)]">*</span>
@@ -626,21 +637,22 @@ export default function AlertsPage() {
 
           <div className="flex justify-end gap-3 pt-4 border-t border-[var(--border)]">
             <button
+              type="button"
               onClick={closeModal}
               className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition"
             >
               {editingRule ? 'Done' : 'Cancel'}
             </button>
             <button
-              onClick={handleSave}
-              disabled={actionLoading || !form.name.trim()}
+              type="submit"
+              disabled={saveSubmitDisabled}
               className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
             >
               {actionLoading && <LoadingSpinner size="sm" />}
               {editingRule ? 'Save Changes' : 'Create Rule'}
             </button>
           </div>
-        </div>
+        </form>
       </Modal>
 
       <ConfirmDialog
@@ -735,6 +747,11 @@ function RecipientsEditor({
   const [newChannel, setNewChannel] = useState<AlertChannel>('in_app');
   const [newTarget, setNewTarget] = useState('');
 
+  const addRecipient = () => {
+    onAdd(newChannel, newTarget);
+    setNewTarget('');
+  };
+
   return (
     <div className="space-y-3">
       {recipients.length === 0 && (
@@ -765,7 +782,18 @@ function RecipientsEditor({
         </div>
       ))}
 
-      <div className="flex items-center gap-2 pt-1">
+      {/* Inside the rule's form: without this, Enter in the new-recipient field
+          would save the whole rule and silently drop the recipient typed here.
+          Enter adds it instead, under the same guard as the Add button. */}
+      <div
+        className="flex items-center gap-2 pt-1"
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' || !(event.target instanceof HTMLInputElement)) return;
+          event.preventDefault();
+          if (actionLoading || !newTarget.trim()) return;
+          addRecipient();
+        }}
+      >
         <select
           value={newChannel}
           onChange={(e) => {
@@ -781,10 +809,7 @@ function RecipientsEditor({
         {renderTargetInput(newChannel, newTarget, setNewTarget)}
         <button
           type="button"
-          onClick={() => {
-            onAdd(newChannel, newTarget);
-            setNewTarget('');
-          }}
+          onClick={addRecipient}
           disabled={actionLoading || !newTarget.trim()}
           className="px-3 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 whitespace-nowrap"
         >

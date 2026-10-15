@@ -169,6 +169,11 @@ export default function TeamClient() {
  });
  };
 
+ // Each dialog's submit guard mirrors its primary button's `disabled`, so Enter
+ // cannot reach a handler the disabled button used to keep out of reach.
+ const inviteSubmitDisabled = actionLoading || !inviteForm.email || !inviteForm.firstName || !inviteForm.lastName;
+ const roleSubmitDisabled = actionLoading || !selectedUser || editRole === selectedUser.role;
+
  return (
  <div className="space-y-6">
  <toast.ToastContainer />
@@ -354,7 +359,14 @@ export default function TeamClient() {
  onClose={() => setIsInviteModalOpen(false)}
  title="Invite Team Member"
  >
- <div className="space-y-4">
+ <form
+   noValidate
+   className="space-y-4"
+   onSubmit={(event) => {
+     event.preventDefault();
+     if (!inviteSubmitDisabled) void handleInvite();
+   }}
+ >
  <div>
  <label className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
  Email Address
@@ -412,21 +424,22 @@ export default function TeamClient() {
  </div>
  <div className="flex justify-end gap-3 pt-4">
  <button
+ type="button"
  onClick={() => setIsInviteModalOpen(false)}
  className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition"
  >
  Cancel
  </button>
  <button
- onClick={handleInvite}
- disabled={actionLoading || !inviteForm.email || !inviteForm.firstName || !inviteForm.lastName}
+ type="submit"
+ disabled={inviteSubmitDisabled}
  className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
  Send Invite
  </button>
  </div>
- </div>
+ </form>
  </Modal>
 
  {/* Edit Role Modal */}
@@ -438,7 +451,14 @@ export default function TeamClient() {
  }}
  title="Edit User Role"
  >
- <div className="space-y-4">
+ <form
+   noValidate
+   className="space-y-4"
+   onSubmit={(event) => {
+     event.preventDefault();
+     if (!roleSubmitDisabled) void handleSaveRole();
+   }}
+ >
  {selectedUser && (
  <>
  <div className="bg-[var(--background)] p-3 rounded-lg">
@@ -462,6 +482,7 @@ export default function TeamClient() {
  </div>
  <div className="flex justify-end gap-3 pt-4">
  <button
+ type="button"
  onClick={() => {
  setIsEditModalOpen(false);
  setSelectedUser(null);
@@ -471,8 +492,8 @@ export default function TeamClient() {
  Cancel
  </button>
  <button
- onClick={handleSaveRole}
- disabled={actionLoading || editRole === selectedUser.role}
+ type="submit"
+ disabled={roleSubmitDisabled}
  className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
@@ -481,7 +502,7 @@ export default function TeamClient() {
  </div>
  </>
  )}
- </div>
+ </form>
  </Modal>
 
  {/* Deactivate Confirmation */}

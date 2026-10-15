@@ -142,6 +142,10 @@ export default function ApiKeysPage() {
  return new Date(expiresAt) < new Date();
  };
 
+ // Mirrors the Create button's `disabled`, so Enter cannot reach handleCreate
+ // while the button would refuse the click (no name, no scope, or in flight).
+ const createSubmitDisabled = actionLoading || !createForm.name || createForm.scopes.length === 0;
+
  return (
  <div className="space-y-6">
  <toast.ToastContainer />
@@ -331,7 +335,14 @@ export default function ApiKeysPage() {
  title="Create API Key"
  size="lg"
  >
- <div className="space-y-6">
+ <form
+   noValidate
+   className="space-y-6"
+   onSubmit={(event) => {
+     event.preventDefault();
+     if (!createSubmitDisabled) void handleCreate();
+   }}
+ >
  <div>
  <label htmlFor="api-key-name" className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
  Key Name <span className="text-[var(--error-ink)]">*</span>
@@ -392,21 +403,22 @@ export default function ApiKeysPage() {
 
  <div className="flex justify-end gap-3 pt-4 border-t">
  <button
+ type="button"
  onClick={() => setIsCreateModalOpen(false)}
  className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition"
  >
  Cancel
  </button>
  <button
- onClick={handleCreate}
- disabled={actionLoading || !createForm.name || createForm.scopes.length === 0}
+ type="submit"
+ disabled={createSubmitDisabled}
  className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
  >
  {actionLoading && <LoadingSpinner size="sm" />}
  Create Key
  </button>
  </div>
- </div>
+ </form>
  </Modal>
 
  {/* Revoke Confirmation */}

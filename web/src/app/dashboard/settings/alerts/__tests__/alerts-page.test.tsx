@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import userEvent from '@testing-library/user-event';
 
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn(), refresh: jest.fn() }),
@@ -114,5 +115,79 @@ describe('AlertsPage', () => {
     fireEvent.click(screen.getByText('Delete'));
     fireEvent.click(screen.getByText('Delete Rule'));
     await waitFor(() => expect(mockDeleteAlertRule).toHaveBeenCalledWith('rule-1'));
+  });
+
+  describe('rule dialog submits on Enter', () => {
+    const NAME_PLACEHOLDER = 'e.g. Lobby screens offline';
+
+    const openEdit = async () => {
+      render(<AlertsPage />);
+      await waitFor(() => expect(screen.getByText('Lobby offline')).toBeInTheDocument());
+      fireEvent.click(screen.getByText('Edit'));
+      expect(screen.getByText('Edit Alert Rule')).toBeInTheDocument();
+    };
+
+    it('saves the rule when Enter is pressed in the rule name field', async () => {
+      mockUpdateAlertRule.mockResolvedValue({ ...sampleRule, name: 'Lobby screens down' });
+      const user = userEvent.setup();
+      await openEdit();
+
+      const name = screen.getByPlaceholderText(NAME_PLACEHOLDER);
+      await user.clear(name);
+      await user.type(name, 'Lobby screens down{Enter}');
+
+      await waitFor(() => {
+        expect(mockUpdateAlertRule).toHaveBeenCalledWith(
+          'rule-1',
+          expect.objectContaining({ name: 'Lobby screens down' }),
+        );
+      });
+      expect(mockUpdateAlertRule).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not save when submitted with an empty rule name', async () => {
+      await openEdit();
+
+      const name = screen.getByPlaceholderText(NAME_PLACEHOLDER);
+      fireEvent.change(name, { target: { value: '  ' } });
+      fireEvent.submit(name.closest('form')!);
+
+      expect(mockUpdateAlertRule).not.toHaveBeenCalled();
+    });
+
+    it('adds the recipient, and does not save the rule, on Enter in the new-recipient field', async () => {
+      mockAddRecipient.mockResolvedValue({
+        id: 'rec-2',
+        alertRuleId: 'rule-1',
+        channel: 'email',
+        target: 'oncall@example.com',
+        createdAt: '',
+      });
+      const user = userEvent.setup();
+      await openEdit();
+
+      // The add-recipient row is the only channel select still on its default.
+      fireEvent.change(screen.getByDisplayValue('In-app notification'), { target: { value: 'email' } });
+      await user.type(screen.getByPlaceholderText('alerts@example.com'), 'oncall@example.com{Enter}');
+
+      await waitFor(() => {
+        expect(mockAddRecipient).toHaveBeenCalledWith('rule-1', {
+          channel: 'email',
+          target: 'oncall@example.com',
+        });
+      });
+      expect(mockUpdateAlertRule).not.toHaveBeenCalled();
+    });
+
+    it('does nothing on Enter in an empty new-recipient field', async () => {
+      const user = userEvent.setup();
+      await openEdit();
+
+      fireEvent.change(screen.getByDisplayValue('In-app notification'), { target: { value: 'email' } });
+      await user.type(screen.getByPlaceholderText('alerts@example.com'), '{Enter}');
+
+      expect(mockAddRecipient).not.toHaveBeenCalled();
+      expect(mockUpdateAlertRule).not.toHaveBeenCalled();
+    });
   });
 });

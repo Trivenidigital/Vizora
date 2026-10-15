@@ -316,6 +316,14 @@ export default function SettingsPage() {
    }
  };
 
+ // Each dialog's submit guard mirrors its primary button's `disabled`, so Enter
+ // cannot reach a handler the disabled button used to keep out of reach. For
+ // account deletion that keeps the typed "DELETE MY ACCOUNT" gate load-bearing.
+ const passwordSubmitDisabled =
+   passwordLoading || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword;
+ const deleteSubmitDisabled =
+   deleteLoading || deleteForm.confirmation !== 'DELETE MY ACCOUNT' || !deleteForm.password;
+
  return (
  <div className="space-y-8">
  <div>
@@ -971,7 +979,14 @@ export default function SettingsPage() {
    }}
    title="Change Password"
  >
-   <div className="space-y-4">
+   <form
+     noValidate
+     className="space-y-4"
+     onSubmit={(event) => {
+       event.preventDefault();
+       if (!passwordSubmitDisabled) void handleChangePassword();
+     }}
+   >
      <div>
        <label className="block text-sm font-semibold text-[var(--foreground-secondary)] mb-1">Current Password</label>
        <input
@@ -1001,6 +1016,7 @@ export default function SettingsPage() {
      </div>
      <div className="flex justify-end gap-3 pt-4">
        <button
+         type="button"
          onClick={() => {
            setShowChangePasswordModal(false);
            setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -1010,14 +1026,14 @@ export default function SettingsPage() {
          Cancel
        </button>
        <button
-         onClick={handleChangePassword}
-         disabled={passwordLoading || !passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword}
+         type="submit"
+         disabled={passwordSubmitDisabled}
          className="eh-btn-neon rounded-xl px-4 py-2 text-sm font-medium transition disabled:opacity-50"
        >
          {passwordLoading ? 'Changing...' : 'Change Password'}
        </button>
      </div>
-   </div>
+   </form>
  </Modal>
  {/* Delete Account Modal */}
  <Modal
@@ -1029,7 +1045,14 @@ export default function SettingsPage() {
    }}
    title="Delete Account"
  >
-   <div className="space-y-4">
+   <form
+     noValidate
+     className="space-y-4"
+     onSubmit={(event) => {
+       event.preventDefault();
+       if (!deleteSubmitDisabled) void handleDeleteAccount();
+     }}
+   >
      <div className="p-4 bg-error/10 border border-error-ink/30 rounded-lg">
        <p className="text-sm text-[var(--error-ink)] font-medium mb-2">
          This action is permanent and cannot be undone.
@@ -1070,6 +1093,7 @@ export default function SettingsPage() {
      </div>
      <div className="flex justify-end gap-3 pt-4">
        <button
+         type="button"
          onClick={() => {
            setShowDeleteAccountModal(false);
            setDeleteForm({ password: '', confirmation: '' });
@@ -1080,14 +1104,14 @@ export default function SettingsPage() {
          Cancel
        </button>
        <button
-         onClick={handleDeleteAccount}
-         disabled={deleteLoading || deleteForm.confirmation !== 'DELETE MY ACCOUNT' || !deleteForm.password}
+         type="submit"
+         disabled={deleteSubmitDisabled}
          className="px-4 py-2 text-sm font-medium bg-[var(--danger-solid)] text-white rounded-lg hover:bg-[var(--danger-solid-hover)] transition disabled:opacity-50 disabled:cursor-not-allowed"
        >
          {deleteLoading ? 'Deleting...' : 'Permanently Delete Account'}
        </button>
      </div>
-   </div>
+   </form>
  </Modal>
  <toast.ToastContainer />
  </div>
