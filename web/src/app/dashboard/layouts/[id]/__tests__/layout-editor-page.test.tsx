@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import LayoutEditorPage from '../page';
 
 const mockPush = jest.fn();
@@ -89,5 +89,58 @@ describe('LayoutEditorPage', () => {
     expect(screen.getAllByText('Left').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Right').length).toBeGreaterThan(0);
     expect(mockGetResolvedLayout).toHaveBeenCalledWith('layout-1');
+  });
+
+  // An older editor build persisted corrupted zones; the page must still open
+  // and save such a layout rather than round-trip the corruption.
+  describe('stored zones that are malformed', () => {
+    let warn: jest.SpyInstance;
+    beforeEach(() => {
+      warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      mockUpdateLayout.mockResolvedValue({});
+    });
+    afterEach(() => warn.mockRestore());
+
+    const withZones = (zones: unknown[]) =>
+      mockGetResolvedLayout.mockResolvedValue({
+        id: 'layout-1',
+        name: 'Lobby Split',
+        type: 'layout',
+        metadata: { layoutType: 'split-horizontal', zones },
+      });
+
+    const savedZones = async () => {
+      await waitFor(() => expect(screen.getByText('Lobby Split')).toBeInTheDocument());
+      fireEvent.click(screen.getByText('Save Layout'));
+      await waitFor(() => expect(mockUpdateLayout).toHaveBeenCalledTimes(1));
+      return mockUpdateLayout.mock.calls[0][1].zones as Array<{ id: unknown; gridArea: unknown }>;
+    };
+
+    it.each([
+      ['the [[],[]] shape prod persisted', [[], []]],
+      ['a zone missing gridArea', [{ id: 'left', name: 'Left', gridArea: '1 / 1 / 2 / 2' }, { id: 'right', name: 'Right' }]],
+      ['a zone with a non-string id', [{ id: 7, name: 'Left', gridArea: '1 / 1 / 2 / 2' }]],
+      ['a null zone', [null]],
+    ])('falls back to the default zones for %s, warns, and saves well-formed zones', async (_label, zones) => {
+      withZones(zones);
+      renderPage();
+
+      const saved = await savedZones();
+
+      expect(saved.map((z) => [z.id, z.gridArea])).toEqual([
+        ['zone-a', '1 / 1 / 2 / 2'],
+        ['zone-b', '1 / 2 / 2 / 3'],
+      ]);
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('malformed zones'), zones);
+    });
+
+    it('keeps well-formed stored zones (and their ids) without warning', async () => {
+      renderPage();
+
+      const saved = await savedZones();
+
+      expect(saved.map((z) => z.id)).toEqual(['left', 'right']);
+      expect(warn).not.toHaveBeenCalled();
+    });
   });
 });

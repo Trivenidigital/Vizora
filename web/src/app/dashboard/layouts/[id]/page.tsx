@@ -78,6 +78,23 @@ function getDefaultZones(layoutType: string): Zone[] {
   }
 }
 
+// Every zone must carry a string id and gridArea: the editor keys assignments
+// by id and saves gridArea back verbatim. An older editor build persisted
+// corrupted zones (e.g. `[[],[]]`), which rendered as blank cells and saved the
+// corruption straight back.
+function hasUsableZones(zones: unknown[]): zones is Zone[] {
+  return zones.every(
+    (zone) =>
+      zone !== null &&
+      typeof zone === 'object' &&
+      !Array.isArray(zone) &&
+      typeof (zone as Zone).id === 'string' &&
+      (zone as Zone).id.length > 0 &&
+      typeof (zone as Zone).gridArea === 'string' &&
+      ((zone as Zone).gridArea as string).length > 0,
+  );
+}
+
 function normalizeLayoutResponse(data: any): LayoutData | null {
   if (!data) {
     return null;
@@ -172,10 +189,22 @@ export default function LayoutEditorPage({ params }: { params: Promise<{ id: str
         if (!normalizedLayout) return;
 
         setLayout(normalizedLayout);
-        // Use the layout zones if present, otherwise build defaults from type
-        const layoutZones = normalizedLayout.zones.length > 0
-          ? normalizedLayout.zones
-          : getDefaultZones(normalizedLayout.layoutType);
+        // Use the layout zones if present and well-formed, otherwise build
+        // defaults from type — so a corrupted layout is still editable and
+        // saving it replaces the corruption.
+        const storedZones = normalizedLayout.zones;
+        let layoutZones: Zone[];
+        if (storedZones.length > 0 && hasUsableZones(storedZones)) {
+          layoutZones = storedZones;
+        } else {
+          if (storedZones.length > 0) {
+            console.warn(
+              `Layout ${normalizedLayout.id} has malformed zones; using the default ${normalizedLayout.layoutType} zones`,
+              storedZones,
+            );
+          }
+          layoutZones = getDefaultZones(normalizedLayout.layoutType);
+        }
         setZones(layoutZones);
       }
     } catch (error: any) {
