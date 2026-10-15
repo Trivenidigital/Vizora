@@ -19,6 +19,7 @@ import LoadingSpinner from '@/components/LoadingSpinner';
 import EmptyState from '@/components/EmptyState';
 import { Icon } from '@/theme/icons';
 import { Switch } from '@/components/ui';
+import { validateAlertRecipientTarget } from '@/lib/validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -94,6 +95,8 @@ export default function AlertsPage() {
   const [draftRecipients, setDraftRecipients] = useState<AlertRuleRecipientInput[]>([
     { channel: 'in_app', target: '' },
   ]);
+  // Per-row target errors for the draft recipients, keyed by row index.
+  const [draftErrors, setDraftErrors] = useState<Record<number, string>>({});
 
   // Delete confirmation
   const [ruleToDelete, setRuleToDelete] = useState<AlertRule | null>(null);
@@ -170,6 +173,7 @@ export default function AlertsPage() {
     setEditingRule(null);
     setForm(EMPTY_FORM);
     setDraftRecipients([{ channel: 'in_app', target: '' }]);
+    setDraftErrors({});
     setIsModalOpen(true);
   };
 
@@ -213,6 +217,20 @@ export default function AlertsPage() {
     if (err) {
       toast.error(err);
       return;
+    }
+
+    // Check each typed recipient against the server's per-channel rule before
+    // sending: production hides a 400's message, so a typo'd address would
+    // otherwise come back as a generic failure that names no recipient.
+    if (!editingRule) {
+      const errors: Record<number, string> = {};
+      draftRecipients.forEach((r, i) => {
+        if (!r.target.trim()) return; // empty rows are dropped, not sent
+        const message = validateAlertRecipientTarget(r.channel, r.target);
+        if (message) errors[i] = message;
+      });
+      setDraftErrors(errors);
+      if (Object.keys(errors).length > 0) return;
     }
 
     setActionLoading(true);
@@ -335,12 +353,18 @@ export default function AlertsPage() {
     channel: AlertChannel,
     value: string,
     onChange: (v: string) => void,
+    errorId?: string,
   ) => {
+    const errorProps = errorId
+      ? { 'aria-invalid': true as const, 'aria-describedby': errorId }
+      : {};
     if (channel === 'in_app') {
       return (
         <select
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          aria-label="Team member"
+          {...errorProps}
           className="flex-1 px-3 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
         >
           <option value="">Select a team member…</option>
@@ -357,6 +381,8 @@ export default function AlertsPage() {
         type={channel === 'email' ? 'email' : 'url'}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        aria-label={channel === 'email' ? 'Email address' : 'Slack webhook URL'}
+        {...errorProps}
         placeholder={
           channel === 'email'
             ? 'alerts@example.com'
@@ -630,6 +656,8 @@ export default function AlertsPage() {
               <DraftRecipientsEditor
                 recipients={draftRecipients}
                 setRecipients={setDraftRecipients}
+                errors={draftErrors}
+                setErrors={setDraftErrors}
                 renderTargetInput={renderTargetInput}
               />
             )}
@@ -672,26 +700,39 @@ export default function AlertsPage() {
 function DraftRecipientsEditor({
   recipients,
   setRecipients,
+  errors,
+  setErrors,
   renderTargetInput,
 }: {
   recipients: AlertRuleRecipientInput[];
   setRecipients: (r: AlertRuleRecipientInput[]) => void;
+  errors: Record<number, string>;
+  setErrors: (e: Record<number, string>) => void;
   renderTargetInput: (
     channel: AlertChannel,
     value: string,
     onChange: (v: string) => void,
+    errorId?: string,
   ) => React.ReactNode;
 }) {
   const update = (index: number, patch: Partial<AlertRuleRecipientInput>) => {
     setRecipients(recipients.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+    if (errors[index]) {
+      const rest = { ...errors };
+      delete rest[index];
+      setErrors(rest);
+    }
   };
   const removeRow = (index: number) => {
     setRecipients(recipients.filter((_, i) => i !== index));
+    // Row indices shift on removal; the remaining rows are re-checked on save.
+    setErrors({});
   };
   return (
     <div className="space-y-3">
       {recipients.map((r, i) => (
-        <div key={i} className="flex items-center gap-2">
+        <div key={i}>
+          <div className="flex items-center gap-2">
           <select
             value={r.channel}
             onChange={(e) => update(i, { channel: e.target.value as AlertChannel, target: '' })}
@@ -701,7 +742,12 @@ function DraftRecipientsEditor({
               <option key={c.value} value={c.value}>{c.label}</option>
             ))}
           </select>
-          {renderTargetInput(r.channel, r.target, (v) => update(i, { target: v }))}
+          {renderTargetInput(
+            r.channel,
+            r.target,
+            (v) => update(i, { target: v }),
+            errors[i] ? `draft-recipient-error-${i}` : undefined,
+          )}
           <button
             type="button"
             onClick={() => removeRow(i)}
@@ -711,6 +757,12 @@ function DraftRecipientsEditor({
           >
             <Icon name="delete" size="md" />
           </button>
+          </div>
+          {errors[i] && (
+            <p id={`draft-recipient-error-${i}`} role="alert" className="mt-1 text-xs text-[var(--error-ink)]">
+              {errors[i]}
+            </p>
+          )}
         </div>
       ))}
       <button
@@ -742,12 +794,19 @@ function RecipientsEditor({
     channel: AlertChannel,
     value: string,
     onChange: (v: string) => void,
+    errorId?: string,
   ) => React.ReactNode;
 }) {
   const [newChannel, setNewChannel] = useState<AlertChannel>('in_app');
   const [newTarget, setNewTarget] = useState('');
+  const [newTargetError, setNewTargetError] = useState<string | null>(null);
 
   const addRecipient = () => {
+    const message = validateAlertRecipientTarget(newChannel, newTarget);
+    if (message) {
+      setNewTargetError(message);
+      return;
+    }
     onAdd(newChannel, newTarget);
     setNewTarget('');
   };
@@ -799,6 +858,7 @@ function RecipientsEditor({
           onChange={(e) => {
             setNewChannel(e.target.value as AlertChannel);
             setNewTarget('');
+            setNewTargetError(null);
           }}
           className="w-40 px-3 py-2 border border-[var(--border)] bg-[var(--surface)] text-[var(--foreground)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent"
         >
@@ -806,7 +866,15 @@ function RecipientsEditor({
             <option key={c.value} value={c.value}>{c.label}</option>
           ))}
         </select>
-        {renderTargetInput(newChannel, newTarget, setNewTarget)}
+        {renderTargetInput(
+          newChannel,
+          newTarget,
+          (v) => {
+            setNewTarget(v);
+            setNewTargetError(null);
+          },
+          newTargetError ? 'new-recipient-error' : undefined,
+        )}
         <button
           type="button"
           onClick={addRecipient}
@@ -816,6 +884,11 @@ function RecipientsEditor({
           Add
         </button>
       </div>
+      {newTargetError && (
+        <p id="new-recipient-error" role="alert" className="text-xs text-[var(--error-ink)]">
+          {newTargetError}
+        </p>
+      )}
     </div>
   );
 }
