@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type FormEvent } from 'react';
 import { useDropzone, type FileRejection } from 'react-dropzone';
 import { apiClient } from '@/lib/api';
 import type { ContentListParams } from '@/lib/api/content';
@@ -191,6 +191,13 @@ export default function ContentClient() {
  const [newFolderName, setNewFolderName] = useState('');
  const [newFolderParentId, setNewFolderParentId] = useState<string | null>(null);
  const [targetFolderId, setTargetFolderId] = useState<string | null>(null);
+ const [folderToRename, setFolderToRename] = useState<ContentFolder | null>(null);
+ const [renameFolderName, setRenameFolderName] = useState('');
+ const [folderToDelete, setFolderToDelete] = useState<ContentFolder | null>(null);
+
+ // Bulk tag state
+ const [isBulkTagModalOpen, setIsBulkTagModalOpen] = useState(false);
+ const [bulkTagIds, setBulkTagIds] = useState<string[]>([]);
 
  // Real-time event handling
  const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -460,6 +467,125 @@ export default function ContentClient() {
  loadFolders();
  } catch (error: any) {
  toast.error(error.message || 'Failed to move content');
+ } finally {
+ setActionLoading(false);
+ }
+ };
+
+ const openRenameFolder = (folder: ContentFolder) => {
+ setFolderToRename(folder);
+ setRenameFolderName(folder.name);
+ };
+
+ const closeRenameFolder = () => {
+ if (actionLoading) return;
+ setFolderToRename(null);
+ setRenameFolderName('');
+ };
+
+ const handleRenameFolder = async (event: FormEvent<HTMLFormElement>) => {
+ event.preventDefault();
+ if (!folderToRename) return;
+ const name = renameFolderName.trim();
+ if (!name) {
+ toast.error('Folder name is required');
+ return;
+ }
+
+ try {
+ setActionLoading(true);
+ await apiClient.updateFolder(folderToRename.id, { name });
+ toast.success('Folder renamed');
+ setFolderToRename(null);
+ setRenameFolderName('');
+ loadFolders();
+ } catch (error: any) {
+ toast.error(error.message || 'Failed to rename folder');
+ } finally {
+ setActionLoading(false);
+ }
+ };
+
+ /**
+ * The server does NOT delete a folder's content: `FoldersService.remove` moves
+ * the folder's content and its child folders up to the folder's parent (or to
+ * the top level), then deletes only the folder. The confirmation copy states
+ * exactly that, so it must change if the server semantics ever do.
+ */
+ const confirmDeleteFolder = async () => {
+ if (!folderToDelete) return;
+ const deleted = folderToDelete;
+ try {
+ await apiClient.deleteFolder(deleted.id);
+ } catch (error: any) {
+ toast.error(error.message || 'Failed to delete folder');
+ throw error; // keeps the confirmation open for a retry
+ }
+ toast.success(`Folder "${deleted.name}" deleted`);
+ setFolderToDelete(null);
+ if (selectedFolderId === deleted.id) {
+ resetPendingDetailForListChange();
+ setSelectedFolderId(null);
+ setSelectedItems(new Set());
+ setContentPage(1);
+ } else {
+ // The current listing may have just received the deleted folder's content.
+ void loadContent();
+ }
+ loadFolders();
+ };
+
+ const findFolderById = (list: ContentFolder[], id: string): ContentFolder | null => {
+ for (const folder of list) {
+ if (folder.id === id) return folder;
+ const match = folder.children ? findFolderById(folder.children, id) : null;
+ if (match) return match;
+ }
+ return null;
+ };
+
+ const folderDeleteMessage = (folder: ContentFolder | null): string => {
+ if (!folder) return '';
+ const parent = folder.parentId ? findFolderById(folders, folder.parentId) : null;
+ const destination = parent ? `the "${parent.name}" folder` : 'the top level (All Content)';
+ return `Delete the folder "${folder.name}"? No content is deleted: everything in it, including any subfolders, moves to ${destination}.`;
+ };
+
+ /** Throws after reporting, so ContentTagger keeps its form open on failure (e.g. 409). */
+ const handleCreateTag = async (name: string, color: string) => {
+ try {
+ const created = await apiClient.createContentTag(name, color);
+ toast.success(`Tag "${created.name}" created`);
+ await loadContentTags();
+ return created;
+ } catch (error: any) {
+ toast.error(error.message || 'Failed to create tag');
+ throw error;
+ }
+ };
+
+ const openBulkTagModal = () => {
+ setBulkTagIds([]);
+ setIsBulkTagModalOpen(true);
+ };
+
+ const applyBulkTags = async (operation: 'add' | 'remove') => {
+ if (selectedItems.size === 0 || bulkTagIds.length === 0) return;
+ const selectedIds = Array.from(selectedItems);
+ const tagLabel = `${bulkTagIds.length} tag${bulkTagIds.length === 1 ? '' : 's'}`;
+ const itemLabel = `${selectedIds.length} item${selectedIds.length === 1 ? '' : 's'}`;
+ try {
+ setActionLoading(true);
+ await apiClient.bulkTagContent(selectedIds, bulkTagIds, operation);
+ toast.success(operation === 'add' ? `Added ${tagLabel} to ${itemLabel}` : `Removed ${tagLabel} from ${itemLabel}`);
+ setIsBulkTagModalOpen(false);
+ setBulkTagIds([]);
+ setSelectedItems(new Set());
+ void loadContent();
+ // Usage counts changed.
+ void loadContentTags();
+ } catch (error: any) {
+ toast.error(error.message || 'Failed to update tags');
  } finally {
  setActionLoading(false);
  }
@@ -1274,6 +1400,8 @@ export default function ContentClient() {
  setContentPage(1);
  }}
  onCreateFolder={permissions.canManageContent ? () => setIsCreateFolderModalOpen(true) : undefined}
+ onRenameFolder={permissions.canManageContent ? openRenameFolder : undefined}
+ onDeleteFolder={permissions.canManageContent ? setFolderToDelete : undefined}
  />
  </div>
 
@@ -1398,11 +1526,17 @@ export default function ContentClient() {
  Retry
  </button>
  </div>
- ) : tags.length === 0 ? (
+ ) : tags.length === 0 && !permissions.canManageContent ? (
  <div className="text-sm text-[var(--foreground-secondary)]">
- No content tags yet. Add tags to content before using tag filters.
+ No content tags yet. An admin or manager can create them.
  </div>
  ) : (
+ <>
+ {tags.length === 0 && (
+ <p className="mb-3 text-sm text-[var(--foreground-secondary)]">
+ No content tags yet. Create one here, then select content and choose Tag to apply it.
+ </p>
+ )}
  <ContentTagger
  tags={tags}
  selectedTags={selectedTags}
@@ -1412,7 +1546,9 @@ export default function ContentClient() {
  setSelectedItems(new Set());
  setContentPage(1);
  }}
+ onCreateTag={permissions.canManageContent ? handleCreateTag : undefined}
  />
+ </>
  )}
  {selectedTags.length > 0 && (
  <button
@@ -1527,6 +1663,17 @@ export default function ContentClient() {
  >
  <Icon name="folder" size="md" />
  Move to Folder
+ </button>
+ )}
+ {permissions.canManageContent && (
+ <button
+ type="button"
+ onClick={openBulkTagModal}
+ disabled={actionLoading}
+ className="eh-btn-secondary px-4 py-2 text-sm font-medium disabled:opacity-50 flex items-center gap-2"
+ >
+ <Icon name="tag" size="md" />
+ Tag
  </button>
  )}
  {permissions.canManageContent && (
@@ -2546,6 +2693,122 @@ export default function ContentClient() {
  </div>
  </div>
  </Modal>
+
+ {/* Bulk Tag Modal */}
+ <Modal
+ isOpen={isBulkTagModalOpen && permissions.canManageContent}
+ onClose={() => {
+ if (!actionLoading) setIsBulkTagModalOpen(false);
+ }}
+ title="Tag Selected Content"
+ >
+ <div className="space-y-4">
+ <p className="text-sm text-[var(--foreground-secondary)]">
+ Choose tags to add to, or remove from, {selectedItems.size} selected item{selectedItems.size === 1 ? '' : 's'}.
+ </p>
+ {tagsLoadError ? (
+ <p className="text-sm text-[var(--error-ink)]">{tagsLoadError}</p>
+ ) : tags.length === 0 ? (
+ <p className="text-sm text-[var(--foreground-secondary)]">No tags yet. Create one to get started.</p>
+ ) : null}
+ <ContentTagger
+ tags={tags}
+ selectedTags={bulkTagIds}
+ onChange={setBulkTagIds}
+ onCreateTag={async (name, color) => {
+ const created = await handleCreateTag(name, color);
+ setBulkTagIds(prev => (prev.includes(created.id) ? prev : [...prev, created.id]));
+ }}
+ />
+ {/* A sibling of ContentTagger's own create <form>, not its parent: forms cannot nest. */}
+ <form
+ onSubmit={(event) => {
+ event.preventDefault();
+ void applyBulkTags('add');
+ }}
+ className="flex justify-end gap-3 pt-2"
+ >
+ <button
+ type="button"
+ onClick={() => setIsBulkTagModalOpen(false)}
+ disabled={actionLoading}
+ className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition disabled:opacity-50"
+ >
+ Cancel
+ </button>
+ <button
+ type="button"
+ onClick={() => void applyBulkTags('remove')}
+ disabled={actionLoading || bulkTagIds.length === 0}
+ className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition disabled:opacity-50"
+ >
+ Remove from Selected
+ </button>
+ <button
+ type="submit"
+ disabled={actionLoading || bulkTagIds.length === 0}
+ className="px-4 py-2 text-sm font-medium bg-[var(--primary)] text-[var(--primary-contrast)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
+ >
+ {actionLoading && <LoadingSpinner size="sm" />}
+ Add to Selected
+ </button>
+ </form>
+ </div>
+ </Modal>
+
+ {/* Rename Folder Modal */}
+ <Modal
+ isOpen={folderToRename !== null && permissions.canManageContent}
+ onClose={closeRenameFolder}
+ title="Rename Folder"
+ >
+ <form onSubmit={handleRenameFolder} className="space-y-4">
+ <div>
+ <label htmlFor="rename-folder-name" className="block text-sm font-medium text-[var(--foreground-secondary)] mb-2">
+ Folder Name
+ </label>
+ <input
+ id="rename-folder-name"
+ type="text"
+ value={renameFolderName}
+ onChange={(e) => setRenameFolderName(e.target.value)}
+ maxLength={100}
+ autoComplete="off"
+ autoFocus
+ className="w-full px-4 py-2 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--primary-ink)] focus:border-transparent text-[var(--foreground)]"
+ />
+ </div>
+ <div className="flex justify-end gap-3 pt-4">
+ <button
+ type="button"
+ onClick={closeRenameFolder}
+ disabled={actionLoading}
+ className="px-4 py-2 text-sm font-medium text-[var(--foreground-secondary)] bg-[var(--surface)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface-hover)] transition disabled:opacity-50"
+ >
+ Cancel
+ </button>
+ <button
+ type="submit"
+ disabled={actionLoading || !renameFolderName.trim()}
+ className="px-4 py-2 text-sm font-medium text-[var(--primary-contrast)] bg-[var(--primary)] rounded-lg hover:bg-[var(--primary-light)] transition disabled:opacity-50 flex items-center gap-2"
+ >
+ {actionLoading && <LoadingSpinner size="sm" />}
+ Rename
+ </button>
+ </div>
+ </form>
+ </Modal>
+
+ {/* Delete Folder Confirmation */}
+ <ConfirmDialog
+ isOpen={folderToDelete !== null && permissions.canManageContent}
+ onClose={() => setFolderToDelete(null)}
+ onConfirm={confirmDeleteFolder}
+ title="Delete Folder"
+ message={folderDeleteMessage(folderToDelete)}
+ confirmText="Delete Folder"
+ type="danger"
+ />
 
  {/* Create Folder Modal */}
  <Modal
