@@ -435,6 +435,11 @@ jobs:
       - name: Build middleware
         run: npx nx build @vizora/middleware
 
+      # A bundled class-transformer silently disables every DTO @Type/@Transform
+      # (see scripts/ops/lib/bundle-externals.ts). Unit tests cannot see it.
+      - name: Assert middleware bundle externals
+        run: npx tsx scripts/ops/assert-middleware-bundle-externals.ts middleware/dist/main.js
+
       - name: Build web
         env:
           NEXT_PUBLIC_API_URL: https://vizora.cloud
