@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import ConfirmDialog from '../ConfirmDialog';
 import Modal from '../Modal';
 
@@ -121,6 +123,49 @@ describe('dialog focus management', () => {
 
       expect(document.activeElement).toBe(trigger);
       trigger.remove();
+    });
+  });
+
+  describe('re-renders of the owner', () => {
+    /**
+     * Nearly every call site passes an inline `onClose`, so the owner hands the
+     * dialog a NEW function on each render — and it re-renders on every
+     * keystroke into a dialog field. When `onClose` was an effect dependency,
+     * each keystroke re-ran the focus effect and moved focus to the close
+     * button: one character, then the field lost focus.
+     */
+    function Owner({ onEscape }: { onEscape: (value: string) => void }) {
+      const [value, setValue] = useState('');
+      return (
+        <Modal isOpen onClose={() => onEscape(value)} title="Rename">
+          <input aria-label="Name" value={value} onChange={(e) => setValue(e.target.value)} />
+        </Modal>
+      );
+    }
+
+    it('keeps focus in a field while an inline onClose changes identity', async () => {
+      const user = userEvent.setup();
+      render(<Owner onEscape={jest.fn()} />);
+      const input = screen.getByLabelText('Name');
+
+      await user.click(input);
+      await user.keyboard('Lobby');
+
+      expect(input).toHaveValue('Lobby');
+      expect(input).toHaveFocus();
+    });
+
+    it('calls the latest onClose on Escape', async () => {
+      const onEscape = jest.fn();
+      const user = userEvent.setup();
+      render(<Owner onEscape={onEscape} />);
+
+      await user.click(screen.getByLabelText('Name'));
+      await user.keyboard('Lobby');
+      fireEvent.keyDown(document, { key: 'Escape' });
+
+      expect(onEscape).toHaveBeenCalledTimes(1);
+      expect(onEscape).toHaveBeenCalledWith('Lobby');
     });
   });
 });
