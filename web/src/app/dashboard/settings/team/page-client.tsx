@@ -21,6 +21,12 @@ interface TeamUser {
  updatedAt: string;
 }
 
+/** Names a row action's target, so "Edit role" is not announced N times identically. */
+const memberLabel = (user: TeamUser): string => {
+ const name = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim();
+ return name ? `${name} (${user.email})` : user.email;
+};
+
 export default function TeamClient() {
  const toast = useToast();
  const [users, setUsers] = useState<TeamUser[]>([]);
@@ -295,6 +301,7 @@ export default function TeamClient() {
  onClick={() => handleEditRole(user)}
  className="text-[var(--primary-ink)] hover:bg-brand/5 px-2 py-1 rounded transition"
  title="Edit role"
+ aria-label={`Edit role for ${memberLabel(user)}`}
  >
  <Icon name="edit" size="md" />
  </button>
@@ -303,6 +310,7 @@ export default function TeamClient() {
  onClick={() => handleDeactivateClick(user)}
  className="text-[var(--error-ink)] hover:text-[var(--foreground)] hover:bg-error/10 px-2 py-1 rounded transition"
  title="Deactivate"
+ aria-label={`Deactivate ${memberLabel(user)}`}
  >
  <Icon name="delete" size="md" />
  </button>
