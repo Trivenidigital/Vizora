@@ -21,6 +21,7 @@ import { StorageQuotaService } from '../storage/storage-quota.service';
 import { SubscriptionActiveGuard } from '../billing/guards/subscription-active.guard';
 import { DatabaseService } from '../database/database.service';
 import { ROLES_KEY } from '../auth/decorators/roles.decorator';
+import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { Readable, Writable } from 'stream';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -525,6 +526,15 @@ describe('ContentController', () => {
     it('should be restricted to admin and manager', () => {
       const roles = Reflect.getMetadata(ROLES_KEY, ContentController.prototype.createContentTag);
       expect(roles).toEqual(['admin', 'manager']);
+    });
+
+    // ContentController carries @RequiresSubscription() at CLASS level, so this
+    // route is gated without a method-level copy (BulkOperationsController has
+    // none at class level, which is why its bulkAddTags declares its own).
+    // A method-level copy would only run SubscriptionActiveGuard twice.
+    it('is behind the subscription write gate via the class-level guard', () => {
+      const classGuards = Reflect.getMetadata(GUARDS_METADATA, ContentController) ?? [];
+      expect(classGuards).toContain(SubscriptionActiveGuard);
     });
   });
 
