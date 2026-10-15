@@ -1,5 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import { test, expect, apiPost, readData } from './fixtures/auth.fixture';
+import { apiGet, patch } from './fixtures/seed';
 
 /**
  * PHASE 6.1: REAL-TIME DEVICE STATUS TEST SUITE
@@ -77,18 +78,20 @@ const STATE_DESCRIPTION = {
 
 test.describe('Phase 6.1: Real-time Device Status Updates', () => {
 
-  test('should load devices page with status indicators', async ({ authenticatedPage }) => {
+  test('should show the empty state in a fresh org, and a status badge once a device exists', async ({ authenticatedPage, token }) => {
     await authenticatedPage.goto('/dashboard/devices');
     await authenticatedPage.waitForLoadState('networkidle');
 
-    // Verify page loaded
     await expect(authenticatedPage.locator('h2').filter({ hasText: 'Devices' })).toBeVisible({ timeout: 10000 });
+    // The fixture registers a brand-new org: no devices, so the empty state,
+    // and no status chips (they render only over a non-empty fleet).
+    await expect(authenticatedPage.getByText('No devices yet')).toBeVisible();
+    await expect(authenticatedPage.getByRole('group', { name: /Filter devices by status/ })).toHaveCount(0);
 
-    // Look for status indicators
-    const statusElements = authenticatedPage.locator('[class*="status"], [class*="indicator"], [class*="online"], [class*="offline"]').first();
-    if (await statusElements.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(statusElements).toBeVisible();
-    }
+    const nickname = await seedDisplay(authenticatedPage, token, 'online');
+    await authenticatedPage.reload();
+    await expect(statusBadge(authenticatedPage, nickname)).toHaveText('Online', { timeout: 10000 });
+    await expect(authenticatedPage.getByText('No devices yet')).toHaveCount(0);
   });
 
   test('should display device status with colors (DOMAIN)', async ({ authenticatedPage, token }) => {
@@ -143,67 +146,6 @@ test.describe('Phase 6.1: Real-time Device Status Updates', () => {
     // stops "Offline" from being read as a live fact.
     await expect(onlineBadge).toHaveAttribute('title', STATE_DESCRIPTION.online);
     await expect(offlineBadge).toHaveAttribute('title', STATE_DESCRIPTION.offline);
-  });
-
-  test('should display last update timestamp (BOUNDARY)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/devices');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for timestamp
-    const timestamp = authenticatedPage.locator('text=/ago|seconds|minutes|hours/i').first();
-
-    if (await timestamp.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(timestamp).toBeVisible();
-    }
-  });
-
-  test('should animate online status indicator (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/devices');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for animated indicator
-    const onlineIndicators = authenticatedPage.locator('[class*="online"], [class*="pulse"], [class*="animate"]').first();
-
-    if (await onlineIndicators.isVisible({ timeout: 3000 }).catch(() => false)) {
-      const classes = await onlineIndicators.getAttribute('class');
-      expect(classes).toMatch(/animate|pulse/i);
-    }
-  });
-
-  test('should show different status colors for different states (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/devices');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Get all status indicators
-    const allStatuses = authenticatedPage.locator('[class*="status"], [class*="indicator"]');
-    const count = await allStatuses.count();
-
-    if (count > 0) {
-      // Check first two have different states
-      const first = allStatuses.nth(0);
-      const second = allStatuses.nth(Math.min(1, count - 1));
-
-      const firstClass = await first.getAttribute('class');
-      const secondClass = await second.getAttribute('class');
-
-      // May or may not be different - just verify they have classes
-      expect(firstClass).toBeTruthy();
-      expect(secondClass).toBeTruthy();
-    }
-  });
-
-  test('should handle missing device status gracefully (ADVERSARIAL)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/devices');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Page should load even if status service is down
-    await expect(authenticatedPage.locator('h2').filter({ hasText: 'Devices' })).toBeVisible();
-
-    // Should show some indication of device
-    const deviceNames = authenticatedPage.locator('text=/Display|Device/i').first();
-    if (await deviceNames.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await expect(deviceNames).toBeVisible();
-    }
   });
 
   /**
@@ -261,85 +203,80 @@ test.describe('Phase 6.1: Real-time Device Status Updates', () => {
     await expect(authenticatedPage.locator('h2').filter({ hasText: 'Devices' })).toBeVisible();
   });
 
-  test('should display status indicator in devices list view (DOMAIN)', async ({ authenticatedPage }) => {
+  /**
+   * The devices page refreshes its list in the background every 30s while the
+   * tab is visible (`DEVICES_BACKGROUND_REFRESH_MS`). A rename made through the
+   * API emits no realtime event, so the timer is the ONLY path by which it can
+   * reach an open page - which is what makes it a clean probe of the refresh.
+   * The page clock is fast-forwarded instead of waiting 30 real seconds.
+   */
+  test('should pick up a device change made elsewhere without a reload (MUTATION)', async ({ authenticatedPage, token }) => {
+    const before = await seedDisplay(authenticatedPage, token, 'online');
+    const after = `${before} renamed`;
+
+    await authenticatedPage.clock.install();
+    await authenticatedPage.goto('/dashboard/devices');
+    await authenticatedPage.waitForLoadState('networkidle');
+    await expect(statusBadge(authenticatedPage, before)).toHaveText('Online', { timeout: 10000 });
+
+    // A marker that a full reload would wipe.
+    await authenticatedPage.evaluate(() => ((window as any).__e2eNoReload = true));
+
+    const displays = await apiGet<{ data: Array<{ id: string; nickname: string }> }>(
+      authenticatedPage,
+      token,
+      '/displays?page=1&limit=50',
+    );
+    const id = displays.data.find((d) => d.nickname === before)?.id;
+    expect(id, 'seeded display must be listed').toBeTruthy();
+    await patch(authenticatedPage, token, `/displays/${id}`, { name: after, status: 'offline' });
+
+    // CONTROL: nothing has refreshed yet, so the page still shows the old row.
+    await expect(deviceRow(authenticatedPage, before)).toHaveCount(1);
+    await expect(authenticatedPage.getByText(after)).toHaveCount(0);
+
+    await authenticatedPage.clock.fastForward(31_000);
+
+    await expect(statusBadge(authenticatedPage, after)).toHaveText('Offline', { timeout: 10000 });
+    expect(await authenticatedPage.evaluate(() => (window as any).__e2eNoReload)).toBe(true);
+  });
+
+  test('should count each status independently in the fleet chips, and filter by them (DOMAIN)', async ({ authenticatedPage, token }) => {
+    const onlineName = await seedDisplay(authenticatedPage, token, 'online');
+    const offlineName = await seedDisplay(authenticatedPage, token, 'offline');
+    const errorName = await seedDisplay(authenticatedPage, token, 'error');
+
     await authenticatedPage.goto('/dashboard/devices');
     await authenticatedPage.waitForLoadState('networkidle');
 
-    // Look for list rows
-    const deviceRows = authenticatedPage.locator('[role="row"]').first();
+    // The chips are the status legend: one per state present, each with a
+    // fleet-wide count, plus "All devices".
+    const chips = authenticatedPage.getByRole('group', { name: /Filter devices by status/ });
+    await expect(chips.getByRole('button')).toHaveCount(4, { timeout: 10000 });
+    await expect(chips.getByRole('button', { name: /All devices$/ })).toHaveText(/3\s*All devices/);
+    await expect(chips.getByRole('button', { name: /Online$/ })).toHaveText(/1\s*Online/);
+    await expect(chips.getByRole('button', { name: /Offline$/ })).toHaveText(/1\s*Offline/);
+    await expect(chips.getByRole('button', { name: /Error$/ })).toHaveText(/1\s*Error/);
+    // States with no devices get no chip (there is no "Idle" device here).
+    await expect(chips.getByRole('button', { name: /Idle$/ })).toHaveCount(0);
+    await expect(
+      authenticatedPage.getByText('Counts are across the whole fleet; the table below also honours the search and group filters.'),
+    ).toBeVisible();
 
-    if (await deviceRows.isVisible({ timeout: 3000 }).catch(() => false)) {
-      // Should have status cell
-      const statusCell = deviceRows.locator('[class*="status"], text=/online|offline/i').first();
-      if (await statusCell.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await expect(statusCell).toBeVisible();
-      }
-    }
-  });
+    const rows = authenticatedPage.locator('table.eh-datatable tbody tr');
+    await expect(rows).toHaveCount(3);
 
-  test('should show status in health monitoring page (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
+    await chips.getByRole('button', { name: /Offline$/ }).click();
+    await expect(chips.getByRole('button', { name: /Offline$/ })).toHaveAttribute('aria-pressed', 'true');
+    await expect(rows).toHaveCount(1);
+    await expect(deviceRow(authenticatedPage, offlineName)).toHaveCount(1);
 
-    // Should show device health with status
-    const healthIndicators = authenticatedPage.locator('[class*="health"], [class*="status"]').first();
-
-    if (await healthIndicators.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(healthIndicators).toBeVisible();
-    }
-  });
-
-  test('should update status without full page reload (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/devices');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    const statusElement = authenticatedPage.locator('text=/online|offline/i').first();
-
-    if (await statusElement.isVisible({ timeout: 3000 }).catch(() => false)) {
-      // Page should not reload while watching
-      const initialURL = authenticatedPage.url();
-
-      await authenticatedPage.waitForTimeout(2000);
-
-      const laterURL = authenticatedPage.url();
-      expect(initialURL).toBe(laterURL); // No reload
-    }
-  });
-
-  test('should show status for each device independently (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/devices');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Get all status indicators (use separate locators and combine)
-    const statusByClass = authenticatedPage.locator('[class*="status"]');
-    const statusByText = authenticatedPage.locator('text=/online|offline|idle/i');
-
-    const countByClass = await statusByClass.count().catch(() => 0);
-    const countByText = await statusByText.count().catch(() => 0);
-
-    expect(countByClass + countByText).toBeGreaterThanOrEqual(0);
-  });
-
-  test('should display status in device detail modal (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/devices');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Find and click device to show details
-    const detailButton = authenticatedPage.locator('button').filter({ hasText: /view|details|info/i }).first();
-
-    if (await detailButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await detailButton.click();
-      await authenticatedPage.waitForTimeout(500);
-
-      // Look for status in modal
-      const modal = authenticatedPage.locator('[role="dialog"]');
-      if (await modal.isVisible({ timeout: 2000 }).catch(() => false)) {
-        const statusInModal = modal.locator('text=/online|offline|status/i');
-        if (await statusInModal.isVisible({ timeout: 1000 }).catch(() => false)) {
-          await expect(statusInModal).toBeVisible();
-        }
-      }
-    }
+    // Clicking the pressed chip again clears it.
+    await chips.getByRole('button', { name: /Offline$/ }).click();
+    await expect(chips.getByRole('button', { name: /All devices$/ })).toHaveAttribute('aria-pressed', 'true');
+    await expect(rows).toHaveCount(3);
+    await expect(deviceRow(authenticatedPage, onlineName)).toHaveCount(1);
+    await expect(deviceRow(authenticatedPage, errorName)).toHaveCount(1);
   });
 
   test('should handle rapid status changes (ADVERSARIAL)', async ({ authenticatedPage }) => {
@@ -354,18 +291,6 @@ test.describe('Phase 6.1: Real-time Device Status Updates', () => {
     // UI should still be responsive
     const devices = authenticatedPage.locator('h2').filter({ hasText: 'Devices' });
     await expect(devices).toBeVisible();
-  });
-
-  test('should display status with appropriate icons (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/devices');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for SVG icons or icon elements
-    const icons = authenticatedPage.locator('svg, [class*="icon"]').first();
-
-    if (await icons.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(icons).toBeVisible();
-    }
   });
 
   test('should show status indicator size variations (BOUNDARY)', async ({ authenticatedPage, token }) => {
@@ -448,18 +373,6 @@ test.describe('Phase 6.1: Real-time Device Status Updates', () => {
     await expect(lastSeenCell.locator('time')).toHaveCount(0);
   });
 
-  test('should show idle status for inactive devices (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/devices');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for idle status
-    const idleStatus = authenticatedPage.locator('text=/idle|waiting|inactive/i');
-
-    if (await idleStatus.count() > 0) {
-      await expect(idleStatus.first()).toBeVisible();
-    }
-  });
-
   test('should handle error status for problematic devices (DOMAIN)', async ({ authenticatedPage, token }) => {
     const errorName = await seedDisplay(authenticatedPage, token, 'error');
     const healthyName = await seedDisplay(authenticatedPage, token, 'online');
@@ -482,31 +395,27 @@ test.describe('Phase 6.1: Real-time Device Status Updates', () => {
     expect(await renderedInk(errorBadge)).not.toBe(await renderedInk(healthyBadge));
   });
 
-  test('should support status filtering/sorting (DOMAIN)', async ({ authenticatedPage }) => {
+  test('should sort the table by status (DOMAIN)', async ({ authenticatedPage, token }) => {
+    await seedDisplay(authenticatedPage, token, 'online');
+    await seedDisplay(authenticatedPage, token, 'offline');
+    await seedDisplay(authenticatedPage, token, 'error');
+
     await authenticatedPage.goto('/dashboard/devices');
     await authenticatedPage.waitForLoadState('networkidle');
 
-    // Look for status sort button
-    const statusSort = authenticatedPage.locator('button').filter({ hasText: /status/i }).first();
+    const header = authenticatedPage.locator('th').filter({ has: authenticatedPage.getByRole('button', { name: /^Status/ }) });
+    const statuses = authenticatedPage.locator('table.eh-datatable tbody tr td[data-label="Status"] span[title]');
+    await expect(statuses).toHaveCount(3, { timeout: 10000 });
+    await expect(header).toHaveAttribute('aria-sort', 'none');
 
-    if (await statusSort.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await statusSort.click();
-      await authenticatedPage.waitForTimeout(500);
+    await header.getByRole('button').click();
+    await expect(header).toHaveAttribute('aria-sort', 'ascending');
+    const asc = await statuses.allInnerTexts();
+    expect(asc).toEqual([...asc].sort((a, b) => a.localeCompare(b)));
 
-      // Devices should be re-sorted
-      await expect(authenticatedPage.locator('h2').filter({ hasText: 'Devices' })).toBeVisible();
-    }
-  });
-
-  test('should show status legend or key (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/devices');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for legend
-    const legend = authenticatedPage.locator('text=/online|offline|legend|key/i');
-
-    const count = await legend.count();
-    expect(count).toBeGreaterThanOrEqual(0);
+    await header.getByRole('button').click();
+    await expect(header).toHaveAttribute('aria-sort', 'descending');
+    expect(await statuses.allInnerTexts()).toEqual([...asc].reverse());
   });
 
   test('should persist device status across page operations (MUTATION)', async ({ authenticatedPage, token }) => {
