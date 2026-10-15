@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { test, expect, apiPost, readData } from './fixtures/auth.fixture';
 
 /**
@@ -8,12 +8,18 @@ import { test, expect, apiPost, readData } from './fixtures/auth.fixture';
  * /dashboard/health renders the "No devices found" empty state unless the test
  * puts a device there. Payload shape is CreateDisplayDto, as used by 03 and 09.
  */
-async function seedDisplay(page: Page, token: string, status: 'online' | 'offline' = 'online'): Promise<string> {
+async function seedDisplay(
+  page: Page,
+  token: string,
+  status: 'online' | 'offline' | 'error' = 'online',
+  name?: string,
+  location = 'Test Location',
+): Promise<string> {
   const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const res = await apiPost(page, token, 'http://localhost:3000/api/v1/displays', {
-    name: `E2E Health ${status} ${stamp}`,
+    name: name ?? `E2E Health ${status} ${stamp}`,
     deviceId: `e2e-health-${stamp}`,
-    location: 'Test Location',
+    location,
     status,
   });
 
@@ -24,12 +30,56 @@ async function seedDisplay(page: Page, token: string, status: 'online' | 'offlin
   return display.nickname;
 }
 
+/**
+ * Stamp `lastHeartbeat` (ms ago) onto named displays in the REAL /displays
+ * response. Only a device token can write a heartbeat, so this is the one way a
+ * user-token spec can reach the heartbeat-dependent score rungs; every other
+ * field still comes from the server.
+ */
+async function stampHeartbeats(page: Page, agesMs: Record<string, number>): Promise<void> {
+  await page.route(/\/api\/v1\/displays(\?|$)/, async (route) => {
+    if (route.request().method() !== 'GET') return route.continue();
+    const response = await route.fetch();
+    const body = await response.json();
+    const list = body?.data?.data;
+    expect(Array.isArray(list), 'GET /displays must return an enveloped page').toBe(true);
+    for (const d of list) {
+      if (d.nickname in agesMs) d.lastHeartbeat = new Date(Date.now() - agesMs[d.nickname]).toISOString();
+    }
+    await route.fulfill({ response, json: body });
+  });
+}
+
+async function gotoHealth(page: Page): Promise<void> {
+  await page.goto('/dashboard/health');
+  await page.waitForLoadState('networkidle');
+  await expect(page.getByRole('heading', { level: 2, name: 'Device Health' })).toBeVisible({ timeout: 10000 });
+}
+
 /** A device's health card, keyed by the <h3> that carries its name. */
 const healthCardHeading = (page: Page, nickname: string) =>
   page.getByRole('heading', { level: 3, name: nickname });
 
+/**
+ * Every device card's title, in order. Each card also embeds
+ * DeviceHealthMonitor, whose own <h3> reads "Device Health", and the empty
+ * state's title is an <h3> too, so both are excluded.
+ */
+const cardTitles = (page: Page): Locator =>
+  page
+    .getByRole('heading', { level: 3 })
+    .filter({ hasNotText: /^(Device Health|No devices found)$/ });
+
+/** The whole card: the device grid's child that holds that heading. */
+const healthCard = (page: Page, nickname: string): Locator =>
+  page.locator('div.grid > div').filter({ has: healthCardHeading(page, nickname) });
+
 /** A stat tile's label - the four tiles are the page's responsive grid. */
 const statLabel = (page: Page, label: string) => page.getByText(label, { exact: true });
+
+/** The number under a stat tile's label. */
+const statValue = (page: Page, label: string): Locator =>
+  statLabel(page, label).locator('xpath=following-sibling::p[1]');
 
 /**
  * PHASE 7.1: DEVICE HEALTH MONITORING DASHBOARD TEST SUITE
@@ -53,310 +103,170 @@ test.describe('Phase 7.1: Device Health Monitoring Dashboard', () => {
     await expect(authenticatedPage.locator('h2').filter({ hasText: /Health|Monitor/i })).toBeVisible({ timeout: 10000 });
   });
 
-  test('should display health statistics cards (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
+  test('a fresh org shows four zero stat tiles and the empty state (ADVERSARIAL)', async ({ authenticatedPage }) => {
+    await gotoHealth(authenticatedPage);
 
-    // Look for stats cards
-    const statsCards = authenticatedPage.locator('[class*="card"], [class*="stat"]').first();
-
-    if (await statsCards.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(statsCards).toBeVisible();
+    for (const label of ['Total Devices', 'Healthy', 'Warnings', 'Critical']) {
+      await expect(statValue(authenticatedPage, label)).toHaveText('0');
     }
+    await expect(authenticatedPage.getByText('No devices found')).toBeVisible();
+    await expect(authenticatedPage.getByRole('button', { name: 'Pair Device' })).toBeVisible();
+    await expect(cardTitles(authenticatedPage)).toHaveCount(0);
   });
 
-  test('should show total devices count card (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
+  /**
+   * Scores are derived client-side from status + last heartbeat
+   * (`deriveDeviceHealthFromDisplay`). A heartbeat can only be written with a
+   * DEVICE token, so the heartbeat-dependent rungs are reached by stamping
+   * `lastHeartbeat` onto the real /displays response; status, name and location
+   * are real seeded rows.
+   *   online + heartbeat now        -> 100 Excellent (Healthy, >= 80)
+   *   online + no heartbeat         ->  70 Good      (Warning, 50..79)
+   *   online + heartbeat 20 min ago ->  55 Fair      (Warning) + warning banner
+   *   error                         ->  35 Poor      (Critical) + critical banner
+   */
+  test('derives each rung of the health score and buckets the stat tiles (BOUNDARY)', async ({ authenticatedPage, token }) => {
+    const stamp = Date.now();
+    const fresh = await seedDisplay(authenticatedPage, token, 'online', `Fresh ${stamp}`);
+    const silent = await seedDisplay(authenticatedPage, token, 'online', `Silent ${stamp}`);
+    const stale = await seedDisplay(authenticatedPage, token, 'online', `Stale ${stamp}`);
+    const faulty = await seedDisplay(authenticatedPage, token, 'error', `Faulty ${stamp}`);
+    await stampHeartbeats(authenticatedPage, { [fresh]: 0, [stale]: 20 * 60_000 });
 
-    // Look for total devices card
-    const totalCard = authenticatedPage.locator('text=/total device/i').first();
+    await gotoHealth(authenticatedPage);
 
-    if (await totalCard.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(totalCard).toBeVisible();
+    await expect(statValue(authenticatedPage, 'Total Devices')).toHaveText('4');
+    await expect(statValue(authenticatedPage, 'Healthy')).toHaveText('1');
+    await expect(statValue(authenticatedPage, 'Warnings')).toHaveText('2');
+    await expect(statValue(authenticatedPage, 'Critical')).toHaveText('1');
+
+    const expectations: Array<[string, string, string]> = [
+      [fresh, '100', 'Excellent'],
+      [silent, '70', 'Good'],
+      [stale, '55', 'Fair'],
+      [faulty, '35', 'Poor'],
+    ];
+    for (const [name, score, label] of expectations) {
+      const card = healthCard(authenticatedPage, name);
+      await expect(card.getByText(score, { exact: true })).toBeVisible();
+      await expect(card.getByText(label, { exact: true }).first()).toBeVisible();
     }
+
+    // The banners follow the score, and only the matching ones render.
+    await expect(healthCard(authenticatedPage, faulty)).toContainText('Critical: Device performance degraded. Consider maintenance.');
+    await expect(healthCard(authenticatedPage, stale)).toContainText('Warning: Some metrics need attention.');
+    await expect(healthCard(authenticatedPage, fresh)).not.toContainText(/Critical:|Warning:/);
+    await expect(healthCard(authenticatedPage, silent)).not.toContainText(/Critical:|Warning:/);
+
+    // Each rung has its own ink: four labels, at least three distinct colours
+    // (Excellent and Good may legitimately share the brand palette).
+    const inks = await Promise.all(
+      expectations.map(([name, score]) =>
+        healthCard(authenticatedPage, name).getByText(score, { exact: true }).evaluate((el) => getComputedStyle(el).color),
+      ),
+    );
+    expect(new Set(inks).size).toBeGreaterThanOrEqual(3);
   });
 
-  test('should show healthy devices count (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
+  test('each device card shows its name and location (DOMAIN)', async ({ authenticatedPage, token }) => {
+    const stamp = Date.now();
+    const a = await seedDisplay(authenticatedPage, token, 'online', `Lobby ${stamp}`, 'Main Entrance');
+    const b = await seedDisplay(authenticatedPage, token, 'offline', `Patio ${stamp}`, 'Back Garden');
 
-    // Look for healthy count
-    const healthyCard = authenticatedPage.locator('text=/healthy|excellent/i').first();
-
-    if (await healthyCard.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(healthyCard).toBeVisible();
-    }
+    await gotoHealth(authenticatedPage);
+    await expect(cardTitles(authenticatedPage)).toHaveCount(2);
+    await expect(healthCard(authenticatedPage, a)).toContainText('Main Entrance');
+    await expect(healthCard(authenticatedPage, b)).toContainText('Back Garden');
   });
 
-  test('should show warning devices count (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
+  /**
+   * No device telemetry reaches this page today (cpu/memory/storage/
+   * temperature/uptime are always null in `deriveDeviceHealthFromDisplay`), so
+   * the honest contract is that every metric says "Not reported" with an EMPTY
+   * bar - never a placeholder percentage.
+   */
+  test('metrics without telemetry say "Not reported" with empty bars (ADVERSARIAL)', async ({ authenticatedPage, token }) => {
+    const name = await seedDisplay(authenticatedPage, token, 'online');
+    await gotoHealth(authenticatedPage);
+    const card = healthCard(authenticatedPage, name);
 
-    // Look for warning count
-    const warningCard = authenticatedPage.locator('text=/warning|fair/i').first();
-
-    if (await warningCard.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(warningCard).toBeVisible();
+    for (const metric of ['CPU', 'Memory', 'Storage', 'Temperature']) {
+      const row = card.locator('div.flex.justify-between').filter({ has: authenticatedPage.getByText(metric, { exact: true }) });
+      await expect(row).toHaveCount(1);
+      await expect(row).toContainText('Not reported');
+      const bar = row.locator('xpath=following-sibling::div[1]/div');
+      await expect(bar).toHaveAttribute('style', /width:\s*0%/);
     }
+    // The only percentage on the card is the health score itself (70 for an
+    // online device that has never sent a heartbeat), never a metric.
+    await expect(card.getByText(/\d+(\.\d)?%/)).toHaveText(['70%']);
+    // Uptime and temperature are repeated in the card footer, also unreported,
+    // and a device that has never sent a heartbeat says so.
+    await expect(card.getByText('Not reported')).toHaveCount(7);
+    await expect(card.getByText('Never', { exact: true })).toBeVisible();
   });
 
-  test('should show critical devices count (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
+  test('shows the age of the last heartbeat (DOMAIN)', async ({ authenticatedPage, token }) => {
+    const name = await seedDisplay(authenticatedPage, token, 'online');
+    await stampHeartbeats(authenticatedPage, { [name]: 90_000 });
+    await gotoHealth(authenticatedPage);
 
-    // Look for critical count
-    const criticalCard = authenticatedPage.locator('text=/critical|poor/i').first();
-
-    if (await criticalCard.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(criticalCard).toBeVisible();
-    }
+    const footer = healthCard(authenticatedPage, name).getByText('Last Heartbeat').locator('xpath=following-sibling::p[1]');
+    await expect(footer).toHaveText(/^(8\d|9\d|1[0-2]\d)s ago$/);
   });
 
-  test('should display device health grid (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
+  test('sorts by health, name and status in both directions (MUTATION)', async ({ authenticatedPage, token }) => {
+    const stamp = Date.now();
+    const alpha = await seedDisplay(authenticatedPage, token, 'error', `Alpha ${stamp}`);
+    const bravo = await seedDisplay(authenticatedPage, token, 'online', `Bravo ${stamp}`);
+    const charlie = await seedDisplay(authenticatedPage, token, 'offline', `Charlie ${stamp}`);
 
-    // Look for device health cards
-    const deviceCards = authenticatedPage.locator('[class*="health"], [class*="device"]').first();
+    await gotoHealth(authenticatedPage);
+    const titles = cardTitles(authenticatedPage);
+    await expect(titles).toHaveCount(3);
 
-    if (await deviceCards.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(deviceCards).toBeVisible();
-    }
+    // Default: health, descending -> 70 (Bravo), 35 (Alpha), 25 (Charlie).
+    await expect(titles).toHaveText([bravo, alpha, charlie]);
+
+    const order = authenticatedPage.getByRole('button', { name: /^[↑↓]$/ });
+    await order.click();
+    await expect(titles).toHaveText([charlie, alpha, bravo]);
+
+    const sort = authenticatedPage.locator('select').filter({ has: authenticatedPage.locator('option', { hasText: 'Sort by Health' }) });
+    await sort.selectOption('name');
+    await expect(titles).toHaveText([alpha, bravo, charlie]); // ascending
+    await order.click();
+    await expect(titles).toHaveText([charlie, bravo, alpha]);
+
+    await sort.selectOption('status');
+    // descending by status string: online > offline > error
+    await expect(titles).toHaveText([bravo, charlie, alpha]);
   });
 
-  test('should show device name in health card (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
+  test('searches by device name and by location (MUTATION)', async ({ authenticatedPage, token }) => {
+    const stamp = Date.now();
+    const a = await seedDisplay(authenticatedPage, token, 'online', `Counter ${stamp}`, 'Front Desk');
+    const b = await seedDisplay(authenticatedPage, token, 'online', `Menu Board ${stamp}`, 'Drive Thru');
 
-    // Look for device name
-    const deviceName = authenticatedPage.locator('text=/Display|Device/i').first();
+    await gotoHealth(authenticatedPage);
+    const titles = cardTitles(authenticatedPage);
+    await expect(titles).toHaveCount(2);
 
-    if (await deviceName.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(deviceName).toBeVisible();
-    }
-  });
+    const search = authenticatedPage.getByPlaceholder('Search devices by name or location...');
+    await search.fill('counter');
+    await expect(titles).toHaveText([a]);
 
-  test('should show device location (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
+    await search.fill('drive thru');
+    await expect(titles).toHaveText([b]);
 
-    // Look for location
-    const location = authenticatedPage.locator('text=/location|office|store|kiosk/i').first();
+    await search.fill('nothing-matches-this');
+    await expect(titles).toHaveCount(0);
+    await expect(authenticatedPage.getByText('No devices found')).toBeVisible();
+    // The tiles stay fleet-wide while the grid is filtered.
+    await expect(statValue(authenticatedPage, 'Total Devices')).toHaveText('2');
 
-    if (await location.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(location).toBeVisible();
-    }
-  });
-
-  test('should display health score 0-100 (BOUNDARY)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for health score - check for percentage or numeric values
-    const healthScore = authenticatedPage.locator('[class*="health"], [class*="score"], [class*="percent"]').first();
-
-    if (await healthScore.isVisible({ timeout: 3000 }).catch(() => false)) {
-      const scoreText = await healthScore.textContent();
-      // Score text should contain a digit
-      expect(scoreText).toMatch(/\d/);
-    }
-  });
-
-  test('should show health status label (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for status label
-    const statusLabel = authenticatedPage.locator('text=/Excellent|Good|Fair|Poor/i').first();
-
-    if (await statusLabel.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(statusLabel).toBeVisible();
-    }
-  });
-
-  test('should display CPU usage metric (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for CPU metric
-    const cpuMetric = authenticatedPage.locator('text=/CPU|cpu/i').first();
-
-    if (await cpuMetric.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(cpuMetric).toBeVisible();
-    }
-  });
-
-  test('should display Memory usage metric (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for Memory metric
-    const memoryMetric = authenticatedPage.locator('text=/Memory|RAM|memory/i').first();
-
-    if (await memoryMetric.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(memoryMetric).toBeVisible();
-    }
-  });
-
-  test('should display Storage usage metric (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for Storage metric
-    const storageMetric = authenticatedPage.locator('text=/Storage|Disk|storage/i').first();
-
-    if (await storageMetric.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(storageMetric).toBeVisible();
-    }
-  });
-
-  test('should display Temperature metric (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for Temperature metric
-    const tempMetric = authenticatedPage.locator('text=/Temperature|Temp|°C|°F/i').first();
-
-    if (await tempMetric.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(tempMetric).toBeVisible();
-    }
-  });
-
-  test('should show metric with progress bars (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for progress bars
-    const progressBars = authenticatedPage.locator('[role="progressbar"], [class*="progress"], [class*="bar"]').first();
-
-    if (await progressBars.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(progressBars).toBeVisible();
-    }
-  });
-
-  test('should show metric values with percentages (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for percentage values
-    const percentages = authenticatedPage.locator('text=/\\d{1,3}%/').first();
-
-    if (await percentages.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(percentages).toBeVisible();
-    }
-  });
-
-  test('should color-code health status (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for colored status indicators
-    const coloredStatus = authenticatedPage.locator('[class*="green"], [class*="yellow"], [class*="red"]').first();
-
-    if (await coloredStatus.isVisible({ timeout: 3000 }).catch(() => false)) {
-      const classes = await coloredStatus.getAttribute('class');
-      expect(classes).toMatch(/green|yellow|red|blue/);
-    }
-  });
-
-  test('should show uptime information (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for uptime
-    const uptime = authenticatedPage.locator('text=/uptime|days?|hours?/i').first();
-
-    if (await uptime.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(uptime).toBeVisible();
-    }
-  });
-
-  test('should show last heartbeat timestamp (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for heartbeat
-    const heartbeat = authenticatedPage.locator('text=/heartbeat|last.*update|ago/i').first();
-
-    if (await heartbeat.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(heartbeat).toBeVisible();
-    }
-  });
-
-  test('should display critical alert for poor health (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for critical alert
-    const criticalAlert = authenticatedPage.locator('text=/critical|maintenance|poor/i').first();
-
-    if (await criticalAlert.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(criticalAlert).toBeVisible();
-    }
-  });
-
-  test('should display warning alert for fair health (DOMAIN)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for warning alert
-    const warningAlert = authenticatedPage.locator('text=/warning|attention/i').first();
-
-    if (await warningAlert.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await expect(warningAlert).toBeVisible();
-    }
-  });
-
-  test('should support sort by health score (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for sort button
-    const sortButton = authenticatedPage.locator('button').filter({ hasText: /sort.*health|health.*score/i }).first();
-
-    if (await sortButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await sortButton.click();
-      await authenticatedPage.waitForTimeout(500);
-
-      // Verify sorted
-      await expect(authenticatedPage.locator('h2').filter({ hasText: /Health|Monitor/i })).toBeVisible();
-    }
-  });
-
-  test('should support search by device name (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for search
-    const searchInput = authenticatedPage.locator('input[placeholder*="Search"]').first();
-
-    if (await searchInput.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await searchInput.fill('Display');
-      await authenticatedPage.waitForTimeout(500);
-
-      // Verify filtered
-      const devices = authenticatedPage.locator('[class*="health"], [class*="device"]');
-      expect(await devices.count()).toBeGreaterThanOrEqual(0);
-
-      await searchInput.clear();
-    }
-  });
-
-  test('should support refresh button (MUTATION)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Look for refresh button
-    const refreshButton = authenticatedPage.locator('button').filter({ hasText: /refresh|reload/i }).first();
-
-    if (await refreshButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await refreshButton.click();
-      await authenticatedPage.waitForTimeout(1000);
-
-      // Verify still functional
-      await expect(authenticatedPage.locator('h2').filter({ hasText: /Health|Monitor/i })).toBeVisible();
-    }
+    await search.fill('');
+    await expect(titles).toHaveCount(2);
   });
 
   /**
@@ -400,21 +310,6 @@ test.describe('Phase 7.1: Device Health Monitoring Dashboard', () => {
         () => (window as unknown as { __vizoraNoReload?: boolean }).__vizoraNoReload === true,
       ),
     ).toBe(true);
-  });
-
-  test('should handle empty health data gracefully (ADVERSARIAL)', async ({ authenticatedPage }) => {
-    await authenticatedPage.goto('/dashboard/health');
-    await authenticatedPage.waitForLoadState('networkidle');
-
-    // Page should display gracefully
-    const emptyState = authenticatedPage.locator('text=/no device|empty|no data/i');
-    const deviceList = authenticatedPage.locator('[class*="health"], [class*="device"]').first();
-
-    if (await emptyState.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await expect(emptyState).toBeVisible();
-    } else if (await deviceList.isVisible({ timeout: 2000 }).catch(() => false)) {
-      await expect(deviceList).toBeVisible();
-    }
   });
 
   /**
