@@ -1,5 +1,5 @@
 import { render, screen, waitFor, fireEvent, within, act } from '@testing-library/react';
-import DevicesClient from '../page-client';
+import DevicesClient, { DEVICES_BACKGROUND_REFRESH_MS } from '../page-client';
 
 const mockPush = jest.fn();
 const mockGetDisplays = jest.fn();
@@ -1369,5 +1369,147 @@ describe('DevicesClient keeps the current page inside the list', () => {
     });
     expect(screen.queryByText('Device 21')).not.toBeInTheDocument();
     expect(screen.getByText('Device 20')).toBeInTheDocument();
+  });
+});
+
+describe('DevicesClient background refresh', () => {
+  let visibility: DocumentVisibilityState = 'visible';
+
+  const setVisibility = (state: DocumentVisibilityState) => {
+    visibility = state;
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+  };
+
+  const renderLoaded = () =>
+    render(
+      <DevicesClient
+        initialDevices={sampleDevices as any}
+        initialPlaylists={samplePlaylists as any}
+        initialDevicesComplete
+        initialPlaylistsComplete
+      />,
+    );
+
+  const tick = async (ms: number) => {
+    await act(async () => {
+      jest.advanceTimersByTime(ms);
+    });
+  };
+
+  beforeAll(() => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => visibility,
+    });
+  });
+
+  afterAll(() => {
+    // Restore jsdom's own getter from the prototype.
+    delete (document as any).visibilityState;
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers();
+    visibility = 'visible';
+    mockUser = { id: 'u1', email: 'test@test.com', organizationId: 'org-1', role: 'admin' };
+    mockGetDisplays.mockResolvedValue({ data: sampleDevices, meta: { total: sampleDevices.length } });
+    mockGetPlaylists.mockResolvedValue({ data: [] });
+    mockGetDisplayGroups.mockResolvedValue({ data: [] });
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('refetches every 30s while visible and renders the fresh list', async () => {
+    renderLoaded();
+    expect(screen.getByText('Lobby Display')).toBeInTheDocument();
+    expect(mockGetDisplays).not.toHaveBeenCalled();
+
+    mockGetDisplays.mockResolvedValue({
+      data: [{ ...sampleDevices[0], nickname: 'Lobby Display (renamed)' }],
+      meta: { total: 1 },
+    });
+    await tick(DEVICES_BACKGROUND_REFRESH_MS - 1);
+    expect(mockGetDisplays).not.toHaveBeenCalled();
+    await tick(1);
+
+    expect(mockGetDisplays).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('Lobby Display (renamed)')).toBeInTheDocument();
+    expect(screen.queryByText('Conference Room')).not.toBeInTheDocument();
+  });
+
+  it('does not poll while hidden and refreshes immediately on becoming visible', async () => {
+    renderLoaded();
+    setVisibility('hidden');
+
+    await tick(DEVICES_BACKGROUND_REFRESH_MS * 3);
+    expect(mockGetDisplays).not.toHaveBeenCalled();
+
+    setVisibility('visible');
+    await tick(0);
+    expect(mockGetDisplays).toHaveBeenCalledTimes(1);
+  });
+
+  it('never stacks a refresh onto one still in flight', async () => {
+    let resolveFetch: (value: any) => void = () => {};
+    mockGetDisplays.mockImplementation(
+      () => new Promise((resolve) => { resolveFetch = resolve; }),
+    );
+    renderLoaded();
+
+    await tick(DEVICES_BACKGROUND_REFRESH_MS);
+    expect(mockGetDisplays).toHaveBeenCalledTimes(1);
+    await tick(DEVICES_BACKGROUND_REFRESH_MS);
+    setVisibility('visible');
+    expect(mockGetDisplays).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveFetch({ data: sampleDevices, meta: { total: sampleDevices.length } });
+    });
+    await tick(DEVICES_BACKGROUND_REFRESH_MS);
+    expect(mockGetDisplays).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the selection, search and current list when a refresh succeeds', async () => {
+    renderLoaded();
+
+    fireEvent.change(screen.getByTestId('search-input'), { target: { value: 'Building A' } });
+    expect(screen.queryByText('Conference Room')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: /Lobby Display/i }));
+    expect(screen.getByText(/1 device selected/)).toBeInTheDocument();
+
+    await tick(DEVICES_BACKGROUND_REFRESH_MS);
+    expect(mockGetDisplays).toHaveBeenCalledTimes(1);
+
+    expect(screen.getByTestId('search-input')).toHaveValue('Building A');
+    expect(screen.queryByText('Conference Room')).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /Lobby Display/i })).toBeChecked();
+    expect(screen.getByText(/1 device selected/)).toBeInTheDocument();
+  });
+
+  it('keeps the last good list, selection and no toast when a refresh fails', async () => {
+    renderLoaded();
+    fireEvent.click(screen.getByRole('checkbox', { name: /Lobby Display/i }));
+
+    mockGetDisplays.mockRejectedValue(new Error('network down'));
+    await tick(DEVICES_BACKGROUND_REFRESH_MS);
+    expect(mockGetDisplays).toHaveBeenCalledTimes(1);
+
+    expect(screen.getByText('Conference Room')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /Lobby Display/i })).toBeChecked();
+    expect(mockToast.error).not.toHaveBeenCalled();
+  });
+
+  it('stops polling and listening on unmount', async () => {
+    const { unmount } = renderLoaded();
+    unmount();
+
+    await tick(DEVICES_BACKGROUND_REFRESH_MS * 2);
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(mockGetDisplays).not.toHaveBeenCalled();
   });
 });

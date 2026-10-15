@@ -51,6 +51,9 @@ const FLEET_STATUS_LABEL: Record<FleetStatus, string> = {
  online: 'Online',
 };
 
+/** Background device-list refresh cadence while the tab is visible. */
+export const DEVICES_BACKGROUND_REFRESH_MS = 30_000;
+
 /** Anything the API sends that is not a state we present falls to `unknown`. */
 const toFleetStatus = (status: unknown): FleetStatus =>
  (FLEET_STATUSES as readonly string[]).includes(String(status))
@@ -242,7 +245,53 @@ export default function DevicesClient({
  loadGroups();
  }, []);
 
+ /**
+  * Background refresh: freshness otherwise depends entirely on the realtime
+  * channel, so a missed socket event left a stale row until a manual reload.
+  *
+  * Deliberately NOT loadDevices(false). That path is for refetches the operator
+  * caused, so it toasts and swaps the table for DashboardSectionError on
+  * failure - and an empty table prunes the selection to nothing (see the
+  * visibleIdsKey effect). A transient blip on a timer must do neither: on
+  * failure it keeps the last good list. On success it only replaces `devices`;
+  * search, filters and page are separate state, and selection survives for
+  * every row still visible.
+  *
+  * Skips while hidden, refreshes on becoming visible again, and never stacks
+  * onto a request already in flight (foreground or background).
+  */
+ const devicesRequestsInFlightRef = useRef(0);
+ useEffect(() => {
+ let cancelled = false;
+ const refresh = async () => {
+ if (document.visibilityState !== 'visible') return;
+ if (devicesRequestsInFlightRef.current > 0) return;
+ devicesRequestsInFlightRef.current += 1;
+ try {
+ const devicesList = await fetchAllPaginated((params) => apiClient.getDisplays(params));
+ if (cancelled) return;
+ setDevices(devicesList);
+ setDevicesLoadError(null);
+ } catch {
+ // Keep the last good list; a foreground load surfaces errors.
+ } finally {
+ devicesRequestsInFlightRef.current -= 1;
+ }
+ };
+ const interval = setInterval(() => { void refresh(); }, DEVICES_BACKGROUND_REFRESH_MS);
+ const handleVisibilityChange = () => {
+ if (document.visibilityState === 'visible') void refresh();
+ };
+ document.addEventListener('visibilitychange', handleVisibilityChange);
+ return () => {
+ cancelled = true;
+ clearInterval(interval);
+ document.removeEventListener('visibilitychange', handleVisibilityChange);
+ };
+ }, []);
+
  const loadDevices = async (showLoading = true) => {
+ devicesRequestsInFlightRef.current += 1;
  try {
  if (showLoading) setLoading(true);
  setDevicesLoadError(null);
@@ -265,6 +314,7 @@ export default function DevicesClient({
  const message = error?.message || 'Failed to load devices';
  setDevicesLoadError(error instanceof Error ? error : new Error(message));
  } finally {
+ devicesRequestsInFlightRef.current -= 1;
  if (showLoading) setLoading(false);
  }
  };
