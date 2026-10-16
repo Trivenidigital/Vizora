@@ -1,0 +1,8 @@
+# /etc/cron.d/vizora-memwatch — READ-ONLY host memory sampler for OOM attribution.
+# Source of truth: deploy/host/memwatch/ in the Vizora repo (host-installed, copied
+# deliberately, never generated). Each run takes 4 samples 15 s apart; the script
+# re-execs itself under nice 19 / ionice idle and flock-skips if a run is still going.
+# Remove this file to stop sampling. See README.md in the same repo directory.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+* * * * * root /usr/local/sbin/vizora-memwatch.sh
