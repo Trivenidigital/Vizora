@@ -3,7 +3,8 @@
 #
 # The kernel OOM report names the victim by pid + a 15-char comm ("node"). This
 # records, every 15 s, the pid -> cmdline / ppid / start time / PM2 app mapping for
-# every large (or orphaned) process, so the next OOM can be joined by pid.
+# every large (or orphaned) process AND its ancestor chain, so the next OOM can be
+# joined by pid from a single sample line.
 #
 # Reads /proc only. Changes no workload, sends nothing anywhere. From
 # /proc/<pid>/environ it reads ONLY the keys `name` and `pm_id` (set by PM2 and
@@ -81,22 +82,23 @@ redact_args() {
 jstr() { if [[ -n $2 ]]; then json_escape "$2"; printf -v "$1" '"%s"' "$REPLY"; else printf -v "$1" null; fi; }
 jnum() { if [[ $2 =~ ^-?[0-9]+(\.[0-9]+)?$ ]]; then printf -v "$1" '%s' "$2"; else printf -v "$1" null; fi; }
 
-# One process as a JSON object -> $PJ. Returns 1 if it is below threshold (and not
-# an orphan under user.slice), a kernel thread, or vanished mid-read (ENOENT).
-proc_json() {
-  local pid=$1 k v _ rss='' swap=0 ppid='' stat rest cg='' line name='' pmid=''
+# One process as a JSON object -> $PJ, its parent -> $PJ_PPID. Returns 1 if it
+# vanished mid-read (ENOENT), is a kernel thread, or — unless FORCE=1, which the
+# ancestor walk uses — is below threshold and not an orphan under user.slice.
+proc_json() { # PID [FORCE]
+  local pid=$1 force=${2:-0} k v _ rss='' swap=0 ppid='' stat rest cg='' line name='' pmid=''
   local start jp jg jn ji ja
   local -a f argv envv
-  PJ=
+  PJ= PJ_PPID=
   while read -r k v _; do
     case $k in PPid:) ppid=$v ;; VmRSS:) rss=$v ;; VmSwap:) swap=$v ;; esac
   done 2>/dev/null <"/proc/$pid/status"
   [[ $rss =~ ^[0-9]+$ && $swap =~ ^[0-9]+$ && $ppid =~ ^[0-9]+$ ]] || return 1
-  ((rss + swap >= THRESHOLD_KB || ppid == 1)) || return 1
+  ((force || rss + swap >= THRESHOLD_KB || ppid == 1)) || return 1
   while IFS= read -r line; do
     [[ $line == 0::* ]] && cg=${line#0::}
   done 2>/dev/null <"/proc/$pid/cgroup"
-  if ((rss + swap < THRESHOLD_KB)) && [[ $cg != */user.slice* ]]; then return 1; fi
+  if ((!force && rss + swap < THRESHOLD_KB)) && [[ $cg != */user.slice* ]]; then return 1; fi
   stat=$(<"/proc/$pid/stat") 2>/dev/null || return 1
   rest=${stat##*) }; read -r -a f <<<"$rest"   # f[n-3] is stat field n (comm-safe)
   mapfile -d '' -t argv 2>/dev/null <"/proc/$pid/cmdline" || return 1
@@ -110,12 +112,15 @@ proc_json() {
   redact_args "${argv[@]}"; jstr ja "$REPLY"
   printf -v PJ '{"pid":%s,"ppid":%s,"pgid":%s,"start":%s,"rss_kb":%s,"swap_kb":%s,"cgroup":%s,"pm2_name":%s,"pm2_id":%s,"args":%s}' \
     "$pid" "$ppid" "$jp" "$start" "$rss" "$swap" "$jg" "$jn" "$ji" "$ja"
+  PJ_PPID=$ppid
 }
 
 # One sample line -> $OUT.
 sample() {
   local k v _ kind a10 a60 mavail='' mtotal='' stot='' sfree='' load1='' p procs='' sep=''
-  local ps10='' ps60='' pf10='' pf60='' a b c d e g h i n
+  local ps10='' ps60='' pf10='' pf60='' a b c d e g h i n q depth
+  local -A seen=()
+  local -a parents=()
   while read -r k v _; do
     case $k in MemAvailable:) mavail=$v ;; MemTotal:) mtotal=$v ;;
                SwapTotal:) stot=$v ;; SwapFree:) sfree=$v ;; esac
@@ -127,7 +132,18 @@ sample() {
   read -r load1 _ 2>/dev/null </proc/loadavg
   for p in /proc/[0-9]*; do
     proc_json "${p#/proc/}" || continue
-    procs+=$sep$PJ; sep=,
+    procs+=$sep$PJ; sep=,; seen[${p#/proc/}]=1; parents+=("$PJ_PPID")
+  done
+  # Ancestor chains: the small parents of a big process (bash -> npm -> sh -> node)
+  # are what name the command, so each is emitted once per sample regardless of
+  # size, up to 10 levels; pid 1 itself is not emitted. A walk stops at a pid
+  # already emitted — its own chain is (or was) walked from there.
+  for q in "${parents[@]}"; do
+    for ((depth = 0; depth < 10 && q > 1; depth++)); do
+      [[ -n ${seen[$q]:-} ]] && break
+      proc_json "$q" 1 || break
+      procs+=$sep$PJ; seen[$q]=1; q=$PJ_PPID
+    done
   done
   jnum a "$mavail"; jnum b "$mtotal"; jnum c "$stot"; jnum d "$sfree"
   jnum e "$ps10"; jnum g "$ps60"; jnum h "$pf10"; jnum i "$pf60"; jnum n "$load1"

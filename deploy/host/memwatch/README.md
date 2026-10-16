@@ -75,13 +75,21 @@ One JSON object per sample:
   from `/proc/<pid>/stat` starttime + `btime`), `rss_kb`, `swap_kb`, `cgroup` (the
   `0::` line), `pm2_name`, `pm2_id`, `args`.
 
-A process that exits mid-read is silently skipped.
+**Ancestor chain:** for every process that qualifies above, its parents are walked
+via `ppid` (up to 10 levels, stopping before pid 1) and each ancestor is emitted
+**once per sample** as a normal entry, however small it is. The small parents are
+what name the command — the 2026-10-15 2 GB victim was the leaf of
+`bash -> npm -> node -> sh -> node -> sh -> node(tsx) -> node`, every parent 2–35 MB.
+So one sample line holds the whole chain; nothing has to be joined across lines.
+
+A process that exits mid-read is silently skipped (and ends that ancestor walk).
 
 ## Expected size
 
 A header-only line is ~300 bytes; each process entry is ~200–550 bytes (`args` is
-capped at 300 chars). On the prod VPS expect roughly 10–20 processes over 50 MB, i.e.
-~3–8 KB per sample. At 5,760 samples/day that is **~20–45 MB/day uncompressed**,
+capped at 300 chars). On the prod VPS expect roughly 10–20 processes over 50 MB plus
+their ancestors (mostly shared: the PM2 daemon, shells, npm) — call it 15–35 entries,
+~4–12 KB per sample. At 5,760 samples/day that is **~25–70 MB/day uncompressed**,
 typically ~10x smaller gzipped — so 14 rotations is a few tens of MB on disk.
 Measure the real figure after a day with `ls -l /var/log/vizora-memwatch/`.
 
@@ -100,10 +108,16 @@ cd /var/log/vizora-memwatch
 grep  '"pid":123456,' memwatch.jsonl memwatch.jsonl.1
 zgrep '"pid":123456,' memwatch.jsonl.*.gz
 
-# 3. Walk the parent chain: repeat step 2 with the ppid from the matching entries,
-#    up to the PM2 daemon or pid 1. Use samples from just before the kill —
-#    pids are reused, so check `start` matches across the entries you join.
+# 3. Take the LAST matching line before the kill time. Its `procs` array already
+#    contains the victim's whole ancestor chain (every parent, however small), so
+#    walk up by ppid WITHIN THAT ONE LINE — no second grep. Pids are reused, so
+#    stay inside one line rather than joining entries across samples.
+grep '"pid":123456,' memwatch.jsonl | tail -n1   | grep -o '{"pid":[^}]*}'           # one entry per line; or: jq -c '.procs[]'
 ```
+
+If the victim grew past the threshold between samples it may be missing from every
+line; then look for its parent (the kernel report lists all pids, so a parent that
+was already large, or the pgid, is the way in).
 
 `pm2_name` / `pm2_id` name the PM2 app even for a forked child (a build, a `tsx`
 ops agent, a worker), because PM2 exports them into the app's environment and
@@ -133,6 +147,13 @@ exposing `w`. Accepted because the log is 0640 root, but anyone granting wider r
 access to `/var/log/vizora-memwatch/` must account for it.
 
 ## Tests
+
+`container-test-memwatch.sh` checks the `/proc` paths on Linux (run it as root in
+a throwaway container: `docker run --rm -v "$PWD:/m:ro" ubuntu:24.04 bash
+/m/container-test-memwatch.sh`). It builds `top.sh -> mid.sh -> leaf.sh` with only
+the leaf large (~150 MB) and asserts the small parents are emitted once each, with
+PM2 env inherited and no other environ key logged. Against the script without the
+ancestor walk it fails 3 of 9 assertions; with the walk it passes 9/9.
 
 `bash test-memwatch.sh` — fixture tests for redaction and JSON escaping. Pure bash
 (>= 4.4), runs in Git Bash. It does not exercise the `/proc` paths; those were
