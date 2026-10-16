@@ -6,6 +6,7 @@ import { AppModule } from '../src/app/app.module';
 import { RedisService } from '../src/services/redis.service';
 import { DeviceGateway } from '../src/gateways/device.gateway';
 import { DatabaseService } from '../src/database/database.service';
+import { DeviceCommandType } from '../src/types';
 
 describe('DeviceGateway (E2E)', () => {
   let app: INestApplication;
@@ -363,12 +364,13 @@ describe('DeviceGateway (E2E)', () => {
       });
     });
 
-    it('should return pending commands with heartbeat response', async () => {
-      // Add a command to Redis
-      await redisService.addDeviceCommand(deviceId, {
-        type: 'restart',
-        timestamp: Date.now(),
-      });
+    it('round-trips a queued command through real Redis, then heartbeats', async () => {
+      const command = { type: DeviceCommandType.RESTART, timestamp: new Date().toISOString() };
+      await redisService.addDeviceCommand(deviceId, command, 300);
+
+      // Drained atomically, intact — creation timestamp unchanged.
+      await expect(redisService.getDeviceCommands(deviceId)).resolves.toEqual([command]);
+      await expect(redisService.getDeviceCommands(deviceId)).resolves.toEqual([]);
 
       const response = await new Promise((resolve) => {
         client.emit('heartbeat', { status: 'active' }, (resp) => resolve(resp));
