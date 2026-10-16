@@ -165,15 +165,46 @@ export class RedisService implements OnModuleDestroy {
 
   /**
    * Store commands for a device
+   *
+   * `ttlSeconds` is the pushed command's REMAINING life (`deviceCommandRemainingTtlSeconds`).
+   * The key's TTL is only ever raised to it, never shortened, so the queue lives exactly as
+   * long as its youngest command: NX sets it on a key with no TTL yet (GT alone would not —
+   * Redis treats a non-volatile key as infinite), GT extends it only when larger. A
+   * requeued old command therefore cannot extend the queue, and a fresh command pushed
+   * onto an old queue is not reaped early. RPUSH and both EXPIREs run in one MULTI, so a
+   * crash cannot leave a TTL-less key. Requires Redis >= 7.
+   *
+   * The TTL is garbage collection only — the real invariant is the per-command age check
+   * against the command's creation time (`DEVICE_COMMAND_MAX_AGE_MS`), which the gateway
+   * enforces before every emit and every requeue.
    */
-  async addDeviceCommand(deviceId: string, command: DeviceCommand): Promise<void> {
+  async addDeviceCommand(deviceId: string, command: DeviceCommand, ttlSeconds: number): Promise<void> {
     const key = `device:commands:${deviceId}`;
-    await this.redis.rpush(key, JSON.stringify(command));
-    await this.redis.expire(key, 300); // 5 minutes
+    const ttl = Math.max(1, Math.ceil(ttlSeconds));
+    const results = await this.redis
+      .multi()
+      .rpush(key, JSON.stringify(command))
+      .expire(key, ttl, 'NX')
+      .expire(key, ttl, 'GT')
+      .exec();
+    // exec() RESOLVES with per-command errors (e.g. WRONGTYPE) rather than rejecting, and
+    // with null when the transaction was aborted. Either way the command was not stored —
+    // throw, so a caller never counts a lost command as queued.
+    if (!results) {
+      throw new Error(`addDeviceCommand: MULTI aborted for device ${deviceId}`);
+    }
+    const failed = results.find(([error]) => error);
+    if (failed) {
+      throw failed[0];
+    }
   }
 
   /**
    * Get pending commands for a device (atomic read + delete)
+   *
+   * Each entry is parsed on its own: an unparseable or non-object entry is dropped with a
+   * WARN (device id + index only — never the raw content) and the rest are kept. A single
+   * bad entry used to throw AFTER the DEL and lose the whole batch.
    */
   async getDeviceCommands(deviceId: string): Promise<DeviceCommand[]> {
     const key = `device:commands:${deviceId}`;
@@ -182,8 +213,23 @@ export class RedisService implements OnModuleDestroy {
     multi.del(key);
     const results = await multi.exec();
     if (!results || !results[0] || !results[0][1]) return [];
-    const commands = results[0][1] as string[];
-    return commands.map((cmd) => JSON.parse(cmd) as DeviceCommand);
+    const entries = results[0][1] as string[];
+    const commands: DeviceCommand[] = [];
+    entries.forEach((entry, index) => {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(entry);
+      } catch {
+        this.logger.warn(`Dropping unparseable queued command for device ${deviceId} at index ${index}`);
+        return;
+      }
+      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        this.logger.warn(`Dropping non-object queued command for device ${deviceId} at index ${index}`);
+        return;
+      }
+      commands.push(parsed as DeviceCommand);
+    });
+    return commands;
   }
 
   /**

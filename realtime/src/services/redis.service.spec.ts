@@ -126,13 +126,165 @@ describe('RedisService', () => {
   });
 
   describe('device commands', () => {
-    it('should add device command', async () => {
-      await service.addDeviceCommand('device-1', {
-        type: 'reload' as any,
-        payload: {},
+    // A MULTI that applies Redis 7 RPUSH / EXPIRE NX|GT semantics to an in-memory store,
+    // so the tests assert the resulting TTL, not merely which arguments were sent.
+    // `ttls` holds remaining seconds; a key absent from it is non-volatile (no TTL).
+    const KEY = 'device:commands:device-1';
+    let lists: Map<string, string[]>;
+    let ttls: Map<string, number>;
+    let multiCalls: unknown[][];
+
+    const installTtlSimulator = () => {
+      lists = new Map();
+      ttls = new Map();
+      multiCalls = [];
+      (service as any).redis.multi.mockImplementation(() => {
+        const ops: Array<() => void> = [];
+        const chain: any = {
+          rpush: (key: string, value: string) => {
+            multiCalls.push(['rpush', key, value]);
+            ops.push(() => lists.set(key, [...(lists.get(key) ?? []), value]));
+            return chain;
+          },
+          expire: (key: string, seconds: number, mode: 'NX' | 'GT') => {
+            multiCalls.push(['expire', key, seconds, mode]);
+            ops.push(() => {
+              if (!lists.has(key)) return;
+              const current = ttls.get(key);
+              if (mode === 'NX' && current === undefined) ttls.set(key, seconds);
+              // GT treats a non-volatile key as infinite, so it never sets a first TTL.
+              if (mode === 'GT' && current !== undefined && seconds > current) ttls.set(key, seconds);
+            });
+            return chain;
+          },
+          exec: async () => {
+            ops.forEach((op) => op());
+            return [];
+          },
+        };
+        return chain;
       });
-      expect(service).toBeDefined();
+    };
+
+    afterEach(() => {
+      (service as any).redis.multi.mockImplementation(() => ({
+        lrange: jest.fn().mockReturnThis(),
+        del: jest.fn().mockReturnThis(),
+        exec: jest.fn().mockResolvedValue([[null, []], [null, 1]]),
+      }));
     });
+
+    it('a new key gets the pushed command\'s TTL via NX, in one MULTI with the RPUSH', async () => {
+      installTtlSimulator();
+
+      await service.addDeviceCommand('device-1', { type: 'reload' as any }, 300);
+
+      expect(ttls.get(KEY)).toBe(300);
+      expect(multiCalls).toEqual([
+        ['rpush', KEY, JSON.stringify({ type: 'reload' })],
+        ['expire', KEY, 300, 'NX'],
+        ['expire', KEY, 300, 'GT'],
+      ]);
+      expect((service as any).redis.rpush).not.toHaveBeenCalled();
+      expect((service as any).redis.expire).not.toHaveBeenCalled();
+    });
+
+    it('a fresh command pushed onto a key with a shorter remaining TTL raises it to ~300', async () => {
+      installTtlSimulator();
+      lists.set(KEY, ['old']);
+      ttls.set(KEY, 10); // the old command has 10s left
+
+      await service.addDeviceCommand('device-1', { type: 'reboot' as any }, 300);
+
+      // Without GT the key (and the brand-new command) would be reaped 10s from now.
+      expect(ttls.get(KEY)).toBe(300);
+    });
+
+    it('a requeued old command (age 200s) cannot raise a key TTL of 250s', async () => {
+      installTtlSimulator();
+      lists.set(KEY, ['younger']);
+      ttls.set(KEY, 250);
+
+      await service.addDeviceCommand('device-1', { type: 'reboot' as any }, 100);
+
+      expect(ttls.get(KEY)).toBe(250);
+      expect(multiCalls).toContainEqual(['expire', KEY, 100, 'GT']);
+      expect(multiCalls).toContainEqual(['expire', KEY, 100, 'NX']);
+    });
+
+    it('a requeue onto a key with a LONGER TTL never shortens it', async () => {
+      installTtlSimulator();
+      lists.set(KEY, ['fresh']);
+      ttls.set(KEY, 290);
+
+      await service.addDeviceCommand('device-1', { type: 'reload' as any }, 5);
+
+      expect(ttls.get(KEY)).toBe(290);
+    });
+
+    it('clamps a sub-second or zero TTL to 1s (EXPIRE 0 would delete the key)', async () => {
+      installTtlSimulator();
+
+      await service.addDeviceCommand('device-1', { type: 'reload' as any }, 0);
+
+      expect(ttls.get(KEY)).toBe(1);
+    });
+
+    it('rejects when the MULTI resolves with a per-command error (exec does not reject on WRONGTYPE)', async () => {
+      const wrongType = new Error('WRONGTYPE Operation against a key holding the wrong kind of value');
+      const chain: any = {
+        rpush: () => chain,
+        expire: () => chain,
+        exec: jest.fn().mockResolvedValue([[wrongType, null], [null, 0], [null, 0]]),
+      };
+      (service as any).redis.multi.mockReturnValueOnce(chain);
+
+      await expect(service.addDeviceCommand('device-1', { type: 'reboot' as any }, 300)).rejects.toBe(wrongType);
+    });
+
+    it('rejects when the MULTI is aborted (exec resolves null)', async () => {
+      const chain: any = { rpush: () => chain, expire: () => chain, exec: jest.fn().mockResolvedValue(null) };
+      (service as any).redis.multi.mockReturnValueOnce(chain);
+
+      await expect(service.addDeviceCommand('device-1', { type: 'reboot' as any }, 300)).rejects.toThrow('MULTI aborted');
+    });
+
+    it('keeps valid queued commands when other entries are unparseable or not objects', async () => {
+      const first = { type: 'reload' as any, timestamp: '2026-10-16T12:00:00.000Z' };
+      const second = { type: 'clear_cache' as any, timestamp: '2026-10-16T12:00:01.000Z' };
+      (service as any).redis.multi.mockReturnValueOnce({
+        lrange: jest.fn().mockReturnThis(),
+        del: jest.fn().mockReturnThis(),
+        exec: jest.fn().mockResolvedValue([
+          [null, [JSON.stringify(first), 'garbage{secret-token', 'null', JSON.stringify(second)]],
+          [null, 1],
+        ]),
+      });
+      const warnSpy = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => undefined);
+
+      await expect(service.getDeviceCommands('device-1')).resolves.toEqual([first, second]);
+
+      const warnings = warnSpy.mock.calls.map(([message]) => String(message));
+      expect(warnings).toHaveLength(2);
+      expect(warnings[0]).toContain('device-1');
+      expect(warnings[0]).toContain('index 1');
+      expect(warnings[1]).toContain('index 2');
+      expect(warnings.join('\n')).not.toContain('secret-token');
+    });
+
+    it.each([['a number', '42'], ['an array', '[1,2]'], ['a string', '"reboot"']])(
+      'drops a queued entry that parses to %s',
+      async (_label, entry) => {
+        (service as any).redis.multi.mockReturnValueOnce({
+          lrange: jest.fn().mockReturnThis(),
+          del: jest.fn().mockReturnThis(),
+          exec: jest.fn().mockResolvedValue([[null, [entry]], [null, 1]]),
+        });
+        jest.spyOn((service as any).logger, 'warn').mockImplementation(() => undefined);
+
+        await expect(service.getDeviceCommands('device-1')).resolves.toEqual([]);
+      },
+    );
 
     it('should get device commands', async () => {
       const commands = await service.getDeviceCommands('device-1');
@@ -142,20 +294,12 @@ describe('RedisService', () => {
     it('stores and replays queued commands in FIFO order', async () => {
       const first = { type: 'clear_cache' as any, payload: { order: 1 } };
       const second = { type: 'reload' as any, payload: { order: 2 } };
+      installTtlSimulator();
 
-      await service.addDeviceCommand('device-1', first);
-      await service.addDeviceCommand('device-1', second);
+      await service.addDeviceCommand('device-1', first, 300);
+      await service.addDeviceCommand('device-1', second, 300);
 
-      expect((service as any).redis.rpush).toHaveBeenNthCalledWith(
-        1,
-        'device:commands:device-1',
-        JSON.stringify(first),
-      );
-      expect((service as any).redis.rpush).toHaveBeenNthCalledWith(
-        2,
-        'device:commands:device-1',
-        JSON.stringify(second),
-      );
+      expect(lists.get(KEY)).toEqual([JSON.stringify(first), JSON.stringify(second)]);
 
       (service as any).redis.multi.mockReturnValueOnce({
         lrange: jest.fn().mockReturnThis(),
