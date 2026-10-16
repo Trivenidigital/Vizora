@@ -526,6 +526,9 @@ scripts/ops/               # Autonomous ops agents (PM2 cron) — see "Autonomou
 deploy/tv/, deploy/nginx/  # Source of truth for the customer APK install surface (vizora.cloud/tv +
                            #   /downloads/vizora-display.apk). Static page + nginx location blocks;
                            #   prod nginx is host-installed so these are copied deliberately, not generated.
+deploy/host/memwatch/      # READ-ONLY host memory sampler (bash, cron.d every minute, 15s samples) so a kernel
+                           #   OOM victim pid can be joined to its cmdline / ppid / PM2 app. Host-installed like
+                           #   deploy/nginx; reads only `name`/`pm_id` from environ. Install + attribution recipe in its README.
 scripts/release/           # Deterministic APK release gate (package id / versionCode / signing-cert
                            #   SHA-256 / APK SHA-256), installer-page renderer, and the single atomic
                            #   publish operation. See docs/plans/2026-08-10-tv-apk-distribution.md

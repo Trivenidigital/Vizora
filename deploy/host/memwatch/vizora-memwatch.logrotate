@@ -1,0 +1,11 @@
+# /etc/logrotate.d/vizora-memwatch — source: deploy/host/memwatch/ in the Vizora repo.
+/var/log/vizora-memwatch/memwatch.jsonl {
+    daily
+    rotate 14
+    maxsize 50M
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 root root
+}
