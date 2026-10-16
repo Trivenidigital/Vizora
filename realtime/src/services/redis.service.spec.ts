@@ -230,6 +230,62 @@ describe('RedisService', () => {
       expect(ttls.get(KEY)).toBe(1);
     });
 
+    it('rejects when the MULTI resolves with a per-command error (exec does not reject on WRONGTYPE)', async () => {
+      const wrongType = new Error('WRONGTYPE Operation against a key holding the wrong kind of value');
+      const chain: any = {
+        rpush: () => chain,
+        expire: () => chain,
+        exec: jest.fn().mockResolvedValue([[wrongType, null], [null, 0], [null, 0]]),
+      };
+      (service as any).redis.multi.mockReturnValueOnce(chain);
+
+      await expect(service.addDeviceCommand('device-1', { type: 'reboot' as any }, 300)).rejects.toBe(wrongType);
+    });
+
+    it('rejects when the MULTI is aborted (exec resolves null)', async () => {
+      const chain: any = { rpush: () => chain, expire: () => chain, exec: jest.fn().mockResolvedValue(null) };
+      (service as any).redis.multi.mockReturnValueOnce(chain);
+
+      await expect(service.addDeviceCommand('device-1', { type: 'reboot' as any }, 300)).rejects.toThrow('MULTI aborted');
+    });
+
+    it('keeps valid queued commands when other entries are unparseable or not objects', async () => {
+      const first = { type: 'reload' as any, timestamp: '2026-10-16T12:00:00.000Z' };
+      const second = { type: 'clear_cache' as any, timestamp: '2026-10-16T12:00:01.000Z' };
+      (service as any).redis.multi.mockReturnValueOnce({
+        lrange: jest.fn().mockReturnThis(),
+        del: jest.fn().mockReturnThis(),
+        exec: jest.fn().mockResolvedValue([
+          [null, [JSON.stringify(first), 'garbage{secret-token', 'null', JSON.stringify(second)]],
+          [null, 1],
+        ]),
+      });
+      const warnSpy = jest.spyOn((service as any).logger, 'warn').mockImplementation(() => undefined);
+
+      await expect(service.getDeviceCommands('device-1')).resolves.toEqual([first, second]);
+
+      const warnings = warnSpy.mock.calls.map(([message]) => String(message));
+      expect(warnings).toHaveLength(2);
+      expect(warnings[0]).toContain('device-1');
+      expect(warnings[0]).toContain('index 1');
+      expect(warnings[1]).toContain('index 2');
+      expect(warnings.join('\n')).not.toContain('secret-token');
+    });
+
+    it.each([['a number', '42'], ['an array', '[1,2]'], ['a string', '"reboot"']])(
+      'drops a queued entry that parses to %s',
+      async (_label, entry) => {
+        (service as any).redis.multi.mockReturnValueOnce({
+          lrange: jest.fn().mockReturnThis(),
+          del: jest.fn().mockReturnThis(),
+          exec: jest.fn().mockResolvedValue([[null, [entry]], [null, 1]]),
+        });
+        jest.spyOn((service as any).logger, 'warn').mockImplementation(() => undefined);
+
+        await expect(service.getDeviceCommands('device-1')).resolves.toEqual([]);
+      },
+    );
+
     it('should get device commands', async () => {
       const commands = await service.getDeviceCommands('device-1');
       expect(Array.isArray(commands)).toBe(true);

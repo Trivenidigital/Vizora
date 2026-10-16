@@ -2433,7 +2433,7 @@ export class DeviceGateway
       return { delivered: 0, requeued: 0, dropped: 0, skipped: false, shouldBackoff: false };
     }
 
-    this.logger.log(`Delivering ${pendingCommands.length} pending command(s) to device ${deviceId}`);
+    this.logger.log(`Draining ${pendingCommands.length} queued command(s) for device ${deviceId}`);
     let delivered = 0;
     let requeued = 0;
     let dropped = 0;
