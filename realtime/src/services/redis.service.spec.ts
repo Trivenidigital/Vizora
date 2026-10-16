@@ -126,25 +126,108 @@ describe('RedisService', () => {
   });
 
   describe('device commands', () => {
-    it('should add device command', async () => {
-      await service.addDeviceCommand('device-1', {
-        type: 'reload' as any,
-        payload: {},
+    // A MULTI that applies Redis 7 RPUSH / EXPIRE NX|GT semantics to an in-memory store,
+    // so the tests assert the resulting TTL, not merely which arguments were sent.
+    // `ttls` holds remaining seconds; a key absent from it is non-volatile (no TTL).
+    const KEY = 'device:commands:device-1';
+    let lists: Map<string, string[]>;
+    let ttls: Map<string, number>;
+    let multiCalls: unknown[][];
+
+    const installTtlSimulator = () => {
+      lists = new Map();
+      ttls = new Map();
+      multiCalls = [];
+      (service as any).redis.multi.mockImplementation(() => {
+        const ops: Array<() => void> = [];
+        const chain: any = {
+          rpush: (key: string, value: string) => {
+            multiCalls.push(['rpush', key, value]);
+            ops.push(() => lists.set(key, [...(lists.get(key) ?? []), value]));
+            return chain;
+          },
+          expire: (key: string, seconds: number, mode: 'NX' | 'GT') => {
+            multiCalls.push(['expire', key, seconds, mode]);
+            ops.push(() => {
+              if (!lists.has(key)) return;
+              const current = ttls.get(key);
+              if (mode === 'NX' && current === undefined) ttls.set(key, seconds);
+              // GT treats a non-volatile key as infinite, so it never sets a first TTL.
+              if (mode === 'GT' && current !== undefined && seconds > current) ttls.set(key, seconds);
+            });
+            return chain;
+          },
+          exec: async () => {
+            ops.forEach((op) => op());
+            return [];
+          },
+        };
+        return chain;
       });
-      expect(service).toBeDefined();
+    };
+
+    afterEach(() => {
+      (service as any).redis.multi.mockImplementation(() => ({
+        lrange: jest.fn().mockReturnThis(),
+        del: jest.fn().mockReturnThis(),
+        exec: jest.fn().mockResolvedValue([[null, []], [null, 1]]),
+      }));
     });
 
-    it('sets the queue TTL with NX so a requeue onto an existing key cannot extend it', async () => {
-      const redis = (service as any).redis;
-      redis.expire.mockClear();
+    it('a new key gets the pushed command\'s TTL via NX, in one MULTI with the RPUSH', async () => {
+      installTtlSimulator();
 
-      await service.addDeviceCommand('device-1', { type: 'reload' as any, timestamp: new Date().toISOString() });
-      await service.addDeviceCommand('device-1', { type: 'reboot' as any, timestamp: new Date().toISOString() });
+      await service.addDeviceCommand('device-1', { type: 'reload' as any }, 300);
 
-      expect(redis.expire).toHaveBeenCalledTimes(2);
-      for (const call of redis.expire.mock.calls) {
-        expect(call).toEqual(['device:commands:device-1', 300, 'NX']);
-      }
+      expect(ttls.get(KEY)).toBe(300);
+      expect(multiCalls).toEqual([
+        ['rpush', KEY, JSON.stringify({ type: 'reload' })],
+        ['expire', KEY, 300, 'NX'],
+        ['expire', KEY, 300, 'GT'],
+      ]);
+      expect((service as any).redis.rpush).not.toHaveBeenCalled();
+      expect((service as any).redis.expire).not.toHaveBeenCalled();
+    });
+
+    it('a fresh command pushed onto a key with a shorter remaining TTL raises it to ~300', async () => {
+      installTtlSimulator();
+      lists.set(KEY, ['old']);
+      ttls.set(KEY, 10); // the old command has 10s left
+
+      await service.addDeviceCommand('device-1', { type: 'reboot' as any }, 300);
+
+      // Without GT the key (and the brand-new command) would be reaped 10s from now.
+      expect(ttls.get(KEY)).toBe(300);
+    });
+
+    it('a requeued old command (age 200s) cannot raise a key TTL of 250s', async () => {
+      installTtlSimulator();
+      lists.set(KEY, ['younger']);
+      ttls.set(KEY, 250);
+
+      await service.addDeviceCommand('device-1', { type: 'reboot' as any }, 100);
+
+      expect(ttls.get(KEY)).toBe(250);
+      expect(multiCalls).toContainEqual(['expire', KEY, 100, 'GT']);
+      expect(multiCalls).toContainEqual(['expire', KEY, 100, 'NX']);
+    });
+
+    it('a requeue onto a key with a LONGER TTL never shortens it', async () => {
+      installTtlSimulator();
+      lists.set(KEY, ['fresh']);
+      ttls.set(KEY, 290);
+
+      await service.addDeviceCommand('device-1', { type: 'reload' as any }, 5);
+
+      expect(ttls.get(KEY)).toBe(290);
+    });
+
+    it('clamps a sub-second or zero TTL to 1s (EXPIRE 0 would delete the key)', async () => {
+      installTtlSimulator();
+
+      await service.addDeviceCommand('device-1', { type: 'reload' as any }, 0);
+
+      expect(ttls.get(KEY)).toBe(1);
     });
 
     it('should get device commands', async () => {
@@ -155,20 +238,12 @@ describe('RedisService', () => {
     it('stores and replays queued commands in FIFO order', async () => {
       const first = { type: 'clear_cache' as any, payload: { order: 1 } };
       const second = { type: 'reload' as any, payload: { order: 2 } };
+      installTtlSimulator();
 
-      await service.addDeviceCommand('device-1', first);
-      await service.addDeviceCommand('device-1', second);
+      await service.addDeviceCommand('device-1', first, 300);
+      await service.addDeviceCommand('device-1', second, 300);
 
-      expect((service as any).redis.rpush).toHaveBeenNthCalledWith(
-        1,
-        'device:commands:device-1',
-        JSON.stringify(first),
-      );
-      expect((service as any).redis.rpush).toHaveBeenNthCalledWith(
-        2,
-        'device:commands:device-1',
-        JSON.stringify(second),
-      );
+      expect(lists.get(KEY)).toEqual([JSON.stringify(first), JSON.stringify(second)]);
 
       (service as any).redis.multi.mockReturnValueOnce({
         lrange: jest.fn().mockReturnThis(),

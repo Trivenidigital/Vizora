@@ -1,6 +1,7 @@
 import {
   DEVICE_COMMAND_MAX_AGE_MS,
   DEVICE_COMMAND_MAX_FUTURE_SKEW_MS,
+  deviceCommandRemainingTtlSeconds,
   getDeviceCommandExpiry,
   isDeviceCommandExpired,
 } from './device-command-expiry';
@@ -48,6 +49,17 @@ describe('device command expiry', () => {
       expired: true,
       reason: 'no_valid_timestamp',
     });
+  });
+
+  it.each([
+    [0, 300],
+    [200_000, 100],
+    [200_001, 100], // rounds UP: never reaps a command before its age limit
+    [299_500, 1],
+    [DEVICE_COMMAND_MAX_AGE_MS, 1], // floor of 1s — EXPIRE 0 would delete the key
+    [-30_000, 330], // within the future-skew guard: the age check keeps it for 330s
+  ])('remaining TTL for a command aged %dms is %ds', (ageMs, ttl) => {
+    expect(deviceCommandRemainingTtlSeconds(ageMs)).toBe(ttl);
   });
 
   it('a timestamp within the future-skew guard is fresh', () => {

@@ -1576,8 +1576,8 @@ describe('DeviceGateway', () => {
 
       expect(result).toEqual({ delivered: 0, requeued: 2, dropped: 0, skipped: false, shouldBackoff: false });
       expect(emit).toHaveBeenCalledTimes(1);
-      expect(mockRedisService.addDeviceCommand).toHaveBeenCalledWith('device-1', pendingCommands[0]);
-      expect(mockRedisService.addDeviceCommand).toHaveBeenCalledWith('device-1', pendingCommands[1]);
+      expect(mockRedisService.addDeviceCommand).toHaveBeenCalledWith('device-1', pendingCommands[0], 300);
+      expect(mockRedisService.addDeviceCommand).toHaveBeenCalledWith('device-1', pendingCommands[1], 300);
     });
 
     it('should back off heartbeat replay after failed pending delivery', async () => {
@@ -2325,6 +2325,7 @@ describe('DeviceGateway', () => {
       expect(mockRedisService.addDeviceCommand).toHaveBeenCalledWith(
         'device-99',
         expect.objectContaining({ type: 'clear_cache', timestamp: expect.any(String) }),
+        300,
       );
       expect((gateway as any).heartbeatReplayState.has('device-99')).toBe(false);
     });
@@ -2347,6 +2348,7 @@ describe('DeviceGateway', () => {
       expect(mockRedisService.addDeviceCommand).toHaveBeenCalledWith(
         'device-1',
         expect.objectContaining({ type: 'reload', timestamp: expect.any(String) }),
+        300,
       );
     });
 
@@ -2364,6 +2366,7 @@ describe('DeviceGateway', () => {
       expect(mockRedisService.addDeviceCommand).toHaveBeenCalledWith(
         'device-1',
         expect.objectContaining({ type: 'reload', timestamp: expect.any(String) }),
+        300,
       );
     });
 
@@ -2418,6 +2421,7 @@ describe('DeviceGateway', () => {
       expect(mockRedisService.addDeviceCommand).toHaveBeenCalledWith(
         'device-1',
         expect.objectContaining({ type: 'reload', timestamp: expect.any(String) }),
+        300,
       );
     });
   });
@@ -3250,6 +3254,16 @@ describe('DeviceGateway', () => {
 
       expect(queue.map((raw) => JSON.parse(raw))).toEqual([fresh]);
       expect(result).toEqual({ delivered: 0, requeued: 1, dropped: 0, skipped: false, shouldBackoff: true });
+    });
+
+    it('requeues with the command\'s REMAINING life as the queue TTL, so an old command cannot extend the key', async () => {
+      const old = { type: 'reload', timestamp: at(-200_000) }; // 200s old → 100s left
+      queue.push(JSON.stringify(old));
+
+      // The ack timeout costs 10s, so at requeue time the command is 210s old → 90s left.
+      await deliverWithAckTimeouts(ackCapableClient(silentEmit()));
+
+      expect(mockRedisService.addDeviceCommand).toHaveBeenCalledWith('device-1', old, 90);
     });
   });
 });

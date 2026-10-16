@@ -50,3 +50,11 @@ export function getDeviceCommandExpiry(command: Pick<DeviceCommand, 'timestamp'>
 export function isDeviceCommandExpired(command: Pick<DeviceCommand, 'timestamp'>, nowMs: number): boolean {
   return getDeviceCommandExpiry(command, nowMs).expired;
 }
+
+/**
+ * Seconds of life a fresh command of age `ageMs` has left — the Redis queue TTL to
+ * request for it. Never below 1 (EXPIRE 0 would delete the key immediately).
+ */
+export function deviceCommandRemainingTtlSeconds(ageMs: number): number {
+  return Math.max(1, Math.ceil((DEVICE_COMMAND_MAX_AGE_MS - ageMs) / 1000));
+}

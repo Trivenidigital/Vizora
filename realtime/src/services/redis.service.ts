@@ -5,7 +5,6 @@ import {
   DeviceCommand,
   Playlist,
 } from '../types';
-import { DEVICE_COMMAND_MAX_AGE_MS } from './device-command-expiry';
 
 // Re-export DeviceStatus for backwards compatibility
 export type { DeviceStatus } from '../types';
@@ -167,16 +166,27 @@ export class RedisService implements OnModuleDestroy {
   /**
    * Store commands for a device
    *
-   * The TTL is set with NX (Redis >= 7) so it applies only to a key that has none yet: a
-   * requeue onto an existing queue must not push its expiry out. The TTL is garbage
-   * collection only — the real invariant is the per-command age check against the
-   * command's creation time (`DEVICE_COMMAND_MAX_AGE_MS`), which the gateway enforces
-   * before every emit and every requeue.
+   * `ttlSeconds` is the pushed command's REMAINING life (`deviceCommandRemainingTtlSeconds`).
+   * The key's TTL is only ever raised to it, never shortened, so the queue lives exactly as
+   * long as its youngest command: NX sets it on a key with no TTL yet (GT alone would not —
+   * Redis treats a non-volatile key as infinite), GT extends it only when larger. A
+   * requeued old command therefore cannot extend the queue, and a fresh command pushed
+   * onto an old queue is not reaped early. RPUSH and both EXPIREs run in one MULTI, so a
+   * crash cannot leave a TTL-less key. Requires Redis >= 7.
+   *
+   * The TTL is garbage collection only — the real invariant is the per-command age check
+   * against the command's creation time (`DEVICE_COMMAND_MAX_AGE_MS`), which the gateway
+   * enforces before every emit and every requeue.
    */
-  async addDeviceCommand(deviceId: string, command: DeviceCommand): Promise<void> {
+  async addDeviceCommand(deviceId: string, command: DeviceCommand, ttlSeconds: number): Promise<void> {
     const key = `device:commands:${deviceId}`;
-    await this.redis.rpush(key, JSON.stringify(command));
-    await this.redis.expire(key, DEVICE_COMMAND_MAX_AGE_MS / 1000, 'NX');
+    const ttl = Math.max(1, Math.ceil(ttlSeconds));
+    await this.redis
+      .multi()
+      .rpush(key, JSON.stringify(command))
+      .expire(key, ttl, 'NX')
+      .expire(key, ttl, 'GT')
+      .exec();
   }
 
   /**

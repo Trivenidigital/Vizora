@@ -46,7 +46,11 @@ import {
   DeviceCommand,
   BroadcastData,
 } from '../types';
-import { getDeviceCommandExpiry } from '../services/device-command-expiry';
+import {
+  DeviceCommandExpiry,
+  deviceCommandRemainingTtlSeconds,
+  getDeviceCommandExpiry,
+} from '../services/device-command-expiry';
 import * as Sentry from '@sentry/nestjs';
 import { createHash } from 'node:crypto';
 import { WsAllExceptionsFilter } from './filters/ws-exception.filter';
@@ -696,9 +700,14 @@ export class DeviceGateway
    * cannot be proven fresh. Logs identifiers and age only — never the payload.
    */
   private dropIfExpired(deviceId: string, command: DeviceCommand): boolean {
+    return this.checkCommandExpiry(deviceId, command).expired;
+  }
+
+  /** As `dropIfExpired`, but returns the verdict (a fresh command's age is needed for its queue TTL). */
+  private checkCommandExpiry(deviceId: string, command: DeviceCommand): DeviceCommandExpiry {
     const expiry = getDeviceCommandExpiry(command, Date.now());
     if (!expiry.expired) {
-      return false;
+      return expiry;
     }
     const topLevelId = (command as DeviceCommand & { commandId?: unknown }).commandId;
     const payloadId = command.payload?.commandId;
@@ -710,7 +719,7 @@ export class DeviceGateway
     } else {
       this.logger.warn(`Dropping expired queued command (${ident}, age ${Math.round(expiry.ageMs / 1000)}s)`);
     }
-    return true;
+    return expiry;
   }
 
   /**
@@ -719,10 +728,11 @@ export class DeviceGateway
    * as-is — its creation `timestamp` is never re-stamped.
    */
   private async queueDeviceCommand(deviceId: string, command: DeviceCommand): Promise<boolean> {
-    if (this.dropIfExpired(deviceId, command)) {
+    const expiry = this.checkCommandExpiry(deviceId, command);
+    if (expiry.expired) {
       return false;
     }
-    await this.redisService.addDeviceCommand(deviceId, command);
+    await this.redisService.addDeviceCommand(deviceId, command, deviceCommandRemainingTtlSeconds(expiry.ageMs));
     return true;
   }
 
