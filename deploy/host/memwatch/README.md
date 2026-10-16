@@ -128,6 +128,9 @@ The rules run per argv token and again over the joined command line, so secrets
 inside one token (`sh -c "redis-cli -a pw ping"`) are caught too. **Known residual:**
 a quoted secret containing a space inside an `sh -c` string leaks the part after the
 space (the joined-string pass cannot see shell quoting); `test-memwatch.sh` pins this.
+Example: `sh -c 'PGPASSWORD="p w" psql'` is logged as `sh -c PGPASSWORD=<redacted> w" psql`,
+exposing `w`. Accepted because the log is 0640 root, but anyone granting wider read
+access to `/var/log/vizora-memwatch/` must account for it.
 
 ## Tests
 
