@@ -134,6 +134,19 @@ describe('RedisService', () => {
       expect(service).toBeDefined();
     });
 
+    it('sets the queue TTL with NX so a requeue onto an existing key cannot extend it', async () => {
+      const redis = (service as any).redis;
+      redis.expire.mockClear();
+
+      await service.addDeviceCommand('device-1', { type: 'reload' as any, timestamp: new Date().toISOString() });
+      await service.addDeviceCommand('device-1', { type: 'reboot' as any, timestamp: new Date().toISOString() });
+
+      expect(redis.expire).toHaveBeenCalledTimes(2);
+      for (const call of redis.expire.mock.calls) {
+        expect(call).toEqual(['device:commands:device-1', 300, 'NX']);
+      }
+    });
+
     it('should get device commands', async () => {
       const commands = await service.getDeviceCommands('device-1');
       expect(Array.isArray(commands)).toBe(true);

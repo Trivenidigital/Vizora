@@ -46,6 +46,7 @@ import {
   DeviceCommand,
   BroadcastData,
 } from '../types';
+import { getDeviceCommandExpiry } from '../services/device-command-expiry';
 import * as Sentry from '@sentry/nestjs';
 import { createHash } from 'node:crypto';
 import { WsAllExceptionsFilter } from './filters/ws-exception.filter';
@@ -163,6 +164,8 @@ type PendingPlaylistDeliveryStatus = 'none' | 'delivered' | 'requeued' | 'deferr
 type PendingCommandDeliveryResult = {
   delivered: number;
   requeued: number;
+  /** Expired commands discarded instead of emitted or requeued. Never counts toward backoff. */
+  dropped: number;
   skipped: boolean;
   shouldBackoff: boolean;
 };
@@ -688,11 +691,55 @@ export class DeviceGateway
     return status;
   }
 
-  private async requeuePendingCommands(deviceId: string, commands: DeviceCommand[]): Promise<number> {
-    for (const command of commands) {
-      await this.redisService.addDeviceCommand(deviceId, command);
+  /**
+   * True (and logged at WARN) when a queued command is past its absolute age limit or
+   * cannot be proven fresh. Logs identifiers and age only — never the payload.
+   */
+  private dropIfExpired(deviceId: string, command: DeviceCommand): boolean {
+    const expiry = getDeviceCommandExpiry(command, Date.now());
+    if (!expiry.expired) {
+      return false;
     }
-    return commands.length;
+    const topLevelId = (command as DeviceCommand & { commandId?: unknown }).commandId;
+    const payloadId = command.payload?.commandId;
+    const commandId =
+      typeof topLevelId === 'string' ? topLevelId : typeof payloadId === 'string' ? payloadId : undefined;
+    const ident = `device ${deviceId}, type ${String(command.type)}${commandId ? `, commandId ${commandId}` : ''}`;
+    if (expiry.reason === 'no_valid_timestamp') {
+      this.logger.warn(`Dropping queued command with no valid creation timestamp (${ident})`);
+    } else {
+      this.logger.warn(`Dropping expired queued command (${ident}, age ${Math.round(expiry.ageMs / 1000)}s)`);
+    }
+    return true;
+  }
+
+  /**
+   * The ONLY way a command enters the queue: an expired command is dropped rather than
+   * queued, so no retry path can extend its lifetime. The command object is pushed
+   * as-is — its creation `timestamp` is never re-stamped.
+   */
+  private async queueDeviceCommand(deviceId: string, command: DeviceCommand): Promise<boolean> {
+    if (this.dropIfExpired(deviceId, command)) {
+      return false;
+    }
+    await this.redisService.addDeviceCommand(deviceId, command);
+    return true;
+  }
+
+  private async requeuePendingCommands(
+    deviceId: string,
+    commands: DeviceCommand[],
+  ): Promise<{ requeued: number; dropped: number }> {
+    let requeued = 0;
+    let dropped = 0;
+    for (const command of commands) {
+      if (await this.queueDeviceCommand(deviceId, command)) {
+        requeued += 1;
+      } else {
+        dropped += 1;
+      }
+    }
+    return { requeued, dropped };
   }
 
   constructor(
@@ -2368,41 +2415,58 @@ export class DeviceGateway
   private async deliverPendingCommands(client: Socket, deviceId: string): Promise<PendingCommandDeliveryResult> {
     if (!this.isActiveDeviceSocket(client, deviceId)) {
       this.logger.debug(`Skipping pending command delivery for stale socket ${client.id} (device ${deviceId})`);
-      return { delivered: 0, requeued: 0, skipped: true, shouldBackoff: false };
+      return { delivered: 0, requeued: 0, dropped: 0, skipped: true, shouldBackoff: false };
     }
 
     const pendingCommands = await this.redisService.getDeviceCommands(deviceId);
     if (pendingCommands.length === 0) {
-      return { delivered: 0, requeued: 0, skipped: false, shouldBackoff: false };
+      return { delivered: 0, requeued: 0, dropped: 0, skipped: false, shouldBackoff: false };
     }
 
     this.logger.log(`Delivering ${pendingCommands.length} pending command(s) to device ${deviceId}`);
     let delivered = 0;
     let requeued = 0;
+    let dropped = 0;
+    const requeueFrom = async (index: number): Promise<void> => {
+      const outcome = await this.requeuePendingCommands(deviceId, pendingCommands.slice(index));
+      requeued += outcome.requeued;
+      dropped += outcome.dropped;
+    };
     for (let index = 0; index < pendingCommands.length; index += 1) {
       const cmd = pendingCommands[index];
       if (!this.isActiveDeviceSocket(client, deviceId) || !client.connected) {
         this.logger.warn(`Device ${deviceId} disconnected before pending command delivery - re-queuing remaining commands`);
-        requeued += await this.requeuePendingCommands(deviceId, pendingCommands.slice(index));
-        return { delivered, requeued, skipped: false, shouldBackoff: false };
+        await requeueFrom(index);
+        return { delivered, requeued, dropped, skipped: false, shouldBackoff: false };
+      }
+
+      // Checked per command, immediately before its emit: each earlier emit can spend up
+      // to 10s waiting for an ack, so a command fresh at drain time may be expired now.
+      if (this.dropIfExpired(deviceId, cmd)) {
+        dropped += 1;
+        continue;
       }
 
       const result = await this.emitWithDeliveryAck(client, 'command', cmd);
       if (!this.isActiveDeviceSocket(client, deviceId) || !client.connected) {
         this.logger.warn(`Device ${deviceId} changed sockets during pending command delivery - re-queuing current and remaining commands`);
-        requeued += await this.requeuePendingCommands(deviceId, pendingCommands.slice(index));
-        return { delivered, requeued, skipped: false, shouldBackoff: false };
+        await requeueFrom(index);
+        return { delivered, requeued, dropped, skipped: false, shouldBackoff: false };
       }
 
       if (!result.delivered) {
         this.logger.warn(`Pending command ${cmd.type} ${result.reason || 'delivery failure'} for device ${deviceId} - re-queuing`);
-        await this.redisService.addDeviceCommand(deviceId, cmd);
-        requeued += 1;
+        if (await this.queueDeviceCommand(deviceId, cmd)) {
+          requeued += 1;
+        } else {
+          dropped += 1;
+        }
       } else {
         delivered += 1;
       }
     }
-    return { delivered, requeued, skipped: false, shouldBackoff: requeued > 0 };
+    // Dropped commands do not count toward backoff: there is nothing left to retry.
+    return { delivered, requeued, dropped, skipped: false, shouldBackoff: requeued > 0 };
   }
 
   private async replayPendingDeliveries(client: Socket, deviceId: string): Promise<void> {
@@ -2551,7 +2615,7 @@ export class DeviceGateway
 
     if (sockets.length === 0) {
       this.logger.warn(`sendCommand: no sockets for device ${deviceId} — queuing`);
-      await this.redisService.addDeviceCommand(deviceId, commandWithTimestamp);
+      await this.queueDeviceCommand(deviceId, commandWithTimestamp);
       this.resetHeartbeatReplayBackoff(deviceId);
       return { delivered: false, reason: 'no_sockets' };
     }
@@ -2571,7 +2635,7 @@ export class DeviceGateway
 
     if (!anyAcknowledged) {
       this.logger.warn(`sendCommand: all sockets timed out for device ${deviceId} — queuing`);
-      await this.redisService.addDeviceCommand(deviceId, commandWithTimestamp);
+      await this.queueDeviceCommand(deviceId, commandWithTimestamp);
       this.resetHeartbeatReplayBackoff(deviceId);
       return { delivered: false, reason: failureReason };
     }

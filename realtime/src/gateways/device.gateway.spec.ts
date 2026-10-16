@@ -10,6 +10,7 @@ import { DatabaseService } from '../database/database.service';
 import { StorageService } from '../storage/storage.service';
 import { resolveEffectiveContent, serializeDeviceContent } from '@vizora/database';
 import { createHash } from 'node:crypto';
+import { DEVICE_COMMAND_MAX_AGE_MS } from '../services/device-command-expiry';
 
 // Mock Sentry
 jest.mock('@sentry/nestjs', () => ({
@@ -1440,7 +1441,7 @@ describe('DeviceGateway', () => {
         emit,
       });
       const pendingPlaylist = { id: 'playlist-pending', items: [] };
-      const pendingCommand = { type: 'reload', timestamp: '2026-05-31T00:00:00.000Z' };
+      const pendingCommand = { type: 'reload', timestamp: new Date().toISOString() };
       mockRedisService.getPendingPlaylist.mockResolvedValueOnce({ playlist: pendingPlaylist, version: 'v-queued' });
       mockRedisService.getDeviceCommands.mockResolvedValueOnce([pendingCommand]);
       (gateway as any).deviceSockets.set('device-1', 'socket-1');
@@ -1551,8 +1552,8 @@ describe('DeviceGateway', () => {
 
     it('should requeue remaining pending commands if the active socket changes during replay', async () => {
       const pendingCommands = [
-        { type: 'reload', timestamp: '2026-05-31T00:00:00.000Z' },
-        { type: 'clear_cache', timestamp: '2026-05-31T00:00:01.000Z' },
+        { type: 'reload', timestamp: new Date().toISOString() },
+        { type: 'clear_cache', timestamp: new Date().toISOString() },
       ];
       const emit = jest.fn((_event: string, _payload: any, ackCb?: (ack?: { ok: boolean }) => void) => {
         ackCb?.({ ok: true });
@@ -1573,7 +1574,7 @@ describe('DeviceGateway', () => {
 
       const result = await (gateway as any).deliverPendingCommands(client, 'device-1');
 
-      expect(result).toEqual({ delivered: 0, requeued: 2, skipped: false, shouldBackoff: false });
+      expect(result).toEqual({ delivered: 0, requeued: 2, dropped: 0, skipped: false, shouldBackoff: false });
       expect(emit).toHaveBeenCalledTimes(1);
       expect(mockRedisService.addDeviceCommand).toHaveBeenCalledWith('device-1', pendingCommands[0]);
       expect(mockRedisService.addDeviceCommand).toHaveBeenCalledWith('device-1', pendingCommands[1]);
@@ -3060,6 +3061,195 @@ describe('DeviceGateway', () => {
         (call: any[]) => call[0] === 'error' && call[1]?.message === 'rate_limited',
       );
       expect(rateLimitEmit).toBeUndefined();
+    });
+  });
+
+  describe('queued command expiry (replay cannot extend a command lifetime)', () => {
+    // An in-memory stand-in for the Redis list, JSON round-tripped exactly like
+    // RedisService does, so a requeue is observable as what a later drain returns.
+    let queue: string[];
+    const MAX_AGE_MS = DEVICE_COMMAND_MAX_AGE_MS;
+    const T0 = Date.parse('2026-10-16T12:00:00.000Z');
+    const at = (msAfterT0: number) => new Date(T0 + msAfterT0).toISOString();
+
+    const ackCapableClient = (emit: jest.Mock) =>
+      createMockSocket({
+        connected: true,
+        data: {
+          deviceId: 'device-1',
+          organizationId: 'org-1',
+          deviceTokenHash: hashToken('valid-token'),
+          deliveryAckCapable: true,
+        },
+        emit,
+      });
+    // Never acks: every emit costs the full 10s ack timeout.
+    const silentEmit = () => jest.fn();
+    const ackingEmit = () =>
+      jest.fn((_event: string, _payload: any, ackCb?: (ack?: { ok: boolean }) => void) => {
+        ackCb?.({ ok: true });
+      });
+    const commandEmits = (emit: jest.Mock) => emit.mock.calls.filter(([event]) => event === 'command');
+
+    const deliverWithAckTimeouts = async (client: unknown) => {
+      const pending = (gateway as any).deliverPendingCommands(client, 'device-1');
+      await jest.advanceTimersByTimeAsync(60_000);
+      return pending;
+    };
+
+    beforeEach(() => {
+      queue = [];
+      jest.setSystemTime(T0);
+      mockRedisService.addDeviceCommand.mockImplementation(async (_deviceId: string, command: unknown) => {
+        queue.push(JSON.stringify(command));
+      });
+      mockRedisService.getDeviceCommands.mockImplementation(async () => {
+        const drained = queue.map((raw) => JSON.parse(raw));
+        queue = [];
+        return drained;
+      });
+      (gateway as any).deviceSockets.set('device-1', 'socket-1');
+    });
+
+    afterEach(() => {
+      mockRedisService.addDeviceCommand.mockReset().mockResolvedValue(undefined);
+      mockRedisService.getDeviceCommands.mockReset().mockResolvedValue([]);
+    });
+
+    it('repeated ack-timeout requeues cannot extend lifetime; creation timestamp is never re-stamped', async () => {
+      mockServer.in.mockReturnValueOnce({ fetchSockets: jest.fn().mockResolvedValue([]) });
+      await gateway.sendCommand('device-1', { type: 'reboot' as any });
+      expect(queue).toHaveLength(1);
+      const createdAt = JSON.parse(queue[0]).timestamp;
+      expect(createdAt).toBe(at(0));
+
+      const timestampsSeen: string[] = [];
+      for (const reconnectAt of [2 * 60_000, 4 * 60_000]) {
+        jest.setSystemTime(T0 + reconnectAt);
+        const emit = silentEmit();
+        const result = await deliverWithAckTimeouts(ackCapableClient(emit));
+        expect(commandEmits(emit)).toHaveLength(1);
+        expect(result.requeued).toBe(1);
+        expect(queue).toHaveLength(1);
+        timestampsSeen.push(JSON.parse(queue[0]).timestamp);
+      }
+      expect(timestampsSeen).toEqual([createdAt, createdAt]);
+
+      // T+6m: past the absolute age limit — neither emitted nor requeued.
+      jest.setSystemTime(T0 + 6 * 60_000);
+      const emit = silentEmit();
+      const result = await deliverWithAckTimeouts(ackCapableClient(emit));
+      expect(commandEmits(emit)).toHaveLength(0);
+      expect(queue).toHaveLength(0);
+      expect(result).toEqual(expect.objectContaining({ delivered: 0, requeued: 0, dropped: 1, shouldBackoff: false }));
+    });
+
+    it('an expired queued reboot never reaches the device on the RECONNECT path', async () => {
+      queue.push(JSON.stringify({ type: 'reboot', timestamp: new Date(T0 - MAX_AGE_MS - 1000).toISOString() }));
+      const emit = ackingEmit();
+      await (gateway as any).sendInitialState(ackCapableClient(emit), 'device-1', 'org-1');
+      expect(mockRedisService.getDeviceCommands).toHaveBeenCalledWith('device-1');
+      expect(commandEmits(emit)).toHaveLength(0);
+      expect(queue).toHaveLength(0);
+    });
+
+    it('an expired queued update never reaches the device on the HEARTBEAT-REPLAY path', async () => {
+      queue.push(JSON.stringify({ type: 'update', timestamp: new Date(T0 - MAX_AGE_MS - 1000).toISOString() }));
+      const emit = ackingEmit();
+      await gateway.handleHeartbeat(ackCapableClient(emit) as any, {} as any);
+      await jest.advanceTimersByTimeAsync(0);
+      expect(mockRedisService.getDeviceCommands).toHaveBeenCalledWith('device-1');
+      expect(commandEmits(emit)).toHaveLength(0);
+      expect(queue).toHaveLength(0);
+    });
+
+    it('checks age per command inside the loop: B crosses the limit while A waits for its ack', async () => {
+      const a = { type: 'reload', timestamp: at(0) };
+      const b = { type: 'reboot', timestamp: new Date(T0 - (MAX_AGE_MS - 5_000)).toISOString() };
+      queue.push(JSON.stringify(a), JSON.stringify(b));
+      const emit = silentEmit();
+
+      const result = await deliverWithAckTimeouts(ackCapableClient(emit));
+
+      // A cost 10s waiting for an ack, so B (5s from the limit) is expired by its turn.
+      expect(commandEmits(emit).map(([, payload]) => payload.type)).toEqual(['reload']);
+      expect(queue.map((raw) => JSON.parse(raw))).toEqual([a]);
+      expect(result).toEqual({ delivered: 0, requeued: 1, dropped: 1, skipped: false, shouldBackoff: true });
+    });
+
+    it('the requeue-on-socket-change path drops expired remaining commands', async () => {
+      const fresh = { type: 'reload', timestamp: at(0) };
+      const expired = { type: 'reboot', timestamp: new Date(T0 - MAX_AGE_MS - 1).toISOString() };
+      const freshTail = { type: 'clear_cache', timestamp: at(0) };
+      queue.push(JSON.stringify(fresh), JSON.stringify(expired), JSON.stringify(freshTail));
+      const emit = jest.fn((_event: string, _payload: any, ackCb?: (ack?: { ok: boolean }) => void) => {
+        ackCb?.({ ok: true });
+        (gateway as any).deviceSockets.set('device-1', 'socket-new');
+      });
+
+      const result = await (gateway as any).deliverPendingCommands(ackCapableClient(emit), 'device-1');
+
+      expect(commandEmits(emit)).toHaveLength(1);
+      // The current command (fresh) and the fresh tail are requeued; the expired one is not.
+      expect(queue.map((raw) => JSON.parse(raw))).toEqual([fresh, freshTail]);
+      expect(result).toEqual({ delivered: 0, requeued: 2, dropped: 1, skipped: false, shouldBackoff: false });
+    });
+
+    it.each([
+      ['no timestamp', { type: 'reboot' }],
+      ['a garbage timestamp', { type: 'reboot', timestamp: 'yesterday-ish' }],
+      ['a non-string timestamp', { type: 'reboot', timestamp: 1760616000000 }],
+      ['a far-future timestamp', { type: 'reboot', timestamp: new Date(T0 + 10 * 60_000).toISOString() }],
+    ])('a legacy command with %s is dropped, never emitted', async (_label, legacy) => {
+      queue.push(JSON.stringify(legacy));
+      const emit = ackingEmit();
+      const warnSpy = jest.spyOn((gateway as any).logger, 'warn');
+
+      const result = await (gateway as any).deliverPendingCommands(ackCapableClient(emit), 'device-1');
+
+      expect(commandEmits(emit)).toHaveLength(0);
+      expect(queue).toHaveLength(0);
+      expect(result).toEqual({ delivered: 0, requeued: 0, dropped: 1, skipped: false, shouldBackoff: false });
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('no valid creation timestamp'));
+    });
+
+    it('logs a dropped command with device, type, commandId and age — never the payload', async () => {
+      queue.push(JSON.stringify({
+        type: 'push_content',
+        timestamp: new Date(T0 - MAX_AGE_MS - 30_000).toISOString(),
+        payload: { commandId: 'cmd-42', secretUrl: 'https://example.com/private' },
+      }));
+      const warnSpy = jest.spyOn((gateway as any).logger, 'warn');
+
+      await (gateway as any).deliverPendingCommands(ackCapableClient(ackingEmit()), 'device-1');
+
+      const line = warnSpy.mock.calls.map(([message]) => String(message)).find((m) => m.includes('cmd-42'));
+      expect(line).toBeDefined();
+      expect(line).toContain('device-1');
+      expect(line).toContain('push_content');
+      expect(line).toContain('330s');
+      expect(line).not.toContain('private');
+    });
+
+    it('control: a fresh queued command is still delivered', async () => {
+      const fresh = { type: 'reload', timestamp: at(-60_000) };
+      queue.push(JSON.stringify(fresh));
+      const emit = ackingEmit();
+
+      const result = await (gateway as any).deliverPendingCommands(ackCapableClient(emit), 'device-1');
+
+      expect(emit).toHaveBeenCalledWith('command', fresh, expect.any(Function));
+      expect(result).toEqual({ delivered: 1, requeued: 0, dropped: 0, skipped: false, shouldBackoff: false });
+    });
+
+    it('control: a fresh command whose delivery fails is still requeued, unchanged', async () => {
+      const fresh = { type: 'reload', timestamp: at(-60_000) };
+      queue.push(JSON.stringify(fresh));
+
+      const result = await deliverWithAckTimeouts(ackCapableClient(silentEmit()));
+
+      expect(queue.map((raw) => JSON.parse(raw))).toEqual([fresh]);
+      expect(result).toEqual({ delivered: 0, requeued: 1, dropped: 0, skipped: false, shouldBackoff: true });
     });
   });
 });

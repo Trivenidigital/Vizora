@@ -60,6 +60,12 @@ export enum DeviceCommandType {
 export interface DeviceCommand {
   type: DeviceCommandType;
   payload?: Record<string, unknown>;
+  /**
+   * CREATION time (ISO-8601), stamped exactly once by `DeviceGateway.sendCommand`.
+   * Every requeue/retry path must carry it unchanged — never re-stamp it: the queued
+   * command's absolute age limit (`DEVICE_COMMAND_MAX_AGE_MS`) is measured from it, so a
+   * re-stamp would let retries keep a stale (possibly disruptive) command alive forever.
+   */
   timestamp?: string;
   priority?: number;
 }

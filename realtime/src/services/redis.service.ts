@@ -5,6 +5,7 @@ import {
   DeviceCommand,
   Playlist,
 } from '../types';
+import { DEVICE_COMMAND_MAX_AGE_MS } from './device-command-expiry';
 
 // Re-export DeviceStatus for backwards compatibility
 export type { DeviceStatus } from '../types';
@@ -165,11 +166,17 @@ export class RedisService implements OnModuleDestroy {
 
   /**
    * Store commands for a device
+   *
+   * The TTL is set with NX (Redis >= 7) so it applies only to a key that has none yet: a
+   * requeue onto an existing queue must not push its expiry out. The TTL is garbage
+   * collection only — the real invariant is the per-command age check against the
+   * command's creation time (`DEVICE_COMMAND_MAX_AGE_MS`), which the gateway enforces
+   * before every emit and every requeue.
    */
   async addDeviceCommand(deviceId: string, command: DeviceCommand): Promise<void> {
     const key = `device:commands:${deviceId}`;
     await this.redis.rpush(key, JSON.stringify(command));
-    await this.redis.expire(key, 300); // 5 minutes
+    await this.redis.expire(key, DEVICE_COMMAND_MAX_AGE_MS / 1000, 'NX');
   }
 
   /**
