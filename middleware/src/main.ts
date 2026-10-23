@@ -21,7 +21,6 @@ import { NestFactory, Reflector } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { join } from 'path';
-import helmet from 'helmet';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
 import * as Sentry from '@sentry/nestjs';
@@ -31,6 +30,7 @@ import { LoggingInterceptor } from './modules/common/interceptors/logging.interc
 import { ResponseEnvelopeInterceptor } from './modules/common/interceptors/response-envelope.interceptor';
 import { SentryInterceptor } from './interceptors/sentry.interceptor';
 import { AllExceptionsFilter } from './modules/common/filters/all-exceptions.filter';
+import { applyHttpSecurity } from './modules/common/cors/cors-policy';
 
 async function bootstrap() {
   // Validate required production environment variables
@@ -99,23 +99,18 @@ async function bootstrap() {
   // Cookie parser (required for httpOnly cookie authentication)
   app.use(cookieParser());
 
-  // Security headers
-  app.use(helmet({
-    contentSecurityPolicy: process.env.NODE_ENV === 'production',
-    crossOriginEmbedderPolicy: false, // Allow embedding for display clients
-  }));
-
-  // CORS configuration - staging mirrors production restrictions
-  const corsOrigins = process.env.CORS_ORIGIN?.split(',').map(o => o.trim()) || [];
-  const isRestrictedEnv = process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging';
-  app.enableCors({
-    origin: isRestrictedEnv
-      ? corsOrigins
-      : true, // Allow all in development
-    credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token'],
-  });
+  // Security headers, the scoped CORP override and CORS: one shared function
+  // so the integration spec exercises this exact wiring. See cors-policy.ts.
+  const deviceNullOrigin = applyHttpSecurity(app);
+  if (deviceNullOrigin.unrecognisedValue !== undefined) {
+    Logger.warn(
+      `DEVICE_NULL_ORIGIN_CORS="${deviceNullOrigin.unrecognisedValue}" is IGNORED — ` +
+        `only the exact string "enabled" turns it on. Device null-origin CORS stays disabled.`,
+    );
+  }
+  Logger.log(
+    `Device null-origin CORS: ${deviceNullOrigin.enabled ? 'ENABLED' : 'disabled (default)'}`,
+  );
 
   // Global exception filter — catches all unhandled exceptions
   app.useGlobalFilters(new AllExceptionsFilter());

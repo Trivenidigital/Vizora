@@ -12,6 +12,8 @@ export const envSchema = z.object({
   
   // CORS
   CORS_ORIGIN: z.string().default('http://localhost:3001'),
+  // Only the exact string 'enabled' turns it on; parsed in ../common/cors/cors-policy.ts.
+  DEVICE_NULL_ORIGIN_CORS: z.string().optional(),
   
   // Database
   DATABASE_URL: z.string().url().refine(
