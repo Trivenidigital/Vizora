@@ -99,7 +99,7 @@ async function bootstrap() {
   // Cookie parser (required for httpOnly cookie authentication)
   app.use(cookieParser());
 
-  // Security headers, the scoped CORP override and CORS: one shared function
+  // Security headers and CORS: one shared function
   // so the integration spec exercises this exact wiring. See cors-policy.ts.
   const deviceNullOrigin = applyHttpSecurity(app);
   if (deviceNullOrigin.unrecognisedValue !== undefined) {

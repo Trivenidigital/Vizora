@@ -1,8 +1,8 @@
 /**
- * Full-stack CORS/CORP integration tests.
+ * Full-stack CORS integration tests.
  *
  * Boots a real Nest express application and wires it with `applyHttpSecurity`
- * — the same function main.ts calls — so helmet, the CORP override and the
+ * — the same function main.ts calls — so helmet and the
  * real `cors` package run exactly as in production. Every assertion is on the
  * FINAL response headers.
  *
@@ -12,8 +12,8 @@
  * assertion catches that.
  *
  * A stub controller supplies the routes: CORS is decided by method, path and
- * origin before routing, not by the handler. Note the stub does not reproduce
- * DeviceContentController's own unconditional CORP header on media responses.
+ * origin before routing, not by the handler. CORP on media responses is set
+ * by DeviceContentController itself and pinned in its controller spec.
  */
 import { Controller, Get, INestApplication, Module, Post } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -89,7 +89,7 @@ function preflight(app: INestApplication, path: string, method: string | undefin
 const PROD_ON = { NODE_ENV: 'production', CORS_ORIGIN: DASHBOARD, DEVICE_NULL_ORIGIN_CORS: 'enabled' };
 const PROD_OFF = { NODE_ENV: 'production', CORS_ORIGIN: DASHBOARD };
 
-describe('HTTP CORS/CORP — real stack (helmet + cors + Nest)', () => {
+describe('HTTP CORS — real stack (helmet + cors + Nest)', () => {
   const apps: INestApplication[] = [];
   const start = async (env: NodeJS.ProcessEnv) => {
     const app = await boot(env);
@@ -237,38 +237,6 @@ describe('HTTP CORS/CORP — real stack (helmet + cors + Nest)', () => {
         }
         const res = await send(app, c, 'null');
         expect({ c, acac: res.headers['access-control-allow-credentials'] }).toEqual({ c, acac: undefined });
-      }
-    });
-  });
-
-  describe('Cross-Origin-Resource-Policy', () => {
-    const FILE = `/api/v1/device-content/${CONTENT_ID}/file`;
-
-    it('flag on: device-content file gets cross-origin, with Origin null and with no Origin', async () => {
-      const app = await start(PROD_ON);
-      const withNull = await request(app.getHttpServer()).get(FILE).set('Origin', 'null');
-      expect(withNull.headers['cross-origin-resource-policy']).toBe('cross-origin');
-      const noOrigin = await request(app.getHttpServer()).get(FILE);
-      expect(noOrigin.headers['cross-origin-resource-policy']).toBe('cross-origin');
-    });
-
-    it.each([
-      '/api/v1/displays',
-      '/api/v1/devices/auth/check',
-      '/api/v1/devices/me/content',
-      `/api/v1/device-content/${CONTENT_ID}/filex`,
-      `/api/v1/device-content/${CONTENT_ID}`,
-    ])('flag on: %s keeps same-origin', async (path) => {
-      const app = await start(PROD_ON);
-      const res = await request(app.getHttpServer()).get(path);
-      expect(res.headers['cross-origin-resource-policy']).toBe('same-origin');
-    });
-
-    it('flag off: same-origin everywhere, including device-content file', async () => {
-      const app = await start(PROD_OFF);
-      for (const path of [FILE, '/api/v1/displays', '/api/v1/devices/auth/check']) {
-        const res = await request(app.getHttpServer()).get(path).set('Origin', 'null');
-        expect({ path, corp: res.headers['cross-origin-resource-policy'] }).toEqual({ path, corp: 'same-origin' });
       }
     });
   });

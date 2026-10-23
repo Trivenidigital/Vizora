@@ -1,5 +1,5 @@
 /**
- * HTTP CORS + CORP policy for the middleware API.
+ * HTTP CORS policy for the middleware API.
  *
  * WHY THIS EXISTS
  * ---------------
@@ -26,8 +26,20 @@
  * ACAC from its static `credentials: true` regardless of whether the origin
  * matched, so a pre-middleware setting ACAO `null` ends up next to
  * `ACAC: true`. That defect was measured on PR #385.
+ *
+ * FLAG OFF IS NOT BYTE-IDENTICAL FOR `Origin: null`, by design. Before this
+ * module the static credentialed options answered a null origin with a stray
+ * `ACAC: true`: without ACAO in production, and next to a reflected ACAO
+ * `null` in development. In either flag state a null origin now gets no CORS
+ * headers outside the allowlist, which is strictly safer. Every non-null
+ * origin still gets exactly the old options.
+ *
+ * CORS ONLY. Media from `device-content/:id/file` is loaded as no-cors
+ * `<img>`/`<video>`, which CORP governs, not CORS. DeviceContentController
+ * already sends `Cross-Origin-Resource-Policy: cross-origin` on every media
+ * response, so helmet's CORP is left alone here.
  */
-import type { NextFunction, Request, Response } from 'express';
+import type { Request } from 'express';
 import type { CorsOptions, CorsOptionsDelegate } from '@nestjs/common/interfaces/external/cors-options.interface';
 import type { INestApplication } from '@nestjs/common';
 import helmet from 'helmet';
@@ -51,9 +63,6 @@ export const DEVICE_NULL_ORIGIN_ROUTES: ReadonlyArray<{ method: 'GET' | 'POST'; 
   { method: 'GET', path: /^\/api\/v1\/devices\/me\/content$/ },
   { method: 'GET', path: /^\/api\/v1\/device-content\/[A-Za-z0-9-]+\/file$/ },
 ];
-
-/** The media route whose no-cors `<img>`/`<video>` loads are governed by CORP. */
-const DEVICE_CONTENT_FILE_PATH = /^\/api\/v1\/device-content\/[A-Za-z0-9-]+\/file$/;
 
 export interface DeviceNullOriginFlag {
   enabled: boolean;
@@ -135,7 +144,7 @@ export function buildCorsOptionsDelegate({
 }
 
 /**
- * Applies helmet, the scoped CORP override and CORS, in that order. main.ts
+ * Applies helmet, then CORS. main.ts
  * and the integration spec both call this, so the spec exercises the exact
  * production wiring.
  */
@@ -147,19 +156,6 @@ export function applyHttpSecurity(app: INestApplication, env: NodeJS.ProcessEnv 
     contentSecurityPolicy: env.NODE_ENV === 'production',
     crossOriginEmbedderPolicy: false, // Allow embedding for display clients
   }));
-
-  // A file:// page's <img>/<video> loads are no-cors requests: CORS does not
-  // govern them, CORP does, and helmet's `same-origin` blocks them. Override
-  // only the device-content file route; every other route keeps same-origin.
-  // Must run after helmet so it replaces the header helmet just set.
-  if (flag.enabled) {
-    app.use((req: Request, res: Response, next: NextFunction) => {
-      if (req.method === 'GET' && DEVICE_CONTENT_FILE_PATH.test(pathOf(req))) {
-        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-      }
-      next();
-    });
-  }
 
   // CORS configuration - staging mirrors production restrictions
   const corsOrigins = env.CORS_ORIGIN?.split(',').map(o => o.trim()) || [];

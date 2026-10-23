@@ -223,7 +223,7 @@ TRUST_PROXY_HOPS        # Trusted reverse-proxy hop count for Express req.ip/rat
 CORS_ORIGIN             # Comma-separated allowed origins
 DEVICE_NULL_ORIGIN_CORS # 'enabled' (exact string only; anything else = off, warned once) lets packaged
                         #   webOS/Tizen apps (file:// => `Origin: null`) call 5 exact device routes, never
-                        #   with credentials, and relaxes CORP on device-content files. See middleware/src/modules/common/cors/cors-policy.ts
+                        #   with credentials. CORS only. See middleware/src/modules/common/cors/cors-policy.ts
 ```
 
 ### Auth
