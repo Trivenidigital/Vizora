@@ -39,7 +39,7 @@
  * already sends `Cross-Origin-Resource-Policy: cross-origin` on every media
  * response, so helmet's CORP is left alone here.
  */
-import type { Request } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import type { CorsOptions, CorsOptionsDelegate } from '@nestjs/common/interfaces/external/cors-options.interface';
 import type { INestApplication } from '@nestjs/common';
 import helmet from 'helmet';
@@ -144,7 +144,7 @@ export function buildCorsOptionsDelegate({
 }
 
 /**
- * Applies helmet, then CORS. main.ts
+ * Applies helmet, Vary: Origin, then CORS. main.ts
  * and the integration spec both call this, so the spec exercises the exact
  * production wiring.
  */
@@ -156,6 +156,15 @@ export function applyHttpSecurity(app: INestApplication, env: NodeJS.ProcessEnv 
     contentSecurityPolicy: env.NODE_ENV === 'production',
     crossOriginEmbedderPolicy: false, // Allow embedding for display clients
   }));
+
+  // The reject branch (`origin: false`) makes cors set no headers at all,
+  // including Vary. The old static config always varied on Origin, and caches
+  // need it whenever the response depends on Origin. res.vary appends and
+  // dedupes, so the Vary cors adds on granted responses is not duplicated.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.headers.origin !== undefined) res.vary('Origin');
+    next();
+  });
 
   // CORS configuration - staging mirrors production restrictions
   const corsOrigins = env.CORS_ORIGIN?.split(',').map(o => o.trim()) || [];

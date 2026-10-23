@@ -81,6 +81,11 @@ function send(app: INestApplication, c: Case, origin: string | undefined) {
   return origin === undefined ? r : r.set('Origin', origin);
 }
 
+/** Number of `Origin` tokens in the Vary header (res.vary must not duplicate). */
+function varyOrigin(res: { headers: Record<string, string | undefined> }): number {
+  return (res.headers['vary'] ?? '').split(',').filter((t) => t.trim().toLowerCase() === 'origin').length;
+}
+
 function preflight(app: INestApplication, path: string, method: string | undefined, origin = 'null') {
   const r = request(app.getHttpServer()).options(path).set('Origin', origin);
   return method === undefined ? r : r.set('Access-Control-Request-Method', method);
@@ -120,6 +125,11 @@ describe('HTTP CORS — real stack (helmet + cors + Nest)', () => {
       expect(res.headers['access-control-allow-credentials']).toBeUndefined();
     });
 
+    it.each(ALLOWED)('allowlisted $method $path: Vary carries a single Origin token', async (c) => {
+      expect(varyOrigin(await preflight(app, c.path, c.method))).toBe(1);
+      expect(varyOrigin(await send(app, c, 'null'))).toBe(1);
+    });
+
     it.each(DENIED)('non-allowlisted $method $path: no ACAO, no ACAC (preflight + actual)', async (c) => {
       const pre = await preflight(app, c.path, c.method);
       expect(pre.headers['access-control-allow-origin']).toBeUndefined();
@@ -127,6 +137,25 @@ describe('HTTP CORS — real stack (helmet + cors + Nest)', () => {
       const res = await send(app, c, 'null');
       expect(res.headers['access-control-allow-origin']).toBeUndefined();
       expect(res.headers['access-control-allow-credentials']).toBeUndefined();
+    });
+
+    // Documented behaviour: a rejected preflight is not answered by cors (which
+    // would send 204). It falls through to Nest, which has no OPTIONS route
+    // and returns 404. Either way the browser fails it: there is no ACAO.
+    it.each(DENIED)('non-allowlisted $method $path: rejected preflight is a Nest 404', async (c) => {
+      const pre = await preflight(app, c.path, c.method);
+      expect(pre.status).toBe(404);
+    });
+
+    it.each(DENIED)('non-allowlisted $method $path: Vary still carries a single Origin token', async (c) => {
+      expect(varyOrigin(await preflight(app, c.path, c.method))).toBe(1);
+      expect(varyOrigin(await send(app, c, 'null'))).toBe(1);
+    });
+
+    it('a preflight rejected for its method is also a Nest 404 with Vary: Origin', async () => {
+      const pre = await preflight(app, '/api/v1/devices/auth/check', 'DELETE');
+      expect(pre.status).toBe(404);
+      expect(varyOrigin(pre)).toBe(1);
     });
 
     it.each(['DELETE', 'PUT', 'PATCH', 'OPTIONS'])(
@@ -180,6 +209,7 @@ describe('HTTP CORS — real stack (helmet + cors + Nest)', () => {
         for (const r of [pre, res]) {
           expect({ c, acao: r.headers['access-control-allow-origin'] }).toEqual({ c, acao: undefined });
           expect({ c, acac: r.headers['access-control-allow-credentials'] }).toEqual({ c, acac: undefined });
+          expect({ c, varyOrigin: varyOrigin(r) }).toEqual({ c, varyOrigin: 1 });
         }
       }
     });
@@ -193,6 +223,7 @@ describe('HTTP CORS — real stack (helmet + cors + Nest)', () => {
       const app = await start(env);
       const pre = await preflight(app, '/api/v1/displays', 'DELETE', DASHBOARD);
       expect(pre.status).toBe(204);
+      expect(varyOrigin(pre)).toBe(1);
       expect(pre.headers['access-control-allow-origin']).toBe(DASHBOARD);
       expect(pre.headers['access-control-allow-credentials']).toBe('true');
       expect(pre.headers['access-control-allow-methods']).toBe('GET,POST,PATCH,PUT,DELETE,OPTIONS');
@@ -203,6 +234,7 @@ describe('HTTP CORS — real stack (helmet + cors + Nest)', () => {
         const res = await send(app, c, DASHBOARD);
         expect({ c, acao: res.headers['access-control-allow-origin'] }).toEqual({ c, acao: DASHBOARD });
         expect({ c, acac: res.headers['access-control-allow-credentials'] }).toEqual({ c, acac: 'true' });
+        expect({ c, varyOrigin: varyOrigin(res) }).toEqual({ c, varyOrigin: 1 });
       }
     });
 
