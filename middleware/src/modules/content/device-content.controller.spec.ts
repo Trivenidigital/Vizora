@@ -194,6 +194,9 @@ describe('DeviceContentController', () => {
           'Cache-Control': 'private, no-cache',
           ETag: expect.stringMatching(/^W\/".+"$/),
           'Last-Modified': 'Sun, 31 May 2026 00:00:00 GMT',
+          // Packaged webOS/Tizen apps load media as no-cors <img>/<video>
+          // from file://; helmet's same-origin CORP would block them.
+          'Cross-Origin-Resource-Policy': 'cross-origin',
         }),
       );
       expect(mockStorageService.getObject).toHaveBeenCalledWith(objectKey);
@@ -502,6 +505,7 @@ describe('DeviceContentController', () => {
           'Content-Range': 'bytes 5-8/12',
           'Cache-Control': 'private, no-cache',
           'Last-Modified': 'Sun, 31 May 2026 00:00:00 GMT',
+          'Cross-Origin-Resource-Policy': 'cross-origin',
         }),
       );
       expect(res.set).not.toHaveBeenCalledWith(
@@ -972,6 +976,7 @@ describe('DeviceContentController', () => {
           'Last-Modified': 'Sun, 31 May 2026 00:00:00 GMT',
           'Cache-Control': 'private, no-cache',
           'Accept-Ranges': 'bytes',
+          'Cross-Origin-Resource-Policy': 'cross-origin',
         }),
       );
       expect(mockStorageService.getObject).not.toHaveBeenCalled();

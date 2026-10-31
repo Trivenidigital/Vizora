@@ -221,6 +221,9 @@ NODE_ENV                # development | production
 PORT, MIDDLEWARE_PORT, WEB_PORT, REALTIME_PORT  # Service ports (3000 / 3001 / 3002 / 3002)
 TRUST_PROXY_HOPS        # Trusted reverse-proxy hop count for Express req.ip/rate-limit keys (default 1)
 CORS_ORIGIN             # Comma-separated allowed origins
+DEVICE_NULL_ORIGIN_CORS # 'enabled' (exact string only; anything else = off, warned once) lets packaged
+                        #   webOS/Tizen apps (file:// => `Origin: null`) call 5 exact device routes, never
+                        #   with credentials. CORS only. See middleware/src/modules/common/cors/cors-policy.ts
 ```
 
 ### Auth
