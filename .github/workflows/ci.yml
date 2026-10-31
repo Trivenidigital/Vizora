@@ -272,7 +272,7 @@ jobs:
   # NODE_ENV=production, and those are build-time inputs for the browser bundle,
   # so a prod build could not be pointed at the CI services at all.
   playwright:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04  # Playwright 1.x has no chromium build for ubuntu-26.04 (ubuntu-latest moved 2026-10)
     needs: [build]
     timeout-minutes: 45
     services:
