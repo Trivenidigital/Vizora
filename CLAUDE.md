@@ -777,6 +777,19 @@ Automated deployment readiness checker. Runs 30 validation rules across content,
 - Skills repo: `hermes-skills/<skill-name>/SKILL.md` — git-tracked, scp'd to `/root/.hermes/skills/` on deploy.
 
 **Hermes-driven agents (state):**
+
+> **Both PM2 crons (`hermes-vizora-*`) were DELETED from prod on 2026-11-02** (#406). They had
+> shipped with an empty `-t` toolset, so `hermes -z` gave gpt-4o-mini the full `hermes-cli`
+> toolset — terminal, execute_code, write_file, delegate_task — as root in `/opt/vizora/app`,
+> approvals auto-bypassed. It built into the live middleware dist, ran a full build and
+> `test:e2e` on prod (both #399 OOM kills), and rewrote its own deployed SKILL.md. **The MCP
+> token scope is not a backstop: shell commands never go through MCP.** Each entry now passes
+> its MCP server name (`vizora` / `vizora-platform`) as `-t`, and `run-hermes-skill.sh` refuses
+> an empty or full-access value (`lib/toolset-guard.sh`, pinned by
+> `scripts/ops/hermes-toolset-scope.test.ts`). Re-enabling needs an explicit
+> `pm2 start ecosystem.config.js --only <name>` after OpenRouter credits are restored (every run
+> has failed `api_error` since 2026-10-22), and the shadow JSONLs carry no trustworthy data
+> before that date. The descriptions below are the design, not current prod state.
 - `vizora-support-triage` — **shadow mode** in cron `*/5 * * * *`. Reads via MCP, scores, appends `/var/log/hermes/vizora-support-triage-shadow.jsonl`. Live-mode skill (`SKILL-live.md`) is built and committed but NOT deployed; cutover is a one-line SCP after the gate below clears.
 - `vizora-customer-lifecycle` — **shadow mode** in cron `*/30 * * * *`. Calls `list_onboarding_candidates` (platform-scope), picks template per org via heuristic-matching prompt, appends `/var/log/hermes/vizora-customer-lifecycle-shadow.jsonl`. PM2 cron `agent-customer-lifecycle` is the source of truth (currently dry-run because `LIFECYCLE_LIVE` is unset on prod). Live-mode skill (`SKILL-live.md`) is built and committed but NOT deployed; cutover is a multi-step procedure documented below.
 

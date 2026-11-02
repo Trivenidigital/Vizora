@@ -18,7 +18,8 @@
 #      (refuse if >= DAILY_BUDGET_USD).
 #   3. Pre-flight check on Hermes version (refuse if HERMES_VERSION env
 #      is set and `hermes --version` returns a different value).
-#   4. Optional per-skill toolset filter via -t (P1.2).
+#   4. REQUIRED per-skill toolset filter via -t (P1.2). The runner refuses
+#      to start Hermes without one — see "Toolset guard" below.
 #   5. Post-flight OpenRouter balance-delta cost attribution.
 #   6. Post-flight POST /internal/agent-runs with run metadata.
 #
@@ -38,11 +39,10 @@
 # for a fire-and-forget cron firing.
 #
 # Usage:
-#   run-hermes-skill.sh <skill-name> <prompt> [toolsets-csv]
+#   run-hermes-skill.sh <skill-name> <prompt> <toolsets-csv>
 #
-# Example:
-#   run-hermes-skill.sh vizora-customer-lifecycle "Run end-to-end..." \
-#     "mcp_vizora_list_onboarding_candidates,mcp_vizora_log_shadow_row"
+# Example (the toolset is an MCP server name from ~/.hermes/config.yaml):
+#   run-hermes-skill.sh vizora-customer-lifecycle "Run end-to-end..." vizora-platform
 
 set -uo pipefail
 
@@ -77,7 +77,7 @@ if [[ -z "$SKILL" || -z "$PROMPT" ]]; then
   exit 0
 fi
 
-LOGDIR="/var/log/hermes/runner"
+LOGDIR="${HERMES_RUNNER_LOG_DIR:-/var/log/hermes/runner}"
 mkdir -p "$LOGDIR"
 LOG="$LOGDIR/${SKILL}.log"
 
@@ -94,9 +94,21 @@ START=$(date -u +%Y-%m-%dT%H:%M:%S.000Z)
 } >> "$LOG"
 
 # ---------------------------------------------------------------------------
-# Pre-flight #1: OpenRouter balance check.
+# Toolset guard (fail closed). An empty or full-access `-t` value would give
+# the model a root shell — see lib/toolset-guard.sh. Refused here rather than
+# trusted to the PM2 config.
 # ---------------------------------------------------------------------------
 SCRIPT_DIR="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/toolset-guard.sh"
+if ! is_safe_toolsets "$TOOLSETS"; then
+  echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] ABORT skill=$SKILL reason=unsafe_toolsets toolsets='${TOOLSETS}'" >> "$LOG"
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------
+# Pre-flight #1: OpenRouter balance check.
+# ---------------------------------------------------------------------------
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/openrouter-balance.sh"
 
@@ -222,10 +234,7 @@ fi
 # Per-call output cap is enforced by /root/.hermes/config.yaml's
 # `model.max_tokens=4096` setting (verified by P0.0a once credits added).
 # ---------------------------------------------------------------------------
-HERMES_ARGS=(--skills "$SKILL" -z "$PROMPT")
-if [[ -n "$TOOLSETS" ]]; then
-  HERMES_ARGS+=(-t "$TOOLSETS")
-fi
+HERMES_ARGS=(--skills "$SKILL" -z "$PROMPT" -t "$TOOLSETS")
 
 # Bound the run. Hermes can occasionally hang; 5 min is generous for
 # our 5-min and 30-min cron cadences without overlapping.
