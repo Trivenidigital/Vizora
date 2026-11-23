@@ -270,7 +270,6 @@ const MANIFEST: readonly ManifestEntry[] = [
 
 const KNOWN_DRIFT: readonly KnownDrift[] = [
   // displayStatus
-  { copy: 'fleet-manager error-reset PATCH status', file: 'scripts/ops/fleet-manager.ts', machine: 'displayStatus', value: 'inactive', kind: 'extra', reason: 'fleet-manager resets error displays with status "inactive"; CreateDisplayDto accepts only online|offline|error, so the PATCH is rejected and the reset can never succeed.' },
   { copy: 'web DeviceStatusContext extra union members', file: 'web/src/lib/context/DeviceStatusContext.tsx', machine: 'displayStatus', value: 'idle', kind: 'extra', reason: 'Web-only derived bucket; no backend path writes "idle". Decide whether it is a derived UI state (then type it separately) or remove it.' },
 
   // subscriptionStatus
