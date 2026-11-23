@@ -3,9 +3,9 @@
  *
  * The definitions live in packages/database/src/lib/state-machines.ts. Before it
  * existed each vocabulary was retyped at every consumer, and the copies drifted
- * into real defects: fleet-manager PATCHes a display status the DTO rejects,
- * support-triage writes priorities that are off the ladder, the admin UI waits
- * for a subscription status the backend never stores. See
+ * into real defects (since fixed): fleet-manager PATCHed a display status the
+ * DTO rejects, support-triage wrote priorities that are off the ladder, the
+ * admin UI waited for a subscription status the backend never stores. See
  * docs/plans/2026-11-23-state-machine-definitions.md.
  *
  * Three rules keep this suite from passing vacuously:
