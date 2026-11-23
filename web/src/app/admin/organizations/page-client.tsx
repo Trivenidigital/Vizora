@@ -117,7 +117,7 @@ export default function AdminOrganizationsClient({ initialOrganizations, initial
         >
           <option value="">All Statuses</option>
           <option value="active">Active</option>
-          <option value="trialing">Trialing</option>
+          <option value="trial">Trial</option>
           <option value="suspended">Suspended</option>
           <option value="canceled">Canceled</option>
           <option value="past_due">Past Due</option>
@@ -215,7 +215,7 @@ export default function AdminOrganizationsClient({ initialOrganizations, initial
                                   Reactivate
                                 </button>
                               )}
-                              {org.subscriptionStatus === 'trialing' && (
+                              {org.subscriptionStatus === 'trial' && (
                                 <button
                                   onClick={() => { setActionOrg(org); setActionType('extend'); setMenuOpen(null); }}
                                   className="w-full text-left px-4 py-2 text-sm text-[var(--primary-ink)] hover:bg-brand/5 flex items-center gap-2"

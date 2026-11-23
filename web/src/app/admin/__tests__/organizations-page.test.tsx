@@ -65,7 +65,8 @@ const mockOrganizations = [
     name: 'TechStart Inc',
     slug: 'techstart-inc',
     subscriptionTier: 'free',
-    subscriptionStatus: 'trialing',
+    // The backend stores 'trial' (billing maps Stripe 'trialing' to it).
+    subscriptionStatus: 'trial',
     screenQuota: 2,
     country: 'IN',
     createdAt: '2024-02-01',
@@ -129,7 +130,7 @@ describe('AdminOrganizationsPage', () => {
 
     // Status text appears both in filter dropdown options and StatusBadge, so use getAllByText
     expect(screen.getAllByText('Active').length).toBeGreaterThanOrEqual(2); // option + badge
-    expect(screen.getAllByText('Trialing').length).toBeGreaterThanOrEqual(2); // option + badge
+    expect(screen.getAllByText('Trial').length).toBeGreaterThanOrEqual(2); // option + badge
     expect(screen.getAllByText('Suspended').length).toBeGreaterThanOrEqual(2); // option + badge
   });
 
@@ -161,6 +162,22 @@ describe('AdminOrganizationsPage', () => {
     );
 
     expect(screen.getByText('All Statuses')).toBeInTheDocument();
+  });
+
+  it('status filter offers the stored trial value, not the Stripe word', () => {
+    render(
+      <AdminOrganizationsClient
+        initialOrganizations={mockOrganizations as any}
+        initialTotal={mockOrganizations.length}
+      />
+    );
+
+    // OrgFiltersDto accepts 'trial' and rejects 'trialing'.
+    const values = Array.from(document.querySelectorAll('select option')).map(
+      (o) => (o as HTMLOptionElement).value
+    );
+    expect(values).toContain('trial');
+    expect(values).not.toContain('trialing');
   });
 
   it('shows pagination info', () => {
@@ -203,7 +220,7 @@ describe('AdminOrganizationsPage', () => {
     });
   });
 
-  it('shows extend trial option for trialing org', async () => {
+  it('shows extend trial option for an org on trial', async () => {
     render(
       <AdminOrganizationsClient
         initialOrganizations={mockOrganizations as any}
