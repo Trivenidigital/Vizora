@@ -114,4 +114,11 @@ export interface OpsState {
   recentRemediations: RemediationAction[];
   /** Latest result per agent */
   agentResults: Record<string, AgentResult>;
+  /**
+   * The status ops-reporter last reported (or decided needed no report).
+   * Owned by ops-reporter; it detects transitions against this, because
+   * `systemStatus` is recomputed by every agent write and so always equals the
+   * reporter's own recompute. Absent on files written before it existed.
+   */
+  lastReportedStatus?: SystemStatus;
 }

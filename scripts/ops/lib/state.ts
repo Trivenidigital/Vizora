@@ -209,6 +209,10 @@ function emptyState(): OpsState {
 
 // ─── Parsing (shared by locked and lock-free reads) ─────────────────────────
 
+function isSystemStatus(v: unknown): v is SystemStatus {
+  return v === 'HEALTHY' || v === 'DEGRADED' || v === 'CRITICAL';
+}
+
 /** Monotonic counter so concurrent corrupt-file rescues get distinct names. */
 let corruptCounter = 0;
 
@@ -243,6 +247,11 @@ function parseStateFile(): OpsState {
       incidents: parsed.incidents ?? [],
       recentRemediations: parsed.recentRemediations ?? [],
       agentResults: parsed.agentResults ?? {},
+      // Rebuilt field by field, so an unlisted field is silently dropped on the
+      // next write. Kept only when it is a real status.
+      ...(isSystemStatus(parsed.lastReportedStatus)
+        ? { lastReportedStatus: parsed.lastReportedStatus }
+        : {}),
     };
   } catch {
     const corruptPath = `${stateFile}.corrupt-${process.pid}-${corruptCounter++}`;
