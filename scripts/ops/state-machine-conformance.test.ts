@@ -34,6 +34,10 @@ import {
   defineStateMachine,
   type StateMachine,
 } from '../../packages/database/src/lib/state-machines.js';
+import {
+  mcpPriorityToCanonical,
+  type McpPriority,
+} from '../../middleware/src/modules/mcp/lib/priority-mapping.js';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -175,6 +179,28 @@ const comparisons = (prop: string) => (src: string) =>
 /** A single regex capture holding a literal list. */
 const captured = (re: RegExp, what: string) => (src: string) => literals(only(src, re, what)[1]);
 
+/**
+ * The priorities support-triage's `maybeUpdatePriority` WRITES: the
+ * `scoreToPriority` returns, passed through `mcpPriorityToCanonical` exactly
+ * when the write calls the translator imported from priority-mapping.ts. Any
+ * other write expression FAILS rather than being guessed at.
+ */
+const supportTriageWrittenPriorities = (src: string): string[] => {
+  const raw = functionReturns('scoreToPriority')(src);
+  const body = slice(src, /async function maybeUpdatePriority\(/, '\n}', 'function maybeUpdatePriority');
+  const written = only(body, /data: \{ priority: ([^}]+?) \}/, 'maybeUpdatePriority priority write')[1].trim();
+  if (written === 'suggested') return raw;
+  if (written === 'mcpPriorityToCanonical(suggested)') {
+    only(
+      src,
+      /import \{[^}]*\bmcpPriorityToCanonical\b[^}]*\} from '\.\.\/\.\.\/middleware\/src\/modules\/mcp\/lib\/priority-mapping\.js';/,
+      'mcpPriorityToCanonical import from priority-mapping',
+    );
+    return raw.map((p) => mcpPriorityToCanonical(p as McpPriority));
+  }
+  throw new Error(`maybeUpdatePriority writes an unrecognised expression: ${written}`);
+};
+
 // ─── The manifest ───────────────────────────────────────────────────────────
 
 const SCHEMA = 'packages/database/prisma/schema.prisma';
@@ -255,9 +281,9 @@ const MANIFEST: readonly ManifestEntry[] = [
   { copy: 'web SupportFilters priorityOptions (minus "")', machine: 'supportRequestPriority', file: SUPPORT_FILTERS, extract: optionObjects('priorityOptions', ['']), relation: 'equal' },
   // `TicketPriority` (packages/database/src/types/agent-signals.ts) is a separate
   // agent-signal vocabulary that MCP maps at its boundary — not a copy of this
-  // ladder. What is pinned is what support-triage WRITES to the column:
-  // `maybeUpdatePriority` persists `scoreToPriority(score)` unmapped.
-  { copy: 'support-triage scoreToPriority (written to SupportRequest.priority)', machine: 'supportRequestPriority', file: 'scripts/agents/support-triage.ts', extract: functionReturns('scoreToPriority'), relation: 'subset' },
+  // ladder. What is pinned is what support-triage WRITES to the column: the
+  // values `maybeUpdatePriority` persists, after any translation it applies.
+  { copy: 'support-triage maybeUpdatePriority write (SupportRequest.priority)', machine: 'supportRequestPriority', file: 'scripts/agents/support-triage.ts', extract: supportTriageWrittenPriorities, relation: 'subset' },
 
   // ── opsIncidentStatus ──
   { copy: 'ops IncidentStatus type', machine: 'opsIncidentStatus', file: 'scripts/ops/lib/types.ts', extract: unionAfter('export type IncidentStatus ='), relation: 'equal' },
@@ -296,8 +322,6 @@ const KNOWN_DRIFT: readonly KnownDrift[] = [
   { copy: 'web SupportChatPanel statusColor cases', file: 'web/src/components/support/SupportChatPanel.tsx', machine: 'supportRequestStatus', value: 'wont_fix', kind: 'missing', reason: 'Customer chat panel has no case for wont_fix; it falls through to the default style.' },
 
   // supportRequestPriority
-  { copy: 'support-triage scoreToPriority (written to SupportRequest.priority)', file: 'scripts/agents/support-triage.ts', machine: 'supportRequestPriority', value: 'urgent', kind: 'extra', reason: 'maybeUpdatePriority writes the agent-signal word "urgent" into SupportRequest.priority without mapping it to "critical".' },
-  { copy: 'support-triage scoreToPriority (written to SupportRequest.priority)', file: 'scripts/agents/support-triage.ts', machine: 'supportRequestPriority', value: 'normal', kind: 'extra', reason: 'maybeUpdatePriority writes the agent-signal word "normal" into SupportRequest.priority without mapping it to "medium".' },
 ];
 
 // ─── Comparison ─────────────────────────────────────────────────────────────

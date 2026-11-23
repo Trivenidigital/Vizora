@@ -28,6 +28,7 @@ import type { SupportRequest, SupportMessage } from '@vizora/database';
 import { readAgentState, writeAgentState } from './lib/state.js';
 import { log as opsLog } from './lib/alerting.js';
 import { createAgentAI } from './lib/ai.js';
+import { mcpPriorityToCanonical } from '../../middleware/src/modules/mcp/lib/priority-mapping.js';
 import type {
   TicketSignal,
   TicketCategory,
@@ -246,10 +247,12 @@ async function maybeUpdatePriority(
     p === 'urgent' ? 3 : p === 'high' ? 2 : p === 'normal' ? 1 : 0;
   if (Math.abs(rank(current) - rank(suggested)) < 2) return false;
 
+  // `suggested` is in the agent vocabulary (urgent|high|normal|low); the column
+  // holds the canonical ladder (critical|high|medium|low). Translate at the write.
   try {
     const res = await prisma.supportRequest.updateMany({
       where: { id: ticket.id, organizationId: ticket.organizationId },
-      data: { priority: suggested },
+      data: { priority: mcpPriorityToCanonical(suggested) },
     });
     return res.count === 1;
   } catch (err) {
