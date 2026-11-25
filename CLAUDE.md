@@ -196,6 +196,19 @@ changed deliberately and verified on both surfaces). Note the app already has a 
 theme pointing at an older warm-cream palette, so three palettes currently coexist. See
 `docs/plans/2026-08-03-full-app-rebrand.md` before touching `.eh-*` or the `:root` light tokens.
 
+**Declared state machines — descriptive, not enforced**: `packages/database/src/lib/state-machines.ts`
+declares six status vocabularies (`displayStatus`, `subscriptionStatus`, `contentStatus`,
+`supportRequestStatus`, `supportRequestPriority`, `opsIncidentStatus`): each state's label, meaning,
+tone, whether any server path writes it, and the transitions the write sites perform today (cited to
+file:line). Nothing consults it at runtime and **no production code imports it yet** — every status
+column is still a free `String`. `scripts/ops/state-machine-conformance.test.ts` (runs under
+`pnpm test:ops`) pins every known retyped copy (DTOs, Zod schemas, web unions, badge maps, ops/agent
+writes) to its definition by anchored source extraction; a missing file, a missing or ambiguous anchor,
+or a zero-value extraction FAILS rather than skipping. Disagreements that exist today are listed in
+`KNOWN_DRIFT` with a reason, and an entry that no longer reproduces fails the test, so the list can
+only shrink. **Fix the drift or justify the entry; never loosen an extractor to get green.** Design:
+`docs/plans/2026-11-23-state-machine-definitions.md`.
+
 **Response envelope**: Global `ResponseEnvelopeInterceptor` wraps all responses in `{ success, data, meta }`. Skip with `@SkipEnvelope()` decorator on individual endpoints.
 
 **API versioning**: All routes prefixed with `/api/v1`. Nginx has backwards-compat rewrite from `/api/` to `/api/v1/`.
@@ -649,7 +662,7 @@ Available at `http://localhost:3000/api/v1/docs` in development mode only.
 - **Middleware**: **3760 / 3760 tests pass** across **179 / 179 suites**, 1 snapshot, 0 fail (re-measured 2026-08-22 on `d2dbaf1e`).
 - **Realtime**: **554 / 554 tests pass** across **19 / 19 suites** (re-measured 2026-08-22 on `d2dbaf1e`). The historical Prisma-generate-in-test-env issue NO LONGER REPRODUCES.
 - **Web**: **1167 / 1167 tests pass** across **113 / 113 suites**, 0 skipped (verified 2026-08-03).
-- **Ops scripts**: **637 / 637 tests pass** via `pnpm test:ops` (node:test + tsx) — verified 2026-08-24.
+- **Ops scripts**: **720 / 720 tests pass** via `pnpm test:ops` (node:test + tsx) — verified 2026-11-23.
   Note `pnpm test:ops` runs under tsx, which strips types without checking them, and CI's
   `typecheck` job covers only `display` while `lint` covers only `middleware/src` + `realtime/src`.
   `scripts/` **is** now type-checked in CI by TWO configs, both in the `test` job:
