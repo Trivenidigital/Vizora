@@ -1,6 +1,6 @@
 # State-machine definitions: one declared vocabulary per lifecycle
 
-**Status:** approved 2026-11-23 (operator said go on the approach below). Step 1 in progress.
+**Status:** approved 2026-11-23 (operator said go on the approach below). Steps 1 and 2 done 2026-11-23; steps 3 and 4 not started.
 
 **New primitives introduced:** `packages/database/src/lib/state-machines.ts` (pure
 data + three tiny helpers), `scripts/ops/state-machine-conformance.test.ts`.
