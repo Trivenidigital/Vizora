@@ -606,6 +606,87 @@ describe('PairingService', () => {
         service.checkPairingStatus(pairingResult.code),
       ).rejects.toThrow(NotFoundException);
     });
+
+    // The display row already holds the hashed token once completePairing
+    // returns, so losing the plaintext handoff leaves the device unable to
+    // request a new code ("Device is already paired").
+    describe('completed near expiry, polled after expiresAt', () => {
+      async function completeNearExpiry(deviceIdentifier: string) {
+        const pairingResult = await service.requestPairingCode({
+          deviceIdentifier,
+          nickname: 'Test',
+          metadata: {},
+        });
+        // Operator completes 10s before the 5-minute code expiry.
+        await jest.advanceTimersByTimeAsync(5 * 60 * 1000 - 10_000);
+        mockDatabaseService.display.findUnique.mockResolvedValue(null);
+        mockDatabaseService.display.create.mockResolvedValue({
+          id: 'display-id',
+          nickname: 'Test',
+          deviceIdentifier,
+          status: 'pairing',
+          organizationId: 'org-123',
+        } as any);
+        await service.completePairing('org-123', 'user-123', {
+          code: pairingResult.code,
+        });
+        mockDatabaseService.display.findUnique.mockResolvedValue({
+          id: 'display-id',
+          organizationId: 'org-123',
+        } as any);
+        return pairingResult.code;
+      }
+
+      it('delivers the token once when the poll lands after expiresAt', async () => {
+        const code = await completeNearExpiry('device-late-poll');
+        await jest.advanceTimersByTimeAsync(20_000); // 10s past expiresAt
+
+        const status = await service.checkPairingStatus(code);
+        expect(status.status).toBe('paired');
+        expect(status.deviceToken).toBe('mock-jwt-token');
+
+        await expect(service.checkPairingStatus(code)).rejects.toThrow(
+          NotFoundException,
+        );
+      });
+
+      it('survives the safety-net cleanup interval running after expiresAt', async () => {
+        const code = await completeNearExpiry('device-late-cleanup');
+        // Crosses at least one 60s cleanup tick while past expiresAt but
+        // inside the Redis TTL that finalizePairing refreshed.
+        await jest.advanceTimersByTimeAsync(90_000);
+
+        const status = await service.checkPairingStatus(code);
+        expect(status.status).toBe('paired');
+        expect(status.deviceToken).toBe('mock-jwt-token');
+      });
+
+      it('is still not deliverable once the refreshed Redis TTL has lapsed', async () => {
+        const code = await completeNearExpiry('device-ttl-lapsed');
+        await jest.advanceTimersByTimeAsync(5 * 60 * 1000 + 1000);
+
+        await expect(service.checkPairingStatus(code)).rejects.toThrow(
+          NotFoundException,
+        );
+      });
+    });
+
+    it('still rejects an UNcompleted code polled after expiresAt', async () => {
+      const pairingResult = await service.requestPairingCode({
+        deviceIdentifier: 'device-uncompleted-late',
+        nickname: 'Test',
+        metadata: {},
+      });
+      // Simulate a lingering key (no Redis TTL) so the record is still readable
+      // past expiresAt and this exercises the expiry check itself.
+      const key = `pairing:${pairingResult.code}`;
+      redisStore.set(key, { ...redisStore.get(key)!, ttl: 0, expiresAt: 0 });
+      jest.advanceTimersByTime(5 * 60 * 1000 + 1);
+
+      await expect(
+        service.checkPairingStatus(pairingResult.code),
+      ).rejects.toThrow('Pairing code has expired');
+    });
   });
 
   describe('completePairing', () => {
