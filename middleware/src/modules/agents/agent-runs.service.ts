@@ -163,15 +163,27 @@ export class AgentRunsService {
   }
 
   /**
-   * Sidecar orphan-row sweep (design §4.3 race scenario + I7).
-   * Marks rows as runner_crash if their tokensIn is still NULL more than
-   * 10 minutes after creation. Called periodically by the sidecar.
+   * Sidecar orphan-row sweep (design §4.3 race scenario + I7), for rows still
+   * unenriched more than 10 minutes after creation. Called periodically by the
+   * sidecar.
+   *
+   * The runner creates a row only AFTER the run finished, with `finishedAt`
+   * and the real outcome already recorded (`recordRun` requires both). So an
+   * unenriched row with a `finishedAt` is a run whose enrichment gave up: the
+   * sweep stamps `enrichedAt` and leaves its outcome and `errorExcerpt` alone.
+   * Only a row with no `finishedAt` — no terminal write ever landed — is
+   * relabelled `runner_crash`.
+   *
+   * `marked` counts runner_crash relabels; `closed` counts finished rows whose
+   * enrichment was given up. Both set `enrichedAt`, so neither is re-swept.
    */
-  async sweepOrphans(): Promise<{ marked: number }> {
+  async sweepOrphans(): Promise<{ marked: number; closed: number }> {
     const cutoff = new Date(Date.now() - 10 * 60 * 1000);
-    const result = await this.db.agentRun.updateMany({
+    const now = new Date();
+    const crashed = await this.db.agentRun.updateMany({
       where: {
         enrichedAt: null,
+        finishedAt: null,
         createdAt: { lt: cutoff },
         outcome: { notIn: ['runner_crash', 'budget_aborted'] satisfies RunOutcomeT[] },
       },
@@ -179,10 +191,18 @@ export class AgentRunsService {
         outcome: 'runner_crash' satisfies RunOutcomeT,
         errorExcerpt: 'orphan row — runner crashed before final write',
         // Mark enrichedAt to prevent re-orphan-sweeping on subsequent ticks.
-        enrichedAt: new Date(),
+        enrichedAt: now,
       },
     });
-    return { marked: result.count };
+    const closed = await this.db.agentRun.updateMany({
+      where: {
+        enrichedAt: null,
+        finishedAt: { not: null },
+        createdAt: { lt: cutoff },
+      },
+      data: { enrichedAt: now },
+    });
+    return { marked: crashed.count, closed: closed.count };
   }
 }
 
