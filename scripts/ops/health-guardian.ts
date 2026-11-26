@@ -71,6 +71,7 @@ import {
   addRemediation,
   makeIncidentId,
   getOpsStateDir,
+  findActiveEpisode,
 } from './lib/state.js';
 import { readTimeoutStreaks, writeTimeoutStreaks } from './lib/timeout-streaks.js';
 import { log, pingHeartbeat, sendInlineAlert } from './lib/alerting.js';
@@ -596,7 +597,9 @@ async function main(): Promise<void> {
 
   for (const svc of services) {
     const incidentId = makeIncidentId(AGENT, 'service-down', svc.name);
-    const existingIncident = priorState.incidents.find(i => i.id === incidentId);
+    // A resolved record is a finished episode: a recurrence gets a fresh
+    // restart budget and `detected`, never the previous outage's.
+    const existingIncident = findActiveEpisode(priorState.incidents, incidentId);
 
     log(AGENT, `Checking ${svc.name}: ${svc.healthUrl}`);
     let result = await checkEndpoint(svc.healthUrl);
@@ -905,8 +908,10 @@ async function main(): Promise<void> {
         : 0;
       const procLabel = `${svc.pm2Name}:${proc.pm_id}`;
       const pm2ErroredIncidentId = makeIncidentId(AGENT, 'pm2-errored', procLabel);
-      const existingPm2ErroredIncident = priorState.incidents.find(
-        i => i.id === pm2ErroredIncidentId,
+      // Same episode rule as service-down: a resolved record does not carry over.
+      const existingPm2ErroredIncident = findActiveEpisode(
+        priorState.incidents,
+        pm2ErroredIncidentId,
       );
 
       if (

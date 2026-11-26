@@ -14,6 +14,7 @@ import { afterEach, beforeEach, test } from 'node:test';
 
 import {
   determineSystemStatus,
+  findActiveEpisode,
   readOpsState,
   readOpsStateSnapshot,
   writeOpsState,
@@ -227,4 +228,16 @@ test('readOpsStateSnapshot is lock-free — repeatable and leaves no lock', () =
   assert.equal(first.incidents.length, 1);
   assert.equal(second.incidents.length, 1);
   assert.equal(existsSync(lockFile), false, 'snapshot must never create a lock file');
+});
+
+// ─── findActiveEpisode: a resolved record is a finished episode ──────────────
+
+test('findActiveEpisode ignores a resolved record so a recurrence starts fresh', () => {
+  assert.equal(findActiveEpisode([incident('resolved', 'critical', 'x')], 'x'), undefined);
+});
+
+test('findActiveEpisode returns open and escalated records so they keep accumulating', () => {
+  assert.equal(findActiveEpisode([incident('open', 'critical', 'x')], 'x')?.attempts, 2);
+  assert.equal(findActiveEpisode([incident('escalated', 'critical', 'x')], 'x')?.status, 'escalated');
+  assert.equal(findActiveEpisode([incident('open', 'critical', 'y')], 'x'), undefined);
 });

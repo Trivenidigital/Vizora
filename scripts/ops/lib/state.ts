@@ -383,6 +383,20 @@ export function isActiveIncident(incident: Pick<Incident, 'status'>): boolean {
 }
 
 /**
+ * The prior record for `id` if its episode is still active, else undefined.
+ *
+ * Incident ids are deterministic and resolved records stay in state, so a bare
+ * lookup returns the LAST episode's record on every recurrence. Carrying its
+ * `attempts` and `detected` forward spent a restart budget on outages that had
+ * already ended: after two outages fixed by a restart, every later one
+ * escalated without a restart. A resolved record is a finished episode.
+ */
+export function findActiveEpisode(incidents: Incident[], id: string): Incident | undefined {
+  const prior = incidents.find((i) => i.id === id);
+  return prior && isActiveIncident(prior) ? prior : undefined;
+}
+
+/**
  * Resolve an agent's prior incidents that it did NOT re-raise this run.
  *
  * The sweep must key off `isActiveIncident`, i.e. "not already resolved" — the
