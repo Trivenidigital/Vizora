@@ -41,7 +41,10 @@
  * reload. "The guardian never restarts during starvation" is NOT an invariant
  * of this file; "the endpoint probe never does" is.
  *
- * Escalation: After 2 failed restart attempts, incident is marked 'escalated'.
+ * Escalation: After 2 restart attempts within one episode, the incident is
+ * marked 'escalated'. An episode spans a crash loop — a record resolved less
+ * than RESTART_BUDGET_QUIET_PERIOD_MS ago still carries its attempts — and ends
+ * once it has stayed resolved that long (lib/state.ts findCurrentEpisode).
  * That state is terminal until the service answers again, which is why the
  * escalated check runs BEFORE the timeout gate — an escalated incident must not
  * be walked back to 'open', nor have its message rewritten with softer text,
@@ -71,7 +74,7 @@ import {
   addRemediation,
   makeIncidentId,
   getOpsStateDir,
-  findActiveEpisode,
+  findCurrentEpisode,
 } from './lib/state.js';
 import { readTimeoutStreaks, writeTimeoutStreaks } from './lib/timeout-streaks.js';
 import { log, pingHeartbeat, sendInlineAlert } from './lib/alerting.js';
@@ -89,6 +92,12 @@ import { probeWebAssets, type ProbeFetch } from './lib/web-assets.js';
 
 const AGENT = 'health-guardian';
 const MAX_RESTART_ATTEMPTS = 2;
+/**
+ * How long a resolved incident must stay resolved before a recurrence starts a
+ * fresh restart budget. 6 guardian cycles at one per 5 min: shorter, and a crash loop whose every
+ * restart "works" would be restarted forever without escalating.
+ */
+const RESTART_BUDGET_QUIET_PERIOD_MS = 30 * 60 * 1000;
 const RESTART_COOLDOWN_MS = 30_000;
 const HEALTH_CHECK_TIMEOUT_MS = 10_000;
 
@@ -597,9 +606,15 @@ async function main(): Promise<void> {
 
   for (const svc of services) {
     const incidentId = makeIncidentId(AGENT, 'service-down', svc.name);
-    // A resolved record is a finished episode: a recurrence gets a fresh
-    // restart budget and `detected`, never the previous outage's.
-    const existingIncident = findActiveEpisode(priorState.incidents, incidentId);
+    // Only the CURRENT episode's record carries attempts and `detected`: a
+    // record resolved longer than the quiet period ago is a finished outage, one
+    // resolved more recently is the same crash loop. See findCurrentEpisode.
+    const existingIncident = findCurrentEpisode(
+      priorState.incidents,
+      incidentId,
+      new Date(),
+      RESTART_BUDGET_QUIET_PERIOD_MS,
+    );
 
     log(AGENT, `Checking ${svc.name}: ${svc.healthUrl}`);
     let result = await checkEndpoint(svc.healthUrl);
@@ -908,10 +923,12 @@ async function main(): Promise<void> {
         : 0;
       const procLabel = `${svc.pm2Name}:${proc.pm_id}`;
       const pm2ErroredIncidentId = makeIncidentId(AGENT, 'pm2-errored', procLabel);
-      // Same episode rule as service-down: a resolved record does not carry over.
-      const existingPm2ErroredIncident = findActiveEpisode(
+      // Same episode rule as service-down.
+      const existingPm2ErroredIncident = findCurrentEpisode(
         priorState.incidents,
         pm2ErroredIncidentId,
+        new Date(),
+        RESTART_BUDGET_QUIET_PERIOD_MS,
       );
 
       if (

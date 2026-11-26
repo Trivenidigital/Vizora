@@ -14,7 +14,7 @@ import { afterEach, beforeEach, test } from 'node:test';
 
 import {
   determineSystemStatus,
-  findActiveEpisode,
+  findCurrentEpisode,
   readOpsState,
   readOpsStateSnapshot,
   writeOpsState,
@@ -230,14 +230,34 @@ test('readOpsStateSnapshot is lock-free — repeatable and leaves no lock', () =
   assert.equal(existsSync(lockFile), false, 'snapshot must never create a lock file');
 });
 
-// ─── findActiveEpisode: a resolved record is a finished episode ──────────────
+// ─── findCurrentEpisode: the restart-budget episode boundary ────────────────
 
-test('findActiveEpisode ignores a resolved record so a recurrence starts fresh', () => {
-  assert.equal(findActiveEpisode([incident('resolved', 'critical', 'x')], 'x'), undefined);
+const QUIET_MS = 30 * 60 * 1000;
+const NOW = new Date('2026-06-03T12:00:00.000Z');
+const minutesBefore = (m: number) => new Date(NOW.getTime() - m * 60 * 1000).toISOString();
+
+test('findCurrentEpisode carries a record resolved INSIDE the quiet period — a crash loop', () => {
+  const prior = { ...incident('resolved', 'critical', 'x'), resolvedAt: minutesBefore(10) };
+  assert.equal(findCurrentEpisode([prior], 'x', NOW, QUIET_MS)?.attempts, 2);
 });
 
-test('findActiveEpisode returns open and escalated records so they keep accumulating', () => {
-  assert.equal(findActiveEpisode([incident('open', 'critical', 'x')], 'x')?.attempts, 2);
-  assert.equal(findActiveEpisode([incident('escalated', 'critical', 'x')], 'x')?.status, 'escalated');
-  assert.equal(findActiveEpisode([incident('open', 'critical', 'y')], 'x'), undefined);
+test('findCurrentEpisode starts fresh for a record resolved OUTSIDE the quiet period', () => {
+  const prior = { ...incident('resolved', 'critical', 'x'), resolvedAt: minutesBefore(31) };
+  assert.equal(findCurrentEpisode([prior], 'x', NOW, QUIET_MS), undefined);
+});
+
+test('findCurrentEpisode starts fresh for a resolved record with no usable resolvedAt', () => {
+  const missing = incident('resolved', 'critical', 'x');
+  const garbage = { ...incident('resolved', 'critical', 'x'), resolvedAt: 'not-a-date' };
+  assert.equal(findCurrentEpisode([missing], 'x', NOW, QUIET_MS), undefined);
+  assert.equal(findCurrentEpisode([garbage], 'x', NOW, QUIET_MS), undefined);
+});
+
+test('findCurrentEpisode returns open and escalated records so they keep accumulating', () => {
+  assert.equal(findCurrentEpisode([incident('open', 'critical', 'x')], 'x', NOW, QUIET_MS)?.attempts, 2);
+  assert.equal(
+    findCurrentEpisode([incident('escalated', 'critical', 'x')], 'x', NOW, QUIET_MS)?.status,
+    'escalated',
+  );
+  assert.equal(findCurrentEpisode([incident('open', 'critical', 'y')], 'x', NOW, QUIET_MS), undefined);
 });
