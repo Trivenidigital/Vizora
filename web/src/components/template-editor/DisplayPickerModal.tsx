@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import Modal from '@/components/Modal';
 import { apiClient } from '@/lib/api';
 import type { Display } from '@/lib/types';
+import { getDeviceStatusPresentation } from '@/components/DeviceStatusBadge';
 
 interface DisplayPickerModalProps {
   isOpen: boolean;
@@ -177,12 +178,9 @@ export default function DisplayPickerModal({
                       )}
                     </div>
                     <span
-                      className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-                        display.status === 'online'
-                          ? 'bg-[var(--success-ink)]'
-                          : 'bg-[var(--foreground-tertiary)]'
-                      }`}
-                      title={display.status === 'online' ? 'Online' : 'Offline'}
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{ background: getDeviceStatusPresentation(display.status).ink }}
+                      title={getDeviceStatusPresentation(display.status).label}
                     />
                   </label>
                 ))}

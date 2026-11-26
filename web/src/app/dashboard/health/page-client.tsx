@@ -11,6 +11,7 @@ import SearchFilter from '@/components/SearchFilter';
 import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useRealtimeEvents } from '@/lib/hooks';
+import { useRealtimeConnectionStatus } from '@/lib/hooks/useRealtimeConnectionStatus';
 import { Icon } from '@/theme/icons';
 
 const parseDisplayHeartbeat = (device: Display): Date | null => {
@@ -68,15 +69,15 @@ export default function HealthMonitoringClient() {
  const debouncedSearch = useDebounce(searchQuery, 300);
  const [sortBy, setSortBy] = useState<'name' | 'health' | 'status'>('health');
  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
- const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline' | 'error'>('offline');
+ // A reconnect blip keeps the last confirmed state, so a brief network drop
+ // does not flip the page into Polling mode.
+ const { stableStatus: realtimeStatus, onConnectionChange } = useRealtimeConnectionStatus();
  const [activeAlerts, setActiveAlerts] = useState<Record<string, any>>({});
 
  // Real-time event handling for health monitoring
  useRealtimeEvents({
  enabled: true,
- onConnectionChange: (isConnected) => {
- setRealtimeStatus(isConnected ? 'connected' : 'offline');
- },
+ onConnectionChange,
  });
 
  useEffect(() => {

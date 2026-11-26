@@ -209,7 +209,11 @@ async function patchRun(id: string, body: Record<string, unknown>): Promise<bool
 }
 
 /**
- * Marks rows older than 10 minutes with no enrichment as runner_crash.
+ * Closes rows still unenriched 10 minutes after creation. Only rows with no
+ * `finishedAt` (no terminal write ever landed) are relabelled runner_crash;
+ * finished rows keep their recorded outcome and just get `enrichedAt`.
+ * Returns the response's `marked` — the runner_crash relabels only, so it is
+ * normally 0; the response's `closed` count is not read here.
  *
  * PR-review R1 I2 fix: previously duplicated AgentRunsService.sweepOrphans
  * logic byte-for-byte. Now POSTs to the middleware's sweep endpoint —

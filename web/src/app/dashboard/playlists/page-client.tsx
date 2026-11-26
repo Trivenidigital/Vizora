@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiClient } from '@/lib/api';
 import { fetchAllPaginated } from '@/lib/api/pagination';
@@ -16,6 +16,7 @@ import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useRealtimeEvents } from '@/lib/hooks';
+import { useRealtimeConnectionStatus } from '@/lib/hooks/useRealtimeConnectionStatus';
 import { getDashboardPermissions } from '@/lib/permissions';
 import { Icon } from '@/theme/icons';
 import PlaylistPreview from '@/components/PlaylistPreview';
@@ -466,14 +467,6 @@ export default function PlaylistsClient() {
   const debouncedSearch = useDebounce(searchQuery, 300);
   const [shapeFilter, setShapeFilter] = useState<ShapeFilter | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>('updated');
-  /*
-   * Two states, because only two are reachable. The Devices route carries a
-   * third, `'error'`, that nothing ever sets — the same never-rendered branch
-   * this PR removed the "Active" badge for. It is dropped here rather than
-   * copied; flagged for Devices in `tasks/ui-wave-todo.md` rather than changed
-   * from a Playlists PR.
-   */
-  const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline'>('offline');
   const [previewPlaylist, setPreviewPlaylist] = useState<PlaylistSummary | null>(null);
 
   /**
@@ -487,19 +480,14 @@ export default function PlaylistsClient() {
    * the next connect event.
    *
    * That is this PR's own thesis inverted: a known-lossy value must not be
-   * promoted into a claim, and `offline` is not `unknown`. Devices handles it
-   * correctly at `devices/page-client.tsx:200-207` and this mirrors it — Content
-   * goes further with a distinct `'reconnecting'` decaying to offline after 15s,
-   * which is the better treatment but a bigger surface than this route needs.
+   * promoted into a claim, and `offline` is not `unknown`. The interpretation now
+   * lives in `useRealtimeConnectionStatus`, shared with every dashboard route:
+   * `null` holds the last confirmed state (this route shows two states, so it
+   * reads `stableStatus`) and only decays to offline if the reconnect does not
+   * recover within the timeout. Content reads the three-state `status` instead.
    */
-  const handleConnectionChange = useCallback((isConnected: boolean | null) => {
-    if (isConnected === true) {
-      setRealtimeStatus('connected');
-    } else if (isConnected === false) {
-      setRealtimeStatus('offline');
-    }
-    // null = reconnecting: keep the current status rather than assert offline.
-  }, []);
+  const { stableStatus: realtimeStatus, onConnectionChange: handleConnectionChange } =
+    useRealtimeConnectionStatus();
 
   // Real-time event handling
   const { emitPlaylistUpdate } = useRealtimeEvents({
@@ -516,7 +504,7 @@ export default function PlaylistsClient() {
             : p
         )
       );
-      setRealtimeStatus('connected');
+      handleConnectionChange(true);
 
       // Show notification for specific actions
       switch (update.action) {

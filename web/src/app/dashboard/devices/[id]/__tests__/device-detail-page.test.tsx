@@ -122,3 +122,40 @@ describe('DeviceDetailPage — re-pair affordance', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('DeviceDetailPage — header status pill', () => {
+  // DeviceStatusIndicator is mocked to the literal "status" above, so any
+  // status word found on the page comes from the header pill.
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it.each([
+    ['pairing', 'Pairing'],
+    ['error', 'Error'],
+  ])('a %s display is labelled %s, never Offline', async (status, label) => {
+    mockGetDisplay.mockResolvedValue({ ...display, status });
+    render(<DeviceDetailPage />);
+    await screen.findByRole('heading', { name: 'Device Information' });
+
+    expect(screen.getByText(label)).toBeInTheDocument();
+    expect(screen.queryByText('Offline')).not.toBeInTheDocument();
+  });
+
+  it('an offline display is still labelled Offline', async () => {
+    mockGetDisplay.mockResolvedValue({ ...display, status: 'offline' });
+    render(<DeviceDetailPage />);
+    await screen.findByRole('heading', { name: 'Device Information' });
+
+    expect(screen.getByText('Offline')).toBeInTheDocument();
+  });
+
+  it('an online display is still labelled Online', async () => {
+    mockGetDisplay.mockResolvedValue({ ...display, status: 'online' });
+    render(<DeviceDetailPage />);
+    await screen.findByRole('heading', { name: 'Device Information' });
+
+    expect(screen.getByText('Online')).toBeInTheDocument();
+    expect(screen.queryByText('Offline')).not.toBeInTheDocument();
+  });
+});

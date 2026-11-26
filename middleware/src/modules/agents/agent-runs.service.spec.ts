@@ -334,14 +334,42 @@ describe('AgentRunsService', () => {
   });
 
   describe('sweepOrphans', () => {
-    it('marks rows older than 10 minutes as runner_crash and sets enrichedAt', async () => {
-      db.agentRun.updateMany.mockResolvedValue({ count: 3 });
-      const result = await service.sweepOrphans();
-      expect(result.marked).toBe(3);
-      const args = db.agentRun.updateMany.mock.calls[0][0];
+    // Rows are created by the runner only AFTER the run has finished, with the
+    // real outcome already recorded. A row the sidecar never enriched is a run
+    // whose enrichment gave up, not a crash — its outcome and excerpt stay.
+    function callWhere(predicate: (where: Record<string, unknown>) => boolean) {
+      return db.agentRun.updateMany.mock.calls
+        .map((c: unknown[]) => c[0] as { where: Record<string, any>; data: Record<string, unknown> })
+        .find((a: { where: Record<string, unknown> }) => predicate(a.where));
+    }
+
+    it('stamps only enrichedAt on finished rows, preserving outcome and errorExcerpt', async () => {
+      db.agentRun.updateMany.mockResolvedValue({ count: 0 });
+      await service.sweepOrphans();
+      const finished = callWhere((w) => w.finishedAt !== null && w.finishedAt !== undefined);
+      expect(finished).toBeDefined();
+      expect(finished!.where).toEqual(
+        expect.objectContaining({
+          enrichedAt: null,
+          createdAt: { lt: expect.any(Date) },
+          finishedAt: { not: null },
+        }),
+      );
+      expect(finished!.data).toEqual({ enrichedAt: expect.any(Date) });
+    });
+
+    it('relabels runner_crash ONLY for rows with no finishedAt', async () => {
+      db.agentRun.updateMany.mockResolvedValue({ count: 0 });
+      await service.sweepOrphans();
+      const relabels = db.agentRun.updateMany.mock.calls
+        .map((c: unknown[]) => c[0] as { where: Record<string, unknown>; data: Record<string, unknown> })
+        .filter((a: { data: Record<string, unknown> }) => a.data.outcome !== undefined);
+      expect(relabels).toHaveLength(1);
+      const args = relabels[0];
       expect(args.where).toEqual(
         expect.objectContaining({
           enrichedAt: null,
+          finishedAt: null,
           createdAt: { lt: expect.any(Date) },
           outcome: { notIn: ['runner_crash', 'budget_aborted'] },
         }),
@@ -350,15 +378,22 @@ describe('AgentRunsService', () => {
         expect.objectContaining({
           outcome: 'runner_crash',
           errorExcerpt: expect.stringContaining('orphan'),
-          // Sweep also marks enrichedAt to prevent re-orphan-sweeping.
+          // Marks enrichedAt to prevent re-orphan-sweeping.
           enrichedAt: expect.any(Date),
         }),
       );
       // Cutoff should be ~10 min in the past.
-      const cutoff = args.where.createdAt.lt as Date;
+      const cutoff = (args.where.createdAt as { lt: Date }).lt;
       const ageMs = Date.now() - cutoff.getTime();
       expect(ageMs).toBeGreaterThanOrEqual(10 * 60 * 1000 - 1000);
       expect(ageMs).toBeLessThanOrEqual(10 * 60 * 1000 + 1000);
+    });
+
+    it('reports relabels as marked and finished-row stamps as closed', async () => {
+      db.agentRun.updateMany.mockImplementation(async (args: { where: Record<string, unknown> }) =>
+        args.where.finishedAt === null ? { count: 1 } : { count: 4 },
+      );
+      expect(await service.sweepOrphans()).toEqual({ marked: 1, closed: 4 });
     });
 
     it('returns 0 when no orphans found', async () => {

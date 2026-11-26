@@ -49,7 +49,22 @@ interface Fixture {
    *   'paginated' — { data: [...], meta: { total } }, the real API shape
    */
   shape?: 'items' | 'paginated';
+  /** When set, every PATCH /displays/:id body is recorded here. */
+  patches?: Record<string, unknown>[];
 }
+
+/**
+ * The statuses UpdateDisplayDto accepts, read from the DTO it inherits rather
+ * than retyped here, so the fake API rejects exactly what the real one does.
+ */
+const DISPLAY_DTO_STATUSES: string[] = (() => {
+  const src = readFileSync(join(repoRoot, 'middleware/src/modules/displays/dto/create-display.dto.ts'), 'utf8');
+  const m = /@IsEnum\(\[([^\]]*)\]\)\s*status\?:/.exec(src);
+  assert.ok(m, 'CreateDisplayDto status @IsEnum not found');
+  const values = [...m[1].matchAll(/'([^']+)'/g)].map(v => v[1]);
+  assert.ok(values.length > 0, 'CreateDisplayDto status @IsEnum is empty');
+  return values;
+})();
 
 /**
  * A healthy tenant: one display seen just now, WITH a playlist, so no check
@@ -136,9 +151,22 @@ function startServer(fixture: Fixture): Promise<{ server: Server; baseUrl: strin
     }
     if (path === '/api/v1/schedules') return paged(fixture.schedules);
 
-    // PATCH /displays/:id — the error-state auto-reset target.
+    // PATCH /displays/:id — the error-state auto-reset target. Validates `status`
+    // against the DTO's own @IsEnum list, as the real ValidationPipe does, so a
+    // reset with a status the API rejects fails here too.
     if (path.startsWith('/api/v1/displays/')) {
-      return json(200, { success: true, data: { id: path.split('/').pop() } });
+      let raw = '';
+      req.setEncoding('utf8');
+      req.on('data', c => (raw += c));
+      req.on('end', () => {
+        const body = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+        fixture.patches?.push(body);
+        if ('status' in body && !DISPLAY_DTO_STATUSES.includes(String(body.status))) {
+          return json(400, { success: false, message: ['status must be one of the following values'] });
+        }
+        json(200, { success: true, data: { id: path.split('/').pop() } });
+      });
+      return;
     }
 
     return json(200, { success: true, data: {} });
@@ -500,6 +528,39 @@ test('a genuinely empty tenant (meta.total=0) is a COMPLETE scan and resolves no
         undefined,
         'an empty-but-complete scan must not file scan-truncated',
       );
+    } finally {
+      rmSync(tmpRoot, { recursive: true, force: true });
+    }
+  });
+});
+
+// ─── Error-state reset ───────────────────────────────────────────────────────
+
+test('the error-state reset PATCHes a status the display DTO accepts, and resolves', async () => {
+  // The reset used to send status "inactive", which CreateDisplayDto (inherited
+  // by the update DTO) does not accept, so the whitelisting ValidationPipe
+  // rejected every reset and display_error could never be auto-fixed.
+  const fixture = healthyFixture();
+  fixture.displays[0].status = 'error';
+  fixture.patches = [];
+
+  await withServer(fixture, async baseUrl => {
+    const tmpRoot = setupTmpRoot();
+    try {
+      const result = await runAgent(tmpRoot, baseUrl);
+
+      assert.equal(fixture.patches?.length, 1, `exactly one reset PATCH\n${result.stdout}`);
+      const sent = String(fixture.patches?.[0].status);
+      assert.ok(
+        DISPLAY_DTO_STATUSES.includes(sent),
+        `reset sent status "${sent}"; the DTO accepts only ${DISPLAY_DTO_STATUSES.join('|')}`,
+      );
+
+      const incident = readState(tmpRoot).incidents.find(
+        i => i.id === 'fleet-manager:display_error:display-1',
+      );
+      assert.ok(incident, `display_error must be recorded\n${result.stdout}`);
+      assert.equal(incident.status, 'resolved', 'an accepted reset resolves the incident');
     } finally {
       rmSync(tmpRoot, { recursive: true, force: true });
     }

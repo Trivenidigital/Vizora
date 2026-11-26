@@ -14,6 +14,7 @@ import { afterEach, beforeEach, test } from 'node:test';
 
 import {
   determineSystemStatus,
+  findCurrentEpisode,
   readOpsState,
   readOpsStateSnapshot,
   writeOpsState,
@@ -227,4 +228,36 @@ test('readOpsStateSnapshot is lock-free — repeatable and leaves no lock', () =
   assert.equal(first.incidents.length, 1);
   assert.equal(second.incidents.length, 1);
   assert.equal(existsSync(lockFile), false, 'snapshot must never create a lock file');
+});
+
+// ─── findCurrentEpisode: the restart-budget episode boundary ────────────────
+
+const QUIET_MS = 30 * 60 * 1000;
+const NOW = new Date('2026-06-03T12:00:00.000Z');
+const minutesBefore = (m: number) => new Date(NOW.getTime() - m * 60 * 1000).toISOString();
+
+test('findCurrentEpisode carries a record resolved INSIDE the quiet period — a crash loop', () => {
+  const prior = { ...incident('resolved', 'critical', 'x'), resolvedAt: minutesBefore(10) };
+  assert.equal(findCurrentEpisode([prior], 'x', NOW, QUIET_MS)?.attempts, 2);
+});
+
+test('findCurrentEpisode starts fresh for a record resolved OUTSIDE the quiet period', () => {
+  const prior = { ...incident('resolved', 'critical', 'x'), resolvedAt: minutesBefore(31) };
+  assert.equal(findCurrentEpisode([prior], 'x', NOW, QUIET_MS), undefined);
+});
+
+test('findCurrentEpisode starts fresh for a resolved record with no usable resolvedAt', () => {
+  const missing = incident('resolved', 'critical', 'x');
+  const garbage = { ...incident('resolved', 'critical', 'x'), resolvedAt: 'not-a-date' };
+  assert.equal(findCurrentEpisode([missing], 'x', NOW, QUIET_MS), undefined);
+  assert.equal(findCurrentEpisode([garbage], 'x', NOW, QUIET_MS), undefined);
+});
+
+test('findCurrentEpisode returns open and escalated records so they keep accumulating', () => {
+  assert.equal(findCurrentEpisode([incident('open', 'critical', 'x')], 'x', NOW, QUIET_MS)?.attempts, 2);
+  assert.equal(
+    findCurrentEpisode([incident('escalated', 'critical', 'x')], 'x', NOW, QUIET_MS)?.status,
+    'escalated',
+  );
+  assert.equal(findCurrentEpisode([incident('open', 'critical', 'y')], 'x', NOW, QUIET_MS), undefined);
 });

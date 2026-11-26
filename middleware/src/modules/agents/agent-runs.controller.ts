@@ -85,8 +85,10 @@ export class AgentRunsController {
   }
 
   /**
-   * Marks rows that haven't been enriched within 10 minutes as runner_crash.
-   * Called by the insights-poller sidecar at the end of each tick.
+   * Closes rows that haven't been enriched within 10 minutes: finished rows
+   * keep their outcome and only get `enrichedAt`; rows with no `finishedAt`
+   * are relabelled runner_crash. Called by the insights-poller sidecar at the
+   * end of each tick.
    *
    * PR-review R1 I2 — eliminates a duplicated implementation that previously
    * lived in poll-insights.ts. Single source of truth for orphan-sweep
@@ -94,7 +96,7 @@ export class AgentRunsController {
    */
   @Post('sweep-orphans')
   @HttpCode(200)
-  async sweepOrphans(): Promise<{ marked: number }> {
+  async sweepOrphans(): Promise<{ marked: number; closed: number }> {
     return this.service.sweepOrphans();
   }
 

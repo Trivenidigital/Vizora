@@ -220,7 +220,12 @@ async function main(): Promise<void> {
   // takes the lock briefly to persist the deterministic mutations (status
   // recompute, prune, lastRun) against FRESH state.
   const snapshot = readOpsStateSnapshot();
-  const previousStatus = snapshot.systemStatus;
+  // Compare against what THIS agent last reported, not the stored
+  // `systemStatus`: every agent write recomputes and stores that, so it always
+  // equals the recompute below and no transition was ever seen. Falls back to
+  // the stored status on a file that predates the field, so the first run after
+  // deploy does not invent a transition.
+  const previousStatus = snapshot.lastReportedStatus ?? snapshot.systemStatus;
 
   log(AGENT, `Current state: status=${previousStatus}, incidents=${snapshot.incidents.length}, remediations=${snapshot.recentRemediations.length}`);
 
@@ -334,6 +339,15 @@ async function main(): Promise<void> {
 
     if (alertTimestamp) {
       state.lastRun[`${AGENT}:last-alert`] = alertTimestamp;
+    }
+
+    // Advance the reported status only when nothing was due or something was
+    // DELIVERED — the same rule that arms the suppression window. An alert
+    // nobody received leaves it unchanged, so the transition is retried next
+    // cycle. Persist the status the DECISION used, not `finalStatus`, so a
+    // change that landed during the I/O above is still a transition next cycle.
+    if (!decision.shouldAlert || anyDelivered(delivery)) {
+      state.lastReportedStatus = currentStatus;
     }
 
     const incidentPrune = pruneOldIncidents(state.incidents);

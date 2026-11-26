@@ -592,8 +592,10 @@ export class PairingService implements OnModuleDestroy {
       throw new NotFoundException('Pairing code not found or expired');
     }
 
-    // Check if expired (safety check — Redis TTL should handle this)
-    if (new Date() > new Date(request.expiresAt)) {
+    // Check if expired (safety check — Redis TTL should handle this). A
+    // completed record keeps its token deliverable past expiresAt — see
+    // isPastHandoffWindow.
+    if (this.isPastHandoffWindow(request, new Date())) {
       await this.deleteActiveOrgPairingIndex(
         request.activePairingOrganizationId,
         code,
@@ -1462,6 +1464,26 @@ export class PairingService implements OnModuleDestroy {
   }
 
   /**
+   * Whether a pairing record may be discarded as expired.
+   *
+   * An UNcompleted code expires at `expiresAt`. A completed one holds the
+   * plaintext token the device has not collected yet, while the display row
+   * already holds its hash — discarding it at `expiresAt` leaves the device
+   * unable to collect the token or request a new code ("Device is already
+   * paired"). `finalizePairing` refreshes the Redis TTL to PAIRING_TTL_SECONDS
+   * and completion is refused after `expiresAt`, so the key itself expires
+   * before `expiresAt + PAIRING_TTL_SECONDS`; that is the bound here, for a
+   * key that lingers past its TTL.
+   */
+  private isPastHandoffWindow(request: PairingRequest, now: Date): boolean {
+    const expiresAtMs = new Date(request.expiresAt).getTime();
+    const deadline = request.plaintextToken
+      ? expiresAtMs + this.PAIRING_TTL_SECONDS * 1000
+      : expiresAtMs;
+    return now.getTime() > deadline;
+  }
+
+  /**
    * Safety-net cleanup. Redis TTL handles most expiration automatically,
    * but this catches keys that might linger due to Redis issues.
    */
@@ -1472,7 +1494,7 @@ export class PairingService implements OnModuleDestroy {
       const code = key.replace(this.REDIS_KEY_PREFIX, '');
       const request = await this.getPairingRequest(code);
 
-      if (request && new Date() > new Date(request.expiresAt)) {
+      if (request && this.isPastHandoffWindow(request, new Date())) {
         await this.deleteActiveOrgPairingIndex(
           request.activePairingOrganizationId,
           code,

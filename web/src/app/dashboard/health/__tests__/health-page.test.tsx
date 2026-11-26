@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 jest.mock('next/navigation', () => ({
@@ -31,11 +31,19 @@ jest.mock('@/lib/hooks/useDebounce', () => ({
   useDebounce: (value: any) => value,
 }));
 
+/**
+ * Capture the page's own `onConnectionChange` so a test can drive the three
+ * signals the real hook emits (`true` / `false` / `null`).
+ */
+let connectionChange: ((connected: boolean | null) => void) | undefined;
 jest.mock('@/lib/hooks', () => ({
-  useRealtimeEvents: () => ({
-    isConnected: false,
-    isOffline: true,
-  }),
+  useRealtimeEvents: (opts: any) => {
+    connectionChange = opts?.onConnectionChange;
+    return {
+      isConnected: false,
+      isOffline: true,
+    };
+  },
 }));
 
 jest.mock('@/theme/icons', () => ({
@@ -120,6 +128,49 @@ describe('HealthMonitoringClient', () => {
     await waitFor(() => {
       expect(screen.getByText(/Monitor device performance and system health/)).toBeInTheDocument();
     });
+  });
+
+  /**
+   * `null` = the socket dropped while the browser is online (reconnecting). A
+   * brief network blip must not flip the page into its offline presentation.
+   */
+  it('does not show Polling mode on a reconnect blip', async () => {
+    render(<HealthMonitoringClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Device Health')).toBeInTheDocument();
+    });
+
+    act(() => connectionChange?.(true));
+    expect(screen.getByText('Real-time monitoring active')).toBeInTheDocument();
+
+    act(() => connectionChange?.(null));
+    expect(screen.queryByText('Polling mode')).not.toBeInTheDocument();
+    expect(screen.getByText('Real-time monitoring active')).toBeInTheDocument();
+  });
+
+  it('shows Polling mode once a reconnect has not recovered within the timeout', async () => {
+    render(<HealthMonitoringClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Device Health')).toBeInTheDocument();
+    });
+
+    act(() => connectionChange?.(true));
+    act(() => connectionChange?.(null));
+    act(() => {
+      jest.advanceTimersByTime(15_000);
+    });
+    expect(screen.getByText('Polling mode')).toBeInTheDocument();
+  });
+
+  it('shows Polling mode immediately when the browser is genuinely offline', async () => {
+    render(<HealthMonitoringClient />);
+    await waitFor(() => {
+      expect(screen.getByText('Device Health')).toBeInTheDocument();
+    });
+
+    act(() => connectionChange?.(true));
+    act(() => connectionChange?.(false));
+    expect(screen.getByText('Polling mode')).toBeInTheDocument();
   });
 
   it('renders refresh button', async () => {

@@ -350,6 +350,55 @@ describe('DevicePreviewModal', () => {
     await waitForInitialScreenshotLoad(offlineDevice.id);
   });
 
+  describe.each([
+    ['pairing', 'Pairing'],
+    ['error', 'Error'],
+  ] as const)('device in %s', (status, label) => {
+    it(`labels the device ${label}, never Offline`, async () => {
+      const device = { ...mockDevice, status };
+      (apiClient.getDeviceScreenshot as jest.Mock).mockResolvedValue(null);
+      render(<DevicePreviewModal device={device} isOpen={true} onClose={jest.fn()} />);
+
+      expect(screen.getByText(label)).toBeInTheDocument();
+      expect(screen.queryByText('Offline')).not.toBeInTheDocument();
+      await waitForInitialScreenshotLoad(device.id);
+    });
+
+    it('does not claim the device is offline, and says capture needs an online device', async () => {
+      const device = { ...mockDevice, status };
+      (apiClient.getDeviceScreenshot as jest.Mock).mockResolvedValue(null);
+      render(<DevicePreviewModal device={device} isOpen={true} onClose={jest.fn()} />);
+      await waitForInitialScreenshotLoad(device.id);
+
+      expect(screen.queryByText(/is (currently )?offline/i)).not.toBeInTheDocument();
+      expect(
+        screen.getByText(/screenshots can only be captured while the device is online/i),
+      ).toBeInTheDocument();
+      const capture = screen.getByRole('button', { name: /available when online/i });
+      expect(capture).toBeDisabled();
+      expect(screen.getByRole('button', { name: /refresh screenshot/i })).toBeDisabled();
+    });
+  });
+
+  it('offline device without a screenshot keeps its offline copy', async () => {
+    const device = { ...mockDevice, status: 'offline' as const };
+    (apiClient.getDeviceScreenshot as jest.Mock).mockResolvedValue(null);
+    render(<DevicePreviewModal device={device} isOpen={true} onClose={jest.fn()} />);
+    await waitForInitialScreenshotLoad(device.id);
+
+    expect(screen.getByText('Offline')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Device is offline' })).toBeDisabled();
+    expect(screen.getByText(/device is currently offline/i)).toBeInTheDocument();
+  });
+
+  it('online device is labelled Online with no availability warning', async () => {
+    render(<DevicePreviewModal device={mockDevice} isOpen={true} onClose={jest.fn()} />);
+    await waitForInitialScreenshotLoad();
+
+    expect(screen.getByText('Online')).toBeInTheDocument();
+    expect(screen.queryByText(/only be captured/i)).not.toBeInTheDocument();
+  });
+
   it('shows timestamp of screenshot', async () => {
     render(
       <DevicePreviewModal

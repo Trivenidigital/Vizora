@@ -209,6 +209,10 @@ function emptyState(): OpsState {
 
 // ─── Parsing (shared by locked and lock-free reads) ─────────────────────────
 
+function isSystemStatus(v: unknown): v is SystemStatus {
+  return v === 'HEALTHY' || v === 'DEGRADED' || v === 'CRITICAL';
+}
+
 /** Monotonic counter so concurrent corrupt-file rescues get distinct names. */
 let corruptCounter = 0;
 
@@ -243,6 +247,11 @@ function parseStateFile(): OpsState {
       incidents: parsed.incidents ?? [],
       recentRemediations: parsed.recentRemediations ?? [],
       agentResults: parsed.agentResults ?? {},
+      // Rebuilt field by field, so an unlisted field is silently dropped on the
+      // next write. Kept only when it is a real status.
+      ...(isSystemStatus(parsed.lastReportedStatus)
+        ? { lastReportedStatus: parsed.lastReportedStatus }
+        : {}),
     };
   } catch {
     const corruptPath = `${stateFile}.corrupt-${process.pid}-${corruptCounter++}`;
@@ -371,6 +380,38 @@ export function addRemediation(state: OpsState, action: RemediationAction): void
  */
 export function isActiveIncident(incident: Pick<Incident, 'status'>): boolean {
   return incident.status !== 'resolved';
+}
+
+/**
+ * The prior record for `id` if it belongs to the CURRENT episode, else
+ * undefined (a new episode: attempts 0, fresh `detected`).
+ *
+ * Incident ids are deterministic and resolved records stay in state, so a bare
+ * lookup returns the LAST episode's record on every recurrence. Carrying its
+ * `attempts` and `detected` forward unconditionally spent a restart budget on
+ * outages that had already ended: after two outages fixed by a restart, every
+ * later one escalated without a restart.
+ *
+ * But treating every resolved record as finished breaks the opposite case: a
+ * service that dies again right after each successful restart would be
+ * restarted every cycle and never escalate. So:
+ *   - open / escalated → current episode.
+ *   - resolved within `quietPeriodMs` of `now` → current episode (crash loop).
+ *   - resolved longer ago, or with a missing/unparseable `resolvedAt` → finished
+ *     (fail toward remediation: an unknown resolution time grants a restart).
+ */
+export function findCurrentEpisode(
+  incidents: Incident[],
+  id: string,
+  now: Date,
+  quietPeriodMs: number,
+): Incident | undefined {
+  const prior = incidents.find((i) => i.id === id);
+  if (!prior) return undefined;
+  if (isActiveIncident(prior)) return prior;
+  const resolvedAtMs = prior.resolvedAt ? Date.parse(prior.resolvedAt) : NaN;
+  if (Number.isNaN(resolvedAtMs)) return undefined;
+  return now.getTime() - resolvedAtMs <= quietPeriodMs ? prior : undefined;
 }
 
 /**

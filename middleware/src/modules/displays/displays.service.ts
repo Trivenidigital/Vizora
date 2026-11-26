@@ -332,13 +332,18 @@ export class DisplaysService {
    * when PairingService completes a code pairing but transitions to 'online'
    * only when the device makes its first WebSocket connection. If the device loses power or network in between — or the
    * QR code never gets scanned — the row stays 'pairing' forever, which
-   * confuses dashboards and prevents the operator from re-pairing the same
-   * deviceIdentifier (the existing-display check throws "already paired").
+   * confuses dashboards.
    *
    * Threshold is 30 minutes — generous compared to the 5-min pairing-token
    * TTL but tolerant of legitimate slow first-connect (cold cache, slow
    * 3G, captive portal handshake). Past the threshold we drop status back
-   * to 'offline' so the device can be re-paired without operator action.
+   * to 'offline'. That is the ONLY change: the row keeps its hashed
+   * `jwtToken`, and `PairingService.requestPairingCode` keys its "Device is
+   * already paired" refusal on that token, not on status — so this does NOT
+   * make the same deviceIdentifier re-pairable. A device that never collected
+   * its token still needs operator action (delete the display, or rebind it
+   * via `completePairing`'s `targetDisplayId` once the device presents a new
+   * deviceIdentifier). Nothing in middleware clears `jwtToken`.
    *
    * Runs hourly — not every minute, because pairing is a low-frequency
    * operator action and the cost of a 30-60min delay on cleanup is

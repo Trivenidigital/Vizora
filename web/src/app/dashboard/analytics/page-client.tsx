@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Icon, type IconName } from '@/theme/icons';
 import { useRealtimeEvents } from '@/lib/hooks';
+import { useRealtimeConnectionStatus } from '@/lib/hooks/useRealtimeConnectionStatus';
 import { apiClient } from '@/lib/api';
 import { useToast } from '@/lib/hooks/useToast';
 import type { AnalyticsSummary } from '@/lib/types';
@@ -149,7 +150,8 @@ export default function AnalyticsClient() {
  const toast = useToast();
  const [dateRange, setDateRange] = useState<'week' | 'month' | 'year'>('month');
  const [exporting, setExporting] = useState(false);
- const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline'>('offline');
+ // A reconnect blip keeps the last confirmed state instead of reading offline.
+ const { stableStatus: realtimeStatus, onConnectionChange } = useRealtimeConnectionStatus();
  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
  const [summaryError, setSummaryError] = useState<string | null>(null);
 
@@ -201,9 +203,7 @@ export default function AnalyticsClient() {
  // Real-time analytics updates
  useRealtimeEvents({
  enabled: true,
- onConnectionChange: (connected) => {
- setRealtimeStatus(connected ? 'connected' : 'offline');
- },
+ onConnectionChange,
  });
 
  const handleExportCSV = async () => {

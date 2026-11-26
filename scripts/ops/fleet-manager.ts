@@ -8,7 +8,7 @@
  *
  * Checks:
  *   1. Offline displays — ping recently-offline (<1hr), escalate persistent (>1hr)
- *   2. Error state displays — auto-reset status to 'inactive'
+ *   2. Error state displays — auto-reset status to 'offline' (the API's "not currently observed"; a live device's next heartbeat sets it online)
  *   3. Cluster offline — all displays in an org (3+) are offline → critical
  *   4. No content — online displays with no playlist and no schedule
  *
@@ -392,18 +392,18 @@ async function main(): Promise<void> {
     const existing = priorState.incidents.find(i => i.id === incidentId);
 
     issuesFound++;
-    log(AGENT, `${label}: in error state (status=${display.status}, error=${display.error || display.errorState || 'none'}) — resetting to inactive`);
+    log(AGENT, `${label}: in error state (status=${display.status}, error=${display.error || display.errorState || 'none'}) — resetting to offline`);
 
     let resetSuccess = false;
     try {
-      await api.patch(`/displays/${display.id}`, { status: 'inactive' }, {
+      await api.patch(`/displays/${display.id}`, { status: 'offline' }, {
         target: 'display',
         targetId: display.id,
-        action: `Reset error-state display "${label}" to inactive`,
+        action: `Reset error-state display "${label}" to offline`,
         before: { status: display.status, error: display.error, errorState: display.errorState },
       });
       resetSuccess = true;
-      log(AGENT, `${label}: reset to inactive successfully`);
+      log(AGENT, `${label}: reset to offline successfully`);
     } catch (err) {
       log(AGENT, `${label}: reset failed — ${err instanceof Error ? err.message : err}`);
     }
@@ -417,8 +417,8 @@ async function main(): Promise<void> {
         target: 'display',
         targetId: display.id,
         detected: existing?.detected ?? new Date().toISOString(),
-        message: `Display "${label}" was in error state — reset to inactive`,
-        remediation: 'PATCH /displays/:id → { status: "inactive" }',
+        message: `Display "${label}" was in error state — reset to offline`,
+        remediation: 'PATCH /displays/:id → { status: "offline" }',
         status: 'resolved',
         attempts: (existing?.attempts ?? 0) + 1,
         resolvedAt: new Date().toISOString(),

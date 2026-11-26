@@ -23,6 +23,7 @@ import { useToast } from '@/lib/hooks/useToast';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useRealtimeEvents, useOptimisticState, useErrorRecovery } from '@/lib/hooks';
+import { useRealtimeConnectionStatus } from '@/lib/hooks/useRealtimeConnectionStatus';
 import { contentUploadSchema, validateForm } from '@/lib/validation';
 import { getDashboardPermissions } from '@/lib/permissions';
 import { Icon } from '@/theme/icons';
@@ -175,7 +176,10 @@ export default function ContentClient() {
  const [tagsLoadError, setTagsLoadError] = useState<string | null>(null);
  const [selectedTags, setSelectedTags] = useState<string[]>([]);
  const [showTagFilter, setShowTagFilter] = useState(false);
- const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'reconnecting' | 'offline'>('offline');
+ // Three visible states: connected, reconnecting, and offline (an explicit
+ // offline, or a reconnect that has not recovered within 15s).
+ const { status: realtimeStatus, onConnectionChange: handleConnectionChange } =
+ useRealtimeConnectionStatus();
 
  // Moderation state
  const [isFlagModalOpen, setIsFlagModalOpen] = useState(false);
@@ -200,7 +204,6 @@ export default function ContentClient() {
  const [bulkTagIds, setBulkTagIds] = useState<string[]>([]);
 
  // Real-time event handling
- const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
  const loadContentRequestRef = useRef(0);
  const contentDetailRequestRef = useRef(0);
  const contentDetailPromiseRef = useRef<{
@@ -213,27 +216,6 @@ export default function ContentClient() {
  const devicesLoadPromiseRef = useRef<Promise<void> | null>(null);
  const playlistsLoadPromiseRef = useRef<Promise<void> | null>(null);
  const lastContentFilterKeyRef = useRef('');
- useEffect(() => {
-   return () => {
-     if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-   };
- }, []);
- const handleConnectionChange = useCallback((connected: boolean | null) => {
- if (reconnectTimerRef.current) {
- clearTimeout(reconnectTimerRef.current);
- reconnectTimerRef.current = null;
- }
- if (connected === true) {
- setRealtimeStatus('connected');
- } else if (connected === false) {
- setRealtimeStatus('offline');
- } else {
- // null = reconnecting (WebSocket dropped but browser is online)
- setRealtimeStatus('reconnecting');
- // After 15s of reconnecting, show offline to set proper expectations
- reconnectTimerRef.current = setTimeout(() => setRealtimeStatus('offline'), 15000);
- }
- }, [toast]);
 
  // eslint-disable-next-line @typescript-eslint/no-unused-vars
  const { isConnected: _isConnected, isOffline: _isOffline } = useRealtimeEvents({

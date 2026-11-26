@@ -6,9 +6,11 @@ type BadgeStatus =
   | 'active'
   | 'inactive'
   | 'suspended'
+  | 'trial'
   | 'trialing'
   | 'canceled'
   | 'past_due'
+  | 'publish_locked'
   | 'pending'
   | 'success'
   | 'warning'
@@ -52,9 +54,14 @@ const statusTone: Record<string, { tone: BadgeTone; outline?: boolean }> = {
   active: { tone: 'success' },
   inactive: { tone: 'neutral' },
   suspended: { tone: 'error' },
+  // `trial` is what Organization.subscriptionStatus stores; `trialing` is kept
+  // for any caller passing the raw Stripe word.
+  trial: { tone: 'brand' },
   trialing: { tone: 'brand' },
   canceled: { tone: 'warning' },
   past_due: { tone: 'warning', outline: true },
+  // The next dunning rung after past_due; same family, told apart by its label.
+  publish_locked: { tone: 'warning', outline: true },
   pending: { tone: 'warning' },
   success: { tone: 'success' },
   warning: { tone: 'warning' },
