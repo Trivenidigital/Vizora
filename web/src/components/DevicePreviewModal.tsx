@@ -8,6 +8,7 @@ import { apiClient } from '@/lib/api';
 import { useToast } from '@/lib/hooks/useToast';
 import { useSocket } from '@/lib/hooks/useSocket';
 import { Icon } from '@/theme/icons';
+import DeviceStatusBadge from './DeviceStatusBadge';
 
 interface DevicePreviewModalProps {
   device: Display;
@@ -210,6 +211,16 @@ export default function DevicePreviewModal({
     return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
   };
 
+  // Capture needs a live device, but only `offline` may be described as
+  // offline: a pairing or faulted display is not, and saying so sends an
+  // operator to check power and network on a screen that is answering.
+  const isOffline = device.status === 'offline';
+  const captureUnavailableLabel =
+    device.status === 'online' ? null : isOffline ? 'Device is offline' : 'Available when online';
+  const captureUnavailableNotice = isOffline
+    ? 'Device is currently offline. Screenshots can only be captured from online devices.'
+    : 'Screenshots can only be captured while the device is online.';
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Device Preview" size="xl">
       <div className="space-y-4">
@@ -222,20 +233,7 @@ export default function DevicePreviewModal({
                 {device.nickname}
               </h3>
               <div className="flex items-center gap-2 mt-1">
-                <span
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                    device.status === 'online'
-                      ? 'bg-success-100 text-success-800'
-                      : 'bg-[var(--background-secondary)] text-[var(--foreground)]'
-                  }`}
-                >
-                  <span
-                    className={`h-1.5 w-1.5 rounded-full ${
-                      device.status === 'online' ? 'bg-success-500' : 'bg-[var(--foreground-tertiary)]'
-                    }`}
-                  />
-                  {device.status === 'online' ? 'Online' : 'Offline'}
-                </span>
+                <DeviceStatusBadge status={device.status} />
                 {device.location && (
                   <span className="text-sm text-[var(--foreground-tertiary)]">
                     • {device.location}
@@ -316,7 +314,7 @@ export default function DevicePreviewModal({
                   disabled={device.status !== 'online'}
                   className="text-[var(--primary-ink)] hover:text-[var(--foreground)] text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {device.status === 'online' ? 'Capture Screenshot' : 'Device is offline'}
+                  {captureUnavailableLabel ?? 'Capture Screenshot'}
                 </button>
               )}
             </div>
@@ -328,7 +326,7 @@ export default function DevicePreviewModal({
           <div className="bg-warning-50 border border-warning-200 rounded-lg p-3">
             <p className="text-sm text-warning-800 flex items-center gap-2">
               <Icon name="warning" size="lg" className="text-warning-600" />
-              Device is currently offline. Screenshots can only be captured from online devices.
+              {captureUnavailableNotice}
             </p>
           </div>
         )}

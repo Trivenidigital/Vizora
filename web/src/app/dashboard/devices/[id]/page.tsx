@@ -7,6 +7,7 @@ import { apiClient } from '@/lib/api';
 import { Display } from '@/lib/types';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import DeviceStatusIndicator from '@/components/DeviceStatusIndicator';
+import DeviceStatusBadge from '@/components/DeviceStatusBadge';
 import { DeviceControls } from '@/components/devices/DeviceControls';
 import { RepairDisplayPanel } from '@/components/devices/RepairDisplayPanel';
 import { Icon } from '@/theme/icons';
@@ -184,20 +185,7 @@ export default function DeviceDetailPage() {
             )}
           </div>
         </div>
-        <span
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${
-            device.status === 'online'
-              ? 'bg-[var(--status-online-bg)] text-[var(--success-ink)]'
-              : 'bg-[var(--background-secondary)] text-[var(--foreground-secondary)]'
-          }`}
-        >
-          <span
-            className={`h-2 w-2 rounded-full ${
-              device.status === 'online' ? 'bg-[var(--success-ink)]' : 'bg-[var(--foreground-tertiary)]'
-            }`}
-          />
-          {device.status === 'online' ? 'Online' : 'Offline'}
-        </span>
+        <DeviceStatusBadge status={device.status} />
       </div>
 
       {/* Device Information */}
