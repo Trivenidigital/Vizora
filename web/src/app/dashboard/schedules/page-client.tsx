@@ -129,7 +129,6 @@ export default function SchedulesClient() {
  const [playlists, setPlaylists] = useState<PlaylistSummary[]>([]);
  const [loading, setLoading] = useState(true);
  const [actionLoading, setActionLoading] = useState(false);
- const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline'>('offline');
  const [executionHistory, setExecutionHistory] = useState<Record<string, any>>({});
  const [targetType, setTargetType] = useState<'device' | 'group'>('device');
  const [displayGroups, setDisplayGroups] = useState<any[]>([]);
@@ -189,11 +188,8 @@ export default function SchedulesClient() {
  }, []);
 
  // Real-time event handling for schedule status
- const { isConnected } = useRealtimeEvents({
+ useRealtimeEvents({
  enabled: true,
- onConnectionChange: (connected) => {
- setRealtimeStatus(connected ? 'connected' : 'offline');
- },
  });
 
  useEffect(() => {

@@ -19,6 +19,7 @@ import DashboardSectionError from '@/components/DashboardSectionError';
 import { useToast } from '@/lib/hooks/useToast';
 import { useDebounce } from '@/lib/hooks/useDebounce';
 import { useRealtimeEvents, useOptimisticState, useErrorRecovery } from '@/lib/hooks';
+import { useRealtimeConnectionStatus } from '@/lib/hooks/useRealtimeConnectionStatus';
 import { Icon } from '@/theme/icons';
 import { FleetCommandDropdown, EmergencyOverrideModal, ActiveOverrideBanner } from '@/components/fleet';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -179,7 +180,10 @@ export default function DevicesClient({
  const [bulkPlaylistId, setBulkPlaylistId] = useState('');
  const [bulkGroupId, setBulkGroupId] = useState('');
  const [bulkOutcome, setBulkOutcome] = useState<BulkOutcome | null>(null);
- const [realtimeStatus, setRealtimeStatus] = useState<'connected' | 'offline' | 'error'>('offline');
+ // Two-state badge: a reconnect blip holds the last confirmed state; see
+ // useRealtimeConnectionStatus for how `null` is interpreted.
+ const { stableStatus: realtimeStatus, onConnectionChange: handleConnectionChange } =
+ useRealtimeConnectionStatus();
  // Bumped by every foreground load and every local write to `devices`. A
  // background refresh that resolves under a different generation than it
  // started with carries data older than what is on screen, so it is dropped.
@@ -202,18 +206,9 @@ export default function DevicesClient({
  : d
  )
  );
- setRealtimeStatus('connected');
- }, []);
-
- // Memoized callback for connection changes
- const handleConnectionChange = useCallback((isConnected: boolean | null) => {
- if (isConnected === true) {
- setRealtimeStatus('connected');
- } else if (isConnected === false) {
- setRealtimeStatus('offline');
- }
- // null = reconnecting, keep current status
- }, [toast]);
+ // A live event is proof the channel is up.
+ handleConnectionChange(true);
+ }, [handleConnectionChange]);
 
  // Real-time event handling
  // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -765,11 +760,7 @@ export default function DevicesClient({
      read "Offline", the same word the rows use for a screen that is down. */}
  <span
  className={`eh-badge ${
- realtimeStatus === 'connected'
- ? 'eh-badge-success'
- : realtimeStatus === 'offline'
- ? 'eh-badge-neutral'
- : 'eh-badge-error'
+ realtimeStatus === 'connected' ? 'eh-badge-success' : 'eh-badge-neutral'
  }`}
  title={
  realtimeStatus === 'connected'
@@ -778,11 +769,7 @@ export default function DevicesClient({
  }
  >
  <Icon name={realtimeStatus === 'connected' ? 'refresh' : 'close'} size="xs" aria-hidden />
- {realtimeStatus === 'connected'
- ? 'Live updates on'
- : realtimeStatus === 'offline'
- ? 'Live updates off'
- : 'Live updates failed'}
+ {realtimeStatus === 'connected' ? 'Live updates on' : 'Live updates off'}
  </span>
  </div>
  <p className="mt-2 text-sm text-[var(--foreground-secondary)]">
